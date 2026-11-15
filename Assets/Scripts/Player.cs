@@ -1,0 +1,388 @@
+using UnityEngine;
+
+// The local player: a walking body, or a prop (the disguise is the body, G5). Mouse and keyboard.
+//   walking body: 0.4 x 1.7 x 0.4 m box, eye at 1.6 m
+//   prop: the prop type's box at its scale; eye at 0.9 x its height (0.25 to 2.0 m); drawn as a faint
+//         see-through shell in first person and as the real prop in third person (G13)
+// Player.cs: movement, camera, disguise, pin and lock. PlayerActions.cs: aiming, doors, the tagger, taunts.
+public partial class Player : MonoBehaviour
+{
+    public const int ROLE_NONE = 0, ROLE_EXPLORE = 1, ROLE_HUNTER = 2, ROLE_HIDER = 3, ROLE_DEAD = 4;
+
+    public int role;
+    public bool active;
+    public BoxBody body;
+    public float camYaw, camPitch;
+    public bool third;
+    float thirdDist = 3.2f;
+
+    public int def = -1;                // disguise def, -1 = walking body
+    public int disguiseClass;           // 0 tiny, 1 medium, 2 large
+    public float eye = Balance.HunterEye;
+    public bool locked, rotationLock = true, settled;
+    float stillTime;
+    Vector3 lastPos;
+    public int health, maxHealth;
+    public int changesLeft;
+    float lastChange = -99f;
+    float noSettleUntil;
+    public string notice = "";
+    float noticeUntil;
+
+    GameObject visual, figure;
+    MeshFilter visualMesh;
+    MeshRenderer visualRend;
+    float stepAccum;
+    float shuffleTimer;
+
+    // simulated input for the build checks (Game.Cmd)
+    float testWalkUntil, testForward, testRight;
+    bool testRun, testJump, testUse, testLock;
+
+    void Awake()
+    {
+        body = new BoxBody("Player");
+        visual = new GameObject("PlayerProp");
+        visualMesh = visual.AddComponent<MeshFilter>();
+        visualRend = visual.AddComponent<MeshRenderer>();
+        visual.SetActive(false);
+        figure = BuildFigure();
+        figure.SetActive(false);
+        InitActions();
+    }
+
+    GameObject BuildFigure()
+    {
+        return FigureMesh.Build("PlayerFigure", new Color32(72, 132, 196, 255));
+    }
+
+    public void Activate(int newRole, Vector3 at, float yaw)
+    {
+        role = newRole; active = true;
+        BecomeWalker();
+        body.pos = at; body.velY = 0f; body.grounded = false;
+        camYaw = yaw; camPitch = 5f;
+        locked = false; settled = false;
+        Game.I.cam.enabled = !Game.I.topView;
+    }
+
+    public void Deactivate()
+    {
+        active = false;
+        visual.SetActive(false); figure.SetActive(false);
+        ClearAim();
+    }
+
+    public void Say(string text, float seconds = 2.5f)
+    {
+        notice = text; noticeUntil = Time.time + seconds;
+    }
+
+    public string Notice { get { return Time.time < noticeUntil ? notice : ""; } }
+
+    // ---------------------------------------------------------------- shape
+    public void BecomeWalker()
+    {
+        def = -1;
+        body.SetShape(Balance.WalkBody);
+        body.stepHeight = Balance.WalkStep;
+        body.hopHeight = 0f; body.jumpSpeed = Balance.HunterJumpImpulse; body.ledge = 0f;
+        body.yaw = 0f;
+        eye = Balance.HunterEye;
+        locked = false; settled = false;
+        visual.SetActive(false);
+    }
+
+    public static Vector3 DefSize(int d)
+    {
+        return new Vector3(GenData.defSx[d], GenData.defSy[d], GenData.defSz[d]) / 1000f;
+    }
+
+    // Become a prop of this type. False (and nothing changes) if its box has no room here.
+    public bool SetDisguise(int d)
+    {
+        Vector3 size = DefSize(d);
+        Vector3 oldHalf = body.half;
+        Vector3 oldPos = body.pos;
+        float oldYaw = body.yaw;
+        if (def < 0) body.yaw = Mathf.Round(camYaw / 15f) * 15f;
+        body.SetShape(size);
+        // a tight spot: nudge clear by up to 0.3 m, else refuse (05 section 3.7)
+        for (int i = 0; i < 4 && !body.Fits(body.pos, body.yaw); i++) body.Depenetrate(0f);
+        if (!body.Fits(body.pos, body.yaw) || (body.pos - oldPos).magnitude > 0.3f)
+        {
+            body.half = oldHalf; body.pos = oldPos; body.yaw = oldYaw;
+            if (def < 0) body.SetShape(Balance.WalkBody); else body.SetShape(DefSize(def));
+            return false;
+        }
+        int oldMax = maxHealth;
+        def = d;
+        disguiseClass = Mathf.Clamp(GenData.defDisguise[d] - 1, 0, 2);
+        body.stepHeight = Balance.StepHeight(size.y);
+        body.hopHeight = Balance.HopHeight[disguiseClass];
+        body.jumpSpeed = 0f;
+        body.ledge = disguiseClass < 2 ? Balance.LedgeAssist : 0f;
+        eye = Balance.EyeHeight(size.y);
+        // changing disguise keeps the same fraction of health (05 section 6.1)
+        maxHealth = Balance.HiderHealth[disguiseClass];
+        health = oldMax > 0 ? Mathf.Max(1, Mathf.RoundToInt((float)health / oldMax * maxHealth)) : maxHealth;
+        visualMesh.sharedMesh = ModelLibrary.mesh[GenData.defModel[d]];
+        float sc = GenData.defScale[d] / 1000f;
+        visual.transform.localScale = new Vector3(sc, sc, sc);
+        visual.SetActive(true);
+        locked = false; settled = false; stillTime = 0f;
+        body.grounded = false;
+        return true;
+    }
+
+    // ---------------------------------------------------------------- frame
+    void Update()
+    {
+        if (!active || Game.I.state != Game.State.Playing) return;
+        bool paused = Game.I.menuOpen || Game.I.round.InputBlocked;
+        float dt = Mathf.Min(Time.deltaTime, 0.1f);
+
+        if (!paused)
+        {
+            if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked)
+            {
+                Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false;
+            }
+            Look();
+            if (Input.GetKeyDown(KeyCode.V)) SetThird(!third);
+            float wheel = Input.GetAxis("Mouse ScrollWheel");
+            if (third && Mathf.Abs(wheel) > 0.001f) thirdDist = Mathf.Clamp(thirdDist - wheel * 2.5f, 1.2f, 6f);
+        }
+
+        // input
+        float f = 0f, r = 0f;
+        bool run = false, jump = false;
+        if (!paused)
+        {
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) f += 1f;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) f -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) r += 1f;
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) r -= 1f;
+            run = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            jump = Input.GetKeyDown(KeyCode.Space);
+        }
+        if (Time.time < testWalkUntil) { f = testForward; r = testRight; run = testRun; }
+        if (testJump) { jump = true; testJump = false; }
+
+        bool moveInput = f != 0f || r != 0f || jump;
+        if (locked || Game.I.round.MovementBlocked(this)) { f = 0f; r = 0f; jump = false; }
+
+        Quaternion yawRot = Quaternion.Euler(0f, camYaw, 0f);
+        Vector3 wish = yawRot * new Vector3(r, 0f, f);
+        if (wish.sqrMagnitude > 1f) wish.Normalize();
+        float speed;
+        if (def < 0) speed = Balance.HunterRun;                               // VRChat's desktop default is running
+        else speed = Balance.HiderRun[disguiseClass] * (run ? 1f : Balance.DesktopWalkFactor);
+        wish *= speed;
+
+        // the prop turns with the view unless it is pinned with rotation lock on (05 section 3.6.5)
+        if (def >= 0)
+        {
+            bool pinned = settled || locked;
+            if (!pinned || !rotationLock) body.TryYaw(camYaw);
+        }
+
+        // sub-steps keep sweeps short on slow frames
+        float left = dt;
+        while (left > 1e-5f)
+        {
+            float h = Mathf.Min(left, 0.034f);
+            body.Move(wish, jump, h);
+            jump = false;
+            left -= h;
+        }
+        body.Depenetrate(dt);
+
+        if ((body.pos - lastPos).sqrMagnitude > 2.5e-5f) lastMoveTime = Time.time;
+        UpdatePin(moveInput, dt);
+        Footsteps(wish, run, dt);
+        UpdateVisual();
+        UpdateCamera();
+        if (!paused) UpdateActions(dt);
+        else ClearAim();
+        lastPos = body.pos;
+    }
+
+    void Look()
+    {
+        float mx = Input.GetAxisRaw("Mouse X"), my = Input.GetAxisRaw("Mouse Y");
+        // without pointer lock (before the first click) only turn while the right button is held
+        if (Cursor.lockState != CursorLockMode.Locked && !Input.GetMouseButton(1)) { mx = 0f; my = 0f; }
+        float s = 2.2f * Game.I.mouseSensitivity;
+        camYaw = Mathf.Repeat(camYaw + mx * s, 360f);
+        camPitch = Mathf.Clamp(camPitch - my * s, -85f, 85f);
+    }
+
+    // moving, settled, locked (05 section 3.6.5)
+    void UpdatePin(bool moveInput, float dt)
+    {
+        if (def < 0) { settled = false; locked = false; return; }
+        float moved = (body.pos - lastPos).magnitude;
+        if (moveInput && !locked) { settled = false; stillTime = 0f; }
+        if (!body.grounded || moved > 0.01f * Mathf.Max(1f, dt / 0.016f)) { stillTime = 0f; if (!locked) settled = false; }
+        else stillTime += dt;
+        if (!settled && !locked && body.grounded && stillTime >= Balance.SettleTime && Time.time >= noSettleUntil)
+        {
+            settled = true;
+            // quantised pose: 1 cm, 256 yaw steps; then an empty hiding socket within 0.3 m takes the prop
+            body.pos = new Vector3(Mathf.Round(body.pos.x * 100f) / 100f, body.pos.y, Mathf.Round(body.pos.z * 100f) / 100f);
+            body.yaw = Mathf.Round(body.yaw / (360f / 256f)) * (360f / 256f);
+            Game.I.round.SnapToSocket(this);
+        }
+    }
+
+    public void Unpin(float noSettleFor)
+    {
+        locked = false; settled = false; stillTime = 0f;
+        noSettleUntil = Time.time + noSettleFor;
+    }
+
+    void Footsteps(Vector3 wish, bool run, float dt)
+    {
+        float moved = new Vector2(body.pos.x - lastPos.x, body.pos.z - lastPos.z).magnitude;
+        if (!body.grounded || moved < 1e-4f) return;
+        if (def < 0)
+        {
+            stepAccum += moved;
+            if (stepAccum < 1.9f) return;
+            stepAccum = 0f;
+            int cell = Game.I.map.CellAt(body.pos);
+            string s = "footstep_concrete_00";
+            if (cell >= 0 && Game.I.map.gen.innerRoom[cell] >= 0)
+            {
+                var g = Game.I.map.gen;
+                int rt = g.roomType[g.innerRoom[cell]];
+                if ((g.tags[cell] & GenData.T_OUTDOOR) != 0) s = "footstep_grass_00";
+                else if (rt == GenData.R_STORAGE || rt == GenData.R_LOADING || rt == GenData.R_DINER_STORE || rt == GenData.R_KITCHEN || rt == GenData.R_BATH || rt == GenData.R_DINER_KITCHEN) s = "footstep_concrete_00";
+                else s = "footstep_wood_00";
+            }
+            // the dead make no sound for anyone else; the local player still hears their own steps
+            AudioHub.I.Play(s + Random.Range(0, 3), role == ROLE_DEAD ? 0.15f : 0.35f, Random.Range(0.92f, 1.08f));
+        }
+        else if (run)
+        {
+            // a running prop shuffles, heard to 6 m (05 section 6.5); walking and standing are silent
+            shuffleTimer -= dt;
+            if (shuffleTimer <= 0f)
+            {
+                shuffleTimer = 0.45f;
+                AudioHub.I.PlayAt("cloth1", body.pos, 6f, 0.5f, Random.Range(0.9f, 1.2f));
+                Game.I.round.NoiseAt(body.pos, 6f, this);
+            }
+        }
+    }
+
+    void UpdateVisual()
+    {
+        bool showProp = def >= 0;
+        if (visual.activeSelf != showProp) visual.SetActive(showProp);
+        if (showProp)
+        {
+            visual.transform.position = body.pos;
+            visual.transform.rotation = body.Rot;
+            // the hider's own prop: a faint shell from inside, the real prop from outside
+            visualRend.sharedMaterial = (third || Game.I.topView) ? ModelLibrary.lit : ModelLibrary.ghost;
+        }
+        bool showFigure = def < 0 && (third || Game.I.topView) && role != ROLE_NONE;
+        if (figure.activeSelf != showFigure) figure.SetActive(showFigure);
+        if (showFigure)
+        {
+            figure.transform.position = body.pos;
+            figure.transform.rotation = Quaternion.Euler(0f, camYaw, 0f);
+        }
+    }
+
+    void UpdateCamera()
+    {
+        Camera cam = Game.I.cam;
+        Quaternion rot = Quaternion.Euler(camPitch, camYaw, 0f);
+        Vector3 head = body.pos + Vector3.up * eye;
+        if (!third)
+        {
+            cam.transform.position = head;
+            cam.transform.rotation = rot;
+            cam.nearClipPlane = def < 0 ? 0.05f : Mathf.Clamp(0.05f * eye, 0.01f, 0.05f);
+        }
+        else
+        {
+            Vector3 pivot = body.pos + Vector3.up * Mathf.Max(eye + 0.15f, 0.6f);
+            Vector3 back = rot * Vector3.back;
+            float dist = thirdDist;
+            RaycastHit hit;
+            if (Physics.SphereCast(pivot, 0.18f, back, out hit, thirdDist, Layers.CameraMask, QueryTriggerInteraction.Ignore))
+                dist = Mathf.Max(0.3f, hit.distance);
+            cam.transform.position = pivot + back * dist;
+            cam.transform.rotation = rot;
+            cam.nearClipPlane = 0.05f;
+        }
+    }
+
+    // ---------------------------------------------------------------- helpers for the game and the checks
+    public Vector3 EyePos { get { return body.pos + Vector3.up * eye; } }
+
+    float lastMoveTime = -9f;
+    public bool MovedRecently { get { return Time.time - lastMoveTime < 0.4f; } }
+
+    // The disguise as a target for bot hunters' darts: the def's own collider set, switched on only while a
+    // shot is being resolved (the player's own casts must never meet it).
+    GameObject hitbox;
+    int hitboxDef = -2;
+
+    public void SetHitbox(bool on)
+    {
+        if (!on) { if (hitbox != null) hitbox.SetActive(false); return; }
+        if (hitboxDef != def)
+        {
+            if (hitbox != null) Destroy(hitbox);
+            hitbox = new GameObject("PlayerHitbox");
+            hitbox.AddComponent<PlayerHitbox>();
+            hitbox.layer = Layers.Hider;
+            PropColliders.Build(hitbox, def);
+            hitboxDef = def;
+        }
+        float sc = GenData.defScale[def] / 1000f;
+        hitbox.transform.position = body.pos;
+        hitbox.transform.rotation = body.Rot;
+        hitbox.transform.localScale = new Vector3(sc, sc, sc);
+        hitbox.SetActive(true);
+    }
+
+    public void Teleport(Vector3 p)
+    {
+        body.pos = p; body.velY = 0f; body.grounded = false; body.lifting = false;
+        lastPos = p; settled = false; locked = false;
+    }
+
+    public void SetLook(float yaw, float pitch) { camYaw = yaw; camPitch = pitch; }
+
+    public void SetThird(bool on) { third = on; }
+
+    public void TestWalk(float forward, float seconds, bool run)
+    {
+        testForward = forward; testRight = 0f; testRun = run; testWalkUntil = Time.time + seconds;
+    }
+
+    public void TestKey(string k)
+    {
+        if (k == "jump") testJump = true;
+        else if (k == "use") testUse = true;
+        else if (k == "lock") testLock = true;
+        else if (k == "take") TryTake();
+        else if (k == "taunt") Taunt(false);
+        else if (k == "left") TurnPinned(-Balance.TurnStepDeg);
+        else if (k == "right") TurnPinned(Balance.TurnStepDeg);
+    }
+
+    public string StatusLine()
+    {
+        return "player role " + role + " def " + (def < 0 ? "walker" : GenData.defId[def]) + " pos " + body.pos.x.ToString("0.00") + "," + body.pos.y.ToString("0.00") + "," + body.pos.z.ToString("0.00")
+            + " yaw " + body.yaw.ToString("0") + " cam " + camYaw.ToString("0") + "/" + camPitch.ToString("0") + " eye " + eye.ToString("0.00")
+            + " grounded " + body.grounded + " settled " + settled + " locked " + locked + " hp " + health + "/" + maxHealth + " hunterHp " + hunterHealth
+            + " aim " + AimText() + " notice '" + Notice + "'";
+    }
+}

@@ -194,6 +194,14 @@ public partial class MapGen
         }
     }
 
+    // is this def in the spawn table of the room's type? (used by bots to pick plausible places)
+    public bool IsNativeRoom(int def, int room)
+    {
+        BuildNative();
+        int table = GenData.FindTable(roomZone[room], roomType[room]);
+        return table >= 0 && nativeIn[def * 64 + table];
+    }
+
     int LeakWeight(int d, int table, int zone, bool outdoor, bool comedic)
     {
         int w = GenData.defLeakWeight[d];
