@@ -14,8 +14,8 @@ public class GameUI : MonoBehaviour
     static readonly string[] SizeNote =
     {
         "S: 7 x 7 cells, about 28 used, about 130 props at Normal density. For up to 8 players.",
-        "M: 9 x 9 cells, about 52 used, about 235 props at Normal density. For 9 to 16 players.",
-        "L: 12 x 12 cells, about 85 used, about 370 props at Normal density. For 17 to 24 players.",
+        "M: 9 x 9 cells, about 52 used, about 240 props at Normal density. For 9 to 16 players.",
+        "L: 12 x 12 cells, about 85 used, about 380 props at Normal density. For 17 to 24 players.",
         "XL: 14 x 14 cells, about 108 used, about 490 props at Normal density. For 25 to 32 players.",
     };
     static readonly string[] ModeName = { "Explore", "Hunt", "Hide" };
@@ -171,7 +171,7 @@ public class GameUI : MonoBehaviour
 
         Sliders();
         GUILayout.Space(6);
-        GUILayout.Label("Controls: W A S D move, mouse look, Shift run (as a prop), Space jump or hop, E disguise, Q lock, V third person, H help, Esc menu.", small);
+        GUILayout.Label("Controls: W A S D move, mouse look, Shift run (as a prop), Space jump or hop, E disguise, Q lock, V third person, P third-person screen, H help, Esc menu.", small);
         GUILayout.Label("Models, sounds and fonts: Kenney (kenney.nl) and KayKit (Kay Lousberg), CC0. Sounds are stand-ins; there is no music yet.", small);
         GUILayout.EndArea();
     }
@@ -338,11 +338,11 @@ public class GameUI : MonoBehaviour
         var p = Game.I.player;
         string t;
         if (p.role == Player.ROLE_HUNTER)
-            t = "<b>Hunter</b>\nW A S D  move\nMouse  look\nSpace  jump\nLeft click  fire a dart (one per press)\nLeft click on a door  open or close it\nV  third-person view\nH  hide this panel\nEsc or M  menu\nF3  debug overlay\n\nDarts knock loose props around. A real prop costs health; a hider flinches and you get a hit mark. Listen for taunts.";
+            t = "<b>Hunter</b>\nW A S D  move\nMouse  look\nSpace  jump\nLeft click  fire a dart (one per press)\nLeft click on a door  open or close it\nV  third-person view\nP  third-person screen (O size, N side, hold B: move)\nH  hide this panel\nEsc or M  menu\nF3  debug overlay\n\nDarts knock loose props around. A real prop costs health; a hider flinches and you get a hit mark. Listen for taunts.";
         else if (p.def >= 0)
-            t = "<b>Prop</b>\nW A S D  move (Shift: run)\nMouse  look\nSpace  hop (not for large props)\nE or click  become the prop you look at\nQ  lock in place / unlock\nZ, C  turn 15 degrees while still\nR  rotation lock on or off\nT  taunt\nClick on a door  open or close it\nV  third-person view\nU  unstick" + (p.role == Player.ROLE_EXPLORE ? "\nG  back to the walking body" : "") + "\nH  hide this panel\nEsc or M  menu\n\nSmall props can hop onto furniture and go under or into it.";
+            t = "<b>Prop</b>\nW A S D  move (Shift: run)\nMouse  look\nSpace  hop (not for large props)\nE or click  become the prop you look at\nQ  lock in place / unlock\nZ, C  turn 15 degrees while still\nR  rotation lock on or off\nT  taunt\nClick on a door  open or close it\nV  third-person view\nP  third-person screen (O size, N side, hold B: move)\nU  unstick" + (p.role == Player.ROLE_EXPLORE ? "\nG  back to the walking body" : "") + "\nH  hide this panel\nEsc or M  menu\n\nSmall props can hop onto furniture and go under or into it.";
         else
-            t = "<b>Walking</b>\nW A S D  move\nMouse  look\nSpace  jump\nE or click  become the prop you look at\nClick on a door  open or close it\nV  third-person view\nH  hide this panel\nEsc or M  menu\nF3  debug overlay";
+            t = "<b>Walking</b>\nW A S D  move\nMouse  look\nSpace  jump\nE or click  become the prop you look at\nClick on a door  open or close it\nV  third-person view\nP  third-person screen (O size, N side, hold B: move)\nH  hide this panel\nEsc or M  menu\nF3  debug overlay";
         float w = 300f, h = p.def >= 0 ? 350f : (p.role == Player.ROLE_HUNTER ? 310f : 230f);
         Rect r = new Rect(W - w - 8, 8, w, h);
         GUI.Box(r, GUIContent.none, box);
@@ -373,14 +373,14 @@ public class GameUI : MonoBehaviour
         {
             int e = p.aimProp.emit;
             int fl = gen.emitFlags[e];
-            aim = "\nAim: emit " + e + " " + GenData.defId[p.aimProp.def] + " x" + gen.defCopies[p.aimProp.def] + (gen.menu[p.aimProp.def] ? " [menu]" : "")
-                + ((fl & MapGen.EF_LEAK) != 0 ? ((fl & MapGen.EF_COMEDIC) != 0 ? " COMEDIC LEAK" : " PLAUSIBLE LEAK") : "") + ((fl & MapGen.EF_QUOTA) != 0 ? " quota copy" : "")
+            aim = "\nAim: emit " + e + " " + GenData.defId[p.aimProp.def] + " x" + gen.defCopies[p.aimProp.def] + (gen.menu[p.aimProp.def] ? " [disguise]" : " [never a disguise]")
+                + ((fl & MapGen.EF_LEAK) != 0 ? ((fl & MapGen.EF_COMEDIC) != 0 ? " COMEDIC LEAK" : " PLAUSIBLE LEAK") : "") + ((fl & MapGen.EF_LOOSE) != 0 ? " loose remainder" : "") + HostText(gen, e)
                 + (gen.emitParent[e] >= 0 ? " in a slot of " + GenData.defId[gen.emitDef[gen.emitParent[e]]] : "") + "  " + p.aimDist.ToString("0.0") + " m";
         }
         string text = "<b>Debug</b>  " + g.fps.ToString("0") + " fps   " + Screen.width + " x " + Screen.height
             + "\nMap hash " + gen.mapHash.ToString("X8") + "   generated in " + g.map.genMs.ToString("0") + " ms, built in " + g.map.buildMs.ToString("0") + " ms, over " + g.genFrames + " frames (" + g.map.wallMs.ToString("0") + " ms)"
             + "\nCells " + gen.statGroundCells + ": House " + gen.statZoneCells[1] + ", Warehouse " + gen.statZoneCells[2] + ", Diner " + gen.statZoneCells[3] + ", Lawn " + gen.statZoneCells[4] + ", Forest " + gen.statZoneCells[5]
-            + "\nEmits " + gen.nEmit + ": props " + gen.statProps + " (" + gen.statFloor + " floor, " + gen.statTop + " furniture), prop groups " + gen.statGroups + ", quota copies " + gen.statQuotaAdded + ", leaks " + gen.statLeakPlausible + " plausible + " + gen.statLeakComedic + " comedic"
+            + "\nEmits " + gen.nEmit + ": props " + gen.statProps + " (" + gen.statFloor + " floor, " + gen.statTop + " furniture), prop groups " + gen.statGroups + ", loose remainder " + gen.statLoose + ", leaks " + gen.statLeakPlausible + " plausible + " + gen.statLeakComedic + " comedic"
             + "\nHiding sockets " + gen.nSockets + ", seed re-rolls " + gen.attempt + ", repairs " + gen.statRepairs + ", renderers " + g.map.rendererCount + ", colliders " + g.map.colliderCount
             + "\nPlayer " + p.body.pos.x.ToString("0.00") + ", " + p.body.pos.y.ToString("0.00") + ", " + p.body.pos.z.ToString("0.00") + "  eye " + p.eye.ToString("0.00") + (p.body.grounded ? "  grounded" : "  in the air")
             + "\n" + where + aim;
@@ -388,6 +388,15 @@ public class GameUI : MonoBehaviour
         GUI.Box(r, GUIContent.none, box);
         GUI.Label(new Rect(r.x + 8, r.y + 4, r.width - 16, r.height - 8), text, small);
         RoomTypeTable(r.x, r.yMax + 6);
+    }
+
+    // what the object was placed against (G28: nothing is placed without a host)
+    static string HostText(MapGen gen, int e)
+    {
+        int h = gen.emitHost[e];
+        if (gen.emitParent[e] >= 0) return "";
+        if (h >= 0) return " placed by " + GenData.defId[gen.emitDef[h]];
+        return h == MapGen.H_WALL ? " placed at a wall or fence" : (h == MapGen.H_FREE ? " centre piece" : (h == MapGen.H_NATURE ? " planting" : (h == MapGen.H_GROUND ? " on the ground" : "")));
     }
 
     // The tuning table (G24): per room type on this map, what stands on the floor and on furniture, per room

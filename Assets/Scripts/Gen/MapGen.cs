@@ -1,27 +1,31 @@
 // The map generator core (04-map-generation-v3, simplest faithful form for the browser prototype).
 //
 //   outer grid of 4 m cells filled with irregular zone pieces  ->  edges (walls, doors, windows, fences)
-//   ->  inner grid of 0.5 m cells with placement tags  ->  rooms populated from spawn tables
+//   ->  inner grid of 0.5 m cells with placement tags  ->  every room composed by the plan of its type
 //   ->  slots (chairs at tables, settings on top, items on shelves)  ->  wrong-category spawns (leaks)
-//   ->  disguise quotas  ->  validation (reachability, repair, seed re-roll)  ->  emit list
+//   ->  validation (reachability, repair, seed re-roll)  ->  emit list
 //
-// Prop rules (owner decisions G24 to G26): every room type has a range of props for its floor area, every type
-// a cap per room, related props stand together as groups, small loose things never stand alone in the open, and
-// every prop is an obstacle for the reachability check.
+// A place is composed, not filled (owner decision G28): the plan of a room type decides its activity areas from
+// the room's floor area, places the anchors by rule (which wall, which corner, facing what, clear of doors,
+// windows and walkways), then what belongs with each anchor relative to it, then a few small named groups, then a
+// small capped remainder, and stops on a count budget (G24). Nothing is placed without a host; facing comes from
+// a relation. Every prop is an obstacle for the reachability check (G26). Any prop can be a disguise (G25).
 //
 // Deterministic: integer maths, flat arrays, its own PRNG with substreams; no UnityEngine, no physics, no time.
 // The same (seed, size, GEN_VERSION) gives the same emit list on every machine. Step() does one small unit
 // of work per call so the caller can spread generation over frames; results do not depend on the slicing.
 //
 // This file: state, stepping and the outer grid. MapGenRooms.cs: edges, rooms and inner tags.
-// MapGenPlace.cs: placement. MapGenSlots.cs: slots, leaks, quotas. MapGenFinish.cs: validation and results.
+// MapGenPlace.cs: low-level placement. MapGenCompose.cs: the composition primitives (wall runs, relations,
+// corners, open spots). MapGenPlans.cs: the plans of indoor rooms. MapGenOutdoor.cs: lawn and forest.
+// MapGenGroups.cs: prop groups. MapGenSlots.cs: slots and wrong-category spawns. MapGenFinish.cs: validation.
 public partial class MapGen
 {
     // ---- stages (also the PRNG substream ids) ----
-    const int ST_LAYOUT = 1, ST_EDGES = 2, ST_ROOM = 3, ST_SLOT = 4, ST_SCENERY = 5, ST_LEAK = 6, ST_QUOTA = 7, ST_SPAWN = 8, ST_ROOMTYPE = 9;
+    const int ST_LAYOUT = 1, ST_EDGES = 2, ST_ROOM = 3, ST_SLOT = 4, ST_SCENERY = 5, ST_LEAK = 6, ST_SPAWN = 8, ST_ROOMTYPE = 9, ST_ROOMTYPE3 = 10;
 
     // ---- emit flags ----
-    public const int EF_LEAK = 1, EF_COMEDIC = 2, EF_QUOTA = 4, EF_REMOVED = 8, EF_GROUP = 16, EF_INSIDE = 32, EF_ON_TOP = 64, EF_ADJACENT = 128, EF_UNDER = 256;
+    public const int EF_LEAK = 1, EF_COMEDIC = 2, EF_LOOSE = 4, EF_REMOVED = 8, EF_GROUP = 16, EF_INSIDE = 32, EF_ON_TOP = 64, EF_ADJACENT = 128, EF_UNDER = 256;
     public const int EF_MANDATORY = 512;
 
     // ---- inputs ----
@@ -45,7 +49,10 @@ public partial class MapGen
     public int[] roomCellStart = new int[400], roomCellCount = new int[400];
     public int[] roomCells;      // inner cell indices grouped by room
     public int[] roomDoorStart = new int[400], roomDoorCount = new int[400];
+    public int[] roomFloorMin = new int[400];    // outdoor areas (G29): the fewest floor props the area may end with
     public int[] roomDoors = new int[3200];      // inner cell just inside each door, 8 per room
+    public int[] roomDoorDir = new int[3200];    // the side of that cell the doorway is on (0 N, 1 E, 2 S, 3 W)
+    public bool[] roomDoorExt = new bool[3200];  // the doorway leads outdoors (or, for an outdoor room, into a building)
     public int[] roomLeaks = new int[400];
     // prop counts per room (G24): what stands on the floor, what sits on, in or under furniture, trees; and the
     // room's rolled floor target, its floor maximum and its on-furniture cap at the map's density
@@ -60,7 +67,7 @@ public partial class MapGen
     public int[] occ;            // emit index + 1 of the object standing on the cell, 0 = free
     public int[] solid;          // how many props' real outlines reach into the cell: every prop is an obstacle (G26)
     public int[] flatOcc;        // rugs
-    public byte[] reserve;       // 1 = kept clear (front clearance, door swing)
+    public int[] reserve;        // kept clear (front clearance, door swing): emit index + 1 of the object it belongs to, 0 = free
     public byte[] walk;          // after Finish(): 0 no floor, 1 walkable, 2 blocked by a solid prop
     public byte[] reach;         // after validation: 1 = reachable from the hunter release
 
@@ -73,6 +80,8 @@ public partial class MapGen
     public int[] emitRot = new int[MAX_EMIT], emitDepth = new int[MAX_EMIT], emitSlot = new int[MAX_EMIT];
     public int[] emitGroup = new int[MAX_EMIT];   // prop group: the emit index of the group's first member, -1 = not in a group
     public int[] emitGrp = new int[MAX_EMIT];     // which prop group (GenData.grpId index), -1 = none
+    public int[] emitSet = new int[MAX_EMIT];     // composition set: the emit index of the anchor whose cells this object may share, -1 = none
+    public int[] emitHost = new int[MAX_EMIT];    // what the object was placed against: an emit index, or H_WALL, H_FREE, H_NATURE, H_GROUND
 
     // free slots and hiding sockets left by the slot pass
     public int nFree;
@@ -81,7 +90,7 @@ public partial class MapGen
     public int[] socketHost = new int[2000], socketSlot = new int[2000];
 
     // ---- results ----
-    public bool[] menu;          // per def: on this map's disguise menu (04 section 4.3.4)
+    public bool[] menu;          // per def: a possible disguise on this map (every disguisable type the map holds)
     public int[] defCopies;
     public int menuCount;
     public int nSpawns;
@@ -91,7 +100,7 @@ public partial class MapGen
     public string failReason = "";
 
     // ---- statistics ----
-    public int statProps, statScenery, statDecor, statSlotItems, statLeakPlausible, statLeakComedic, statQuotaAdded;
+    public int statProps, statScenery, statDecor, statSlotItems, statLeakPlausible, statLeakComedic, statLoose;
     public int statRepairs, statGroundCells, statSteps, statMandatoryFail, statGroups, statFloor, statTop, statWalkRejects;
     public int[] statZoneCells = new int[8], statZoneRooms = new int[8], statZoneFloor = new int[8], statZoneTop = new int[8];
     // per room type (index = GenData.R_*): rooms, floor cells, floor props, props on furniture
@@ -138,7 +147,8 @@ public partial class MapGen
         edgeV = new int[(W + 1) * H]; edgeVOff = new int[(W + 1) * H];
         tags = new int[IW * IH]; innerRoom = new int[IW * IH]; occ = new int[IW * IH]; flatOcc = new int[IW * IH];
         solid = new int[IW * IH];
-        reserve = new byte[IW * IH]; walk = new byte[IW * IH]; reach = new byte[IW * IH];
+        reserve = new int[IW * IH]; walk = new byte[IW * IH]; reach = new byte[IW * IH];
+        clr = new int[IW * IH]; canopy = new int[IW * IH];
         roomCells = new int[IW * IH];
         queue = new int[IW * IH]; dist = new int[IW * IH];
         menu = new bool[GenData.nDefs]; defCopies = new int[GenData.nDefs];
@@ -160,7 +170,8 @@ public partial class MapGen
         switch (stage)
         {
             case 0:
-                statRepairs = 0; statMandatoryFail = 0; statGroups = 0; statWalkRejects = 0; statLeakComedic = 0; statLeakPlausible = 0; statQuotaAdded = 0;
+                for (int i = 0; i < 64; i++) statTypeMandFail[i] = 0;
+                statRepairs = 0; statMandatoryFail = 0; statGroups = 0; statWalkRejects = 0; statLeakComedic = 0; statLeakPlausible = 0; statLoose = 0;
                 if (!Layout()) { Retry("layout"); break; }
                 stage = 1; progressPermille = 80;
                 break;
@@ -181,11 +192,7 @@ public partial class MapGen
                 break;
             case 3:
                 PlaceLeaks();
-                stage = 4; progressPermille = 800;
-                break;
-            case 4:
-                Quotas();
-                stage = 5; progressPermille = 870;
+                stage = 5; progressPermille = 850;
                 break;
             case 5:
                 if (!Validate()) { Retry("unreachable rooms"); break; }

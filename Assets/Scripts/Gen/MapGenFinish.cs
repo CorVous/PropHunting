@@ -80,6 +80,22 @@ public partial class MapGen
                     victim = e;
                 }
             if (victim < 0) return false;
+            if (TraceRoom == -2)
+                for (int z = roomZ1[bad] + 1; z >= roomZ0[bad] - 1; z--)
+                {
+                    string line = "    ";
+                    for (int x = roomX0[bad] - 1; x <= roomX1[bad] + 1; x++)
+                    {
+                        if (x < 0 || z < 0 || x >= IW || z >= IH) { line += ' '; continue; }
+                        int i = z * IW + x;
+                        char c = (tags[i] & GenData.T_FLOOR) == 0 ? ' ' : (solid[i] > 0 ? '#' : (reach[i] != 0 ? '.' : 'o'));
+                        if (innerRoom[i] != bad && c == '.') c = ',';
+                        if (innerRoom[i] != bad && c == '#') c = '+';
+                        line += c;
+                    }
+                    System.Console.Error.WriteLine(line);
+                }
+            if (TraceRoom == -2) System.Console.Error.WriteLine("  repair in room " + bad + " (" + GenData.RoomName(roomType[bad]) + "): removing " + GenData.defId[emitDef[victim]] + " flags " + emitFlags[victim] + " attempt " + attempt);
             Remove(victim);
             statRepairs++;
         }
@@ -103,6 +119,11 @@ public partial class MapGen
         if ((emitFlags[e] & EF_REMOVED) != 0) return;
         Account(e, -1);
         emitFlags[e] |= EF_REMOVED;
+        if (GenData.defCanopyY[emitDef[e]] > 0) RebuildCanopy();
+        // its front clearance is free again (it reaches at most 4 cells from its own cells)
+        for (int z = emitRZ[e] - 4; z < emitRZ[e] + emitRD[e] + 4; z++)
+            for (int x = emitRX[e] - 4; x < emitRX[e] + emitRW[e] + 4; x++)
+                if (x >= 0 && z >= 0 && x < IW && z < IH && reserve[z * IW + x] == e + 1) reserve[z * IW + x] = 0;
         for (int z = emitRZ[e]; z < emitRZ[e] + emitRD[e]; z++)
             for (int x = emitRX[e]; x < emitRX[e] + emitRW[e]; x++)
             {
@@ -131,6 +152,7 @@ public partial class MapGen
                 emitRX[m] = emitRX[e]; emitRZ[m] = emitRZ[e]; emitRW[m] = emitRW[e]; emitRD[m] = emitRD[e];
                 emitRot[m] = emitRot[e]; emitDepth[m] = emitDepth[e]; emitSlot[m] = emitSlot[e];
                 emitGroup[m] = emitGroup[e]; emitGrp[m] = emitGrp[e];
+                emitSet[m] = emitSet[e]; emitHost[m] = emitHost[e];
             }
             m++;
         }
@@ -138,12 +160,16 @@ public partial class MapGen
         {
             if (emitParent[e] >= 0) emitParent[e] = remap[emitParent[e]];
             if (emitGroup[e] >= 0) emitGroup[e] = remap[emitGroup[e]];
+            if (emitSet[e] >= 0) emitSet[e] = remap[emitSet[e]];
+            // a host that was taken away afterwards: the object stays where it stood, against nothing in particular
+            if (emitHost[e] >= 0) emitHost[e] = remap[emitHost[e]] >= 0 ? remap[emitHost[e]] : H_FREE;
         }
         int n = IW * IH;
         for (int i = 0; i < n; i++)
         {
             if (occ[i] > 0) occ[i] = remap[occ[i] - 1] + 1;
             if (flatOcc[i] > 0) flatOcc[i] = remap[flatOcc[i] - 1] + 1;
+            if (reserve[i] > 0) reserve[i] = remap[reserve[i] - 1] + 1;
         }
         int nf = 0;
         for (int k = 0; k < nFree; k++)
@@ -161,16 +187,18 @@ public partial class MapGen
         nSockets = ns;
         nEmit = m;
 
-        // quota recount after repairs, so the menu is exact
+        // Disguises (G25): any prop on the map can be one. No copies are counted and none are ever added; only the
+        // technical exclusions stay off the list (GenData.defDisguise == 0: fixed dressing, trees, ground cover,
+        // anything longer than 2.5 m).
         for (int d = 0; d < GenData.nDefs; d++) defCopies[d] = 0;
         for (int e = 0; e < nEmit; e++) defCopies[emitDef[e]]++;
-        CountKin();
         menuCount = 0;
         for (int d = 0; d < GenData.nDefs; d++)
         {
-            if (menu[d] && (defCopies[d] == 0 || Copies(d) < Need(d, 0))) menu[d] = false;
+            menu[d] = GenData.defDisguise[d] > 0 && defCopies[d] > 0;
             if (menu[d]) menuCount++;
         }
+        BuildGround();
 
         Flood();
         for (int i = 0; i < n; i++)
@@ -194,7 +222,7 @@ public partial class MapGen
         for (int k = 0; k < nSpawns; k++) spawnCell[k] = cand[k];
 
         // counts for the statistics and the tuning overlay (G24): floor and on-furniture props per room type and zone
-        statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0; statGroups = 0;
+        statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0; statGroups = 0; statLoose = 0;
         for (int i = 0; i < 64; i++) { statTypeRooms[i] = 0; statTypeCells[i] = 0; statTypeFloor[i] = 0; statTypeTop[i] = 0; }
         for (int i = 0; i < 8; i++) { statZoneFloor[i] = 0; statZoneTop[i] = 0; }
         for (int r = 0; r < nRooms; r++)
@@ -208,7 +236,8 @@ public partial class MapGen
             if (Has(d, GenData.FL_DECOR)) { statDecor++; continue; }
             if (Has(d, GenData.FL_SCENERY)) { statScenery++; continue; }
             statProps++;
-            if (emitGroup[e] == e && emitGrp[e] >= 0) statGroups++;
+            if (emitGroup[e] == e) statGroups++;
+            if ((emitFlags[e] & EF_LOOSE) != 0) statLoose++;
             if (emitParent[e] >= 0) statSlotItems++;
             int r = emitRoom[e], t = roomType[r] & 63, z = roomZone[r] & 7;
             if (OnFloor(e)) { statFloor++; statTypeFloor[t]++; statZoneFloor[z]++; }
@@ -222,6 +251,7 @@ public partial class MapGen
         for (int i = 0; i < edgeH.Length; i++) h2 = Fnv(h2, edgeH[i] * 16 + edgeHOff[i]);
         for (int i = 0; i < edgeV.Length; i++) h2 = Fnv(h2, edgeV[i] * 16 + edgeVOff[i]);
         for (int r = 0; r < nRooms; r++) h2 = Fnv(h2, roomType[r]);
+        for (int i = 0; i < n; i++) h2 = Fnv(h2, ground[i]);
         for (int e = 0; e < nEmit; e++)
         {
             h2 = Fnv(h2, emitDef[e]); h2 = Fnv(h2, emitX[e]); h2 = Fnv(h2, emitY[e]); h2 = Fnv(h2, emitZ[e]);
@@ -243,9 +273,14 @@ public partial class MapGen
         return a > GenData.SEALED_POCKET ? a : GenData.SEALED_POCKET;
     }
 
-    // Is the room's free floor still in one piece? Checked from a doorway cell (or any free cell outdoors) over
-    // the cells no prop reaches into. Small sealed pockets are allowed (the corner behind a plant, the gap
-    // between a campfire and its seats): none larger than SEALED_POCKET cells, and SealedAllowance in all.
+    // Is the room still walkable? The test is from a doorway cell (or any free cell outdoors) over the cells no
+    // prop reaches into, in two steps (report 15, K1: a walkway is 0.91 m wide):
+    //   1. the wide floor: cells that lie in a free square of 2 x 2 cells (1 m), reached from the door through
+    //      such cells only;
+    //   2. the narrow leftovers that hang on it: the strip beside a bed, the gap between two chairs.
+    // Free floor that neither step reaches is cut off, or reached only by squeezing through a half-metre gap.
+    // Small pockets of it are allowed (the corner behind a plant, the gap between a fire and its seats): none
+    // larger than SEALED_POCKET cells, and SealedAllowance in all.
     bool RoomWalkable(int room)
     {
         int s = roomCellStart[room], n = roomCellCount[room];
@@ -255,25 +290,117 @@ public partial class MapGen
             int i = roomCells[k];
             if (solid[i] > 0) continue;
             free++;
-            if (start < 0 || ((tags[i] & GenData.T_DOOR_CLEAR) != 0 && (tags[start] & GenData.T_DOOR_CLEAR) == 0)) start = i;
+            bool better = start < 0;
+            if (!better)
+            {
+                bool dNew = (tags[i] & GenData.T_DOOR_CLEAR) != 0, dOld = (tags[start] & GenData.T_DOOR_CLEAR) != 0;
+                better = dNew && !dOld;
+                if (!better && dNew == dOld && !WideCell(room, start) && WideCell(room, i)) better = true;
+            }
+            if (better) start = i;
         }
         walkBlocked = n - free;
         if (start < 0) return false;
-        walkStamp++;
-        int seen = FloodRoom(room, start);
+        int seen = 0;
+        for (int round = 0; round < 3; round++)
+        {
+            walkStamp++;
+            seen = FloodRoom(room, start, walkNarrow ? 0 : 1);
+            // the narrow leftovers that hang on the wide floor
+            int qh = 0, qt = 0;
+            for (int k = s; k < s + n; k++) if (dist[roomCells[k]] == walkStamp) queue[qt++] = roomCells[k];
+            while (qh < qt)
+            {
+                int i = queue[qh++];
+                int ix = i % IW, iz = i / IW;
+                for (int d = 0; d < 4; d++)
+                {
+                    int jx = ix + DX[d], jz = iz + DZ[d];
+                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
+                    int j = jz * IW + jx;
+                    if (innerRoom[j] != room || solid[j] > 0 || dist[j] == walkStamp || WideCell(room, j)) continue;
+                    dist[j] = walkStamp; queue[qt++] = j; seen++;
+                }
+            }
+            if (seen * 2 >= free || (tags[start] & GenData.T_DOOR_CLEAR) != 0) break;
+            // an area without a door (outdoors) was entered in a small corner: start again in the rest of it
+            int other = -1;
+            for (int k = s; k < s + n && other < 0; k++)
+            {
+                int i = roomCells[k];
+                if (solid[i] == 0 && dist[i] != walkStamp && WideCell(room, i)) other = i;
+            }
+            if (other < 0) break;
+            start = other;
+        }
+        if (!ExitsJoined(room)) return false;
         if (seen == free) return true;
         if (free - seen > SealedAllowance(room)) return false;
         for (int k = s; k < s + n; k++)
         {
             int i = roomCells[k];
             if (solid[i] > 0 || dist[i] == walkStamp) continue;
-            if (FloodRoom(room, i) > GenData.SEALED_POCKET) return false;
+            if (FloodRoom(room, i, 0) > GenData.SEALED_POCKET) return false;
         }
         return true;
     }
 
-    // marks the free cells of the room connected to `start` with walkStamp; returns how many
-    int FloodRoom(int room, int start)
+    // FillToMinimum: a small outdoor area that is still below its minimum only has to stay passable (gaps of one
+    // cell count): it is open to its neighbours, and the map-wide check (Validate) keeps every part reachable
+    bool walkNarrow;
+
+    // Every way out of the room (a doorway, an open side towards another outdoor area) leads from the floor the
+    // walkway test has just marked, not from a cut-off pocket: a room is entered from its neighbours, so a pocket
+    // that holds the only way in would seal the rest of the room off from the map.
+    int[] exitAll = new int[24], exitMain = new int[24];
+
+    bool ExitsJoined(int room)
+    {
+        int nAll = 0, nMain = 0;
+        int s = roomCellStart[room], n = roomCellCount[room];
+        for (int k = s; k < s + n; k++)
+        {
+            int i = roomCells[k];
+            if (solid[i] > 0) continue;
+            // only the room's border cells can have a way out
+            int ix = i % IW, iz = i / IW;
+            for (int d = 0; d < 4; d++)
+            {
+                int jx = ix + DX[d], jz = iz + DZ[d];
+                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
+                int j = jz * IW + jx, other = innerRoom[j];
+                if (other == room || other < 0 || solid[j] > 0 || !CanStep(ix, iz, d)) continue;
+                bool main = dist[i] == walkStamp, have = false;
+                for (int q = 0; q < nAll && !have; q++) have = exitAll[q] == other;
+                if (!have && nAll < exitAll.Length) exitAll[nAll++] = other;
+                if (!main) continue;
+                have = false;
+                for (int q = 0; q < nMain && !have; q++) have = exitMain[q] == other;
+                if (!have && nMain < exitMain.Length) exitMain[nMain++] = other;
+            }
+        }
+        return nMain == nAll;
+    }
+
+    // does the free cell lie in a free square of 2 x 2 cells of its room?
+    bool WideCell(int room, int i)
+    {
+        int ix = i % IW, iz = i / IW;
+        for (int oz = -1; oz <= 0; oz++)
+            for (int ox = -1; ox <= 0; ox++)
+            {
+                int x = ix + ox, z = iz + oz;
+                if (x < 0 || z < 0 || x + 1 >= IW || z + 1 >= IH) continue;
+                int a = z * IW + x;
+                if (innerRoom[a] == room && innerRoom[a + 1] == room && innerRoom[a + IW] == room && innerRoom[a + IW + 1] == room
+                    && solid[a] == 0 && solid[a + 1] == 0 && solid[a + IW] == 0 && solid[a + IW + 1] == 0) return true;
+            }
+        return false;
+    }
+
+    // marks the free cells of the room connected to `start` with walkStamp; returns how many.
+    // wide = 1: only through cells of the wide floor (the start cell counts as one)
+    int FloodRoom(int room, int start, int wide)
     {
         int qh = 0, qt = 0;
         dist[start] = walkStamp; queue[qt++] = start;
@@ -287,6 +414,7 @@ public partial class MapGen
                 if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
                 int j = jz * IW + jx;
                 if (innerRoom[j] != room || solid[j] > 0 || dist[j] == walkStamp) continue;
+                if (wide != 0 && !WideCell(room, j)) continue;
                 dist[j] = walkStamp; queue[qt++] = j;
             }
         }
@@ -300,17 +428,95 @@ public partial class MapGen
     bool KeepIfWalkable(int room, int first, bool exempt)
     {
         if (RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room])) return true;
+        // is it one chair that is in the way? Then only that one goes
+        for (int c = nEmit - 1; c > first; c--)
+        {
+            if (emitParent[c] < first || (emitFlags[c] & (EF_REMOVED | EF_ADJACENT)) != EF_ADJACENT) continue;
+            Account(c, -1);
+            bool fixedIt = RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room]);
+            Account(c, 1);
+            if (fixedIt) { Remove(c); RoomWalkable(room); return true; }
+        }
         for (int c = nEmit - 1; c > first; c--)
         {
             if (emitParent[c] < first || (emitFlags[c] & EF_REMOVED) != 0) continue;
             Remove(c);
             if (RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room])) return true;
         }
+        if (TraceRoom == room)
+        {
+            // the room as the walkway test saw it: # blocked, . free, d doorway floor, digits = cut-off pocket cells
+            RoomWalkable(room);
+            for (int z = roomZ1[room]; z >= roomZ0[room]; z--)
+            {
+                string line = "    ";
+                for (int x = roomX0[room]; x <= roomX1[room]; x++)
+                {
+                    int i = z * IW + x;
+                    line += innerRoom[i] != room ? ' ' : (solid[i] > 0 ? '#' : (dist[i] != walkStamp ? 'o' : ((tags[i] & GenData.T_DOOR_CLEAR) != 0 ? 'd' : '.')));
+                }
+                System.Console.Error.WriteLine(line);
+            }
+        }
         for (int e = first; e < nEmit; e++)
             if (emitParent[e] < 0) Remove(e);
         statWalkRejects++;
         RoomWalkable(room);   // walkBlocked is the room's again, without what was taken away
         return false;
+    }
+
+    // =====================================================================================================
+    // Ground (G30): what the floor of every inner cell is made of. Outdoors the kinds blend at their borders.
+    // =====================================================================================================
+    public const int GR_NONE = 0, GR_INDOOR = 1, GR_LAWN = 2, GR_FOREST = 3, GR_SOIL = 4, GR_PAVING = 5, GR_TRACK = 6, GR_RELEASE = 7;
+    public byte[] ground;
+
+    int BaseGround(int i)
+    {
+        int t = tags[i];
+        if ((t & GenData.T_FLOOR) == 0) return GR_NONE;
+        if ((t & GenData.T_OUTDOOR) == 0) return GR_INDOOR;
+        int room = innerRoom[i], zone = roomZone[room];
+        if (zone == GenData.Z_RELEASE) return GR_RELEASE;
+        if ((t & GenData.T_EARTH) != 0) return GR_TRACK;                 // trodden earth around a fire
+        if (zone == GenData.Z_FOREST) return (t & GenData.T_PATH) != 0 ? GR_TRACK : GR_FOREST;
+        if ((t & GenData.T_COVERED) != 0) return GR_PAVING;
+        if ((t & GenData.T_SOFT_GROUND) != 0) return GR_SOIL;
+        return GR_LAWN;
+    }
+
+    // The kind of every cell, then the borders between two outdoor kinds are frayed: a cell next to another kind
+    // takes that kind with a chance of 38%, a cell two away with 14%. The chance comes from a hash of the seed
+    // and the cell, so it is the same on every machine and needs no state. Paving keeps a straight edge against
+    // the building it lies at (walls are not borders); a walkway that must stay clear keeps its kind.
+    void BuildGround()
+    {
+        int n = IW * IH;
+        if (ground == null || ground.Length != n) ground = new byte[n];
+        for (int i = 0; i < n; i++) { ground[i] = (byte)BaseGround(i); dist[i] = ground[i]; }
+        for (int i = 0; i < n; i++)
+        {
+            int g = dist[i];
+            if (g < GR_LAWN || g == GR_RELEASE) continue;
+            int ix = i % IW, iz = i / IW;
+            int other = 0, away = 3;
+            for (int d = 0; d < 4 && away > 1; d++)
+                for (int step = 1; step <= 2; step++)
+                {
+                    int jx = ix + DX[d] * step, jz = iz + DZ[d] * step;
+                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) break;
+                    // a wall or a fence between the two cells is not a border to blend across
+                    if (!CanStep(ix + DX[d] * (step - 1), iz + DZ[d] * (step - 1), d)) break;
+                    int gj = dist[jz * IW + jx];
+                    if (gj < GR_LAWN || gj == GR_RELEASE) break;
+                    if (gj != g && step < away) { away = step; other = gj; }
+                    if (gj != g) break;
+                }
+            if (other == 0) continue;
+            if (away == 2 && (g == GR_PAVING || other == GR_PAVING)) continue;   // paving keeps a tighter edge: no stray slabs
+            uint h = GenRng.Hash32(seed, (uint)GenData.GEN_VERSION, 77, (uint)i, (uint)size) % 100u;
+            if (h < (away == 1 ? 38u : 14u)) ground[i] = (byte)other;
+        }
     }
 
     static uint Fnv(uint h, int v)

@@ -22,6 +22,17 @@ public class MeshBuf
         tris.Add(s); tris.Add(s + 2); tris.Add(s + 3);
     }
 
+    // the same with a colour per corner (blended ground)
+    public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 n, Color32 ca, Color32 cb, Color32 cc, Color32 cd)
+    {
+        int s = verts.Count;
+        verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
+        norms.Add(n); norms.Add(n); norms.Add(n); norms.Add(n);
+        cols.Add(ca); cols.Add(cb); cols.Add(cc); cols.Add(cd);
+        tris.Add(s); tris.Add(s + 1); tris.Add(s + 2);
+        tris.Add(s); tris.Add(s + 2); tris.Add(s + 3);
+    }
+
     public void Box(Vector3 mn, Vector3 mx, Color32 col, int faces = FACE_ALL)
     {
         Box(mn, mx, col, col, col, faces);

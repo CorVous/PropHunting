@@ -183,15 +183,69 @@ public class MapBuilder
     }
 
     // ------------------------------------------------------------------ ground
+    // Outdoors the ground is drawn by kind (MapGen.BuildGround): lawn, forest floor, soil, paving, trodden earth.
+    // Where two kinds meet they blend (G30), in two ways that work together: the generator frays the border (cells
+    // within two of it take the other kind by a seeded hash), and here the corners of the cells along a border
+    // take the mean colour of the cells around them, so the colour runs over half a metre instead of stepping.
+    // Indoor floors keep their hard edges at the walls.
+    Color32[] cellColour;
+
+    Color32 CellColour(int i, int ix, int iz)
+    {
+        switch (gen.ground[i])
+        {
+            case MapGen.GR_LAWN: return Vary(C(116, 170, 86), ix, iz, 7);
+            case MapGen.GR_FOREST: return Vary(C(88, 138, 74), ix, iz, 9);
+            case MapGen.GR_SOIL: return Vary(C(138, 104, 74), ix, iz, 8);
+            case MapGen.GR_PAVING: return (((ix / 2 + iz / 2) & 1) == 0) ? C(196, 190, 178) : C(182, 176, 166);
+            case MapGen.GR_TRACK: return Vary(C(158, 134, 100), ix, iz, 6);
+        }
+        return FloorColour(gen.roomType[gen.innerRoom[i]], ix, iz);
+    }
+
+    bool Blends(int i)
+    {
+        int g = gen.ground[i];
+        return g >= MapGen.GR_LAWN && g != MapGen.GR_RELEASE;
+    }
+
+    // the colour of the grid corner at (cx, cz) for the cell `self`: the mean of the outdoor cells around the
+    // corner if they are of more than one kind, else the cell's own colour
+    Color32 CornerColour(int cx, int cz, int self)
+    {
+        int n = 0, r = 0, g = 0, b = 0, kind = -1;
+        bool mixed = false;
+        for (int k = 0; k < 4; k++)
+        {
+            int x = cx - (k & 1), z = cz - (k >> 1);
+            if (x < 0 || z < 0 || x >= gen.IW || z >= gen.IH) continue;
+            int i = z * gen.IW + x;
+            if (!Blends(i)) continue;
+            if (kind >= 0 && gen.ground[i] != kind) mixed = true;
+            kind = gen.ground[i];
+            Color32 c = cellColour[i];
+            r += c.r; g += c.g; b += c.b; n++;
+        }
+        if (!mixed) return cellColour[self];
+        return C(r / n, g / n, b / n);
+    }
+
     void GroundRow(int iz)
     {
+        if (iz == 0 || cellColour == null || cellColour.Length != gen.IW * gen.IH)
+        {
+            cellColour = new Color32[gen.IW * gen.IH];
+            for (int i = 0; i < cellColour.Length; i++)
+                if ((gen.tags[i] & GenData.T_FLOOR) != 0) cellColour[i] = CellColour(i, i % gen.IW, i / gen.IW);
+        }
         for (int ix = 0; ix < gen.IW; ix++)
         {
             int i = iz * gen.IW + ix;
             if ((gen.tags[i] & GenData.T_FLOOR) == 0) continue;
-            Color32 c = FloorColour(gen.roomType[gen.innerRoom[i]], ix, iz);
             float x = ix * INNER, z = iz * INNER;
-            ground.Quad(new Vector3(x, 0, z), new Vector3(x, 0, z + INNER), new Vector3(x + INNER, 0, z + INNER), new Vector3(x + INNER, 0, z), Vector3.up, c);
+            Vector3 a = new Vector3(x, 0, z), b = new Vector3(x, 0, z + INNER), c = new Vector3(x + INNER, 0, z + INNER), d = new Vector3(x + INNER, 0, z);
+            if (Blends(i)) ground.Quad(a, b, c, d, Vector3.up, CornerColour(ix, iz, i), CornerColour(ix, iz + 1, i), CornerColour(ix + 1, iz + 1, i), CornerColour(ix + 1, iz, i));
+            else ground.Quad(a, b, c, d, Vector3.up, cellColour[i]);
         }
     }
 

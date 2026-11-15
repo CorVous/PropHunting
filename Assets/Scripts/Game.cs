@@ -88,6 +88,7 @@ public class Game : MonoBehaviour
         gameObject.AddComponent<AudioHub>();
         ui = gameObject.AddComponent<GameUI>();
         round = gameObject.AddComponent<Round>();
+        gameObject.AddComponent<PipScreen>();
         var pgo = new GameObject("Player");
         player = pgo.AddComponent<Player>();
 
@@ -198,7 +199,7 @@ public class Game : MonoBehaviour
         return "seed " + seedCode + " size " + GenData.SizeName[g.size] + " density " + GenData.DensityName[g.density] + " hash " + g.mapHash.ToString("X8") + " cells " + g.statGroundCells
             + " rooms " + g.nRooms + " props " + g.statProps + " floor " + g.statFloor + " onFurniture " + g.statTop + " groups " + g.statGroups
             + " scenery " + g.statScenery + " slotItems " + g.statSlotItems
-            + " leaks " + g.statLeakPlausible + "+" + g.statLeakComedic + " menu " + g.menuCount + " sockets " + g.nSockets
+            + " leaks " + g.statLeakPlausible + "+" + g.statLeakComedic + " disguiseTypes " + g.menuCount + " loose " + g.statLoose + " sockets " + g.nSockets
             + " rerolls " + g.attempt + " repairs " + g.statRepairs + " genMs " + map.genMs.ToString("0") + " buildMs " + map.buildMs.ToString("0") + " wallMs " + map.wallMs.ToString("0")
             + " frames " + genFrames + " renderers " + map.rendererCount + " colliders " + map.colliderCount;
     }
@@ -331,6 +332,7 @@ public class Game : MonoBehaviour
                 case "tp": player.Teleport(new Vector3(float.Parse(a[1]), a.Length > 3 ? float.Parse(a[3]) : 0.05f, float.Parse(a[2]))); break;
                 case "look": player.SetLook(float.Parse(a[1]), float.Parse(a[2])); break;
                 case "third": player.SetThird(a.Length < 2 || a[1] != "0"); break;
+                case "pip": r = PipScreen.I.Command(a); break;
                 case "disguise": r = player.TakeDisguiseByName(a[1]); break;
                 case "undisguise": player.ToWalker(); break;
                 case "key": player.TestKey(a[1]); break;

@@ -1,5 +1,5 @@
-// MapGen, part 3: placing objects in rooms from the spawn tables (04 section 4.3.3), up to each room type's
-// range of props (G24). MapGenGroups.cs places prop groups and things that stand beside other things (G25).
+// MapGen, part 3: low-level placement: the emit list, the cells an object takes, free-cell tests, and the
+// room loop that hands each room to the plan of its type (MapGenPlans.cs, MapGenOutdoor.cs).
 public partial class MapGen
 {
     const int SOLID_TOL = 50;   // mm a prop may reach into a cell and leave it walkable (the walking body is 0.4 m, a cell 0.5 m)
@@ -12,7 +12,8 @@ public partial class MapGen
         emitYaw[e] = ((yaw % 360) + 360) % 360;
         emitParent[e] = parent; emitRoom[e] = room; emitFlags[e] = flags;
         emitRX[e] = 0; emitRZ[e] = 0; emitRW[e] = 0; emitRD[e] = 0; emitRot[e] = 0; emitSlot[e] = -1;
-        emitGroup[e] = -1; emitGrp[e] = -1;
+        emitGroup[e] = -1; emitGrp[e] = -1; emitSet[e] = -1;
+        emitHost[e] = parent >= 0 ? parent : curHost;
         emitDepth[e] = parent < 0 ? 0 : emitDepth[parent] + 1;
         return e;
     }
@@ -50,12 +51,13 @@ public partial class MapGen
         // the outline grown by half a cell less the tolerance
         int hx, hz;
         HalfExtents(def, emitYaw[e], out hx, out hz);
-        int x0 = FloorDiv(emitX[e] - hx, GenData.INNER_MM), x1 = FloorDiv(emitX[e] + hx, GenData.INNER_MM);
-        int z0 = FloorDiv(emitZ[e] - hz, GenData.INNER_MM), z1 = FloorDiv(emitZ[e] + hz, GenData.INNER_MM);
+        // only cells the turned outline's box reaches into by more than the tolerance (the cells the placement tested)
+        int x0 = FloorDiv(emitX[e] - hx + SOLID_TOL, GenData.INNER_MM), x1 = FloorDiv(emitX[e] + hx - SOLID_TOL - 1, GenData.INNER_MM);
+        int z0 = FloorDiv(emitZ[e] - hz + SOLID_TOL, GenData.INNER_MM), z1 = FloorDiv(emitZ[e] + hz - SOLID_TOL - 1, GenData.INNER_MM);
         bool tree = Has(def, GenData.FL_SCENERY);
         int grow = GenData.INNER_MM / 2 - SOLID_TOL;
         int lim_x = (tree ? 220 : GenData.defSx[def] / 2) + grow, lim_z = (tree ? 220 : GenData.defSz[def] / 2) + grow;
-        int a = emitYaw[e], sn = sinTab[a], cs = sinTab[(a + 90) % 360];
+        int a = tree ? 0 : emitYaw[e], sn = sinTab[a], cs = sinTab[(a + 90) % 360];   // a trunk is a square post whatever way the tree is turned
         int marked = 0;
         for (int z = z0; z <= z1; z++)
             for (int x = x0; x <= x1; x++)
@@ -63,7 +65,7 @@ public partial class MapGen
                 if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
                 int dx = x * GenData.INNER_MM + GenData.INNER_MM / 2 - emitX[e], dz = z * GenData.INNER_MM + GenData.INNER_MM / 2 - emitZ[e];
                 int lx = (dx * cs - dz * sn) / 4096, lz = (dx * sn + dz * cs) / 4096;
-                if (Abs(lx) > lim_x || Abs(lz) > lim_z) continue;
+                if (Abs(lx) >= lim_x || Abs(lz) >= lim_z) continue;   // reaching exactly 5 cm in still leaves the cell walkable
                 solid[z * IW + x] += sign;
                 marked++;
             }
@@ -78,7 +80,8 @@ public partial class MapGen
     // every cell of the rectangle is free floor of this room
     bool RectFree(int x0, int z0, int gw, int gd, int room, int def) { return RectFree(x0, z0, gw, gd, room, def, -1); }
 
-    // ignore: an emit whose own cells count as free (the host a group stands right next to)
+    // ignore: an emit whose own cells, front clearance and composition set count as free (the host an object
+    // is placed in relation to: a coffee table stands in front of its sofa, a run's units stand side by side)
     bool RectFree(int x0, int z0, int gw, int gd, int room, int def, int ignore)
     {
         if (x0 < 0 || z0 < 0 || x0 + gw > IW || z0 + gd > IH) return false;
@@ -92,8 +95,15 @@ public partial class MapGen
                 if ((t & (GenData.T_BLOCKED | GenData.T_NO_SPAWN)) != 0) return false;
                 if (flat) { if (flatOcc[i] != 0) return false; continue; }
                 if ((t & (GenData.T_DOOR_CLEAR | GenData.T_SWING)) != 0) return false;
-                if ((occ[i] != 0 && occ[i] != ignore + 1) || reserve[i] != 0) return false;
-                // nothing stands on PATH: every prop is solid now, so the walkway between a room's doors stays clear
+                int o = occ[i];
+                if (o != 0)
+                {
+                    if (ignore < 0 || (o != ignore + 1 && emitSet[o - 1] != ignore)) return false;
+                }
+                else if (solid[i] > 0 && ignore < 0) return false;   // a pulled-out chair or a turned object reaches into the cell
+                int rs = reserve[i];
+                if (rs != 0 && (ignore < 0 || (rs != ignore + 1 && emitSet[rs - 1] != ignore))) return false;
+                // nothing stands on PATH: every prop is solid, so the walkway between a room's doors stays clear
                 if ((t & GenData.T_PATH) != 0) return false;
             }
         return true;
@@ -126,7 +136,7 @@ public partial class MapGen
         return true;
     }
 
-    void ReserveFront(int x0, int z0, int gw, int gd, int rot, int depth, bool swing)
+    void ReserveFront(int x0, int z0, int gw, int gd, int rot, int depth, bool swing, int owner)
     {
         for (int k = 1; k <= depth; k++)
         {
@@ -135,23 +145,25 @@ public partial class MapGen
             for (int z = az0; z < az0 + ad; z++)
                 for (int x = ax0; x < ax0 + aw; x++)
                 {
+                    if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
                     int i = z * IW + x;
-                    reserve[i] = 1;
+                    if (reserve[i] == 0) reserve[i] = owner + 1;
                     if (swing) tags[i] |= GenData.T_SWING;
                 }
         }
     }
 
-    // a free ring of one cell around the rectangle (for the chairs of a table)
-    bool RingFree(int x0, int z0, int gw, int gd, int room)
+    // a free ring of `depth` cells around the rectangle: room for the chairs of a table and for passing behind
+    // them (report 15, K3: 0.81 to 1.12 m behind a seat)
+    bool RingFree(int x0, int z0, int gw, int gd, int room, int depth)
     {
-        for (int z = z0 - 1; z <= z0 + gd; z++)
-            for (int x = x0 - 1; x <= x0 + gw; x++)
+        for (int z = z0 - depth; z < z0 + gd + depth; z++)
+            for (int x = x0 - depth; x < x0 + gw + depth; x++)
             {
                 if (x >= x0 && x < x0 + gw && z >= z0 && z < z0 + gd) continue;
                 if (x < 0 || z < 0 || x >= IW || z >= IH) return false;
                 int i = z * IW + x;
-                if ((tags[i] & GenData.T_FLOOR) == 0 || innerRoom[i] != room || occ[i] != 0) return false;
+                if ((tags[i] & GenData.T_FLOOR) == 0 || innerRoom[i] != room || occ[i] != 0 || solid[i] > 0) return false;
             }
         return true;
     }
@@ -181,8 +193,18 @@ public partial class MapGen
 
     int StampObject(int def, int room, int x0, int z0, int gw, int gd, int rot, int px, int pz, int yaw, int flags)
     {
+        return StampObject(def, room, x0, z0, gw, gd, rot, px, pz, yaw, flags, true);
+    }
+
+    // reserveFront = false: the caller reserves the front clearance itself, once a whole run stands
+    int StampObject(int def, int room, int x0, int z0, int gw, int gd, int rot, int px, int pz, int yaw, int flags, bool reserveFront)
+    {
+        // the whole object, not only the cells its base stands on, has to be clear of walls and fences (G31)
+        if (!ExtentClear(def, px, pz, yaw, -1)) return -1;
+        if (!NeighboursClear(def, px, pz, yaw, x0, z0, gw, gd, -1)) return -1;
         int e = Emit(def, px, 0, pz, yaw, -1, room, flags);
         if (e < 0) return -1;
+        if (GenData.defCanopyY[def] > 0) StampCanopy(e);
         emitRX[e] = x0; emitRZ[e] = z0; emitRW[e] = gw; emitRD[e] = gd; emitRot[e] = rot;
         Account(e, 1);
         bool flat = Has(def, GenData.FL_FLAT);
@@ -191,10 +213,10 @@ public partial class MapGen
             for (int x = x0; x < x0 + gw; x++)
             {
                 if (flat) flatOcc[z * IW + x] = e + 1;
-                else if (!decor) occ[z * IW + x] = e + 1;
+                else if (!decor && occ[z * IW + x] == 0) occ[z * IW + x] = e + 1;
             }
         int clear = GenData.defClear[def];
-        if (clear > 0) ReserveFront(x0, z0, gw, gd, rot, clear, Has(def, GenData.FL_OPENABLE));
+        if (clear > 0 && reserveFront) ReserveFront(x0, z0, gw, gd, rot, clear, Has(def, GenData.FL_OPENABLE), e);
         return e;
     }
 
@@ -304,15 +326,20 @@ public partial class MapGen
                         if (!SpacingOk(def, x0, z0)) continue;
                         // position: centre of the rectangle along the wall, back face 2 cm off the wall surface
                         int px = (2 * x0 + gw) * GenData.INNER_MM / 2, pz = (2 * z0 + gd) * GenData.INNER_MM / 2;
-                        int slack = (span * GenData.INNER_MM - sx) / 2 - 20;
+                        int yaw = rot * 90 + Jitter(ref rng, Min(GenData.defJitYaw[def], 4));
+                        int fhx, fhz;
+                        FullHalf(def, yaw, out fhx, out fhz);
+                        int halfAlong = (wd == 0 || wd == 2) ? fhx : fhz, halfDeep = (wd == 0 || wd == 2) ? fhz : fhx;
+                        int slack = span * GenData.INNER_MM / 2 - halfAlong - 20;
                         int jit = Jitter(ref rng, Min(slack < 0 ? 0 : slack, GenData.defJitPos[def] * 10));
-                        int off = GenData.WALL_HALF_MM + 20 + sz / 2;
+                        int off = GenData.WALL_HALF_MM + 20 + halfDeep;
                         if (wd == 2) { pz = z0 * GenData.INNER_MM + off; px += jit; }
                         else if (wd == 0) { pz = (z0 + gd) * GenData.INNER_MM - off; px += jit; }
                         else if (wd == 3) { px = x0 * GenData.INNER_MM + off; pz += jit; }
                         else { px = (x0 + gw) * GenData.INNER_MM - off; pz += jit; }
-                        int yaw = rot * 90 + Jitter(ref rng, Min(GenData.defJitYaw[def], 4));
-                        return StampObject(def, room, x0, z0, gw, gd, rot, px, pz, yaw, flags);
+                        curHost = H_WALL;
+                        int placed = StampObject(def, room, x0, z0, gw, gd, rot, px, pz, yaw, flags);
+                        if (placed >= 0) return placed;
                     }
                 }
             }
@@ -330,14 +357,19 @@ public partial class MapGen
                 if (!RectFree(x0, z0, gw, gd, room, def)) continue;
                 if (tall && (t & GenData.T_WINDOW_WALL) != 0) continue;
                 if (!SpacingOk(def, x0, z0)) continue;
-                int ex = ((rot & 1) == 0 ? sx : sz) / 2, ez = ((rot & 1) == 0 ? sz : sx) / 2;
-                int gap = GenData.WALL_HALF_MM + 40;
-                int px = wx == 3 ? x0 * GenData.INNER_MM + gap + ex : (x0 + gw) * GenData.INNER_MM - gap - ex;
-                int pz = wz == 2 ? z0 * GenData.INNER_MM + gap + ez : (z0 + gd) * GenData.INNER_MM - gap - ez;
-                // turned a little towards the middle of the room
+                // turned a little towards the middle of the room; the turned outline keeps clear of both walls
                 int towardX = wx == 3 ? 1 : -1, towardZ = wz == 2 ? 1 : -1;
                 int sign = pickZ ? towardX * towardZ : -towardX * towardZ;
-                return StampObject(def, room, x0, z0, gw, gd, rot, px, pz, rot * 90 + sign * turn, flags);
+                int cyaw = rot * 90 + sign * turn;
+                int ex, ez;
+                FullHalf(def, cyaw, out ex, out ez);
+                int gap = GenData.WALL_HALF_MM + 30;
+                int px = wx == 3 ? x0 * GenData.INNER_MM + gap + ex : (x0 + gw) * GenData.INNER_MM - gap - ex;
+                int pz = wz == 2 ? z0 * GenData.INNER_MM + gap + ez : (z0 + gd) * GenData.INNER_MM - gap - ez;
+                curHost = H_WALL;
+                int placed = StampObject(def, room, x0, z0, gw, gd, rot, px, pz, cyaw, flags);
+                if (placed >= 0) return placed;
+                continue;
             }
             else
             {
@@ -376,53 +408,17 @@ public partial class MapGen
                     gw = x1 - x0 + 1; gd = z1 - z0 + 1;
                 }
                 if (!RectFree(x0, z0, gw, gd, room, def)) continue;
-                if (HasChairSlots(def) && !RingFree(x0, z0, gw, gd, room)) continue;
+                if (HasChairSlots(def) && !RingFree(x0, z0, gw, gd, room, 1)) continue;
                 int clear = GenData.defClear[def];
                 if (clear > 0 && !FrontFree(x0, z0, gw, gd, rot, clear)) continue;
                 if (!SpacingOk(def, x0, z0)) continue;
-                return StampObject(def, room, x0, z0, gw, gd, rot, px, pz, yaw, flags);
+                curHost = SceneryOrDecor(def) ? H_NATURE : H_FREE;
+                int placed = StampObject(def, room, x0, z0, gw, gd, rot, px, pz, yaw, flags);
+                if (placed >= 0) return placed;
             }
         }
         return -1;
     }
-
-    // Warehouse racks follow a row template with aisles (04 section 4.3.3)
-    int PlaceRackRows(int room, int def, int max, ref GenRng rng)
-    {
-        int placed = 0;
-        int alongWalls = rng.Between(2, 4);
-        for (int i = 0; i < alongWalls && placed < max; i++)
-        {
-            int first = nEmit;
-            if (TryPlace(def, room, GenData.A_WALL, 0, ref rng) >= 0 && KeepIfWalkable(room, first, false)) placed++;
-        }
-        int x0 = roomX0[room], z0 = roomZ0[room], x1 = roomX1[room], z1 = roomZ1[room];
-        bool alongX = (x1 - x0) >= (z1 - z0);
-        int len = GenData.defW[def];
-        int rowStart = (alongX ? z0 : x0) + 5, rowEnd = (alongX ? z1 : x1) - 5;
-        int row = 0;
-        for (int r = rowStart; r <= rowEnd && placed < max; r += 5, row++)
-        {
-            int a0 = (alongX ? x0 : z0) + 2 + rng.Range(2), a1 = (alongX ? x1 : z1) - 2;
-            int inRow = 0;
-            for (int a = a0; a + len - 1 <= a1 && placed < max; a += len)
-            {
-                if (inRow == 2) { a += 2; inRow = 0; if (a + len - 1 > a1) break; }   // a gap every two racks
-                int rx = alongX ? a : r, rz = alongX ? r : a;
-                int gw = alongX ? len : 1, gd = alongX ? 1 : len;
-                if (!RectFree(rx, rz, gw, gd, room, def)) { inRow = 0; continue; }
-                int rot = alongX ? ((row & 1) == 0 ? 0 : 2) : ((row & 1) == 0 ? 1 : 3);
-                int px = (2 * rx + gw) * GenData.INNER_MM / 2, pz = (2 * rz + gd) * GenData.INNER_MM / 2;
-                int first = nEmit;
-                StampObject(def, room, rx, rz, gw, gd, rot, px, pz, rot * 90, 0);
-                if (!KeepIfWalkable(room, first, false)) { inRow = 0; continue; }
-                placed++; inRow++;
-            }
-        }
-        return placed;
-    }
-
-    int rackDefCache = -1;
 
     // A cap written for a 16 m2 room, for this room: larger rooms hold more, and a density above Normal loosens
     // the caps that allow more than one, so the higher floor targets can be met.
@@ -432,12 +428,6 @@ public partial class MapGen
         int pct = GenData.DensityPercent[density];
         if (cap > 1 && pct > 100) c = (c * pct + 50) / 100;
         return c < 1 ? 1 : c;
-    }
-
-    // the cap of a table entry in this room; one-of-a-kind pieces (one table, one bed, one sofa) never scale
-    int EntryCap(int e, int room)
-    {
-        return GenData.entryGroup[e] > 0 ? GenData.entryMax[e] : ScaledCap(GenData.entryMax[e], room);
     }
 
     // a number per 100 m2 of the range table, for this room's floor area (4 inner cells are 1 m2)
@@ -457,17 +447,6 @@ public partial class MapGen
     }
 
     int[] roomEmitStart = new int[400];   // every emit of a room has an index at or above this
-
-    // floor props an entry adds at least: a host brings its chairs, a group its smallest size
-    int UnitSize(int e)
-    {
-        int g = GenData.entryGrp[e];
-        if (g >= 0) return GenData.grpMin[g];
-        int def = GenData.entryDef[e], n = 1;
-        for (int i = GenData.defSlotStart[def]; i < GenData.defSlotStart[def] + GenData.defSlotCount[def]; i++)
-            if (GenData.slotType[i] == GenData.S_ADJACENT) n++;
-        return n;
-    }
 
     static bool SceneryOrDecor(int def)
     {
@@ -490,161 +469,64 @@ public partial class MapGen
         return TryPlace(def, room, anchor, flags, ref rng);
     }
 
-    // Places entry i of the room's table: a single def or a prop group of at most `room for` members.
-    // Chairs and seats of a new host are placed at once, because they stand on the floor and count there.
-    // Returns how many floor props were added (0 = no place found).
-    int PlaceEntry(int e, int room, int flags, int roomFor, ref GenRng rng)
-    {
-        int before = roomFloor[room], first = nEmit;
-        int g = GenData.entryGrp[e];
-        bool ok;
-        if (g >= 0)
-        {
-            int n = rng.Between(GenData.grpMin[g], GenData.grpMax[g]);
-            if (n > roomFor) n = roomFor;
-            ok = PlaceGroup(g, room, GenData.entryAnchor[e] >= 0 ? GenData.entryAnchor[e] : GenData.grpAnchor[g], n, flags, ref rng);
-        }
-        else
-        {
-            int def = GenData.entryDef[e];
-            ok = PlaceSingle(def, room, GenData.entryAnchor[e] >= 0 ? GenData.entryAnchor[e] : GenData.defAnchor[def], flags, ref rng) >= 0;
-        }
-        if (!ok) return 0;
-        for (int h = first; h < nEmit; h++) FillSlots(h, 0);
-        if (!KeepIfWalkable(room, first, (flags & EF_MANDATORY) != 0)) return 0;
-        int added = roomFloor[room] - before;
-        return added > 0 ? added : 1;
-    }
-
-    // weighted pick among the table's scenery (trees) or decoration (grass) entries
-    void PlaceScenery(int room, int table, int flagBit, int count, ref GenRng rng)
-    {
-        int es = GenData.tableEntryStart[table], ec = GenData.tableEntryCount[table];
-        int total = 0;
-        for (int i = 0; i < ec; i++) if (Has(GenData.entryDef[es + i], flagBit) && GenData.entryGrp[es + i] < 0) total += GenData.entryWeight[es + i];
-        if (total == 0) return;
-        int placed = 0;
-        for (int tries = count * 3; tries > 0 && placed < count; tries--)
-        {
-            int r = rng.Range(total), pick = -1;
-            for (int i = 0; i < ec; i++)
-            {
-                int e = es + i;
-                if (!Has(GenData.entryDef[e], flagBit) || GenData.entryGrp[e] >= 0) continue;
-                if (r < GenData.entryWeight[e]) { pick = e; break; }
-                r -= GenData.entryWeight[e];
-            }
-            if (pick < 0) break;
-            int def = GenData.entryDef[pick], first = nEmit;
-            if (TryPlace(def, room, GenData.entryAnchor[pick] >= 0 ? GenData.entryAnchor[pick] : GenData.defAnchor[def], 0, ref rng) < 0) continue;
-            if (flagBit == GenData.FL_DECOR || KeepIfWalkable(room, first, false)) placed++;
-        }
-    }
-
+    // One room: its numbers from the range table (G24), then the plan of its type composes it (G28), then the
+    // things that sit on, in and under the furniture.
     void PopulateRoom(int room)
     {
         roomEmitStart[room] = nEmit;
-        int table = GenData.FindTable(roomZone[room], roomType[room]);
-        if (table < 0) return;
-        if (rackDefCache < 0) rackDefCache = GenData.FindDef("gen_rack");
-        GenRng rng = Rng(ST_ROOM, room, 0);
-        GenRng srng = Rng(ST_SCENERY, room, 0);
+        pRoom = room; looseUsed = 0;
         int type = roomType[room];
-        // the room's numbers from the range table (G24), for its floor area and the map's density
+        if (type == GenData.R_RELEASE || GenData.FindTable(roomZone[room], type) < 0) return;
+        GenRng rng = Rng(ST_ROOM, room, 0);
+        // the room's floor budget inside its type's range, for its floor area and the map's density
         int lo = PerArea(GenData.rangeFloorMin[type], room, true);
         roomFloorMax[room] = PerArea(GenData.rangeFloorMax[type], room, true);
         roomFloorTarget[room] = rng.Between(lo, roomFloorMax[room]);
+        // an outdoor area is never bare (G29): its type's minimum per area, with the density setting but never below 4
+        int abs = GenData.rangeFloorAbs[type];
+        roomFloorMin[room] = 0;
+        if (abs > 0)
+        {
+            abs = (abs * GenData.DensityPercent[density] + 50) / 100;
+            if (abs < 4) abs = 4;
+            if (roomFloorTarget[room] < abs) roomFloorTarget[room] = abs;
+            if (roomFloorMax[room] < abs) roomFloorMax[room] = abs;
+            // the area's minimum: its type's number per 100 m2, and never fewer than the type's fewest per area
+            roomFloorMin[room] = lo > abs ? lo : abs;
+        }
         roomTopCap[room] = PerArea(GenData.rangeTopMax[type], room, true);
         int cover = GenData.rangeCover[type] * GenData.DensityPercent[density] / 100;
         roomCoverMax[room] = roomCellCount[room] * (cover > 70 ? 70 : cover) / 100;
-        int trees = srng.Between(PerArea(GenData.rangeTreeMin[type], room, false), PerArea(GenData.rangeTreeMax[type], room, false));
-        int grass = srng.Between(PerArea(GenData.rangeDecorMin[type], room, false), PerArea(GenData.rangeDecorMax[type], room, false));
-
-        int es = GenData.tableEntryStart[table], ec = GenData.tableEntryCount[table];
-        if (ec > entryCount.Length) ec = entryCount.Length;
-        for (int i = 0; i < ec; i++) entryCount[i] = 0;
-        for (int i = 0; i < groupCount.Length; i++) groupCount[i] = 0;
         int firstEmit = nEmit;
-
-        // exclusive groups (one table, one bed, one sofa): one member is chosen up front by weight
-        for (int g = 1; g < groupCount.Length; g++)
-        {
-            int total = 0;
-            for (int i = 0; i < ec; i++) if (GenData.entryGroup[es + i] == g) total += GenData.entryWeight[es + i];
-            if (total == 0) continue;
-            int r = rng.Range(total), pick = -1;
-            for (int i = 0; i < ec; i++)
-            {
-                if (GenData.entryGroup[es + i] != g) continue;
-                if (r < GenData.entryWeight[es + i]) { pick = i; break; }
-                r -= GenData.entryWeight[es + i];
-            }
-            groupCount[g] = pick + 1;   // remembered as the allowed entry + 1
-        }
-        // 1. mandatory entries, biggest footprint first
-        int[] order = new int[ec];
-        for (int i = 0; i < ec; i++) order[i] = i;
-        for (int i = 1; i < ec; i++)
-        {
-            int k = i, v = order[i];
-            int av = GenData.defW[GenData.entryDef[es + v]] * GenData.defD[GenData.entryDef[es + v]];
-            while (k > 0 && GenData.defW[GenData.entryDef[es + order[k - 1]]] * GenData.defD[GenData.entryDef[es + order[k - 1]]] < av) { order[k] = order[k - 1]; k--; }
-            order[k] = v;
-        }
-        for (int oi = 0; oi < ec; oi++)
-        {
-            int i = order[oi], e = es + i, def = GenData.entryDef[e];
-            int g = GenData.entryGroup[e];
-            if (g > 0 && groupCount[g] != i + 1) continue;
-            if (GenData.entryGrp[e] < 0 && SceneryOrDecor(def)) continue;
-            if (GenData.entryGrp[e] < 0 && def == rackDefCache && roomType[room] == GenData.R_STORAGE)
-            {
-                entryCount[i] += PlaceRackRows(room, def, ScaledCap(GenData.entryMax[e], room), ref rng);
-                continue;
-            }
-            for (int k = 0; k < GenData.entryMin[e]; k++)
-            {
-                if (PlaceEntry(e, room, EF_MANDATORY, 99, ref rng) > 0) entryCount[i]++;
-                else { statMandatoryFail++; break; }
-            }
-        }
-        // 2. trees, before the rest: other things stand around and beside them
-        PlaceScenery(room, table, GenData.FL_SCENERY, trees, ref srng);
-        // 3. weighted fill up to the room's floor target; an entry is skipped when its type is at its cap or
-        //    when what it brings (a table and its chairs, a whole group) no longer fits under the target
-        int attempts = 4 * ec + 8;
+        BuildSegs(room);
         RoomWalkable(room);
-        while (attempts-- > 0 && roomFloor[room] < roomFloorTarget[room] && walkBlocked < roomCoverMax[room])
+        switch (type)
         {
-            int roomFor = roomFloorTarget[room] - roomFloor[room];
-            int total = 0;
-            for (int i = 0; i < ec; i++)
-                if (Fillable(es + i, i, room, roomFor)) total += GenData.entryWeight[es + i];
-            if (total == 0) break;
-            int r = rng.Range(total), pick = -1;
-            for (int i = 0; i < ec; i++)
-            {
-                if (!Fillable(es + i, i, room, roomFor)) continue;
-                if (r < GenData.entryWeight[es + i]) { pick = i; break; }
-                r -= GenData.entryWeight[es + i];
-            }
-            if (pick < 0) break;
-            if (PlaceEntry(es + pick, room, 0, roomFor, ref rng) > 0) entryCount[pick]++;
+            case GenData.R_LIVING: PlanLiving(); break;
+            case GenData.R_DINING: PlanDining(); break;
+            case GenData.R_KITCHEN: PlanKitchen(); break;
+            case GenData.R_BEDROOM: PlanBedroom(); break;
+            case GenData.R_KIDS: PlanKids(); break;
+            case GenData.R_BATH: PlanBath(); break;
+            case GenData.R_OFFICE: PlanOffice(false); break;
+            case GenData.R_HALL: PlanHall(); break;
+            case GenData.R_STORAGE: PlanStorage(); break;
+            case GenData.R_LOADING: PlanLoading(); break;
+            case GenData.R_WH_OFFICE: PlanOffice(true); break;
+            case GenData.R_DINER_DINING: PlanDinerDining(); break;
+            case GenData.R_DINER_KITCHEN: PlanDinerKitchen(); break;
+            case GenData.R_DINER_STORE: PlanDinerStore(); break;
+            case GenData.R_LAWN_OPEN: PlanLawn(); break;
+            case GenData.R_GARDEN: PlanGarden(); break;
+            case GenData.R_PATIO: PlanPatio(); break;
+            case GenData.R_FIREPIT: PlanFirepit(); break;
+            case GenData.R_FOREST_DENSE: PlanForest(false); break;
+            case GenData.R_FOREST_CLEARING: PlanForest(true); break;
         }
-        // 4. what sits on, in and under the furniture, thinned evenly to the room's cap
+        if (roomFloorMin[room] > 0) FillToMinimum();
+        // what sits on, in and under the furniture, thinned evenly to the room's cap
         SetTopFactor(room, firstEmit);
         for (int h = firstEmit; h < nEmit; h++)
             if (emitRoom[h] == room) FillSlots(h, 1);
-        // 5. grass tufts
-        PlaceScenery(room, table, GenData.FL_DECOR, grass, ref srng);
-    }
-
-    bool Fillable(int e, int i, int room, int roomFor)
-    {
-        int g = GenData.entryGroup[e];
-        if (GenData.entryWeight[e] <= 0 || (g > 0 && groupCount[g] != i + 1)) return false;
-        if (GenData.entryGrp[e] < 0 && SceneryOrDecor(GenData.entryDef[e])) return false;
-        if (entryCount[i] >= EntryCap(e, room)) return false;
-        return UnitSize(e) <= roomFor;
     }
 }

@@ -81,11 +81,14 @@ public partial class MapGen
             fDep = 0;
             for (int i = 0; i < fN; i++)
             {
-                int d = fDef[i], sx = GenData.defSx[d], sz = GenData.defSz[d];
-                fX[i] = x + sx / 2; fZ[i] = sz / 2 + rng.Range(31);
+                // the turned outline: a member turned a few degrees still keeps its whole back off the wall (G31)
+                int d = fDef[i], hx, hz;
+                int jz = rng.Range(31);
                 fYaw[i] = Jitter(ref rng, Min(GenData.defJitYaw[d], 8));
-                x += sx + gap;
-                if (sz + 30 > fDep) fDep = sz + 30;
+                FullHalf(d, fYaw[i], out hx, out hz);
+                fX[i] = x + hx; fZ[i] = hz + jz;
+                x += 2 * hx + gap;
+                if (2 * hz + 30 > fDep) fDep = 2 * hz + 30;
             }
             fLen = x - gap;
             return;
@@ -95,12 +98,13 @@ public partial class MapGen
         int xb = 0, depBack = 0, xf = 0, depFront = 0;
         for (int i = 0; i < fN; i++)
         {
-            int d = fDef[i];
-            int s = GenData.defSx[d] > GenData.defSz[d] ? GenData.defSx[d] : GenData.defSz[d];
+            // each member takes the room of its turned outline, so members never reach into each other (G31)
+            int d = fDef[i], hx, hz;
             fYaw[i] = Jitter(ref rng, GenData.defJitYaw[d]);
+            FullHalf(d, fYaw[i], out hx, out hz);
             int j = rng.Range(41);
-            if (i < nb) { fX[i] = xb + s / 2; fZ[i] = s / 2 + j; xb += s + gap; if (s + 40 > depBack) depBack = s + 40; }
-            else { fX[i] = xf + s / 2; fZ[i] = s / 2 + j; xf += s + gap; if (s + 40 > depFront) depFront = s + 40; }
+            if (i < nb) { fX[i] = xb + hx; fZ[i] = hz + j; xb += 2 * hx + gap; if (2 * hz + 40 > depBack) depBack = 2 * hz + 40; }
+            else { fX[i] = xf + hx; fZ[i] = hz + j; xf += 2 * hx + gap; if (2 * hz + 40 > depFront) depFront = 2 * hz + 40; }
         }
         int lenB = xb - gap, lenF = xf - gap;
         fLen = lenB > lenF ? lenB : lenF;
@@ -152,10 +156,23 @@ public partial class MapGen
                 if (fTall && (bt & GenData.T_WINDOW_WALL) != 0) return -1;
             }
         }
+        for (int i = 0; i < fN; i++)
+        {
+            if (!ExtentClear(fDef[i], fWX[i], fWZ[i], rot * 90 + fYaw[i], host)) return -1;
+            if (!NeighboursClear(fDef[i], fWX[i], fWZ[i], rot * 90 + fYaw[i], x0, z0, gw, gd, host)) return -1;
+            if (host < 0) continue;
+            // beside a host: clear of the host itself and of everything placed in relation to it
+            int ohx, ohz;
+            HalfExtents(fDef[i], rot * 90 + fYaw[i], out ohx, out ohz);
+            int hs = emitSet[host] >= 0 ? emitSet[host] : host;
+            if (OverlapsSet(fDef[i], fWX[i], fWZ[i], ohx, ohz, hs)) return -1;
+        }
         int leader = -1;
         for (int i = 0; i < fN; i++)
         {
-            int e = Emit(fDef[i], fWX[i], 0, fWZ[i], rot * 90 + fYaw[i], -1, room, flags | (grp >= 0 ? EF_GROUP : 0));
+            // the first member records what the group stands against; the others stand with the first
+            curHost = leader >= 0 ? leader : (fHost != H_NONE ? fHost : (wallDir >= 0 ? H_WALL : (host >= 0 ? host : H_NATURE)));
+            int e = Emit(fDef[i], fWX[i], 0, fWZ[i], rot * 90 + fYaw[i], -1, room, flags | (grp >= 0 || fN > 1 ? EF_GROUP : 0));
             if (e < 0) break;
             emitRot[e] = rot;
             if (leader < 0)
@@ -164,7 +181,8 @@ public partial class MapGen
                 emitRX[e] = x0; emitRZ[e] = z0; emitRW[e] = gw; emitRD[e] = gd;
             }
             else { emitRX[e] = FloorDiv(fWX[i], GenData.INNER_MM); emitRZ[e] = FloorDiv(fWZ[i], GenData.INNER_MM); }
-            if (grp >= 0) { emitGroup[e] = leader; emitGrp[e] = grp; }
+            if (grp >= 0 || fN > 1) { emitGroup[e] = leader; emitGrp[e] = grp; }
+            if (host >= 0) emitSet[e] = emitSet[host] >= 0 ? emitSet[host] : host;   // beside a host: one composition with it
             Account(e, 1);
         }
         if (leader < 0) return -1;
@@ -193,6 +211,21 @@ public partial class MapGen
         if (nc == 0) return -1;
         Shuffle(cand, nc, ref rng);
         int tries = nc < 24 ? nc : 24;
+        if (gMode == WM_NEAR || gMode == WM_FAR)
+        {
+            // the nearest (or farthest) cells to the wanted point first
+            for (int k = 0; k < tries; k++)
+            {
+                int bi = k, bs = -2000000000;
+                for (int q = k; q < nc; q++)
+                {
+                    int dd = Abs(cand[q] % IW * GenData.INNER_MM + 250 - gTx) + Abs(cand[q] / IW * GenData.INNER_MM + 250 - gTz);
+                    int sc = gMode == WM_NEAR ? -dd : dd;
+                    if (sc > bs) { bs = sc; bi = q; }
+                }
+                int tmp = cand[k]; cand[k] = cand[bi]; cand[bi] = tmp;
+            }
+        }
         int cells = (fLen + GenData.INNER_MM - 1) / GenData.INNER_MM;
         for (int k = 0; k < tries; k++)
         {
@@ -310,33 +343,44 @@ public partial class MapGen
         return -1;
     }
 
-    // A single copy of a group's member type (a disguise quota copy): it joins a group of that kind that is
-    // already in the room while the room holds fewer props of the kind than one full group, or stands where
-    // such a group would when the room has none. A room that already has a full group takes no copy: the
-    // copy goes to another room. Returns the emit index or -1.
-    int PlaceGroupCopy(int g, int def, int room, int anchor, int flags, ref GenRng rng)
+    // ---- what the plans call ----
+    int gMode = WM_ANY, gTx, gTz;   // where PlaceFormationAt looks first
+    int fHost = H_NONE;             // what the next formation's first member records as its host, if not the default
+
+    // a group of n members against a wall or fence (or on the cells of another anchor), near or far from a point
+    bool GroupAt(int g, int anchor, int n, int mode, int tx, int tz, int flags, ref GenRng rng)
     {
-        int have = 0;
-        for (int e = roomEmitStart[room]; e < nEmit; e++)
-            if (emitRoom[e] == room && emitGrp[e] == g && (emitFlags[e] & EF_REMOVED) == 0) have++;
-        if (have >= GenData.grpMax[g]) return -1;
-        fN = 1; fDef[0] = def;
-        BuildFormation(GenData.GL_ROW, GenData.grpGapMm[g], ref rng);
-        for (int e = roomEmitStart[room]; e < nEmit && have > 0; e++)
-        {
-            if (emitRoom[e] != room || emitGroup[e] != e || emitGrp[e] != g || (emitFlags[e] & EF_REMOVED) != 0) continue;
-            int j = BesideHost(e, room, flags, g, GenData.grpGapMm[g], ref rng);
-            if (j >= 0) return j;
-        }
-        if (have > 0) return -1;
-        fN = 1; fDef[0] = def;
-        int leader = -1;
-        if (anchor == GenData.A_BESIDE)
-        {
-            leader = PlaceFormationBeside(GenData.GL_ROW, GenData.grpGapMm[g], GenData.grpBeside[g], room, flags, g, ref rng);
-            if (leader < 0) anchor = GenData.A_WALL;
-        }
-        if (leader < 0) leader = PlaceFormationAt(GenData.GL_ROW, GenData.grpGapMm[g], room, anchor, flags, g, ref rng);
-        return leader;
+        gMode = mode; gTx = tx; gTz = tz;
+        bool ok = PlaceGroup(g, pRoom, anchor, n, flags, ref rng);
+        gMode = WM_ANY;
+        return ok;
+    }
+
+    // a group right beside one host
+    bool GroupBeside(int g, int host, int n, int flags, ref GenRng rng)
+    {
+        if (ChooseMembers(g, pRoom, n, ref rng) < 1) return false;
+        BuildFormation(GenData.grpLayout[g], GenData.grpGapMm[g], ref rng);
+        return BesideHost(host, pRoom, flags, g, 60, ref rng) >= 0;
+    }
+
+    // a formation of chosen members (fN, fDef set by FSet) beside a host, or against a wall
+    void FSet(int a) { fN = 1; fDef[0] = a; }
+    void FSet(int a, int b) { fN = 2; fDef[0] = a; fDef[1] = b; }
+    void FSet(int a, int b, int c) { fN = 3; fDef[0] = a; fDef[1] = b; fDef[2] = c; }
+    void FAdd(int a) { if (fN < MAXF) fDef[fN++] = a; }
+
+    int FormBeside(int layout, int gap, int host, int flags, ref GenRng rng)
+    {
+        BuildFormation(layout, gap, ref rng);
+        return BesideHost(host, pRoom, flags, -1, 60, ref rng);
+    }
+
+    int FormAt(int layout, int gap, int anchor, int mode, int tx, int tz, int flags, ref GenRng rng)
+    {
+        gMode = mode; gTx = tx; gTz = tz;
+        int e = PlaceFormationAt(layout, gap, pRoom, anchor, flags, -1, ref rng);
+        gMode = WM_ANY;
+        return e;
     }
 }

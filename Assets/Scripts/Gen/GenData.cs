@@ -5,10 +5,11 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 2;
-    // The zone layout, the walls and doors and the room types have a version of their own, so a seed keeps its
-    // buildings when only the prop rules change (generator 1 and 2 share layout 1: the same seed can be compared
-    // before and after). Bump it when Layout, BuildEdges or AssignRoomTypes change.
+    public const int GEN_VERSION = 3;
+    // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
+    // the prop rules change (generators 1, 2 and 3 share layout 1: the same seed can be compared before and after).
+    // Bump it when Layout or BuildEdges change. Room types: the draws of layout 1 are kept; what generator 3
+    // decides on top of them (kids' room, office, hall) draws from GEN_VERSION (MapGen.AssignRoomTypes).
     public const int LAYOUT_VERSION = 1;
 
     public const int CELL_MM = 4000;      // outer cell
@@ -23,7 +24,6 @@ public static class GenData
     public static readonly int[] SizeGrid = { 7, 9, 12, 14 };            // bounding box, outer cells per side
     public static readonly int[] SizeGroundCells = { 28, 52, 85, 108 };  // ground cells to fill
     public static readonly int[] SizeLeaks = { 8, 11, 15, 18 };          // wrong-category spawns (04 section 4.3.5)
-    public static readonly int[] SizeHiders = { 5, 11, 16, 21 };         // hiders the quota is sized for
     public static readonly int[] SizePlayers = { 8, 16, 24, 32 };
     public const int LEAK_COMEDIC_PERMILLE = 300;                        // D10
     public const int MIXED_SET_PERMILLE = 150;                           // 04 section 4.3.6
@@ -35,16 +35,11 @@ public static class GenData
     public static readonly int[] DensityPercent = { 100, 70, 135, 45, 200 };
     public static readonly int[] DensityOrder = { 3, 1, 0, 2, 4 };
 
-    // ---- disguise copies (04 section 4.7.3, as changed by G25): copies a type needs on the map to be on the
-    // disguise menu, by disguise class (index 1 tiny, 2 medium, 3 large). Quota copies never break a room's cap.
-    public static readonly int[] QuotaCopies = { 0, 3, 3, 2 };
-    // The kinds of one prop group stand in for each other (a hider's metal bucket fits any row of buckets), so a
-    // member type is on the menu when the map holds this many props of its group in all, whatever their kinds.
-    public const int QUOTA_GROUP_COPIES = 4;
-    public const int QUOTA_BUDGET_PERCENT = 8;     // quota copies may add at most this share of the map's props,
-    public const int QUOTA_BUDGET_MIN = 14;        // or this many on a small map
-    public const int QUOTA_ROOM_ALLOWANCE = 1;     // a quota copy may take a room this far over its floor maximum
+    // ---- disguises: any prop on the map can be a disguise (G25: no copies rule, no quota pass). The only types
+    // that are never a disguise are technical: fixed dressing (FL_FIXTURE), trees (FL_SCENERY), ground cover
+    // (FL_DECOR) and anything longer than 2.5 m (Z3).
     public const int LEAK_ROOM_MAX = 2;            // wrong-category spawns per room
+    public const int LOOSE_SHARE = 15;             // most of a room's floor props (%) that may be loose remainder (never fewer than 1 allowed)
 
     // ---- walkways (G26): every prop is solid, so every placement must leave its room's free floor in one piece
     public const int SEALED_POCKET = 4;     // largest piece of free floor (cells, 1 m2) a placement may cut off: the gap behind a sofa
@@ -101,7 +96,11 @@ public static class GenData
     public const int T_BY_BUILDING = 1 << 16;   // outdoor cell against a building wall (not a fence)
     public const int T_SWING = 1 << 17;
     public const int T_DOOR_SIDE = 1 << 18;     // against the wall right beside a doorway's keep-clear cells
+    public const int T_GLADE = 1 << 19;         // a clearing: no trees
+    public const int T_EARTH = 1 << 20;         // trodden earth around a fire
     public const int T_WALL_ANY = T_WALL_N | T_WALL_E | T_WALL_S | T_WALL_W;
+    // T_SOFT_GROUND: forest floor, and the planting beds of a garden. T_COVERED: the paved part of a patio.
+    // T_PATH: the walkway between a room's doors; outdoors the approach to a building door and a forest path.
 
     // ---- edges between outer cells ----
     public const int E_NONE = 0, E_WALL = 1, E_DOOR = 2, E_WINDOW = 3, E_FENCE = 4;
@@ -120,6 +119,39 @@ public static class GenData
     public const int I_SEAT_OUT = 1 << 18, I_MUSHROOM = 1 << 19;
     public const int I_STORE = 1 << 20;   // warehouse goods (buckets, jerrycans, rolls, bars): on racks, pallets and workbenches, not on a bookcase
     public const int I_CHOP = 1 << 21;    // the axe: the one tool that sticks in a stump
+    public const int I_COOK = 1 << 22;    // pots and pans: on a hob
+    public const int I_LINEN = 1 << 23;   // towels: on a bathroom cabinet, a washer or a dryer
+
+    // ---- room themes (report 15, M4 and M5): an item that sits on, in or under furniture only appears in rooms of
+    // its themes (0 = anywhere). Wrong-category spawns ignore them.
+    public const int TH_LIVING = 1 << 0, TH_KITCHEN = 1 << 1, TH_DINING = 1 << 2, TH_BED = 1 << 3, TH_BATH = 1 << 4, TH_OFFICE = 1 << 5;
+    public const int TH_KIDS = 1 << 6, TH_HALL = 1 << 7, TH_STORE = 1 << 8, TH_DINER = 1 << 9, TH_PRO_KITCHEN = 1 << 10, TH_PANTRY = 1 << 11;
+    public const int TH_PATIO = 1 << 12, TH_GARDEN = 1 << 13, TH_CAMP = 1 << 14, TH_FOREST = 1 << 15;
+    public const int TH_HOME = TH_LIVING | TH_BED | TH_OFFICE | TH_KIDS | TH_HALL | TH_DINING;
+
+    public static int RoomTheme(int roomType)
+    {
+        switch (roomType)
+        {
+            case R_LIVING: return TH_LIVING;
+            case R_KITCHEN: return TH_KITCHEN;
+            case R_DINING: return TH_DINING;
+            case R_BEDROOM: return TH_BED;
+            case R_BATH: return TH_BATH;
+            case R_OFFICE: case R_WH_OFFICE: return TH_OFFICE;
+            case R_KIDS: return TH_KIDS;
+            case R_HALL: return TH_HALL;
+            case R_STORAGE: case R_LOADING: return TH_STORE;
+            case R_DINER_DINING: return TH_DINER;
+            case R_DINER_KITCHEN: return TH_PRO_KITCHEN;
+            case R_DINER_STORE: return TH_PANTRY;
+            case R_PATIO: return TH_PATIO;
+            case R_LAWN_OPEN: case R_GARDEN: return TH_GARDEN;
+            case R_FIREPIT: case R_FOREST_CLEARING: return TH_CAMP;
+            case R_FOREST_DENSE: return TH_FOREST;
+        }
+        return 0;
+    }
 
     // ---- def flags ----
     public const int FL_SOLID = 1 << 0;      // furniture: also blocks the third-person camera and bots' sight. Every prop blocks movement (G26)
@@ -128,7 +160,7 @@ public static class GenData
     public const int FL_FLAT = 1 << 3;       // rugs: take no floor cells
     public const int FL_DECOR = 1 << 4;      // grass tufts: ground cover, not a prop (no collider, never a disguise)
     public const int FL_SEEINTO = 1 << 5;    // open shelves, tents
-    public const int FL_COMMON = 1 << 6;     // common small type (no longer changes the copies a type needs)
+    public const int FL_COMMON = 1 << 6;     // common small type (unused since the copies rule was dropped)
     public const int FL_HEAVY = 1 << 7;      // STATIC_HEAVY: a dart does not move it
     public const int FL_LIGHT = 1 << 8;      // LIGHT: flies further
     public const int FL_LEAK_IN = 1 << 9;    // may leak into indoor rooms
@@ -166,7 +198,8 @@ public static class GenData
     public static int[] defAnchor = new int[MAXD], defFacing = new int[MAXD], defClear = new int[MAXD], defSpacing = new int[MAXD];
     public static int[] defJitPos = new int[MAXD], defJitYaw = new int[MAXD];
     public static int[] defDisguise = new int[MAXD];   // 0 not a disguise, 1 tiny, 2 medium, 3 large
-    public static int[] defMinCopies = new int[MAXD];
+    public static int[] defCanopyY = new int[MAXD];    // trees: the height (mm) at which the crown begins; below it only the trunk is in the way (G31)
+    public static int[] defThemes = new int[MAXD];     // rooms in which the type appears on, in or under furniture (0 = anywhere)
     public static int[] defLeakWeight = new int[MAXD], defAbsurd = new int[MAXD];
     public static int[] defCollider = new int[MAXD];
     public static int[] defSizeClass = new int[MAXD];
@@ -177,7 +210,7 @@ public static class GenData
     public static int[] defGroupStart = new int[MAXD], defGroupCount = new int[MAXD];
     public static int[] defKind = new int[MAXD], defBeside = new int[MAXD];
     public static int[] defRoomCap = new int[MAXD];    // copies of the type standing on the floor of one room (16 m2; larger rooms scale it)
-    public static int[] defKin = new int[MAXD];        // the prop group whose kinds stand in for this type in the copies rule, -1 = none
+    public static int[] defKin = new int[MAXD];        // the prop group the type is a kind of (a hider bucket fits any row of buckets), -1 = none
 
     // ---- prop groups (G25): related props placed together as one tidy unit
     const int MAXGR = 48, MAXGM = 256;
@@ -194,6 +227,7 @@ public static class GenData
     public static int[] rangeTreeMin = new int[64], rangeTreeMax = new int[64];     // trees (scenery, not props)
     public static int[] rangeDecorMin = new int[64], rangeDecorMax = new int[64];   // grass tufts (ground cover, not props)
     public static int[] rangeCover = new int[64];   // most of the room's floor (%) that props and trees may block; not per 100 m2
+    public static int[] rangeFloorAbs = new int[64]; // outdoor areas (G29): the fewest floor props one area of the type gets, whatever its size
 
     const int MAXS = 1024;
     public static int nSlots;
@@ -205,16 +239,14 @@ public static class GenData
     public static int nGroups;
     public static int[] groupMode = new int[MAXG], groupChance = new int[MAXG], groupRef = new int[MAXG];
 
-    // ---- spawn tables ----
+    // ---- native lists: what belongs in a room type (the plans place it; everything else is a wrong-category spawn) ----
     const int MAXT = 64, MAXE = 1024;
     public static int nTables;
     public static int[] tableZone = new int[MAXT], tableRoom = new int[MAXT];
     public static int[] tableEntryStart = new int[MAXT], tableEntryCount = new int[MAXT];
     public static int nEntries;
-    public static int[] entryDef = new int[MAXE], entryWeight = new int[MAXE], entryMin = new int[MAXE], entryMax = new int[MAXE];
-    public static int[] entryGroup = new int[MAXE];    // entries sharing a group id > 0 share one "max 1" budget
-    public static int[] entryAnchor = new int[MAXE];   // -1 = the def's (or the prop group's) own anchor
-    public static int[] entryGrp = new int[MAXE];      // prop group placed by this entry, -1 = a single def (entryDef)
+    public static int[] entryDef = new int[MAXE];      // a type that is native to the room type
+    public static int[] entryGrp = new int[MAXE];      // or a prop group whose kinds all are, -1 = a single def (entryDef)
 
     // ---- zone pieces (04 section 4.1.1) ----
     const int MAXP = 64;
@@ -292,7 +324,7 @@ public static class GenData
         else if (longest < 350) defDisguise[d] = 1;
         else if (longest >= 1800 || defSy[d] >= 1600) defDisguise[d] = 3;
         else defDisguise[d] = 2;
-        defMinCopies[d] = QuotaCopies[defDisguise[d]];
+        defThemes[d] = 0; defCanopyY[d] = 0;
         defKind[d] = 0; defBeside[d] = 0; defKin[d] = -1;
         defRoomCap[d] = 2;
         // rough mass for knocks: volume of the bounding box at 35 kg/m3 (furniture is mostly air), clamped
@@ -317,6 +349,9 @@ public static class GenData
     static void Beside(int kinds) { defBeside[cur] = kinds; }
     static void Cap(int perRoom) { defRoomCap[cur] = perRoom; }
     static void Loose() { defFlags[cur] |= FL_LOOSE; }
+    static void Th(int themes) { defThemes[cur] = themes; }
+    static void Canopy(int mm) { defCanopyY[cur] = mm; }
+    static void ThOf(string id, int themes) { defThemes[FindDef(id)] = themes; }
 
     // A prop group: id, layout, where it stands, how many members, the gap between them (mm), then the member
     // defs. Members are drawn without repeating a def while there are unused ones (different kinds side by side).
@@ -473,28 +508,6 @@ public static class GenData
         return t;
     }
 
-    static void E(string def, int weight, int min, int max) { E(def, weight, min, max, 0, -1); }
-
-    static void E(string def, int weight, int min, int max, int group, int anchor)
-    {
-        int e = nEntries++;
-        entryDef[e] = FindDef(def); entryWeight[e] = weight; entryMin[e] = min; entryMax[e] = max;
-        entryGroup[e] = group; entryAnchor[e] = anchor; entryGrp[e] = -1;
-        tableEntryCount[nTables - 1]++;
-    }
-
-    // an entry that places a prop group; min and max count groups, not members
-    static void G(string grp, int weight, int min, int max) { G(grp, weight, min, max, -1); }
-
-    static void G(string grp, int weight, int min, int max, int anchor)
-    {
-        int e = nEntries++;
-        int g = FindGrp(grp);
-        entryDef[e] = grpMemberDef[grpMemberStart[g]]; entryWeight[e] = weight; entryMin[e] = min; entryMax[e] = max;
-        entryGroup[e] = 0; entryAnchor[e] = anchor; entryGrp[e] = g;
-        tableEntryCount[nTables - 1]++;
-    }
-
     public static int FindTable(int zone, int room)
     {
         for (int t = 0; t < nTables; t++)
@@ -544,14 +557,15 @@ public static class GenData
         D("k_bookcase", "bookcaseOpen", K, 0, A_WALL, FL_SOLID | FL_HEAVY | FL_SEEINTO | IN, 1); Col(C_SHELF); Clear(1); SlotsShelves(2, I_DECOR | I_BOX | I_TOY, 550, false); Kind(K_STORE);
         D("k_bookcaseLow", "bookcaseOpenLow", K, 0, A_WALL, FL_SOLID | FL_SEEINTO | IN, 1); Col(C_SHELF); Clear(1); SlotsShelves(2, I_DECOR | I_BOX | I_TOY, 500, true); Kind(K_STORE);
         D("k_tvCabinet", "cabinetTelevision", K, 0, A_WALL, FL_SOLID | IN, 1); Clear(2); Kind(K_TV);
-        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, 0, defTopY[cur], 0, 0, SZ_XL, I_SCREEN, 850); Slot(g, S_ON_TOP, -defSx[cur] * 4 / 10, defTopY[cur], 0, 0, SZ_S, I_DECOR, 300); }
+        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, 0, defTopY[cur], 0, 0, SZ_XL, I_SCREEN, 950); Slot(g, S_ON_TOP, -defSx[cur] * 4 / 10, defTopY[cur], 0, 0, SZ_S, I_DECOR, 300); }
         D("k_tv", "televisionModern", K, I_SCREEN, A_SLOT_ONLY, BOTH, 2);
         D("k_tvVintage", "televisionVintage", K, I_SCREEN, A_SLOT_ONLY, BOTH, 2);
-        D("k_fridge", "kitchenFridge", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_STORE);
-        D("k_stove", "kitchenStove", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(1); Kind(K_COUNTER);
-        D("k_sink", "kitchenSink", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(1); Kind(K_COUNTER | K_WET);
-        D("k_counter", "kitchenCabinet", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(1); SlotsTop(1, I_KITCHENWARE | I_FOOD, SZ_M, 700); Kind(K_COUNTER);
-        D("k_counterDrawer", "kitchenCabinetDrawer", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(1); SlotsTop(1, I_KITCHENWARE | I_FOOD, SZ_M, 700); Kind(K_COUNTER);
+        D("k_fridge", "kitchenFridge", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(2); Kind(K_STORE);
+        D("k_stove", "kitchenStove", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(2); Kind(K_COUNTER);
+        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, -190, defTopY[cur], 60, 0, SZ_M, I_COOK, 550); Slot(g, S_ON_TOP, 190, defTopY[cur], 60, 0, SZ_M, I_COOK, 350); }
+        D("k_sink", "kitchenSink", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(2); Kind(K_COUNTER | K_WET);
+        D("k_counter", "kitchenCabinet", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(2); SlotsTop(1, I_KITCHENWARE | I_FOOD, SZ_M, 700); Kind(K_COUNTER);
+        D("k_counterDrawer", "kitchenCabinetDrawer", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(2); SlotsTop(1, I_KITCHENWARE | I_FOOD, SZ_M, 700); Kind(K_COUNTER);
         D("k_desk", "desk", K, 0, A_WALL, FL_SOLID | IN, 1); Col(C_TABLE); Clear(2); Kind(K_WORK);
         {
             int g = Group(G_INDEPENDENT, 1000, 0);
@@ -565,10 +579,10 @@ public static class GenData
         D("k_lampTable", "lampRoundTable", K, I_LAMP, A_SLOT_ONLY, BOTH, 1);
         D("k_plant", "pottedPlant", K, 0, A_CORNER, FL_COMMON | BOTH, 0);
         D("k_plantSmall", "plantSmall1", K, I_DECOR, A_SLOT_ONLY, FL_COMMON | BOTH, 0);
-        D("k_bathtub", "bathtub", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Kind(K_WET);
-        D("k_toilet", "toilet", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1);
-        D("k_bathSink", "bathroomSink", K, 0, A_WALL, FL_SOLID | FL_HEAVY | IN, 2); Clear(1); Kind(K_WET);
-        D("k_washer", "washer", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_WET);
+        D("k_bathtub", "bathtub", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_WET);
+        D("k_toilet", "toilet", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(2);
+        D("k_bathSink", "bathroomSink", K, 0, A_WALL, FL_SOLID | FL_HEAVY | IN, 2); Clear(2); Kind(K_WET);
+        D("k_washer", "washer", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_WET); SlotsTop(1, I_LINEN, SZ_M, 250);
         D("k_sideTable", "sideTable", K, 0, A_WALL, FL_SOLID | IN, 1); Col(C_TABLE); SlotsTop(2, I_DECOR | I_LAMP, SZ_M, 500);
         D("k_bedside", "cabinetBed", K, 0, A_BESIDE, IN, 1); SlotsTop(1, I_LAMP | I_DECOR, SZ_M, 650); Beside(K_BED);
         D("k_rug", "rugRound", K, I_RUG, A_CENTER, FL_FLAT | IN, 1); Fp(4, 4);
@@ -582,6 +596,7 @@ public static class GenData
         D("k_microwave", "kitchenMicrowave", K, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 1);
         D("k_coffeeMachine", "kitchenCoffeeMachine", K, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 1);
         D("k_bench", "bench", K, 0, A_WALL, BOTH, 0); Col(C_SEAT); Kind(K_SEAT);
+        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, -defSx[cur] / 4, defTopY[cur], 0, 0, SZ_M, I_PILLOW, 250); }
         D("k_coatRack", "coatRackStanding", K, 0, A_CORNER, FL_LIGHT | IN, 1);
         D("k_pillow", "pillow", K, I_PILLOW, A_SLOT_ONLY, FL_LIGHT | BOTH, 0);
         D("k_speaker", "speaker", K, 0, A_BESIDE, FL_LIGHT | BOTH, 1); Beside(K_TV);
@@ -600,8 +615,8 @@ public static class GenData
         D("f_ketchup", "bottle-ketchup", F, I_FOOD, A_SLOT_ONLY, BOTH, 0);
         D("f_mug", "mug", F, I_TABLEWARE | I_DECOR, A_SLOT_ONLY, FL_COMMON | BOTH, 0);
         D("f_bowl", "bowl", F, I_TABLEWARE | I_CENTERPIECE, A_SLOT_ONLY, BOTH, 0);
-        D("f_pan", "frying-pan", F, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 0);
-        D("f_pot", "pot", F, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 0);
+        D("f_pan", "frying-pan", F, I_KITCHENWARE | I_COOK, A_SLOT_ONLY, BOTH, 0);
+        D("f_pot", "pot", F, I_KITCHENWARE | I_COOK, A_SLOT_ONLY, BOTH, 0);
         D("f_cuttingBoard", "cutting-board", F, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 0);
         D("f_watermelon", "watermelon", F, I_FOOD | I_CENTERPIECE, A_SLOT_ONLY, BOTH, 0);
         D("f_wine", "wine-red", F, I_FOOD | I_CENTERPIECE, A_SLOT_ONLY, BOTH, 0);
@@ -620,7 +635,7 @@ public static class GenData
         D("q_lampStanding", "lamp_standing", 700, 0, A_CORNER, FL_LIGHT | BOTH, 1);
         D("q_lampTable", "lamp_table", 500, I_LAMP, A_SLOT_ONLY, BOTH, 1);
         D("q_cabinet", "cabinet_medium", 800, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 1); Clear(1); SlotsTop(3, I_LAMP | I_DECOR, SZ_M, 500); Kind(K_STORE);
-        D("q_cabinetSmall", "cabinet_small", 800, 0, A_WALL, FL_SOLID | BOTH, 1); Clear(1); SlotsTop(1, I_LAMP | I_DECOR, SZ_M, 600); Kind(K_STORE);
+        D("q_cabinetSmall", "cabinet_small", 800, 0, A_WALL, FL_SOLID | BOTH, 1); Clear(1); SlotsTop(1, I_LAMP | I_DECOR | I_LINEN, SZ_M, 600); Kind(K_STORE);
         D("q_bed", "bed_single_A", 700, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_BED);
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, 0, defTopY[cur], 250, 0, SZ_M, I_TOY | I_PILLOW, 250); }
         D("q_rug", "rug_rectangle_A", 800, I_RUG, A_CENTER, FL_FLAT | IN, 1); Fp(5, 3);
@@ -646,14 +661,15 @@ public static class GenData
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, 0, defSy[cur], 0, 0, SZ_L, I_CRATE | I_BOX, 300); }
         D("r_crateTomatoes", "crate_tomatoes", 350, I_CRATE, A_WALL, BOTH, 0); Loose();
         D("r_crateCheese", "crate_cheese", 350, I_CRATE, A_WALL, BOTH, 0); Loose();
-        D("r_fridge", "fridge_A", 700, 0, A_WALL, FL_SOLID | FL_HEAVY | FL_OPENABLE | BOTH, 2); Col(C_HOLLOW); Clear(3); Kind(K_STORE);
+        D("r_fridge", "fridge_A", 700, 0, A_WALL, FL_SOLID | FL_HEAVY | FL_OPENABLE | BOTH, 2); Col(C_HOLLOW); Clear(2); Kind(K_STORE);
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_INSIDE, -250, 256 * 700 / 1000, 0, 0, SZ_M, I_FOOD | I_KITCHENWARE, 500); Slot(g, S_INSIDE, 250, 256 * 700 / 1000, 0, 0, SZ_M, I_FOOD, 350); Hiding(); }
         D("r_counter", "kitchencounter_straight_A", 700, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(1); SlotsTop(2, I_KITCHENWARE | I_FOOD | I_TABLEWARE, SZ_M, 650); Kind(K_COUNTER);
         D("r_counterSink", "kitchencounter_sink", 700, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(1); Kind(K_COUNTER | K_WET);
         D("r_stove", "stove_single", 700, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Clear(1); Kind(K_COUNTER);
+        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, -300, defTopY[cur], 150, 0, SZ_M, I_COOK, 600); Slot(g, S_ON_TOP, 300, defTopY[cur], 150, 0, SZ_M, I_COOK, 400); }
         D("r_dishrack", "dishrack_plates", 400, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 0);
-        D("r_pot", "pot_A", 300, I_KITCHENWARE, A_SLOT_ONLY, FL_COMMON | BOTH, 0);
-        D("r_pan", "pan_A", 300, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 0);
+        D("r_pot", "pot_A", 300, I_KITCHENWARE | I_COOK, A_SLOT_ONLY, FL_COMMON | BOTH, 0);
+        D("r_pan", "pan_A", 300, I_KITCHENWARE | I_COOK, A_SLOT_ONLY, BOTH, 0);
         D("r_menu", "menu", 350, I_CENTERPIECE, A_SLOT_ONLY, BOTH, 0);
         D("r_papertowel", "papertowel", 300, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 0);
         D("r_jar", "jar_A_large", 400, I_KITCHENWARE | I_FOOD, A_SLOT_ONLY, FL_COMMON | BOTH, 0);
@@ -677,8 +693,8 @@ public static class GenData
             Slot(gSmall, S_ON_TOP, q, defTopY[cur], q, 0, SZ_M, I_BOX | I_STORE, 500); Hiding();
         }
         D("w_palletLoaded", "Pallet_Small_Decorated_A", 600, 0, A_ANY, FL_SOLID | FL_HEAVY | BOTH, 1); Facing(F_ALIGN_GRID); Kind(K_STORE);
-        D("w_fuelBarrel", "Fuel_A_Barrel", 900, I_CRATE, A_WALL, FL_SOLID | FL_COMMON | BOTH, 0); Loose();
-        D("w_fuelBarrelB", "Fuel_B_Barrel", 900, I_CRATE, A_WALL, FL_SOLID | BOTH, 0); Loose();
+        D("w_fuelBarrel", "Fuel_A_Barrel", 900, I_CRATE, A_WALL, FL_SOLID | FL_COMMON | BOTH, 0); Loose(); Cap(5);
+        D("w_fuelBarrelB", "Fuel_B_Barrel", 900, I_CRATE, A_WALL, FL_SOLID | BOTH, 0); Loose(); Cap(5);
         D("w_jerrycan", "Fuel_A_Jerrycan", 600, I_STORE, A_WALL, FL_COMMON | FL_LIGHT | BOTH, 0); Loose(); SlotW(5);
         D("w_planks", "Wood_Planks_Stack_Medium", 700, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 0); Facing(F_ALIGN_GRID); Cap(1);
         D("w_logs", "Wood_Log_Stack", 700, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 1); Facing(F_ALIGN_GRID); Cap(1);
@@ -703,7 +719,8 @@ public static class GenData
         D("s_bedroll", "bedroll", 2600, I_BEDROLL, A_BESIDE, FL_LIGHT | BOTH, 1); Loose(); Beside(K_TENT | K_FIRE); Cap(1);
         D("s_axe", "tool-axe", 2500, I_TOOL | I_CHOP, A_WALL, BOTH, 1); Loose(); Beside(K_WORK | K_TENT | K_STUMP);
         D("s_signpost", "signpost", 3000, 0, A_OUT_EDGE, BOTH, 1);
-        D("s_workbench", "workbench", 2800, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 1); Clear(1); SlotsTop(2, I_TOOL | I_STORE, SZ_M, 600); Kind(K_WORK);
+        D("s_workbench", "workbench", 2800, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 1); Clear(1); SlotsTop(3, I_TOOL | I_STORE, SZ_M, 600); Kind(K_WORK);
+        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ADJACENT, 0, 0, defSz[cur] / 2 + 330, 180, SZ_XL, I_STOOL, 650); Hiding(); }
         D("s_treeLog", "tree-log", 2000, I_SEAT_OUT, A_SOFT, FL_SOLID | FL_HEAVY | OUT, 0); Kind(K_STUMP); Cap(1);
         D("s_bottle", "bottle", 1500, I_FOOD | I_DECOR, A_SLOT_ONLY, FL_COMMON | BOTH, 0);
         D("s_campfirePit", "campfire-pit", 3000, 0, A_OUT_OPEN, FL_HEAVY | BOTH, 2); Kind(K_FIRE);
@@ -720,11 +737,11 @@ public static class GenData
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_INSIDE, -250, 120, 20, 0, SZ_M, I_BOX | I_PILLOW | I_TOY, 400); Slot(g, S_INSIDE, 250, 120, 20, 0, SZ_M, I_BOX | I_PILLOW | I_TOY, 300); Hiding(); }
 
         // ===== Kenney Nature Kit (Lawn, Forest) =====
-        D("n_treeDefault", "tree_default", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(4); Jit(15, 180); Kind(K_TREE);
-        D("n_treeOak", "tree_oak", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(4); Jit(15, 180); Kind(K_TREE);
-        D("n_treePineTall", "tree_pineTallA", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(3); Jit(15, 180); Kind(K_TREE);
-        D("n_treePineRound", "tree_pineRoundA", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(4); Jit(15, 180); Kind(K_TREE);
-        D("n_treeFat", "tree_fat", 3500, 0, A_OUT_OPEN, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(5); Jit(15, 180); Kind(K_TREE);
+        D("n_treeDefault", "tree_default", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(4); Jit(15, 180); Kind(K_TREE); Canopy(2800);
+        D("n_treeOak", "tree_oak", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(4); Jit(15, 180); Kind(K_TREE); Canopy(2530);
+        D("n_treePineTall", "tree_pineTallA", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(3); Jit(15, 180); Kind(K_TREE); Canopy(2200);
+        D("n_treePineRound", "tree_pineRoundA", 3500, 0, A_SOFT, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(4); Jit(15, 180); Kind(K_TREE); Canopy(640);
+        D("n_treeFat", "tree_fat", 3500, 0, A_OUT_OPEN, FL_SOLID | FL_SCENERY, 0); Col(C_TRUNK); Fp(1, 1); Spacing(5); Jit(15, 180); Kind(K_TREE); Canopy(850);
         D("n_bush", "plant_bush", 3000, 0, A_OUT_OPEN, FL_COMMON | OUT, 0); Jit(10, 180); Kind(K_PLANT);
         D("n_bushLarge", "plant_bushLarge", 3000, 0, A_OUT_EDGE, OUT, 0); Jit(6, 20); Kind(K_PLANT);
         D("n_bushDetailed", "plant_bushDetailed", 2000, 0, A_OUT_OPEN, OUT, 0); Jit(10, 180); Kind(K_PLANT);
@@ -782,7 +799,7 @@ public static class GenData
         D("r_cratePotatoes", "crate_potatoes", 350, I_CRATE, A_WALL, BOTH, 0); Loose();
         D("w_barrelC", "Barrel_C", 850, I_CRATE, A_WALL, FL_SOLID | BOTH, 0); Loose();
         D("s_barrelOpen", "barrel-open", 2600, I_CRATE, A_WALL, FL_SOLID | BOTH, 0); Loose();
-        D("w_fuelBarrelC", "Fuel_C_Barrel", 900, I_CRATE, A_WALL, FL_SOLID | BOTH, 0); Loose();
+        D("w_fuelBarrelC", "Fuel_C_Barrel", 900, I_CRATE, A_WALL, FL_SOLID | BOTH, 0); Loose(); Cap(5);
         D("w_jerrycanB", "Fuel_B_Jerrycan", 600, I_STORE, A_WALL, FL_LIGHT | BOTH, 0); Loose(); SlotW(5);
         D("w_jerrycanC", "Fuel_C_Jerrycan", 600, I_STORE, A_WALL, FL_LIGHT | BOTH, 0); Loose(); SlotW(5);
         D("s_boxOpen", "box-open", 2400, I_BOX, A_WALL, BOTH, 0); Loose();
@@ -795,7 +812,7 @@ public static class GenData
         D("w_logA", "Wood_Log_A", 700, 0, A_OUT_EDGE, FL_HEAVY | BOTH, 0); Loose(); Beside(K_FIRE | K_TENT);
         D("w_logB", "Wood_Log_B", 700, 0, A_OUT_EDGE, FL_HEAVY | BOTH, 0); Loose(); Beside(K_FIRE | K_TENT);
         D("n_logStackLarge", "log_stackLarge", 2500, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | BOTH, 0); Beside(K_TENT | K_FIRE); Cap(1);
-        D("n_potSmall", "pot_small", 1500, 0, A_WALL, FL_HEAVY | BOTH, 0); Kind(K_PLANT); Loose();
+        D("n_potSmall", "pot_small", 1500, 0, A_WALL, FL_HEAVY | BOTH, 0); Kind(K_PLANT); Loose(); Cap(3);
         D("n_flowerRedB", "flower_redB", 2500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(12, 180); Loose(); Cap(3);
         D("n_flowerYellowB", "flower_yellowB", 2500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(12, 180); Loose(); Cap(3);
         D("n_flowerPurpleB", "flower_purpleB", 2500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(12, 180); Loose(); Cap(3);
@@ -804,15 +821,75 @@ public static class GenData
         D("n_mushroomTanGroup", "mushroom_tanGroup", 2500, 0, A_BESIDE, FL_LIGHT | OUT, 0); Jit(15, 180); Loose(); Beside(K_TREE | K_STUMP);
         D("n_rockSmallC", "rock_smallB", 1800, 0, A_OUT_OPEN, FL_HEAVY | OUT, 0); Jit(12, 180); Cap(3);
 
+        // ===== generator 3 (G28): pieces the room plans need. From the mirror: =====
+        D("k_bar", "kitchenBar", K, 0, A_WALL, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); SlotsTop(2, I_TABLEWARE | I_FOOD | I_CENTERPIECE, SZ_M, 380); Kind(K_COUNTER);
+        D("k_benchCushion", "benchCushion", K, 0, A_WALL, BOTH, 0); Col(C_SEAT); Kind(K_SEAT);
+        D("k_doormat", "rugDoormat", K, 0, A_DOOR_SIDE, FL_FLAT | BOTH, 1);
+        D("k_dryer", "dryer", K, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_WET); SlotsTop(1, I_LINEN, SZ_M, 350);
+        D("n_pathStone", "path_stone", 1000, 0, A_OUT_OPEN, FL_FLAT | FL_DECOR, 0); Jit(4, 8);
+        D("n_cropCarrot", "crop_carrot", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(4);
+        D("n_cropPumpkin", "crop_pumpkin", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(4);
+        D("n_cropMelon", "crop_melon", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(4);
+        D("m_wheelbarrow", "wheelbarrow", 2400, 0, A_OUT_EDGE, BOTH, 1); Beside(K_STORE | K_WORK);
+        D("m_sack", "sack", 3200, I_STORE, A_WALL, BOTH, 0); Jit(4, 14); Loose(); Beside(K_STORE | K_WORK); Cap(3); SlotW(4);
+        D("ms_handTruck", "hand-truck", 2200, 0, A_WALL, BOTH, 1); Beside(K_STORE);
+        // stand-ins built from simple shapes in the packs' style, because the mirror has none (Z5)
+        D("gen_wateringCan", "gen_wateringCan", 1000, 0, A_OUT_EDGE, FL_LIGHT | BOTH, 1); Jit(3, 25); Loose(); Beside(K_WET | K_WORK | K_STORE);
+        D("gen_tap", "gen_tap", 1000, 0, A_OUT_EDGE, FL_FIXTURE | FL_HEAVY, 1); Kind(K_WET);
+        D("gen_mop", "gen_mop", 1000, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 4); Loose(); Beside(K_WET | K_STORE | K_WORK);
+        D("gen_broom", "gen_broom", 1000, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 4); Loose(); Beside(K_WET | K_STORE | K_WORK);
+        D("gen_shed", "gen_shed", 1000, 0, A_OUT_EDGE, FL_SOLID | FL_FIXTURE | FL_HEAVY, 2); Kind(K_STORE | K_WORK); Jit(0, 0);
+        D("gen_laundryBasket", "gen_laundryBasket", 1000, 0, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Beside(K_WET);
+        D("gen_towels", "gen_towels", 1000, I_LINEN, A_SLOT_ONLY, FL_LIGHT | BOTH, 0);
+        D("gen_shoes", "gen_shoes", 1000, 0, A_WALL, FL_LIGHT | IN, 0); Jit(2, 10); Loose();
+
+        BuildThemes();
         BuildGroups();
         BuildRanges();
         BuildTables();
         BuildPieces();
     }
 
+    // ---------------------------------------------------------------- room themes of the items that sit on furniture
+    static void BuildThemes()
+    {
+        ThOf("k_tv", TH_LIVING | TH_BED | TH_KIDS | TH_OFFICE); ThOf("k_tvVintage", TH_LIVING | TH_BED | TH_KIDS);
+        ThOf("k_screen", TH_OFFICE | TH_BED | TH_KIDS); ThOf("k_laptop", TH_LIVING | TH_OFFICE | TH_BED | TH_KIDS);
+        ThOf("k_lampTable", TH_HOME); ThOf("q_lampTable", TH_HOME);
+        ThOf("k_books", TH_HOME); ThOf("q_books", TH_HOME); ThOf("q_frame", TH_HOME);
+        ThOf("k_radio", TH_LIVING | TH_BED | TH_KITCHEN | TH_OFFICE | TH_STORE);
+        ThOf("k_toaster", TH_KITCHEN); ThOf("k_microwave", TH_KITCHEN | TH_PRO_KITCHEN); ThOf("k_coffeeMachine", TH_KITCHEN | TH_OFFICE | TH_PRO_KITCHEN);
+        ThOf("k_pillow", TH_LIVING | TH_BED | TH_KIDS | TH_HALL | TH_DINER); ThOf("q_pillow", TH_LIVING | TH_BED | TH_KIDS | TH_HALL | TH_DINER);
+        ThOf("setting_basic", TH_DINING | TH_KITCHEN | TH_PATIO | TH_DINER); ThOf("setting_food", TH_DINER | TH_KITCHEN | TH_PATIO);
+        ThOf("condiments", TH_DINER | TH_PATIO | TH_KITCHEN);
+        ThOf("f_plate", TH_DINING | TH_KITCHEN | TH_PATIO | TH_LIVING); ThOf("f_apple", TH_KITCHEN | TH_DINING | TH_LIVING | TH_PANTRY);
+        ThOf("f_loaf", TH_KITCHEN | TH_DINING | TH_PANTRY); ThOf("f_cake", TH_DINING | TH_KITCHEN | TH_DINER);
+        ThOf("f_pizzaBox", TH_LIVING | TH_KITCHEN | TH_OFFICE); ThOf("f_sodaCan", TH_LIVING | TH_KITCHEN | TH_OFFICE | TH_PATIO | TH_DINER | TH_CAMP | TH_KIDS);
+        ThOf("f_ketchup", TH_KITCHEN | TH_DINER); ThOf("f_mug", TH_LIVING | TH_KITCHEN | TH_DINING | TH_OFFICE | TH_BED | TH_DINER | TH_CAMP | TH_PATIO);
+        ThOf("f_bowl", TH_KITCHEN | TH_DINING | TH_LIVING); ThOf("f_pan", TH_KITCHEN | TH_PRO_KITCHEN | TH_CAMP); ThOf("f_pot", TH_KITCHEN | TH_PRO_KITCHEN | TH_CAMP);
+        ThOf("f_cuttingBoard", TH_KITCHEN | TH_PRO_KITCHEN); ThOf("f_watermelon", TH_KITCHEN | TH_DINING | TH_PATIO | TH_PANTRY);
+        ThOf("f_wine", TH_DINING | TH_KITCHEN | TH_LIVING | TH_PATIO); ThOf("f_donut", TH_KITCHEN | TH_LIVING | TH_OFFICE | TH_DINER);
+        ThOf("f_pie", TH_KITCHEN | TH_DINING | TH_DINER);
+        ThOf("r_plate", TH_DINER | TH_PRO_KITCHEN | TH_KITCHEN); ThOf("r_bowl", TH_DINER | TH_PRO_KITCHEN | TH_KITCHEN);
+        ThOf("r_burger", TH_DINER | TH_PRO_KITCHEN); ThOf("r_dinner", TH_DINER | TH_DINING | TH_PRO_KITCHEN);
+        ThOf("r_ketchup", TH_DINER); ThOf("r_mustard", TH_DINER); ThOf("r_menu", TH_DINER);
+        ThOf("r_dishrack", TH_KITCHEN | TH_PRO_KITCHEN); ThOf("r_pot", TH_PRO_KITCHEN | TH_KITCHEN | TH_PANTRY); ThOf("r_pan", TH_PRO_KITCHEN | TH_KITCHEN | TH_PANTRY);
+        ThOf("r_papertowel", TH_PRO_KITCHEN | TH_KITCHEN | TH_PANTRY | TH_BATH); ThOf("r_jar", TH_KITCHEN | TH_PRO_KITCHEN | TH_PANTRY);
+        ThOf("r_cuttingboard", TH_PRO_KITCHEN | TH_KITCHEN);
+        ThOf("w_cog", TH_STORE | TH_OFFICE); ThOf("w_nugget", TH_STORE);
+        ThOf("s_bottle", TH_CAMP | TH_STORE | TH_BATH | TH_KITCHEN | TH_PANTRY | TH_PATIO); ThOf("s_bottleLarge", TH_CAMP | TH_STORE | TH_BATH | TH_PANTRY);
+        ThOf("n_sleepingMat", TH_CAMP); ThOf("gen_towels", TH_BATH);
+        ThOf("toy_cat", TH_KIDS | TH_LIVING | TH_BED); ThOf("toy_dog", TH_KIDS | TH_LIVING | TH_BED); ThOf("toy_bunny", TH_KIDS | TH_LIVING | TH_BED);
+        ThOf("toy_chick", TH_KIDS | TH_LIVING | TH_BED | TH_BATH); ThOf("toy_panda", TH_KIDS | TH_LIVING | TH_BED);
+        ThOf("s_chest", TH_KIDS | TH_BED | TH_CAMP);
+        // store goods on racks, pallets and workbenches
+        string[] goods = { "s_bucket", "t_bucketMetal", "m_bucketWood", "m_bucketWater", "w_jerrycan", "w_jerrycanB", "w_jerrycanC", "w_textileRoll", "w_goldBars", "w_ironStack", "m_sack" };
+        for (int i = 0; i < goods.Length; i++) ThOf(goods[i], TH_STORE | TH_PANTRY | TH_GARDEN | TH_CAMP | TH_OFFICE);
+    }
+
     // ---------------------------------------------------------------- prop groups (G25)
-    // Related props that stand together as one tidy unit. A group is one entry of a spawn table; its members
-    // count towards the room's floor range and towards each member type's cap.
+    // Related props that stand together as one tidy unit. A room plan places a group where such a place has it
+    // (MapGenPlans.cs); its members count towards the room's floor range and towards each member type's cap.
     static void BuildGroups()
     {
         //  id           layout      where        members  gap   the kinds to choose from
@@ -820,174 +897,135 @@ public static class GenData
         Grp("crates", GL_ROW, A_WALL, 2, 3, 50, "r_crate", "r_crateTomatoes", "r_crateCheese", "r_crateCarrots", "r_crateLettuce", "r_cratePotatoes"); GrpBeside(K_STORE | K_COUNTER);
         Grp("boxes", GL_ROW, A_WALL, 2, 3, 50, "w_boxA", "w_boxB", "w_boxC", "s_box", "s_boxOpen"); GrpBeside(K_STORE | K_WORK);
         Grp("cardboard", GL_ROW, A_WALL, 2, 3, 40, "k_boxClosed", "k_boxOpen", "w_boxB");
-        Grp("barrels", GL_ROW, A_WALL, 2, 3, 60, "w_barrel", "w_barrelB", "w_barrelC", "s_barrel", "s_barrelOpen");
-        Grp("fuel", GL_ROW, A_WALL, 2, 4, 60, "w_fuelBarrel", "w_fuelBarrelB", "w_fuelBarrelC", "w_jerrycan", "w_jerrycanB", "w_jerrycanC");
+        Grp("barrels", GL_ROW, A_WALL, 2, 4, 60, "w_barrel", "w_barrelB", "w_barrelC", "s_barrel", "s_barrelOpen");
+        Grp("fuel", GL_ROW, A_WALL, 3, 5, 60, "w_fuelBarrel", "w_fuelBarrelB", "w_fuelBarrelC", "w_jerrycan", "w_jerrycanB", "w_jerrycanC");
         Grp("pots", GL_ROW, A_WALL, 2, 3, 90, "n_planter", "n_potSmall", "k_plant", "q_cactus");
-        Grp("flowers", GL_CLUSTER, A_SOFT, 3, 5, 40, "n_flowerRed", "n_flowerYellow", "n_flowerPurple", "n_flowerRedB", "n_flowerYellowB", "n_flowerPurpleB");
+        // flowers stand in drifts of one colour (report 15, C7): two shapes of the colour, 3 to 5 plants
+        Grp("flowersRed", GL_CLUSTER, A_SOFT, 3, 5, 40, "n_flowerRed", "n_flowerRedB");
+        Grp("flowersYellow", GL_CLUSTER, A_SOFT, 3, 5, 40, "n_flowerYellow", "n_flowerYellowB");
+        Grp("flowersPurple", GL_CLUSTER, A_SOFT, 3, 5, 40, "n_flowerPurple", "n_flowerPurpleB");
         Grp("mushrooms", GL_CLUSTER, A_BESIDE, 2, 4, 40, "n_mushroomRed", "n_mushroomTan", "n_mushroomRedTall", "n_mushroomTanTall", "n_mushroomGroup", "n_mushroomTanGroup"); GrpBeside(K_TREE | K_STUMP);
         Grp("logpile", GL_ROW, A_OUT_EDGE, 2, 3, 30, "w_logA", "w_logB"); GrpBeside(K_FIRE | K_TENT);
-        Grp("tools", GL_ROW, A_WALL, 2, 3, 130, "s_axe", "s_shovel", "s_hoe", "s_pickaxe", "s_hammer"); GrpBeside(K_WORK | K_TENT | K_STUMP);
+        Grp("tools", GL_ROW, A_WALL, 2, 3, 130, "s_axe", "s_shovel", "s_hoe", "s_pickaxe", "s_hammer"); GrpBeside(K_WORK | K_TENT | K_STUMP | K_STORE);
         Grp("toys", GL_CLUSTER, A_CENTER, 2, 3, 90, "toy_cat", "toy_dog", "toy_bunny", "toy_chick", "toy_panda"); GrpBeside(K_BED | K_SEAT);
         Grp("rocks", GL_CLUSTER, A_OUT_OPEN, 2, 3, 60, "n_rockSmall", "n_rockSmallB", "n_rockSmallC");
-        // one kind repeated: a row of the same stool, two loungers side by side
+        // one kind repeated: a row of the same stool, two loungers side by side, one crop to a row, a pile of sacks
         Grp("stoolsDiner", GL_ROW, A_WALL, 2, 3, 160, "r_stool");
         Grp("stoolsBar", GL_ROW, A_BESIDE, 2, 2, 160, "k_stool"); GrpBeside(K_COUNTER);
         Grp("loungers", GL_ROW, A_COVERED, 2, 2, 250, "k_loungeChair");
+        Grp("vegCarrot", GL_ROW, A_SOFT, 3, 4, 110, "n_cropCarrot");
+        Grp("vegPumpkin", GL_ROW, A_SOFT, 3, 4, 90, "n_cropPumpkin");
+        Grp("vegMelon", GL_ROW, A_SOFT, 3, 4, 110, "n_cropMelon");
+        Grp("sacks", GL_ROW, A_WALL, 2, 3, 40, "m_sack"); GrpBeside(K_STORE | K_WORK);
+        // garden things at the water point; a bucket with a mop or a broom (the cleaning corner)
+        Grp("watering", GL_ROW, A_OUT_EDGE, 2, 3, 80, "gen_wateringCan", "m_bucketWater", "s_bucket", "m_bucketWood"); GrpBeside(K_WET);
+        Grp("cleaning", GL_ROW, A_WALL, 2, 3, 70, "gen_mop", "gen_broom", "s_bucket", "t_bucketMetal"); GrpBeside(K_WET | K_STORE);
+        // the kinds of a group stand in for each other: a hider's metal bucket fits any row of buckets (bots use this)
+        int bk = FindGrp("buckets");
+        defKin[FindDef("gen_wateringCan")] = bk;
+        int fl = FindGrp("flowersRed");
+        string[] flowers = { "n_flowerYellow", "n_flowerYellowB", "n_flowerPurple", "n_flowerPurpleB" };
+        for (int i = 0; i < flowers.Length; i++) defKin[FindDef(flowers[i])] = fl;
+        ThOf("k_stool", TH_KITCHEN | TH_DINER | TH_STORE | TH_OFFICE); ThOf("r_stool", TH_DINER | TH_STORE | TH_PANTRY | TH_PRO_KITCHEN | TH_OFFICE);
     }
 
     // ---------------------------------------------------------------- prop counts per room type (G24)
     // Props per 100 m2 of the room's floor at Normal density; the density setting scales every number. A room
-    // rolls a floor target inside its range and fills up to it; mandatory pieces (a kitchen's stove, a table and
-    // its chairs) are placed even when a small room's target is lower. Chairs at a table stand on the floor and
-    // count there. "Cover" is the share of the room's floor that props and trees may block: the fill stops there
-    // even below the target, so a room of bulky things stays open. Trees and grass are not props.
+    // rolls a floor budget inside its range. The plan of its type then places anchors, what belongs with them,
+    // a few groups and a small remainder, and stops when the budget is used: empty floor is a correct result.
+    // The pieces that make the room what it is (a kitchen's run, a table and its chairs, a bed) are placed even
+    // when a small room's budget is lower. Everything that stands on the floor counts, fixtures and chairs too.
+    // "Cover" is the share of the room's floor that props and trees may block. Trees and grass are not props.
     static void BuildRanges()
     {
         //    room type            on the floor    on furniture    cover    trees     grass
         //                         min   max       max             max %    min max   min max
-        Range(R_LIVING,            22,   34,       30,             50);
-        Range(R_DINING,            38,   50,       40,             50);
-        Range(R_KITCHEN,           34,   46,       20,             50);
-        Range(R_BEDROOM,           30,   44,       16,             55);
-        Range(R_BATH,              19,   31,        6,             50);
-        Range(R_OFFICE,            30,   44,       32,             50);
-        Range(R_KIDS,              36,   50,       24,             55);
-        Range(R_HALL,              19,   31,       10,             40);
-        Range(R_STORAGE,           28,   40,       36,             50);
-        Range(R_LOADING,           28,   40,       12,             50);
-        Range(R_WH_OFFICE,         30,   44,       30,             50);
-        Range(R_DINER_DINING,      38,   54,       30,             55);
-        Range(R_DINER_KITCHEN,     25,   38,       16,             60);
-        Range(R_DINER_STORE,       30,   44,       28,             50);
-        Range(R_LAWN_OPEN,          3,    8,        0,             12,      0,  2,    0,  0);
-        Range(R_GARDEN,            24,   36,        0,             30,      0,  2,    0,  0);
-        Range(R_PATIO,             18,   28,        8,             30);
-        Range(R_FIREPIT,           12,   20,        2,             25);
-        Range(R_FOREST_DENSE,      16,   26,        2,             34,      12, 20,   6, 14);
-        Range(R_FOREST_CLEARING,   20,   28,        4,             38,      5,  9,    4,  8);
+        Range(R_LIVING,            28,   40,       32,             50);
+        Range(R_DINING,            40,   56,       40,             50);
+        Range(R_KITCHEN,           38,   52,       30,             50);
+        Range(R_BEDROOM,           32,   46,       20,             55);
+        Range(R_BATH,              25,   40,       10,             50);
+        Range(R_OFFICE,            34,   50,       34,             50);
+        Range(R_KIDS,              36,   50,       26,             55);
+        Range(R_HALL,              19,   31,       12,             40);
+        Range(R_STORAGE,           38,   54,       40,             50);
+        Range(R_LOADING,           34,   50,       16,             50);
+        Range(R_WH_OFFICE,         32,   46,       30,             50);
+        Range(R_DINER_DINING,      44,   62,       36,             55);
+        Range(R_DINER_KITCHEN,     30,   46,       24,             60);
+        Range(R_DINER_STORE,       36,   54,       34,             50);
+        Range(R_LAWN_OPEN,         10,   18,        2,             34,      1,  2,    0,  0);
+        Range(R_GARDEN,            22,   34,        2,             40,      0,  2,    0,  0);
+        Range(R_PATIO,             16,   26,        8,             36,      0,  2,    0,  0);
+        Range(R_FIREPIT,           14,   22,        3,             34,      0,  2,    0,  0);
+        Range(R_FOREST_DENSE,      16,   26,        2,             44,      9,  15,   8, 16);
+        Range(R_FOREST_CLEARING,   16,   24,        5,             44,      4,  7,    4,  8);
+        // No outdoor area is bare (G29): the fewest props on the floor of one area, whatever its size
+        rangeFloorAbs[R_LAWN_OPEN] = 5; rangeFloorAbs[R_GARDEN] = 8; rangeFloorAbs[R_PATIO] = 7; rangeFloorAbs[R_FIREPIT] = 7;
+        rangeFloorAbs[R_FOREST_DENSE] = 6; rangeFloorAbs[R_FOREST_CLEARING] = 8;
     }
 
-    // ---------------------------------------------------------------- spawn tables
-    // E: def, weight, min, max [, exclusive group, anchor]. G: prop group, weight, min, max [, anchor].
-    // max is the cap of that type in a 16 m2 room (larger rooms scale it, MapGen.ScaledCap). Trees and grass are
-    // listed for their weights only: their numbers come from the range table.
+    // ---------------------------------------------------------------- what is native to a room type
+    // The types a room's plan may place (MapGenPlans.cs, MapGenOutdoor.cs). A type that is not listed for a room
+    // type can only come there as a wrong-category spawn (D10). "@name" lists every kind of a prop group.
+    static void Native(int zone, int room, params string[] ids)
+    {
+        Table(zone, room);
+        for (int i = 0; i < ids.Length; i++)
+        {
+            if (ids[i][0] == '@')
+            {
+                int g = FindGrp(ids[i].Substring(1));
+                int e = nEntries++;
+                entryDef[e] = grpMemberDef[grpMemberStart[g]]; entryGrp[e] = g;
+                tableEntryCount[nTables - 1]++;
+            }
+            else
+            {
+                int e = nEntries++;
+                entryDef[e] = FindDef(ids[i]); entryGrp[e] = -1;
+                tableEntryCount[nTables - 1]++;
+            }
+        }
+    }
+
     static void BuildTables()
     {
-        // ---------------- HOUSE ----------------
-        Table(Z_HOUSE, R_LIVING);
-        E("k_sofa", 6, 1, 1, 1, -1); E("q_couch", 4, 1, 1, 1, -1);
-        E("k_tableCoffee", 5, 0, 1, 2, -1); E("q_tableLow", 3, 0, 1, 2, -1);
-        E("k_tvCabinet", 6, 0, 1); E("q_armchair", 4, 0, 2); E("k_loungeChair", 3, 0, 1);
-        E("k_bookcase", 4, 0, 1); E("k_bookcaseLow", 3, 0, 1); E("q_cabinet", 3, 0, 1);
-        E("k_lampFloor", 3, 0, 1); E("q_lampStanding", 3, 0, 1); E("k_plant", 4, 0, 1); E("q_cactus", 2, 0, 1);
-        E("k_sideTable", 3, 0, 1); E("q_tableSmall", 3, 0, 1); E("k_speaker", 2, 0, 2); E("k_rug", 3, 0, 1); E("q_rug", 3, 0, 1);
+        Native(Z_HOUSE, R_LIVING, "k_sofa", "q_couch", "k_tableCoffee", "q_tableLow", "k_tvCabinet", "q_armchair", "k_loungeChair", "k_bookcase", "k_bookcaseLow",
+            "q_cabinet", "k_lampFloor", "q_lampStanding", "k_plant", "q_cactus", "k_sideTable", "q_tableSmall", "k_speaker", "k_rug", "q_rug", "k_rugLong", "@cardboard", "@toys");
+        Native(Z_HOUSE, R_DINING, "k_table", "q_table", "q_cabinet", "k_bookcaseLow", "k_sideTable", "k_plant", "q_cactus", "q_lampStanding", "k_lampFloor", "k_rug", "q_rug");
+        Native(Z_HOUSE, R_KITCHEN, "k_stove", "k_sink", "k_fridge", "k_counter", "k_counterDrawer", "k_trashcan", "k_stool", "k_bar", "r_tableRound", "k_table", "k_plant",
+            "k_boxOpen", "@crates", "q_tableSmall");
+        Native(Z_HOUSE, R_BEDROOM, "k_bedDouble", "k_bedSingle", "q_bed", "gen_wardrobe", "k_bedside", "q_cabinet", "q_cabinetSmall", "k_desk", "k_lampFloor", "q_lampStanding",
+            "k_plant", "k_rug", "q_rug", "k_bookcaseLow", "q_armchair", "k_bench", "@cardboard");
+        Native(Z_HOUSE, R_BATH, "k_toilet", "k_bathSink", "k_bathtub", "k_washer", "k_dryer", "k_trashcan", "k_plant", "q_cabinetSmall", "@buckets", "@cleaning",
+            "gen_laundryBasket", "k_doormat");
+        Native(Z_HOUSE, R_OFFICE, "k_desk", "k_bookcase", "q_cabinet", "k_bookcaseLow", "k_plant", "k_lampFloor", "k_sideTable", "q_armchair", "k_trashcan", "@cardboard", "q_tableSmall");
+        Native(Z_HOUSE, R_KIDS, "k_bedSingle", "q_bed", "k_bookcaseLow", "k_desk", "gen_wardrobe", "k_rug", "k_bedside", "k_plant", "@toys", "k_boxOpen", "s_chest");
+        Native(Z_HOUSE, R_HALL, "k_bench", "k_benchCushion", "k_coatRack", "gen_wardrobe", "k_plant", "q_cabinetSmall", "k_sideTable", "k_lampFloor", "@cardboard", "k_doormat", "gen_shoes");
 
-        Table(Z_HOUSE, R_DINING);
-        E("k_table", 6, 1, 1, 1, -1); E("q_table", 4, 1, 1, 1, -1);
-        E("q_cabinet", 4, 0, 1); E("k_bookcase", 2, 0, 1); E("k_bookcaseLow", 3, 0, 1); E("k_sideTable", 3, 0, 1);
-        E("k_plant", 4, 0, 1); E("q_lampStanding", 2, 0, 1); E("k_lampFloor", 2, 0, 1);
+        Native(Z_WAREHOUSE, R_STORAGE, "gen_rack", "w_pallet", "w_palletLoaded", "@crates", "@barrels", "@fuel", "@boxes", "w_planks", "w_logs", "w_textiles", "w_bricks", "w_ironStack",
+            "w_parts", "s_boxLarge", "s_boxLargeOpen", "s_workbench", "@buckets", "@tools", "@cleaning", "ms_handTruck", "@sacks", "q_stool", "r_stool");
+        Native(Z_WAREHOUSE, R_LOADING, "w_pallet", "w_palletLoaded", "@crates", "@barrels", "@fuel", "@boxes", "s_boxLarge", "w_planks", "k_trashcan", "ms_handTruck", "@sacks", "@cleaning");
+        Native(Z_WAREHOUSE, R_WH_OFFICE, "k_desk", "q_cabinet", "k_bookcase", "k_bookcaseLow", "k_trashcan", "k_plant", "s_workbench", "q_tableSmall", "k_lampFloor", "@cardboard", "r_tableRound");
 
-        Table(Z_HOUSE, R_KITCHEN);
-        E("k_stove", 5, 1, 1); E("k_sink", 5, 1, 1); E("k_fridge", 5, 1, 1);
-        E("k_counter", 6, 1, 2); E("k_counterDrawer", 4, 0, 1);
-        E("k_trashcan", 4, 0, 1); G("stoolsBar", 3, 0, 1); E("q_tableSmall", 2, 0, 1, 0, A_WALL); E("k_plant", 2, 0, 1);
-        E("r_tableRound", 3, 0, 1, 1, -1);
+        Native(Z_DINER, R_DINER_DINING, "r_table", "r_tableRound", "k_table", "k_plant", "q_cactus", "q_cabinet", "q_lampStanding", "k_trashcan", "k_bench", "k_benchCushion", "r_stool",
+            "k_stool", "k_bar", "k_coatRack", "k_doormat", "q_couch", "q_tableLow", "n_planter", "@pots");
+        Native(Z_DINER, R_DINER_KITCHEN, "r_counter", "r_counterSink", "r_stove", "r_fridge", "@crates", "k_trashcan", "@cleaning");
+        Native(Z_DINER, R_DINER_STORE, "r_fridge", "@crates", "@barrels", "gen_rackPantry", "w_pallet", "@boxes", "@sacks");
 
-        Table(Z_HOUSE, R_BEDROOM);
-        E("k_bedDouble", 5, 1, 1, 1, -1); E("k_bedSingle", 3, 1, 1, 1, -1); E("q_bed", 3, 1, 1, 1, -1);
-        E("gen_wardrobe", 7, 0, 1); E("k_bedside", 6, 0, 2); E("q_cabinet", 3, 0, 1); E("q_cabinetSmall", 2, 0, 1);
-        E("k_desk", 3, 0, 1); E("k_lampFloor", 2, 0, 1); E("k_plant", 3, 0, 1); E("k_rug", 2, 0, 1); E("q_rug", 2, 0, 1);
-        E("k_bookcaseLow", 2, 0, 1); E("q_armchair", 2, 0, 1); G("cardboard", 1, 0, 1);
+        Native(Z_LAWN, R_LAWN_OPEN, "n_treeFat", "n_treeOak", "n_bush", "n_bushDetailed", "n_bushLarge", "@rocks", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_sign", "k_bench",
+            "n_logStack", "@pots", "k_trashcan", "n_pathStone", "w_pallet", "@barrels", "r_tableRound", "n_rockLargeB");
+        Native(Z_LAWN, R_GARDEN, "n_treeFat", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_bush", "n_bushLarge", "n_bushDetailed", "@rocks", "@pots", "n_sign", "@buckets", "@tools",
+            "@watering", "gen_tap", "gen_shed", "m_wheelbarrow", "@sacks", "@vegCarrot", "@vegPumpkin", "@vegMelon", "k_bench", "n_pathStone");
+        Native(Z_LAWN, R_PATIO, "n_treeFat", "k_table", "r_tableRound", "@pots", "k_loungeChair", "k_bench", "k_benchCushion", "n_bushLarge", "n_bush", "s_barrel", "n_pathStone", "@flowersYellow");
+        Native(Z_LAWN, R_FIREPIT, "n_treeFat", "n_campfire", "s_campfirePit", "n_logStack", "n_logStackLarge", "@logpile", "n_bush", "n_bushLarge", "@rocks", "n_stump", "n_stumpRound", "n_log",
+            "@buckets", "n_pathStone", "s_axe");
 
-        Table(Z_HOUSE, R_BATH);
-        E("k_toilet", 5, 1, 1); E("k_bathSink", 5, 1, 1); E("k_bathtub", 5, 0, 1); E("k_washer", 4, 0, 1);
-        E("k_trashcan", 3, 0, 1); E("k_plant", 2, 0, 1); E("q_cabinetSmall", 2, 0, 1); E("s_bucket", 1, 0, 1, 0, A_BESIDE);
-
-        Table(Z_HOUSE, R_OFFICE);
-        E("k_desk", 6, 1, 2); E("k_bookcase", 5, 1, 2); E("q_cabinet", 3, 0, 1); E("k_bookcaseLow", 3, 0, 1);
-        E("k_plant", 3, 0, 1); E("k_lampFloor", 3, 0, 1); E("k_sideTable", 2, 0, 1); E("q_armchair", 2, 0, 1); E("k_trashcan", 3, 0, 1);
-        E("gen_wardrobe", 2, 0, 1); G("cardboard", 3, 0, 1);
-
-        Table(Z_HOUSE, R_KIDS);
-        E("k_bedSingle", 5, 1, 2); E("q_bed", 3, 0, 1); E("k_bookcaseLow", 4, 0, 1); E("k_desk", 3, 0, 1);
-        E("gen_wardrobe", 4, 0, 1); E("k_rug", 4, 0, 1); E("k_bedside", 3, 0, 1); E("k_plant", 1, 0, 1);
-        G("toys", 6, 1, 2); E("k_boxOpen", 2, 0, 1);
-
-        Table(Z_HOUSE, R_HALL);
-        E("k_bench", 5, 0, 1); E("k_coatRack", 5, 0, 1); E("gen_wardrobe", 4, 0, 1); E("k_plant", 4, 0, 1);
-        E("q_cabinetSmall", 3, 0, 1); E("k_sideTable", 3, 0, 1); E("k_lampFloor", 2, 0, 1); G("cardboard", 1, 0, 1);
-
-        // ---------------- WAREHOUSE ----------------
-        Table(Z_WAREHOUSE, R_STORAGE);
-        E("gen_rack", 0, 0, 3);   // placed by the row template, not by weight
-        E("w_pallet", 8, 1, 2); E("w_palletLoaded", 4, 0, 1); G("crates", 5, 1, 1); G("barrels", 5, 0, 1); G("fuel", 4, 0, 1); G("boxes", 5, 0, 1);
-        E("w_planks", 3, 0, 1); E("w_logs", 2, 0, 1); E("w_textiles", 3, 0, 1); E("w_bricks", 3, 0, 1); E("w_ironStack", 2, 0, 1);
-        E("w_parts", 2, 0, 1); E("s_boxLarge", 3, 0, 1); E("s_boxLargeOpen", 2, 0, 1); E("s_workbench", 3, 0, 1);
-        G("buckets", 1, 0, 1, A_BESIDE); G("tools", 2, 0, 1, A_BESIDE);
-
-        Table(Z_WAREHOUSE, R_LOADING);
-        E("w_pallet", 8, 1, 2); E("w_palletLoaded", 5, 0, 1); G("crates", 5, 0, 1); G("barrels", 4, 0, 1); G("fuel", 4, 0, 1);
-        G("boxes", 4, 0, 1); E("s_boxLarge", 3, 0, 1); E("w_planks", 2, 0, 1); E("s_workbench", 2, 0, 1); E("k_trashcan", 2, 0, 1);
-
-        Table(Z_WAREHOUSE, R_WH_OFFICE);
-        E("k_desk", 6, 1, 1); E("q_cabinet", 4, 0, 1); E("k_bookcase", 4, 0, 2); E("k_trashcan", 3, 0, 1);
-        E("k_plant", 2, 0, 1); E("s_workbench", 3, 0, 1); E("q_tableSmall", 2, 0, 1, 0, A_WALL); E("k_lampFloor", 2, 0, 1);
-        G("cardboard", 4, 0, 1);
-
-        // ---------------- DINER ----------------
-        Table(Z_DINER, R_DINER_DINING);
-        E("r_table", 8, 2, 3); E("r_tableRound", 5, 0, 2); E("k_table", 2, 0, 1);
-        E("k_plant", 3, 0, 1); E("q_cactus", 2, 0, 1); E("q_cabinet", 2, 0, 1); E("q_lampStanding", 2, 0, 1); E("k_trashcan", 2, 0, 1);
-        E("k_bench", 2, 0, 1); G("stoolsDiner", 3, 0, 1);
-
-        Table(Z_DINER, R_DINER_KITCHEN);
-        E("r_counter", 7, 1, 2); E("r_counterSink", 5, 1, 1); E("r_stove", 5, 1, 1); E("r_fridge", 6, 1, 1);
-        G("crates", 5, 0, 1); E("k_trashcan", 3, 0, 1);
-
-        Table(Z_DINER, R_DINER_STORE);
-        E("r_fridge", 4, 0, 1); G("crates", 6, 1, 2); G("barrels", 3, 0, 1); E("gen_rackPantry", 5, 0, 2);
-        E("w_pallet", 3, 0, 1); G("boxes", 4, 0, 1);
-
-        // ---------------- LAWN ----------------
-        // An open lawn is nearly empty. What stands on it stands at its edge: against the fence, against a
-        // building wall or beside a building's door. Only plants, rocks and trees stand in the open.
-        Table(Z_LAWN, R_LAWN_OPEN);
-        E("n_treeFat", 3, 0, 1);
-        E("n_bush", 6, 0, 1); E("n_bushDetailed", 3, 0, 1); E("n_bushLarge", 4, 0, 1); G("rocks", 3, 0, 1);
-        G("flowers", 3, 0, 1, A_OUT_EDGE); E("n_sign", 2, 0, 1); E("k_bench", 3, 0, 1, 0, A_OUT_EDGE); E("n_logStack", 1, 0, 1);
-        G("pots", 3, 0, 1, A_DOOR_SIDE); E("k_trashcan", 2, 0, 1, 0, A_BUILDING);
-
-        Table(Z_LAWN, R_GARDEN);
-        E("n_treeFat", 2, 0, 1, 0, A_SOFT);
-        G("flowers", 14, 1, 2); E("n_bush", 4, 0, 1); E("n_bushLarge", 3, 0, 1); E("n_rockSmallB", 2, 0, 1);
-        G("pots", 4, 0, 1, A_OUT_EDGE); E("n_sign", 2, 0, 1); G("buckets", 2, 0, 1, A_OUT_EDGE); G("tools", 3, 0, 1, A_OUT_EDGE);
-
-        Table(Z_LAWN, R_PATIO);
-        E("k_table", 5, 1, 1, 1, A_OUT_OPEN); E("r_tableRound", 4, 1, 1, 1, A_OUT_OPEN);
-        G("pots", 5, 0, 1, A_OUT_EDGE); G("loungers", 3, 0, 1); E("k_bench", 3, 0, 1, 0, A_OUT_EDGE);
-        E("n_bushLarge", 3, 0, 1); E("s_barrel", 2, 0, 1, 0, A_OUT_EDGE);
-
-        Table(Z_LAWN, R_FIREPIT);
-        E("n_campfire", 5, 1, 1, 1, -1); E("s_campfirePit", 3, 1, 1, 1, -1);
-        E("n_logStack", 4, 0, 1, 3, -1); E("n_logStackLarge", 2, 0, 1, 3, -1); G("logpile", 4, 0, 1, A_BESIDE); E("n_bush", 4, 0, 1); G("rocks", 3, 0, 1);
-
-        // ---------------- FOREST ----------------
-        Table(Z_FOREST, R_FOREST_DENSE);
-        E("n_treeDefault", 6, 0, 0); E("n_treeOak", 5, 0, 0); E("n_treePineTall", 6, 0, 0); E("n_treePineRound", 4, 0, 0);
-        E("n_bush", 5, 0, 1, 0, A_SOFT); E("n_bushDetailed", 3, 0, 1, 0, A_SOFT); E("n_rockLarge", 2, 0, 1); G("rocks", 4, 0, 1, A_SOFT);
-        E("n_rockTall", 1, 0, 1); E("n_stump", 4, 0, 1); E("n_stumpRound", 3, 0, 1); E("n_log", 4, 0, 1); E("n_logLarge", 1, 0, 1);
-        E("s_treeLog", 2, 0, 1); G("mushrooms", 8, 0, 1); G("flowers", 2, 0, 1);
-        E("n_grass", 6, 0, 0); E("n_grassLarge", 4, 0, 0);
-
-        Table(Z_FOREST, R_FOREST_CLEARING);
-        E("n_tentOpen", 5, 1, 1, 1, -1); E("n_tentClosed", 3, 1, 1, 1, -1);
-        E("n_campfire", 5, 1, 1, 2, A_SOFT); E("s_campfirePit", 3, 1, 1, 2, A_SOFT);
-        E("n_treeDefault", 4, 0, 0); E("n_treePineTall", 4, 0, 0); E("n_treeOak", 3, 0, 0);
-        E("n_stump", 3, 0, 1); E("n_log", 3, 0, 1); E("n_logStack", 3, 0, 1, 0, A_BESIDE); G("logpile", 4, 0, 1, A_BESIDE);
-        E("s_bedroll", 3, 0, 1); E("s_chest", 2, 0, 1, 0, A_BESIDE); E("s_barrel", 2, 0, 1, 0, A_BESIDE); E("s_box", 2, 0, 1, 0, A_BESIDE);
-        E("n_bush", 4, 0, 1, 0, A_SOFT); G("rocks", 3, 0, 1, A_SOFT); G("mushrooms", 3, 0, 1);
-        G("buckets", 2, 0, 1, A_BESIDE); G("tools", 3, 0, 1, A_BESIDE);
-        E("n_grass", 4, 0, 0);
+        Native(Z_FOREST, R_FOREST_DENSE, "n_treeDefault", "n_treeOak", "n_treePineTall", "n_treePineRound", "n_bush", "n_bushDetailed", "n_bushLarge", "n_rockLarge", "@rocks", "n_rockTall",
+            "n_stump", "n_stumpRound", "n_log", "n_logLarge", "s_treeLog", "@mushrooms", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_grass", "n_grassLarge", "s_signpost", "s_axe");
+        Native(Z_FOREST, R_FOREST_CLEARING, "n_tentOpen", "n_tentClosed", "n_campfire", "s_campfirePit", "n_treeDefault", "n_treePineTall", "n_treeOak", "n_stump", "n_stumpRound", "n_log",
+            "n_logStack", "@logpile", "s_bedroll", "s_chest", "s_barrel", "s_box", "n_bush", "n_bushLarge", "@rocks", "@mushrooms", "@buckets", "@tools", "n_grass", "n_grassLarge", "s_axe");
 
         Table(Z_RELEASE, R_RELEASE);
     }

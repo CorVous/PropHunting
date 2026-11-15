@@ -150,7 +150,7 @@ public partial class Player : MonoBehaviour
                 Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false;
                 captureClickFrame = Time.frameCount;   // this click only captures the mouse
             }
-            Look();
+            if (!PipScreen.I.grabbing) Look();   // B held: the mouse moves the third-person screen
             if (Input.GetKeyDown(KeyCode.V)) SetThird(!third);
             float wheel = Input.GetAxis("Mouse ScrollWheel");
             if (third && Mathf.Abs(wheel) > 0.001f) thirdDist = Mathf.Clamp(thirdDist - wheel * 2.5f, 1.2f, 6f);
@@ -296,6 +296,23 @@ public partial class Player : MonoBehaviour
         {
             figure.transform.position = body.pos;
             figure.transform.rotation = Quaternion.Euler(0f, camYaw, 0f);
+        }
+    }
+
+    // The third-person screen draws the player from outside: the real prop instead of the faint shell, the figure
+    // instead of nothing. PipScreen renders between the two calls; afterwards the first-person state is back.
+    public void PipRender(bool begin)
+    {
+        bool outside = begin || third || Game.I.topView;
+        if (def >= 0) visualRend.sharedMaterial = outside ? ModelLibrary.lit : ModelLibrary.ghost;
+        else if (role != ROLE_NONE)
+        {
+            if (figure.activeSelf != outside) figure.SetActive(outside);
+            if (outside)
+            {
+                figure.transform.position = body.pos;
+                figure.transform.rotation = Quaternion.Euler(0f, camYaw, 0f);
+            }
         }
     }
 

@@ -280,6 +280,33 @@ public partial class MapGen
         {
             for (int i = 0; i < n; i++) roomType[order[i]] = GenData.R_RELEASE;
         }
+        // Generator 3: the room types the pieces never produced. These draws are the prop generator's own, so the
+        // types layout 1 chose stay where they were. A third room may be a kids' room instead of a bedroom; a
+        // fourth may be an office or a kids' room instead of a bathroom; a one-cell room with three or more
+        // doorways is a passage, so it is a hall.
+        if (zone == GenData.Z_HOUSE)
+        {
+            GenRng r3 = Rng(ST_ROOMTYPE3, inst, 0);
+            int third = r3.Range(100), fourth = r3.Range(100);
+            for (int i = 0; i < n; i++)
+            {
+                int r = order[i];
+                if (i == 2 && n == 3 && third < 30) roomType[r] = GenData.R_KIDS;
+                if (i == 3 && roomType[r] == GenData.R_BATH) { if (fourth < 25) roomType[r] = GenData.R_OFFICE; else if (fourth < 45) roomType[r] = GenData.R_KIDS; }
+                if (i >= 1 && n >= 3 && roomOuterCells[r] == 1 && roomType[r] != GenData.R_KITCHEN && DoorwaysOf(r) >= 3) roomType[r] = GenData.R_HALL;
+            }
+        }
+    }
+
+    int DoorwaysOf(int room)
+    {
+        int n = 0;
+        for (int c = 0; c < W * H; c++)
+        {
+            if (cellRoom[c] != room || cellZone[c] == GenData.Z_NONE) continue;
+            for (int d = 0; d < 4; d++) if (EdgeType(c % W, c / W, d) == GenData.E_DOOR) n++;
+        }
+        return n;
     }
 
     // =====================================================================================================
@@ -293,7 +320,7 @@ public partial class MapGen
     void BuildTags()
     {
         int n = IW * IH;
-        for (int i = 0; i < n; i++) { tags[i] = 0; innerRoom[i] = -1; occ[i] = 0; flatOcc[i] = 0; solid[i] = 0; reserve[i] = 0; walk[i] = 0; reach[i] = 0; }
+        for (int i = 0; i < n; i++) { tags[i] = 0; innerRoom[i] = -1; occ[i] = 0; flatOcc[i] = 0; solid[i] = 0; reserve[i] = 0; walk[i] = 0; reach[i] = 0; canopy[i] = 0; }
         for (int r = 0; r < nRooms; r++) { roomDoorCount[r] = 0; roomDoorStart[r] = r * 8; roomX0[r] = 1 << 20; roomZ0[r] = 1 << 20; roomX1[r] = -1; roomZ1[r] = -1; }
         nEmit = 0; nFree = 0; nSockets = 0;
 
@@ -304,8 +331,7 @@ public partial class MapGen
             int cx = c % W, cz = c / W, room = cellRoom[c], rt = roomType[room];
             int baseTags = GenData.T_FLOOR;
             if (!GenData.IsBuilding(zone)) baseTags |= GenData.T_OUTDOOR;
-            if (zone == GenData.Z_FOREST || rt == GenData.R_GARDEN) baseTags |= GenData.T_SOFT_GROUND;
-            if (rt == GenData.R_PATIO) baseTags |= GenData.T_COVERED;
+            if (zone == GenData.Z_FOREST) baseTags |= GenData.T_SOFT_GROUND;   // a garden's beds and a patio's paving are laid out by their plans
             if (zone == GenData.Z_RELEASE) baseTags |= GenData.T_NO_SPAWN;
             for (int lz = 0; lz < 8; lz++)
                 for (int lx = 0; lx < 8; lx++)
@@ -379,8 +405,23 @@ public partial class MapGen
                     else if (d == 2) { lx2 = off; lz2 = 0; }
                     else if (d == 1) { lx2 = 7; lz2 = off; }
                     else { lx2 = 0; lz2 = off; }
-                    roomDoors[roomDoorStart[room] + roomDoorCount[room]] = (cz * 8 + lz2) * IW + cx * 8 + lx2;
+                    int k = roomDoorStart[room] + roomDoorCount[room];
+                    roomDoors[k] = (cz * 8 + lz2) * IW + cx * 8 + lx2;
+                    roomDoorDir[k] = d;
+                    roomDoorExt[k] = GenData.IsBuilding(cellZone[c]) != GenData.IsBuilding(ZoneAt(cx + DX[d], cz + DZ[d]));
                     roomDoorCount[room]++;
+                    // outdoors the approach to a building's door stays clear: a walkway two cells wide, 3 m deep (report 15, K1 and K4)
+                    if (!GenData.IsBuilding(cellZone[c]))
+                        for (int a = off; a < off + GenData.DOOR_CELLS; a++)
+                            for (int depth = 0; depth < 6; depth++)
+                            {
+                                int lx, lz;
+                                if (d == 0) { lx = a; lz = 7 - depth; }
+                                else if (d == 2) { lx = a; lz = depth; }
+                                else if (d == 1) { lx = 7 - depth; lz = a; }
+                                else { lx = depth; lz = a; }
+                                tags[(cz * 8 + lz) * IW + cx * 8 + lx] |= GenData.T_PATH;
+                            }
                 }
             }
         }
@@ -425,59 +466,9 @@ public partial class MapGen
         }
         for (int i = 0; i < n; i++)
             if (innerRoom[i] >= 0 && (dist[i] < 0 || dist[i] >= 2)) tags[i] |= GenData.T_CENTER;
-        // PATH: keep-clear corridor between a room's doors (shortest path, widened by one cell)
-        for (int r = 0; r < nRooms; r++)
-        {
-            if (!GenData.IsBuilding(roomZone[r]) || roomDoorCount[r] < 2) continue;
-            int d0 = roomDoors[roomDoorStart[r]];
-            for (int k = 1; k < roomDoorCount[r]; k++)
-                MarkPath(r, d0, roomDoors[roomDoorStart[r] + k]);
-        }
-    }
-
-    void MarkPath(int room, int from, int to)
-    {
-        int s = roomCellStart[room], e = s + roomCellCount[room];
-        for (int k = s; k < e; k++) dist[roomCells[k]] = -1;
-        int qh = 0, qt = 0;
-        dist[from] = 0; queue[qt++] = from;
-        while (qh < qt && dist[to] < 0)
-        {
-            int i = queue[qh++];
-            int ix = i % IW, iz = i / IW;
-            for (int d = 0; d < 4; d++)
-            {
-                int jx = ix + DX[d], jz = iz + DZ[d];
-                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
-                int j = jz * IW + jx;
-                if (innerRoom[j] != room || dist[j] >= 0) continue;
-                dist[j] = dist[i] + 1; queue[qt++] = j;
-            }
-        }
-        if (dist[to] < 0) return;
-        int cur = to;
-        while (true)
-        {
-            int cx = cur % IW, cz = cur / IW;
-            for (int dz = -1; dz <= 0; dz++)
-                for (int dx = -1; dx <= 0; dx++)
-                {
-                    int jx = cx + dx, jz = cz + dz;
-                    if (jx < 0 || jz < 0) continue;
-                    int j = jz * IW + jx;
-                    if (innerRoom[j] == room) tags[j] |= GenData.T_PATH;
-                }
-            if (cur == from) break;
-            int next = -1;
-            for (int d = 0; d < 4; d++)
-            {
-                int jx = cx + DX[d], jz = cz + DZ[d];
-                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
-                int j = jz * IW + jx;
-                if (innerRoom[j] == room && dist[j] == dist[cur] - 1) { next = j; break; }
-            }
-            if (next < 0) break;
-            cur = next;
-        }
+        // No walkway is marked between a room's doors any more (generator 2 kept the shortest path clear, which
+        // ran straight through the middle of small rooms, where the table belongs). The walkway test of every
+        // placement (RoomWalkable) keeps all doors joined by floor at least 1 m wide instead, wherever the
+        // furniture leaves it. T_PATH is now only the approach to a building's door outdoors and a forest path.
     }
 }
