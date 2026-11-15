@@ -71,8 +71,8 @@ public static class Balance
     public const int SmallGroup = 6;
 
     // ---- knocks (04 section 4.8; values are the prototype's) ----
-    public const float KnockImpulseLight = 3.2f;     // prototype, N s per kg-ish: scaled by mass below
-    public const float KnockImpulse = 2.2f;          // prototype
+    public const float KnockSpeedLight = 5.5f;       // prototype: m/s a dart gives a LIGHT prop (less when heavy)
+    public const float KnockSpeed = 3.2f;            // prototype: m/s for a KNOCKABLE prop
     public const float KnockSettleTime = 4f;         // "IsSleeping or 4 s"
     public const int KnockMaxChildren = 6;
     public const int KnockMaxSimulating = 24;

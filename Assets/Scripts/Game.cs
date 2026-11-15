@@ -36,6 +36,7 @@ public class Game : MonoBehaviour
     public string lastCmdResult = "";
 
     Camera topCam;
+    bool wasLocked;
     float fpsTimer; int fpsFrames;
     int autoMode = -1;
 
@@ -199,7 +200,12 @@ public class Game : MonoBehaviour
         }
         if (state == State.Playing)
         {
-            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.M)) ToggleMenu();
+            // Esc: the browser releases the mouse itself and may keep the key press; losing the mouse opens the menu
+            bool locked = Cursor.lockState == CursorLockMode.Locked;
+            bool lostMouse = wasLocked && !locked && !menuOpen && !round.InputBlocked;
+            wasLocked = locked;
+            if (lostMouse) { menuOpen = true; AudioHub.I.Play("open_001", 0.5f); }
+            else if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.M)) ToggleMenu();
             if (Input.GetKeyDown(KeyCode.H)) helpOpen = !helpOpen;
             if (Input.GetKeyDown(KeyCode.F3) || Input.GetKeyDown(KeyCode.Alpha0)) debugOpen = !debugOpen;
         }
@@ -209,7 +215,8 @@ public class Game : MonoBehaviour
     {
         menuOpen = !menuOpen;
         AudioHub.I.Play(menuOpen ? "open_001" : "close_001", 0.5f);
-        if (menuOpen) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
+        if (menuOpen) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; wasLocked = false; }
+        else if (!round.InputBlocked && !topView) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
     }
 
     // ---------------------------------------------------------------- top view (debug, for checking builds)

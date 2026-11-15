@@ -236,10 +236,10 @@ public static class GenData
         else if (longest >= 1800 || defSy[d] >= 1600) defDisguise[d] = 3;
         else defDisguise[d] = 2;
         defMinCopies[d] = defDisguise[d] == 3 ? 3 : ((flags & FL_COMMON) != 0 ? 8 : 4);
-        // rough mass for knocks: volume of the box at 120 kg/m3, clamped
+        // rough mass for knocks: volume of the bounding box at 35 kg/m3 (furniture is mostly air), clamped
         long vol = (long)defSx[d] * defSy[d] / 1000 * defSz[d] / 1000;   // litres
-        int kg = (int)(vol * 120 / 1000);
-        defMassKg[d] = kg < 1 ? 1 : (kg > 80 ? 80 : kg);
+        int kg = (int)(vol * 35 / 1000);
+        defMassKg[d] = kg < 1 ? 1 : (kg > 40 ? 40 : kg);
         defSlotStart[d] = nSlots; defSlotCount[d] = 0;
         defGroupStart[d] = nGroups; defGroupCount[d] = 0;
         return d;

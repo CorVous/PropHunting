@@ -57,9 +57,11 @@ public class PropInstance : MonoBehaviour
         knockedAt = Time.time;
         displaced = true;
         float mass = rb.mass;
-        float speed = (Light ? Balance.KnockImpulseLight : Balance.KnockImpulse) * damp * Mathf.Clamp(6f / (mass + 2f), 0.35f, 1.6f) * 2.2f;
+        // the dart gives the prop a speed, less for heavier props
+        float speed = (Light ? Balance.KnockSpeedLight : Balance.KnockSpeed) * damp * Mathf.Clamp(8f / (mass + 4f), 0.5f, 1.2f);
         Vector3 push = (dir.normalized + Vector3.up * 0.45f).normalized * speed;
         rb.AddForceAtPosition(push * mass, point, ForceMode.Impulse);
+        rb.AddTorque(Random.insideUnitSphere * mass * 0.4f, ForceMode.Impulse);
         if (topChildren != null && damp > 0.9f)
         {
             int n = 0;
