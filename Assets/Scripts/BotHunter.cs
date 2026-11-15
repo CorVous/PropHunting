@@ -154,13 +154,13 @@ public class BotHunter : MonoBehaviour
         if (pl.role == Player.ROLE_HIDER && pl.def >= 0 && !pl.settled && !pl.locked && pl.MovedRecently)
         {
             Vector3 c = pl.body.Centre;
-            if (Vector3.Distance(c, Eye) < Balance.BotHunterSight && Sees(c)) { ShootAt(c); return; }
+            if (Vector3.Distance(c, Eye) < Balance.BotHunterSight && Sees(c)) { ShootAt(c, Balance.BotHunterMoverScatter); return; }
         }
         foreach (var h in round.hiders)
         {
             if (!h.alive || !h.moving) continue;
             Vector3 c = h.Centre;
-            if (Vector3.Distance(c, Eye) < Balance.BotHunterSight && Sees(c)) { ShootAt(c); return; }
+            if (Vector3.Distance(c, Eye) < Balance.BotHunterSight && Sees(c)) { ShootAt(c, Balance.BotHunterMoverScatter); return; }
         }
     }
 
@@ -216,14 +216,20 @@ public class BotHunter : MonoBehaviour
         }
     }
 
-    void ShootAt(Vector3 point)
+    // after a hit the bot needs a moment before its next dart, so a hider that is found can run
+    public void HitPause()
+    {
+        nextShot = Mathf.Max(nextShot, Time.time + Balance.BotHunterFollowUp);
+    }
+
+    void ShootAt(Vector3 point, float scatter = 1f)
     {
         nextShot = Time.time + Balance.DartInterval + 0.3f;
         Vector3 e = Eye - Vector3.up * 0.2f;
         Vector3 flat = point - transform.position; flat.y = 0f;
         if (flat.sqrMagnitude > 1e-4f) transform.rotation = Quaternion.LookRotation(flat);
         float dist = Vector3.Distance(e, point);
-        Vector3 aim = point + Random.insideUnitSphere * (Balance.BotHunterAimError * dist / 10f);
+        Vector3 aim = point + Random.insideUnitSphere * (Balance.BotHunterAimError * scatter * dist / 10f);
         AudioHub.I.PlayAt("pluck_002", e, 18f, 0.8f, Random.Range(0.9f, 1.05f));
         Game.I.round.BotShot(this, e, (aim - e).normalized);
         pauseUntil = Mathf.Max(pauseUntil, Time.time + 0.35f);

@@ -383,6 +383,7 @@ public partial class Round : MonoBehaviour
         {
             b.hitsLanded++;
             b.health = Mathf.Min(Balance.HunterHealth, b.health + Balance.HitReward);
+            b.HitPause();
             AudioHub.I.PlayAt("impactPunch_medium_000", hit.point, 14f, 0.8f);
             var bh = hit.collider.GetComponentInParent<BotHider>();
             if (bh != null)

@@ -83,6 +83,8 @@ public static class Balance
     public const float BotHunterSight = 9f;          // how far a bot hunter notices a moving prop
     public const float BotHunterGuessInterval = 30f;  // seconds between a bot hunter's idle guesses at still props on patrol
     public const int BotHunterIdleGuessHealth = 60;  // no idle guesses at or below this health
+    public const float BotHunterFollowUp = 1.8f;     // seconds before a bot hunter's next dart after it landed a hit
+    public const float BotHunterMoverScatter = 3f;   // aim scatter multiplier when shooting at a moving prop
     public const float BotHunterNoiseHit = 0.35f;    // chance that a guess after a taunt picks the hider, if it is in view
     public const float BotHunterAimError = 0.25f;    // metres of aim scatter at 10 m
     public const float BotHiderMoveChance = 0.35f;   // chance that a bot hider relocates after a forced taunt
