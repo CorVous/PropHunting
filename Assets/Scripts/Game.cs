@@ -37,6 +37,7 @@ public class Game : MonoBehaviour
 
     Camera topCam;
     bool wasLocked;
+    float menuOpenedAt = -9f;
     float fpsTimer; int fpsFrames;
     int autoMode = -1;
 
@@ -204,8 +205,9 @@ public class Game : MonoBehaviour
             bool locked = Cursor.lockState == CursorLockMode.Locked;
             bool lostMouse = wasLocked && !locked && !menuOpen && !round.InputBlocked;
             wasLocked = locked;
-            if (lostMouse) { menuOpen = true; AudioHub.I.Play("open_001", 0.5f); }
-            else if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.M)) ToggleMenu();
+            if (lostMouse) { menuOpen = true; menuOpenedAt = Time.unscaledTime; AudioHub.I.Play("open_001", 0.5f); }
+            // the Esc press that released the mouse may arrive a frame later: it must not close the menu again
+            else if (Input.GetKeyDown(KeyCode.M) || (Input.GetKeyDown(KeyCode.Escape) && Time.unscaledTime - menuOpenedAt > 0.4f)) ToggleMenu();
             if (Input.GetKeyDown(KeyCode.H)) helpOpen = !helpOpen;
             if (Input.GetKeyDown(KeyCode.F3) || Input.GetKeyDown(KeyCode.Alpha0)) debugOpen = !debugOpen;
         }

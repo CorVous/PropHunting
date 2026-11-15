@@ -292,9 +292,17 @@ public partial class Player
         // stand in front of it, looking at it
         Vector3 fwd = best.transform.forward;
         float back = Mathf.Max(GenData.defSz[d], GenData.defSx[d]) / 2000f + 1.3f;
+        Vector3 mid = pp + Vector3.up * (GenData.defSy[d] / 2000f);
         Vector3 at = pp + fwd * back;
-        int cell = map.CellAt(at);
-        if (cell < 0 || map.gen.walk[cell] != 1) at = pp - fwd * back;
+        Vector3[] dirs = { fwd, -fwd, best.transform.right, -best.transform.right };
+        for (int i = 0; i < dirs.Length; i++)
+        {
+            Vector3 c = pp + dirs[i] * back;
+            int cell = map.CellAt(c);
+            if (cell < 0 || map.gen.walk[cell] != 1) continue;
+            if (Physics.Linecast(new Vector3(c.x, pp.y + Balance.HunterEye, c.z), mid, 1 << Layers.Arch, QueryTriggerInteraction.Ignore)) continue;
+            at = c; break;
+        }
         Teleport(new Vector3(at.x, pp.y + 0.05f, at.z));
         Vector3 to = pp + Vector3.up * (GenData.defSy[d] / 2000f) - (new Vector3(at.x, pp.y, at.z) + Vector3.up * eye);
         SetLook(Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, -Mathf.Atan2(to.y, new Vector2(to.x, to.z).magnitude) * Mathf.Rad2Deg);
