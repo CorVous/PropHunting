@@ -15,7 +15,6 @@ public class PropHuntWebGLAssemblyFilter : IFilterBuildAssemblies
     static readonly string[] dropPrefixes =
     {
         "VRC", "Udon", "UdonSharp", "WorldQualitySettings", "UniTask", "DOTween", "Collections.Pooled",
-        "Unity.XR.Oculus", "Unity.XR.Management",
     };
 
     public string[] OnFilterAssemblies(BuildOptions buildOptions, string[] assemblies)
