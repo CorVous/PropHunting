@@ -122,7 +122,7 @@ public static class PropColliders
         for (int i = a; i < e; i++)
         {
             float y = GenModels.Surf[i * 6] / 1000f;
-            if (y > 0.01f && y < 0.3f * h && (best == 0f || y < best)) best = y;
+            if (y > 0.01f && y < 0.3f * h && y > best) best = y;
         }
         return best;
     }

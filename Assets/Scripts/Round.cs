@@ -406,7 +406,7 @@ public partial class Round : MonoBehaviour
                 Say("You were caught by " + b.label + ". You are out: walk the arena unseen.", 5f);
                 AudioHub.I.Play("you_lose", 0.8f);
                 P.role = Player.ROLE_DEAD;
-                P.BecomeWalker();
+                P.ToWalker();
             }
             else P.Say("Hit by " + b.label + "! " + P.health + " health left. Move!", 2.5f);
             return;
@@ -511,6 +511,7 @@ public partial class Round : MonoBehaviour
     {
         if (a.Length < 2) return "?";
         if (a[1] == "skip") { left = Mathf.Min(left, 0.2f); return "skipped"; }
+        if (a[1] == "hunt") { if (phase == PH_BRIEF || phase == PH_HIDE) StartHunt(); return "phase " + phase; }
         if (a[1] == "end" && phase == PH_HUNT) { EndRound("Ended by a test command"); return "ended"; }
         if (a[1] == "restart") { StartRound(); return "restarted"; }
         if (a[1] == "goto" && a.Length > 2)

@@ -301,7 +301,7 @@ public class Game : MonoBehaviour
                 case "look": player.SetLook(float.Parse(a[1]), float.Parse(a[2])); break;
                 case "third": player.SetThird(a.Length < 2 || a[1] != "0"); break;
                 case "disguise": r = player.TakeDisguiseByName(a[1]); break;
-                case "undisguise": player.BecomeWalker(); break;
+                case "undisguise": player.ToWalker(); break;
                 case "key": player.TestKey(a[1]); break;
                 case "walk": player.TestWalk(float.Parse(a[1]), float.Parse(a[2]), a.Length > 3 && a[3] == "1"); break;
                 case "menu": menuOpen = a.Length < 2 || a[1] != "0"; break;

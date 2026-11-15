@@ -35,7 +35,7 @@ public partial class Player
 
     void ClearAim()
     {
-        aimProp = null; aimHider = null; aimDoor = null; aimValid = false;
+        aimProp = null; aimHider = null; aimDoor = null; aimValid = false; insideNow = null;
         Highlight(null);
     }
 
@@ -75,12 +75,15 @@ public partial class Player
         // a soft highlight on the prop a hider could take, on the hider's own screen only (05 section 3.8)
         Highlight(CanDisguise && aimDoor == null && aimProp != null && aimDist <= Balance.TakeRange ? aimProp : null);
 
+        insideNow = def >= 0 ? InsideOpenable() : null;
         bool use = Input.GetMouseButtonDown(0) && Cursor.lockState == CursorLockMode.Locked && Time.frameCount != captureClickFrame;
         if (testUse) { use = true; testUse = false; }
         if (use)
         {
-            // a click that operates a handle does not also fire or take
-            if (aimDoor != null && DoorInReach()) UseDoor();
+            // a click that operates a handle does not also fire or take; a prop shut inside furniture works
+            // its door from inside with a click, wherever the view points (the inner handle, 05 section 3.11)
+            if (insideNow != null) { aimDoor = insideNow; aimPoint = body.Centre; UseDoor(); }
+            else if (aimDoor != null && DoorInReach()) UseDoor();
             else if (role == ROLE_HUNTER) Fire();
             else if (CanDisguise) TryTake();
         }
@@ -91,7 +94,7 @@ public partial class Player
         if (Input.GetKeyDown(KeyCode.Z)) TurnPinned(-Balance.TurnStepDeg);
         if (Input.GetKeyDown(KeyCode.C)) TurnPinned(Balance.TurnStepDeg);
         if (Input.GetKeyDown(KeyCode.T)) Taunt(false);
-        if (Input.GetKeyDown(KeyCode.G) && role == ROLE_EXPLORE && def >= 0) { BecomeWalker(); Say("Back to the walking body"); }
+        if (Input.GetKeyDown(KeyCode.G) && role == ROLE_EXPLORE && def >= 0) { ToWalker(); Say("Back to the walking body"); }
         if (Input.GetKeyDown(KeyCode.U)) Unstick();
 
         // tagger view model
@@ -101,9 +104,9 @@ public partial class Player
         {
             recoil = Mathf.MoveTowards(recoil, 0f, dt * 6f);
             Transform ct = cam.transform;
-            tagger.transform.position = ct.position + ct.right * 0.2f - ct.up * (0.2f - recoil * 0.03f) + ct.forward * (0.42f - recoil * 0.08f);
+            tagger.transform.position = ct.position + ct.right * 0.21f - ct.up * (0.21f - recoil * 0.03f) + ct.forward * (0.5f - recoil * 0.08f);
             tagger.transform.rotation = ct.rotation * Quaternion.Euler(-recoil * 12f, 0f, 0f);
-            tagger.transform.localScale = Vector3.one * 0.42f;
+            tagger.transform.localScale = Vector3.one * 0.32f;
         }
     }
 
@@ -116,6 +119,7 @@ public partial class Player
 
     public string AimText()
     {
+        if (insideNow != null) return insideNow.open ? "Inside: click to close the door" : "Inside: click to open the door";
         if (!aimValid) return "";
         if (aimDoor != null) return DoorInReach() ? (aimDoor.open ? "Click: close" : "Click: open") : "";
         if (!CanDisguise || aimProp == null || aimDist > Balance.TakeRange) return "";
@@ -188,7 +192,15 @@ public partial class Player
         Game.I.round.PlayerTaunted(forced);
     }
 
-    void Unstick()
+    // back to the walking body where the prop stood; if the taller box has no room there, the nearest free spot
+    public void ToWalker()
+    {
+        BecomeWalker();
+        for (int i = 0; i < 4 && !body.Fits(body.pos, 0f); i++) body.Depenetrate(0f);
+        if (!body.Fits(body.pos, 0f)) Unstick();
+    }
+
+    public void Unstick()
     {
         // to the nearest free reachable cell (05 N5)
         var map = Game.I.map;
@@ -205,6 +217,21 @@ public partial class Player
             if (dd < bestD) { bestD = dd; best = i; }
         }
         if (best >= 0) { Teleport(map.CellCentre(best) + Vector3.up * 0.05f); Say("Unstuck"); }
+    }
+
+    static readonly Collider[] nearSolid = new Collider[12];
+    Openable insideNow;   // the furniture the prop is inside this frame, if any
+
+    // the openable whose hollow the prop body is in, or null
+    public Openable InsideOpenable()
+    {
+        int n = Physics.OverlapSphereNonAlloc(body.Centre, 0.6f, nearSolid, 1 << Layers.Solid, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            var op = nearSolid[i].GetComponentInParent<Openable>();
+            if (op != null && op.Contains(body.Centre)) return op;
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------- doors (C7: click on desktop)

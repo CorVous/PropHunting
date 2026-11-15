@@ -246,9 +246,9 @@ public class GameUI : MonoBehaviour
 
         // health
         if (p.role == Player.ROLE_HUNTER || (p.role == Player.ROLE_DEAD && rd.mode == Game.MODE_HUNT))
-            Bar(new Rect(16, H - 46, 260, 26), p.hunterHealth / 100f, "Hunter health " + p.hunterHealth + "   wrong props " + p.wrongProps, new Color(0.86f, 0.36f, 0.30f));
+            Bar(new Rect(16, H - 46, 260, 26), p.hunterHealth / 100f, "Hunter health " + p.hunterHealth + "   wrong props " + p.wrongProps, new Color(0.70f, 0.22f, 0.20f));
         else if (p.role == Player.ROLE_HIDER && p.maxHealth > 0)
-            Bar(new Rect(16, H - 46, 260, 26), (float)p.health / p.maxHealth, "Prop health " + p.health + " / " + p.maxHealth, new Color(0.36f, 0.70f, 0.42f));
+            Bar(new Rect(16, H - 46, 260, 26), (float)p.health / p.maxHealth, "Prop health " + p.health + " / " + p.maxHealth, new Color(0.20f, 0.52f, 0.28f));
         if (p.def >= 0)
         {
             string st = GameUI.DefName(p.def) + "  ·  " + (p.locked ? "LOCKED" : (p.settled ? "settled" : "moving")) + "  ·  view " + (p.third ? "third person" : "first person")
@@ -313,7 +313,7 @@ public class GameUI : MonoBehaviour
     {
         Fill(r, new Color(0.05f, 0.06f, 0.08f, 0.9f));
         Fill(new Rect(r.x + 2, r.y + 2, (r.width - 4) * Mathf.Clamp01(f), r.height - 4), c);
-        GUI.Label(new Rect(r.x + 8, r.y + 2, r.width + 200, r.height), text, small);
+        GUI.Label(new Rect(r.x + 8, r.y + 2, r.width + 200, r.height), "<color=#ffffff>" + text + "</color>", small);
     }
 
     void Help()

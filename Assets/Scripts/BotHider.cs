@@ -16,6 +16,7 @@ public class BotHider : MonoBehaviour
     public float nextTaunt;
     public bool moving;
     public Vector3 lastSeenPos;
+    public PropInstance support;        // the furniture this hider stands on or in, if any
 
     List<int> path;
     int pathIndex;
@@ -52,6 +53,7 @@ public class BotHider : MonoBehaviour
         path = cells; pathIndex = 1; moving = true;
         speed = Balance.HiderRun[disguiseClass] * (run ? 1f : Balance.DesktopWalkFactor);
         finalPos = endPos; hasFinal = true; yawTarget = endYaw; hasYawTarget = true;
+        support = null;
         spotNote = note;
         // a moving disguise has no blocking collider (05 section 3.7)
         gameObject.layer = Layers.Hider;
@@ -67,7 +69,13 @@ public class BotHider : MonoBehaviour
             transform.position = flinchBase + new Vector3(a, 0f, -a);
             return;
         }
-        if (!moving) return;
+        if (!moving)
+        {
+            // the furniture it stood on was knocked away: it falls and stands where it lands, without tumbling (05 section 3.9)
+            if (support != null && support.displaced && transform.position.y > 0.001f)
+                transform.position = new Vector3(transform.position.x, Mathf.Max(0f, transform.position.y - 4f * Time.deltaTime), transform.position.z);
+            return;
+        }
         var map = Game.I.map;
         Vector3 target = pathIndex < path.Count ? map.CellCentre(path[pathIndex]) : finalPos;
         if (pathIndex >= path.Count - 1 && hasFinal) target = finalPos;

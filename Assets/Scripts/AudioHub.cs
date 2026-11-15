@@ -1,18 +1,19 @@
-using System.Collections;
-using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
-using UnityEngine.Networking;
 
 // Sounds: Kenney's CC0 audio packs from the owner's mirror, as stand-ins (taunts in particular: the mirror has
 // no taunt, ambience or music tracks, so taunts are jingles and synth sounds, and there is no music).
+//
+// The clips are the packs' own .ogg files in StreamingAssets, decoded and played by the browser through
+// Assets/Plugins/WebGL/PropHuntAudio.jslib (see that file for why Unity's audio is not used). A positional
+// sound gets its loudness and left/right pan from the listener's pose at the moment it starts.
 public class AudioHub : MonoBehaviour
 {
     public static AudioHub I;
     public float volume = Balance.MasterDefault;
-    readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
-    readonly List<AudioSource> pool = new List<AudioSource>();
-    AudioSource ui;
-    int next;
+    public int wanted;
+    float reportAt = 6f;
+    bool reported;
 
     public static readonly string[] Taunts = { "jingles_SAX03", "jingles_SAX07", "jingles_SAX10", "pepSound1", "pepSound2", "pepSound3", "pepSound4",
         "pepSound5", "threeTone1", "lowRandom", "phaseJump1", "zapThreeToneUp" };
@@ -20,87 +21,76 @@ public class AudioHub : MonoBehaviour
     public static readonly string[] SoftKnock = { "impactSoft_medium_000", "impactSoft_medium_001" };
     public static readonly string[] Thud = { "impactGeneric_light_000", "impactGeneric_light_001" };
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [DllImport("__Internal")] static extern void PH_AudioInit();
+    [DllImport("__Internal")] static extern void PH_AudioLoad(string name, string url);
+    [DllImport("__Internal")] static extern int PH_AudioPlay(string name, float gain, float pan, float rate);
+    [DllImport("__Internal")] static extern void PH_AudioVolume(float v);
+    [DllImport("__Internal")] static extern int PH_AudioLoaded();
+    [DllImport("__Internal")] static extern int PH_AudioFailed();
+#else
+    static void PH_AudioInit() { }
+    static void PH_AudioLoad(string name, string url) { }
+    static int PH_AudioPlay(string name, float gain, float pan, float rate) { return 0; }
+    static void PH_AudioVolume(float v) { }
+    static int PH_AudioLoaded() { return 0; }
+    static int PH_AudioFailed() { return 0; }
+#endif
+
     void Awake()
     {
         I = this;
-        ui = gameObject.AddComponent<AudioSource>();
-        ui.spatialBlend = 0f; ui.playOnAwake = false;
-        for (int i = 0; i < 12; i++)
-        {
-            var go = new GameObject("Sound " + i);
-            go.transform.SetParent(transform, false);
-            var s = go.AddComponent<AudioSource>();
-            s.playOnAwake = false; s.spatialBlend = 1f; s.rolloffMode = AudioRolloffMode.Linear; s.dopplerLevel = 0f;
-            pool.Add(s);
-        }
-        AudioListener.volume = volume;
-    }
-
-    // The clips are the packs' own .ogg files in StreamingAssets, decoded by the browser at run time
-    // (the Linux editor cannot encode audio for WebGL without ffmpeg, so they are not imported assets).
-    public int loaded, failed, wanted;
-
-    void Start()
-    {
+        PH_AudioInit();
+        PH_AudioVolume(volume);
         var index = Resources.Load<TextAsset>("PropHunt/audio_index");
         if (index == null) { Debug.LogWarning("[prophunt] audio_index.txt is missing"); return; }
-        string[] names = index.text.Split('\n');
-        var queue = new Queue<string>();
-        foreach (string n in names) if (n.Trim().Length > 0) queue.Enqueue(n.Trim());
-        wanted = queue.Count;
-        for (int i = 0; i < 4; i++) StartCoroutine(LoadWorker(queue));
-    }
-
-    IEnumerator LoadWorker(Queue<string> queue)
-    {
-        while (queue.Count > 0)
+        foreach (string line in index.text.Split('\n'))
         {
-            string name = queue.Dequeue();
-            string url = Application.streamingAssetsPath + "/PropHunt/Audio/" + name + ".ogg";
-            using (var req = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.OGGVORBIS))
-            {
-                yield return req.SendWebRequest();
-                AudioClip c = null;
-                if (req.result == UnityWebRequest.Result.Success) c = DownloadHandlerAudioClip.GetContent(req);
-                if (c != null) { c.name = name; clips[name] = c; loaded++; }
-                else { failed++; Debug.LogWarning("[prophunt] sound " + name + " did not load: " + req.error); }
-            }
-            if (loaded + failed == wanted) Debug.Log("[prophunt] sounds loaded " + loaded + " of " + wanted);
+            string n = line.Trim();
+            if (n.Length == 0) continue;
+            PH_AudioLoad(n, Application.streamingAssetsPath + "/PropHunt/Audio/" + n + ".ogg");
+            wanted++;
         }
     }
 
-    AudioClip Clip(string name)
+    void Update()
     {
-        AudioClip c;
-        return clips.TryGetValue(name, out c) ? c : null;
+        if (reported || Time.realtimeSinceStartup < reportAt) return;
+        int ok = PH_AudioLoaded(), bad = PH_AudioFailed();
+        if (ok + bad >= wanted || Time.realtimeSinceStartup > 30f)
+        {
+            reported = true;
+            Debug.Log("[prophunt] sounds loaded " + ok + " of " + wanted + (bad > 0 ? ", failed " + bad : ""));
+        }
+        else reportAt += 1f;
     }
+
+    public int Loaded { get { return PH_AudioLoaded(); } }
 
     public void SetVolume(float v)
     {
         volume = Mathf.Clamp01(v);
-        AudioListener.volume = volume;
+        PH_AudioVolume(volume);
     }
 
     // flat, for interface sounds and the player's own cues
     public void Play(string name, float vol = 1f, float pitch = 1f)
     {
-        var c = Clip(name);
-        if (c == null) return;
-        ui.pitch = pitch;
-        ui.PlayOneShot(c, vol);
+        PH_AudioPlay(name, vol, 0f, pitch);
     }
 
     // positional, heard up to `range` metres (a taunt: 20 m)
     public void PlayAt(string name, Vector3 pos, float range, float vol = 1f, float pitch = 1f)
     {
-        var c = Clip(name);
-        if (c == null) return;
-        var s = pool[next];
-        next = (next + 1) % pool.Count;
-        s.transform.position = pos;
-        s.clip = c; s.volume = vol; s.pitch = pitch;
-        s.minDistance = Mathf.Min(2f, range * 0.2f); s.maxDistance = range;
-        s.Play();
+        Transform ear = Game.I.cam.transform;
+        // during the reveal the listener stays with the player, not with the camera above the map
+        Vector3 at = Game.I.player.active ? Game.I.player.EyePos : ear.position;
+        Vector3 to = pos - at;
+        float d = to.magnitude;
+        if (d >= range) return;
+        float gain = vol * Mathf.Pow(1f - d / range, 1.3f);
+        float pan = d > 0.3f ? Mathf.Clamp(Vector3.Dot(to / d, ear.right), -1f, 1f) * 0.85f : 0f;
+        PH_AudioPlay(name, gain, pan, pitch);
     }
 
     public static string Pick(string[] set)

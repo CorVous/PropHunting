@@ -92,10 +92,13 @@ public partial class Round
     }
 
     // Finds a plausible pose for a prop of this type. Returns false if nothing was found.
+    int pickedHost = -1;   // the furniture the last PickSpot put its prop on or in, -1 for the floor
+
     bool PickSpot(int def, out Vector3 pos, out float yaw, out string note, out Sock sock)
     {
         var g = Map.gen;
         sock = null; pos = Vector3.zero; yaw = 0f; note = "";
+        pickedHost = -1;
         int tags = GenData.defTags[def];
         Vector3 rel = Map.ReleasePoint();
         // 1. an empty slot that accepts the type: hiding sockets first
@@ -115,6 +118,7 @@ public partial class Round
             if (best != null)
             {
                 sock = best; pos = best.pos; yaw = best.yaw + Random.Range(-8f, 8f);
+                if (best.type != GenData.S_ADJACENT) pickedHost = best.host;
                 string where = best.type == GenData.S_ADJACENT ? "at" : (best.type == GenData.S_INSIDE ? "in" : "on");
                 note = where + " a " + HostName(best.host) + " in the " + RoomNameAt(pos);
                 return true;
@@ -141,6 +145,7 @@ public partial class Round
                 foreach (var h in hiders) if (h != null && h.alive && Vector3.Distance(h.transform.position, p) < half + 0.25f) clear = false;
                 if (!clear) continue;
                 pos = p; yaw = Random.Range(0f, 360f);
+                pickedHost = host;
                 note = "on a " + HostName(host) + " in the " + RoomNameAt(pos);
                 return true;
             }
@@ -270,6 +275,7 @@ public partial class Round
             var go = new GameObject("BotHider " + GenData.defId[def]);
             var bh = go.AddComponent<BotHider>();
             bh.Init(def, pos, yaw, "Hider " + (index + 1), note);
+            if (pickedHost >= 0) bh.support = Map.props[pickedHost];
             hiders.Add(bh);
             return;
         }
@@ -289,7 +295,9 @@ public partial class Round
             var path = Map.FindPath(from, to, false);
             if (path == null) continue;
             if (sock != null) sock.used = true;
+            int host = pickedHost;
             h.Relocate(path, pos, yaw, run, note);
+            if (host >= 0) h.support = Map.props[host];
             return;
         }
     }
