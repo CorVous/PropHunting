@@ -50,13 +50,17 @@ public partial class MapGen
         }
     }
 
+    // From the front door the path runs on to the garden gate at the lane (G32); from other doors 3.5 to 6 m.
     void StonePaths(int k0, ref GenRng rng)
     {
         int room = pRoom;
         for (int k = 0; k < roomDoorCount[room]; k++)
         {
             GenRng r = SR(k0 + k);
-            StonePath(room, k, 7 + r.Range(6), ref r);
+            int i = roomDoorStart[room] + k, cell = roomDoors[i], d = roomDoorDir[i];
+            int ox = cell % IW + DX[d], oz = cell / IW + DZ[d];
+            bool front = ox >= 0 && oz >= 0 && ox < IW && oz < IH && IsFrontDoor(oz * IW + ox, (d + 2) & 3);
+            StonePath(room, k, front ? 24 : 7 + r.Range(6), ref r);
         }
     }
 
@@ -198,6 +202,15 @@ public partial class MapGen
             walkNarrow = k >= 8;   // first with the full walkway width, then passable is enough
             GenRng r = SR(200 + pass * 24 + k);
             int first = nEmit, how = k % 4;
+            if (type == GenData.R_YARD)
+            {
+                // a yard fills up with what a yard holds: goods in rows at the fence and the wall, a pallet
+                string[] rows = { "crates", "barrels", "boxes", "sacks" };
+                if (how < 3 && GroupAt(GenData.FindGrp(rows[(k + pass) % 4]), GenData.A_OUT_EDGE, r.Between(2, 3), WM_ANY, 0, 0, 0, ref r) && Keep(first, false)) continue;
+                first = nEmit;
+                if (WallPlace(Pick(ref r, "w_pallet", 5, "w_palletLoaded", 3, "s_boxLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
+                continue;
+            }
             if (how == 0 && !forest) { if (Border(2500, type != GenData.R_FIREPIT, WM_ANY, 0, 0, ref r) > 0) continue; }
             if (how <= 1)
             {
@@ -343,6 +356,7 @@ public partial class MapGen
         int room = pRoom;
         GenRng r = SR(1);
         StonePaths(40, ref r);
+        Mailbox(9);
         DoorSides(50);
         int trees = TreeCount(room, ref r);
         if (trees < 1 && AreaM2(room) >= 30) trees = 1;
@@ -513,7 +527,12 @@ public partial class MapGen
         int setDef = Pick(ref r, "k_table", 5, "r_tableRound", 5);
         int set = CentrePiece(setDef, 0, true, 2, 1, WM_NEAR, midX, midZ, GenData.T_COVERED, EF_MANDATORY, ref r);
         if (set < 0) set = CentrePiece(Dn("r_tableRound"), 0, false, 1, 1, WM_NEAR, midX, midZ, 0, EF_MANDATORY, ref r);
-        if (set < 0) MandFail(1);
+        if (set < 0)
+        {
+            // a paving too narrow beside the door's walkway for a table set: a bench against the wall by the door
+            int first = nEmit;
+            if (WallPlace(Pick(ref r, "k_bench", 6, "k_benchCushion", 4), WM_NEAR, midX, midZ, WIN_ANY, EF_MANDATORY, ref r) < 0 || !Keep(first, true)) MandFail(1);
+        }
         // (c) loungers side by side on the paving, planters at the door, a bench against the wall
         GenRng r2 = SR(2);
         if (r2.Chance(600) && Fit(2))
@@ -545,6 +564,107 @@ public partial class MapGen
         Borders(10, 6, true);
         GenRng r6 = SR(6);
         for (int j = 0; j < 2 && Fit(1); j++) if (!Island(ref r6)) break;
+    }
+
+    // A front garden's mailbox at its gate (G32): against the lane fence beside the end of the front path.
+    void Mailbox(int k)
+    {
+        int room = pRoom, gate = -1, far = -1;
+        for (int q = 0; q < roomDoorCount[room]; q++)
+        {
+            int i = roomDoorStart[room] + q, cell = roomDoors[i], d = roomDoorDir[i];
+            int ox = cell % IW + DX[d], oz = cell / IW + DZ[d];
+            if (ox < 0 || oz < 0 || ox >= IW || oz >= IH || !IsFrontDoor(oz * IW + ox, (d + 2) & 3)) continue;
+            // the path cell of this room farthest from the door is where it meets the gate
+            for (int c = roomCellStart[room]; c < roomCellStart[room] + roomCellCount[room]; c++)
+            {
+                int j = roomCells[c];
+                if ((tags[j] & GenData.T_PATH) == 0) continue;
+                int dd = Abs(j % IW - cell % IW) + Abs(j / IW - cell / IW);
+                if (dd > far) { far = dd; gate = j; }
+            }
+        }
+        if (gate < 0 || !Fit(1)) return;
+        GenRng r = SR(k);
+        int first = nEmit;
+        if (WallPlace(Dn("gen_mailbox"), WM_NEAR, gate % IW * GenData.INNER_MM + 250, gate / IW * GenData.INNER_MM + 250, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
+    }
+
+    // ============================================================================================ LANE
+    // The way in from the hunter release past the plots' gates to the wood (G32): a track kept open down its
+    // middle. What stands on it stands against the fences: the sign at its start, a bench facing across, a bin by
+    // a shop's front, planting between the gates.
+    void PlanLane()
+    {
+        int room = pRoom;
+        int rx = (releaseX * 8 + 4) * GenData.INNER_MM, rz = (releaseZ * 8 + 4) * GenData.INNER_MM;
+        GenRng r = SR(1);
+        if (Fit(1))
+        {
+            int first = nEmit;
+            if (WallPlace(Dn("n_sign"), WM_NEAR, rx, rz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
+        }
+        BenchAtEdge(2);
+        if (AreaM2(room) >= 100) BenchAtEdge(3);
+        GenRng r4 = SR(4);
+        if (r4.Chance(600) && Fit(1))
+        {
+            int first = nEmit;
+            if (WallPlace(Dn("k_trashcan"), WM_ANY, 0, 0, WIN_ANY, 0, ref r4) >= 0) Keep(first, false);
+        }
+        ClearBans();
+        Borders(10, 6, false);
+    }
+
+    // ============================================================================================ YARD
+    // A warehouse's loading yard or a diner's service yard (G32): paved. The goods wait against the building and
+    // the fence near the loading or service door: pallets, then rows of crates, boxes, barrels, sacks, fuel; the
+    // hand truck and the dumpster (or a bin) by the door. The way from the door to the gates stays open.
+    void PlanYard()
+    {
+        int room = pRoom, dx, dz;
+        MainDoor(room, out dx, out dz);
+        bool diner = false;
+        for (int k = 0; k < roomDoorCount[room]; k++) if (DoorZone(room, k) == GenData.Z_DINER) diner = true;
+        GenRng r = SR(1);
+        if (!diner && Fit(2))
+        {
+            // pallets side by side against the building beside the dock door
+            int first = nEmit;
+            FSet(Dn("w_pallet"), Dn(r.Chance(500) ? "w_palletLoaded" : "w_pallet"));
+            if (FormAt(GenData.GL_ROW, 100, GenData.A_BUILDING, WM_NEAR, dx, dz, 0, ref r) >= 0) Keep(first, false);
+        }
+        string[] rows = diner ? new string[] { "crates", "barrels", "boxes", "sacks" } : new string[] { "crates", "barrels", "fuel", "boxes", "sacks" };
+        for (int k = 0; k < rows.Length; k++)
+        {
+            GenRng rk = SR(2 + k);
+            if (!rk.Chance(k < 2 ? 800 : 500) || !Fit(2)) continue;
+            int first = nEmit;
+            if (GroupAt(GenData.FindGrp(rows[k]), GenData.A_OUT_EDGE, rk.Between(2, 3), WM_NEAR, dx, dz, 0, ref rk)) Keep(first, false);
+        }
+        GenRng r8 = SR(8);
+        if (!diner && r8.Chance(700) && Fit(1))
+        {
+            int first = nEmit;
+            if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r8) >= 0) Keep(first, false);
+        }
+        GenRng r9 = SR(9);
+        if (r9.Chance(750) && Fit(1))
+        {
+            // the waste: a dumpster at the fence or the wall near the door, else a bin
+            int first = nEmit;
+            if (WallPlace(Dn("gen_dumpster"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r9) < 0 || !Keep(first, false))
+            {
+                first = nEmit;
+                if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r9) >= 0) Keep(first, false);
+            }
+        }
+        GenRng r10 = SR(10);
+        if (r10.Chance(450) && Fit(1))
+        {
+            int first = nEmit;
+            if (WallPlace(Pick(ref r10, "s_boxLarge", 5, "w_planks", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r10) >= 0) Keep(first, false);
+        }
     }
 
     // ============================================================================================ FIRE PIT

@@ -2,12 +2,10 @@ using UnityEngine;
 
 // The third-person screen (owner decision G27): a small screen in front of the player that shows the player from
 // outside, so a hider can see how the prop sits in the scene. In the VRChat world it is a floating screen that only
-// its owner sees and that can be grabbed and moved; here it is a picture-in-picture panel:
-//   P            show or hide it (remembered; on by default for hiders and in explore, off for hunters)
-//   O            its size: small, medium, large
-//   N            the side it looks from: behind, in front, right, left
-//   hold B       and move the mouse: move the panel (the view stands still meanwhile)
-//   mouse drag   while the mouse is free (Esc menu open): move the panel
+// its owner sees and that can be grabbed and moved; here it is a picture-in-picture panel. No keys (G38): the
+// wrist panel (GameUI.Wrist) shows or hides it (remembered; on by default for hiders and in explore, off for
+// hunters), steps its size (small, medium, large) and the side it looks from (behind, front, right, left), and
+// while the wrist panel has freed the mouse the panel is dragged with it: the stand-in for grabbing it in VR.
 // Its place and size are kept in PlayerPrefs. It is a second camera rendering into a texture every second frame;
 // the camera is pulled in front of walls and ceilings the same way the V third-person view is. The V view stays
 // as it was.
@@ -15,7 +13,6 @@ public class PipScreen : MonoBehaviour
 {
     public static PipScreen I;
 
-    public bool grabbing;                                  // B is held: the mouse moves the panel, not the view
     public Vector2 centre = new Vector2(0.84f, 0.76f);     // of the panel, as a share of the screen (y from the top)
     public int sizeIndex = 1, view;
 
@@ -105,27 +102,14 @@ public class PipScreen : MonoBehaviour
         centre = new Vector2((r.x + r.width / 2) / Screen.width, (r.y + r.height / 2) / Screen.height);
     }
 
-    void Update()
-    {
-        var g = Game.I;
-        if (g.state != Game.State.Playing || !g.player.active) { grabbing = false; return; }
-        bool paused = g.menuOpen || g.round.InputBlocked;
-        if (!paused)
-        {
-            if (Input.GetKeyDown(KeyCode.P)) { On = !On; Say(On ? "Third-person screen on (O size, N side, hold B to move it)" : "Third-person screen off"); }
-            if (On && Input.GetKeyDown(KeyCode.O)) { sizeIndex = (sizeIndex + 1) % Widths.Length; Save(); }
-            if (On && Input.GetKeyDown(KeyCode.N)) { view = (view + 1) % ViewYaw.Length; Save(); Say("Third-person screen: " + ViewName[view]); }
-        }
-        bool grab = !paused && On && Input.GetKey(KeyCode.B);
-        if (grab)
-        {
-            // with the mouse captured the axes still report its movement (ten pixels per unit)
-            float mx = Input.GetAxisRaw("Mouse X") * 10f, my = Input.GetAxisRaw("Mouse Y") * 10f;
-            if (mx != 0f || my != 0f) MoveBy(mx, -my);
-        }
-        else if (grabbing) Save();
-        grabbing = grab;
-    }
+
+    // the wrist panel's buttons
+    public void Toggle() { On = !On; Say(On ? "Third-person screen on: drag it to move it" : "Third-person screen off"); }
+    public void NextSize() { sizeIndex = (sizeIndex + 1) % Widths.Length; Save(); }
+    public void NextView() { view = (view + 1) % ViewYaw.Length; Save(); Say("Third-person screen: " + ViewName[view]); }
+
+    // is a point (GUI pixels, y from the top) on the screen? A click there drags it instead of capturing the mouse
+    public bool Contains(Vector2 p) { return Visible && PanelRect().Contains(p); }
 
     void LateUpdate()
     {
@@ -193,7 +177,7 @@ public class PipScreen : MonoBehaviour
             r = PanelRect(); e.Use();
         }
         else if (dragging && (e.rawType == EventType.MouseUp || !free)) { dragging = false; Save(); }
-        bool held = grabbing || dragging;
+        bool held = dragging;
         float b = held ? 3f : 2f;
         GUI.DrawTexture(new Rect(r.x - b, r.y - b, r.width + 2 * b, r.height + 2 * b), held ? barTex : frameTex);
         GUI.DrawTexture(r, rt, ScaleMode.StretchToFill, false);

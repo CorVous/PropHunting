@@ -87,6 +87,10 @@
       }).then(function (instance) {
         window.__phunity = instance;
         window.__phmark('unity instance ready');
+        // when the browser frees the mouse (Esc), the game shows the wrist panel (G38)
+        document.addEventListener('pointerlockchange', function () {
+          if (!document.pointerLockElement) instance.SendMessage('Game', 'Cmd', 'mousefreed');
+        });
         document.querySelector("#ph-loading").style.display = "none";
         canvas.focus();
       }).catch(function (message) {

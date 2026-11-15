@@ -120,10 +120,10 @@ public partial class MapGen
         return StampAt(mat, room, px, pz, yaw, 0, -1, H_WALL, false);
     }
 
-    // the room's main doorway (an outside one if it has one), mm; the middle of the room if it has no door
+    // the room's main doorway, mm: its entrance (RoomEntries), else an outside one; the middle of the room if it has no door
     void MainDoor(int room, out int dx, out int dz)
     {
-        int ext = ExtDoor(room), dk = ext >= 0 ? ext : 0;
+        int ext = roomEntry[room] >= 0 ? roomEntry[room] : ExtDoor(room), dk = ext >= 0 ? ext : 0;
         dx = roomDoorCount[room] > 0 ? DoorX(room, dk) : RoomMidX(room);
         dz = roomDoorCount[room] > 0 ? DoorZ(room, dk) : RoomMidZ(room);
     }

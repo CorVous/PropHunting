@@ -485,6 +485,8 @@ public partial class MapGen
         if ((t & GenData.T_OUTDOOR) == 0) return GR_INDOOR;
         int room = innerRoom[i], zone = roomZone[room];
         if (zone == GenData.Z_RELEASE) return GR_RELEASE;
+        if (roomType[room] == GenData.R_LANE) return GR_TRACK;    // the lane is a track (G32)
+        if (roomType[room] == GenData.R_YARD) return GR_PAVING;   // a yard is paved
         if ((t & GenData.T_EARTH) != 0) return GR_TRACK;                 // trodden earth around a fire
         if (zone == GenData.Z_FOREST) return (t & GenData.T_PATH) != 0 ? GR_TRACK : GR_FOREST;
         if ((t & GenData.T_COVERED) != 0) return GR_PAVING;

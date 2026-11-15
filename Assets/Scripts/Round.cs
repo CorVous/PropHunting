@@ -2,14 +2,17 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // One round: BRIEF -> HIDE -> HUNT -> ROUND_END (reveal) -> result panel (05 section 4).
-// Hunt mode: the player hunts bot hiders. Hide mode: the player hides with bot hiders from bot hunters.
+// A run is this one round (G34: no equal teams, no side swap). Of the players taking part (the lobby's zone)
+// about 1 in 4 hunt, at least 1, drawn at random each round; everyone else hides. The player's own role is drawn
+// the same way unless the start panel or the URL fixes it. Bots fill the other places on both sides.
 // A round has no winner: it is scored by the hiders' survival share (G7, 05 section 8.1).
 // Round.cs: flow, shots, scoring. RoundSpots.cs: where bot hiders hide, and hiding sockets.
 public partial class Round : MonoBehaviour
 {
     public const int PH_NONE = 0, PH_BRIEF = 1, PH_HIDE = 2, PH_HUNT = 3, PH_END = 4, PH_RESULT = 5;
 
-    public int phase, mode;
+    public int phase, mode;             // mode: the player's side this round (Game.MODE_HUNT or MODE_HIDE), or explore
+    public int requested;               // what the start panel or the URL asked for: a side, explore, or Game.MODE_RANDOM
     public float left;                  // seconds left in the phase
     public float huntLength, huntElapsed;
     public bool endgame;
@@ -94,14 +97,15 @@ public partial class Round : MonoBehaviour
     public void Begin(int newMode)
     {
         Stop();
-        mode = newMode;
+        requested = newMode;
+        mode = newMode == Game.MODE_RANDOM ? Game.MODE_HIDE : newMode;
         BuildSockets();
         if (mode == Game.MODE_EXPLORE)
         {
             phase = PH_NONE;
             P.Activate(Player.ROLE_EXPLORE, Map.ReleasePoint() + Vector3.up * 0.05f, Map.ReleaseYaw());
             P.changesLeft = 99;
-            P.Say("Explore: walk the map. Look at a prop and press E to disguise as it.", 6f);
+            P.Say("Explore: walk the map. Look at a prop and click to disguise as it.", 6f);
             return;
         }
         StartRound();
@@ -140,22 +144,22 @@ public partial class Round : MonoBehaviour
         huntElapsed = 0f; endgame = false; playerCaught = false; playerSurvived = 0f; warned = false;
         resultLines.Clear(); endReason = "";
 
-        int botHiders = mode == Game.MODE_HUNT ? Balance.BotHiders[size] : Balance.BotHiders[size] - 1;
+        // who takes part, how many hunt (1 in 4, at least 1), and the player's side: drawn for every round
+        totalPlayers = Mathf.Max(2, Game.I.participants);
+        int nHunters = Balance.Hunters(totalPlayers);
+        if (requested == Game.MODE_RANDOM) mode = Random.Range(0, totalPlayers) < nHunters ? Game.MODE_HUNT : Game.MODE_HIDE;
+        bool playerHunts = mode == Game.MODE_HUNT;
+        int botHiders = totalPlayers - nHunters - (playerHunts ? 0 : 1);
         for (int i = 0; i < botHiders; i++) SpawnBotHider(i);
-        if (mode == Game.MODE_HUNT)
+        int botHunters = nHunters - (playerHunts ? 1 : 0);
+        for (int i = 0; i < botHunters; i++) SpawnBotHunter(i);
+        startHunters = nHunters; startHiders = totalPlayers - nHunters;
+        if (playerHunts)
         {
-            startHunters = 1; startHiders = hiders.Count;
             P.Activate(Player.ROLE_HUNTER, Map.ReleasePoint() + Vector3.up * 0.05f, Map.ReleaseYaw());
             P.hunterHealth = Balance.HunterHealth; P.wrongProps = 0; P.hitsLanded = 0; P.catches = 0;
         }
-        else
-        {
-            int n = Balance.BotHunters[size];
-            for (int i = 0; i < n; i++) SpawnBotHunter(i);
-            startHunters = hunters.Count; startHiders = hiders.Count + 1;
-            SpawnPlayerHider();
-        }
-        totalPlayers = startHiders + startHunters;
+        else SpawnPlayerHider();
         bool small = totalPlayers < Balance.SmallGroup;
         basePenalty = small ? (Balance.WrongPropPenalty + 1) / 2 : Balance.WrongPropPenalty;
         forcedInterval = small ? Balance.ForcedTauntSmallGroup : Balance.ForcedTaunt;
@@ -170,7 +174,7 @@ public partial class Round : MonoBehaviour
         var bh = go.AddComponent<BotHunter>();
         bh.label = "Hunter " + (i + 1);
         Vector3 rp = Map.ReleasePoint();
-        go.transform.position = rp + new Vector3((i - 1) * 0.8f, 0f, 0f);
+        go.transform.position = rp + new Vector3(((i % 3) - 1) * 0.8f, 0f, (i / 3) * 0.8f);
         go.transform.rotation = Quaternion.Euler(0f, Map.ReleaseYaw(), 0f);
         hunters.Add(bh);
     }
@@ -207,7 +211,7 @@ public partial class Round : MonoBehaviour
         }
         else if (phase == PH_HIDE)
         {
-            // prototype convenience: the bots are already hidden, so a waiting hunter may skip the rest
+            // a testing aid, not a player control (G38): the bots are already hidden, so Enter skips a hunter's wait
             if (mode == Game.MODE_HUNT && Input.GetKeyDown(KeyCode.Return) && left > 3f) left = 3f;
             if (left <= 0f) StartHunt();
         }
@@ -218,7 +222,8 @@ public partial class Round : MonoBehaviour
         }
         else if (phase == PH_END)
         {
-            if (left <= 0f || Input.GetKeyDown(KeyCode.Return)) { phase = PH_RESULT; Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
+            // the reveal ends by itself, or with a click (the trigger in VR)
+            if (left <= 0f || Input.GetMouseButtonDown(0)) { phase = PH_RESULT; Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
         }
     }
 

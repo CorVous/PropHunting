@@ -87,15 +87,9 @@ public partial class Player
             else if (role == ROLE_HUNTER) Fire();
             else if (CanDisguise) TryTake();
         }
-        if (Input.GetKeyDown(KeyCode.E) && CanDisguise) TryTake();
-        if ((Input.GetKeyDown(KeyCode.Q) || testLock) && def >= 0) ToggleLock();
+        // lock, taunt, unstick and the walking body are on the wrist panel (GameUI.Wrist, G38), not on keys
+        if (testLock && def >= 0) ToggleLock();
         testLock = false;
-        if (Input.GetKeyDown(KeyCode.R) && def >= 0) { rotationLock = !rotationLock; Say(rotationLock ? "Rotation lock on: the prop keeps its direction while pinned" : "Rotation lock off: the prop turns with your view"); }
-        if (Input.GetKeyDown(KeyCode.Z)) TurnPinned(-Balance.TurnStepDeg);
-        if (Input.GetKeyDown(KeyCode.C)) TurnPinned(Balance.TurnStepDeg);
-        if (Input.GetKeyDown(KeyCode.T)) Taunt(false);
-        if (Input.GetKeyDown(KeyCode.G) && role == ROLE_EXPLORE && def >= 0) { ToWalker(); Say("Back to the walking body"); }
-        if (Input.GetKeyDown(KeyCode.U)) Unstick();
 
         // tagger view model
         bool showTagger = role == ROLE_HUNTER && !third && !Game.I.topView;
@@ -130,7 +124,7 @@ public partial class Player
         string cn = cls == 1 ? "tiny" : (cls == 2 ? "medium" : "large");
         string t = GameUI.DefName(d) + " · " + cn + " · " + Balance.HiderHealth[cls - 1] + " HP";
         if (!onMenu && role == ROLE_HIDER) return t + " · not a disguise this round";
-        return t + " · E: disguise";
+        return t + " · click: disguise";
     }
 
     // ---------------------------------------------------------------- disguise
@@ -165,21 +159,13 @@ public partial class Player
         return SetDisguise(d) ? "disguised as " + id + " eye " + eye.ToString("0.00") : "no room";
     }
 
-    void ToggleLock()
+    public void ToggleLock()
     {
         if (locked) { locked = false; Say("Unlocked"); AudioHub.I.Play("toggle_001", 0.5f); return; }
         if (!settled) { Say("Stand still for a moment to lock"); return; }
         locked = true;
-        Say("Locked in place (Q to unlock, Z / C to turn)");
+        Say("Locked in place (wrist panel: unlock)");
         AudioHub.I.Play("toggle_002", 0.5f);
-    }
-
-    // turn the prop in 15 degree steps while pinned (05 section 3.6.5)
-    public void TurnPinned(float deg)
-    {
-        if (def < 0 || !(settled || locked)) return;
-        if (!body.TryYaw(Mathf.Round((body.yaw + deg) / Balance.TurnStepDeg) * Balance.TurnStepDeg)) Say("No room to turn");
-        else AudioHub.I.Play("tick_001", 0.4f);
     }
 
     public void Taunt(bool forced)

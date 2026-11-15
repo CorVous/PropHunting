@@ -489,6 +489,8 @@ public partial class MapGen
         {
             abs = (abs * GenData.DensityPercent[density] + 50) / 100;
             if (abs < 4) abs = 4;
+            // an area of one cell (a patio at a back door, a fire pit in a back garden: G32) needs 4 at most
+            if (roomOuterCells[room] == 1 && abs > 4) abs = 4;
             if (roomFloorTarget[room] < abs) roomFloorTarget[room] = abs;
             if (roomFloorMax[room] < abs) roomFloorMax[room] = abs;
             // the area's minimum: its type's number per 100 m2, and never fewer than the type's fewest per area
@@ -522,6 +524,8 @@ public partial class MapGen
             case GenData.R_FIREPIT: PlanFirepit(); break;
             case GenData.R_FOREST_DENSE: PlanForest(false); break;
             case GenData.R_FOREST_CLEARING: PlanForest(true); break;
+            case GenData.R_LANE: PlanLane(); break;
+            case GenData.R_YARD: PlanYard(); break;
         }
         if (roomFloorMin[room] > 0) FillToMinimum();
         // what sits on, in and under the furniture, thinned evenly to the room's cap

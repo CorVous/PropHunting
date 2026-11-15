@@ -43,7 +43,6 @@ public static class Balance
     public const float SettleTime = 0.5f;
     public const float HitSlide = 0.3f;
     public const float HitNoSettle = 1.5f;
-    public const float TurnStepDeg = 15f;
 
     public static float StepHeight(float boxHeight) { return Mathf.Clamp(0.4f * boxHeight, 0.04f, 0.30f); }
 
@@ -78,8 +77,11 @@ public static class Balance
     public const int KnockMaxSimulating = 24;
 
     // ---- bots (prototype) ----
-    public static readonly int[] BotHiders = { 3, 4, 5, 6 };     // hunt mode: bot hiders by map size
-    public static readonly int[] BotHunters = { 1, 2, 2, 3 };    // hide mode: bot hunters by map size
+    // A run is one round (G34). The players in the lobby's zone take part; about 1 in 4 of them hunt (at least 1),
+    // drawn at random each round, and everyone else hides. In the prototype bots stand in for the other players.
+    public static readonly int[] LobbyBotsInZone = { 5, 7, 9, 11 };   // bots in the zone by map size: 6, 8, 10, 12 taking part with the player
+    public const int LobbyWatchers = 3;                               // bots in the lobby outside the zone (they do not play)
+    public static int Hunters(int participants) { int h = (participants + 2) / 4; return h < 1 ? 1 : h; }   // 1 in 4, rounded, at least 1
     public const float BotHunterSight = 9f;          // how far a bot hunter notices a moving prop
     public const float BotHunterGuessInterval = 30f;  // seconds between a bot hunter's idle guesses at still props on patrol
     public const int BotHunterIdleGuessHealth = 60;  // no idle guesses at or below this health

@@ -5,13 +5,12 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 4;
+    public const int GEN_VERSION = 5;
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
-    // the prop rules change (generators 1 to 4 share layout 1: the same seed keeps its buildings and walls).
-    // Bump it when Layout or BuildEdges change. Room types: the draws of layout 1 are kept; what generator 3 and
-    // later decide on top of them (kids' room, office, hall) draws from GEN_VERSION (MapGen.AssignRoomTypes), so a
-    // room of one seed may change between those types from one generator version to the next.
-    public const int LAYOUT_VERSION = 1;
+    // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
+    // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
+    // Layout 2 (generator 5): plots along a lane, buildings from the plan library, a wood (MapGenSite.cs, G32).
+    public const int LAYOUT_VERSION = 2;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell
@@ -22,8 +21,14 @@ public static class GenData
 
     // ---- size buckets (04 section 4.7.7) ----
     public static readonly string[] SizeName = { "S", "M", "L", "XL" };
-    public static readonly int[] SizeGrid = { 7, 9, 12, 14 };            // bounding box, outer cells per side
-    public static readonly int[] SizeGroundCells = { 28, 52, 85, 108 };  // ground cells to fill
+    // Layout 2 (G32, G36): the map is a lane with plots on both sides and a wood, so its box follows the site; the
+    // sizes give the plots, the ground cells the wood tops the map up to, and the wood's own minimum. Layout 1 (the
+    // zone pieces) filled a fixed square of SizeGrid cells to 28, 52, 85 and 108 ground cells.
+    public static readonly int[] SizeGrid = { 7, 9, 12, 14 };            // layout 1: bounding box, outer cells per side
+    public static readonly int[] SizeGroundCells = { 46, 80, 124, 164 }; // ground cells the wood tops the map up to (layout 1: 28, 52, 85, 108)
+    public static readonly int[] SizeWoodMin = { 6, 10, 16, 22 };        // the wood is never smaller than this
+    public static readonly string[] SizePlots = { "H+", "HH+", "HHDW", "HHHDW" };   // plots: H house, D diner, W warehouse, + a diner or a warehouse (or a house at S)
+    public static readonly int[] SizeExtraHouse = { 0, 300, 400, 500 };  // chance (per mille) of one more house plot
     public static readonly int[] SizeLeaks = { 8, 11, 15, 18 };          // wrong-category spawns (04 section 4.3.5)
     public static readonly int[] SizePlayers = { 8, 16, 24, 32 };
     public const int LEAK_COMEDIC_PERMILLE = 300;                        // D10
@@ -55,7 +60,7 @@ public static class GenData
 
     // ---- room types ----
     public const int R_LIVING = 1, R_KITCHEN = 2, R_DINING = 3, R_BEDROOM = 4, R_BATH = 5, R_OFFICE = 6, R_KIDS = 7, R_HALL = 8;
-    public const int R_LAWN_OPEN = 10, R_GARDEN = 11, R_PATIO = 12, R_FIREPIT = 13;
+    public const int R_LAWN_OPEN = 10, R_GARDEN = 11, R_PATIO = 12, R_FIREPIT = 13, R_LANE = 14, R_YARD = 15;
     public const int R_STORAGE = 20, R_LOADING = 21, R_WH_OFFICE = 22;
     public const int R_DINER_DINING = 30, R_DINER_KITCHEN = 31, R_DINER_STORE = 32;
     public const int R_FOREST_DENSE = 40, R_FOREST_CLEARING = 41;
@@ -85,6 +90,8 @@ public static class GenData
             case R_DINER_STORE: return "Diner store room";
             case R_FOREST_DENSE: return "Dense forest";
             case R_FOREST_CLEARING: return "Forest camp";
+            case R_LANE: return "Lane";
+            case R_YARD: return "Yard";
             case R_RELEASE: return "Hunter release";
         }
         return "Room";
@@ -142,12 +149,12 @@ public static class GenData
             case R_OFFICE: case R_WH_OFFICE: return TH_OFFICE;
             case R_KIDS: return TH_KIDS;
             case R_HALL: return TH_HALL;
-            case R_STORAGE: case R_LOADING: return TH_STORE;
+            case R_STORAGE: case R_LOADING: case R_YARD: return TH_STORE;
             case R_DINER_DINING: return TH_DINER;
             case R_DINER_KITCHEN: return TH_PRO_KITCHEN;
             case R_DINER_STORE: return TH_PANTRY;
             case R_PATIO: return TH_PATIO;
-            case R_LAWN_OPEN: case R_GARDEN: return TH_GARDEN;
+            case R_LAWN_OPEN: case R_GARDEN: case R_LANE: return TH_GARDEN;
             case R_FIREPIT: case R_FOREST_CLEARING: return TH_CAMP;
             case R_FOREST_DENSE: return TH_FOREST;
         }
@@ -249,12 +256,6 @@ public static class GenData
     public static int[] entryDef = new int[MAXE];      // a type that is native to the room type
     public static int[] entryGrp = new int[MAXE];      // or a prop group whose kinds all are, -1 = a single def (entryDef)
 
-    // ---- zone pieces (04 section 4.1.1) ----
-    const int MAXP = 64;
-    public static int nPieces;
-    public static int[] pieceZone = new int[MAXP], pieceW = new int[MAXP], pieceH = new int[MAXP], pieceWeight = new int[MAXP];
-    public static string[] pieceRows = new string[MAXP];   // rows joined by '/', a letter per cell = room, '.' = empty
-    public static bool[] pieceHub = new bool[MAXP];
 
     static bool built;
     static int cur;
@@ -516,20 +517,6 @@ public static class GenData
         for (int t = 0; t < nTables; t++)
             if (tableZone[t] == zone) return t;   // per-zone fallback
         return -1;
-    }
-
-    static void Piece(int zone, string rows, int weight, bool hub)
-    {
-        int p = nPieces++;
-        pieceZone[p] = zone; pieceRows[p] = rows; pieceWeight[p] = weight; pieceHub[p] = hub;
-        string[] r = rows.Split('/');
-        pieceH[p] = r.Length; pieceW[p] = r[0].Length;
-    }
-
-    // room letter at (x, y) of piece p before rotation, or '.'
-    public static char PieceCell(int p, int x, int y)
-    {
-        return pieceRows[p][y * (pieceW[p] + 1) + x];
     }
 
     // ------------------------------------------------------------------ the content
@@ -836,6 +823,8 @@ public static class GenData
         D("ms_handTruck", "hand-truck", 2200, 0, A_WALL, BOTH, 1); Beside(K_STORE);
         // stand-ins built from simple shapes in the packs' style, because the mirror has none (Z5)
         D("gen_wateringCan", "gen_wateringCan", 1000, 0, A_OUT_EDGE, FL_LIGHT | BOTH, 1); Jit(3, 25); Loose(); Beside(K_WET | K_WORK | K_STORE);
+        D("gen_mailbox", "gen_mailbox", 1000, 0, A_OUT_EDGE, FL_HEAVY | OUT, 1); Jit(2, 3); Cap(1);
+        D("gen_dumpster", "gen_dumpster", 1000, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Jit(2, 3); Cap(1);
         D("gen_tap", "gen_tap", 1000, 0, A_OUT_EDGE, FL_FIXTURE | FL_HEAVY, 1); Kind(K_WET);
         D("gen_mop", "gen_mop", 1000, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 4); Loose(); Beside(K_WET | K_STORE | K_WORK);
         D("gen_broom", "gen_broom", 1000, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 4); Loose(); Beside(K_WET | K_STORE | K_WORK);
@@ -848,7 +837,6 @@ public static class GenData
         BuildGroups();
         BuildRanges();
         BuildTables();
-        BuildPieces();
     }
 
     // ---------------------------------------------------------------- room themes of the items that sit on furniture
@@ -959,11 +947,13 @@ public static class GenData
         Range(R_GARDEN,            22,   34,        2,             40,      0,  2,    0,  0);
         Range(R_PATIO,             16,   26,        8,             36,      0,  2,    0,  0);
         Range(R_FIREPIT,           14,   22,        3,             34,      0,  2,    0,  0);
+        Range(R_LANE,               6,   10,        0,             16);
+        Range(R_YARD,              18,   28,        6,             36);
         Range(R_FOREST_DENSE,      16,   26,        2,             44,      9,  15,   8, 16);
         Range(R_FOREST_CLEARING,   16,   24,        5,             44,      4,  7,    4,  8);
         // No outdoor area is bare (G29): the fewest props on the floor of one area, whatever its size
         rangeFloorAbs[R_LAWN_OPEN] = 5; rangeFloorAbs[R_GARDEN] = 8; rangeFloorAbs[R_PATIO] = 7; rangeFloorAbs[R_FIREPIT] = 7;
-        rangeFloorAbs[R_FOREST_DENSE] = 6; rangeFloorAbs[R_FOREST_CLEARING] = 8;
+        rangeFloorAbs[R_FOREST_DENSE] = 6; rangeFloorAbs[R_FOREST_CLEARING] = 8; rangeFloorAbs[R_LANE] = 4; rangeFloorAbs[R_YARD] = 6;
     }
 
     // ---------------------------------------------------------------- what is native to a room type
@@ -1015,7 +1005,7 @@ public static class GenData
         Native(Z_DINER, R_DINER_KITCHEN, "r_counter", "r_counterSink", "r_stove", "r_fridge", "k_fridge", "k_counter", "k_counterDrawer", "@crates", "k_trashcan", "@cleaning");
         Native(Z_DINER, R_DINER_STORE, "r_fridge", "@crates", "@barrels", "gen_rackPantry", "w_pallet", "@boxes", "@sacks");
 
-        Native(Z_LAWN, R_LAWN_OPEN, "n_treeFat", "n_treeOak", "n_bush", "n_bushDetailed", "n_bushLarge", "@rocks", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_sign", "k_bench",
+        Native(Z_LAWN, R_LAWN_OPEN, "gen_mailbox", "n_treeFat", "n_treeOak", "n_bush", "n_bushDetailed", "n_bushLarge", "@rocks", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_sign", "k_bench",
             "n_logStack", "@pots", "k_trashcan", "n_pathStone", "w_pallet", "@barrels", "r_tableRound", "n_rockLargeB");
         Native(Z_LAWN, R_GARDEN, "n_treeFat", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_bush", "n_bushLarge", "n_bushDetailed", "@rocks", "@pots", "n_sign", "@buckets", "@tools",
             "@watering", "gen_tap", "gen_shed", "m_wheelbarrow", "@sacks", "@vegCarrot", "@vegPumpkin", "@vegMelon", "k_bench", "n_pathStone");
@@ -1023,47 +1013,18 @@ public static class GenData
         Native(Z_LAWN, R_FIREPIT, "n_treeFat", "n_campfire", "s_campfirePit", "n_logStack", "n_logStackLarge", "@logpile", "n_bush", "n_bushLarge", "@rocks", "n_stump", "n_stumpRound", "n_log",
             "@buckets", "n_pathStone", "s_axe");
 
+        // the lane between the plots (G32): a sign at its start, benches and bins against the fences, planting
+        Native(Z_LAWN, R_LANE, "n_sign", "k_bench", "k_benchCushion", "k_trashcan", "@pots", "n_bush", "n_bushDetailed", "@rocks", "@flowersRed", "@flowersYellow",
+            "@flowersPurple", "n_pathStone");
+        // the yard of a warehouse (loading yard) or of a diner (service yard)
+        Native(Z_LAWN, R_YARD, "gen_dumpster", "w_pallet", "w_palletLoaded", "@crates", "@barrels", "@fuel", "@boxes", "s_boxLarge", "w_planks", "ms_handTruck", "k_trashcan",
+            "@sacks", "@cleaning", "n_pathStone");
+
         Native(Z_FOREST, R_FOREST_DENSE, "n_treeDefault", "n_treeOak", "n_treePineTall", "n_treePineRound", "n_bush", "n_bushDetailed", "n_bushLarge", "n_rockLarge", "@rocks", "n_rockTall",
             "n_stump", "n_stumpRound", "n_log", "n_logLarge", "s_treeLog", "@mushrooms", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_grass", "n_grassLarge", "s_signpost", "s_axe");
         Native(Z_FOREST, R_FOREST_CLEARING, "n_tentOpen", "n_tentClosed", "n_campfire", "s_campfirePit", "n_treeDefault", "n_treePineTall", "n_treeOak", "n_stump", "n_stumpRound", "n_log",
             "n_logStack", "@logpile", "s_bedroll", "s_chest", "s_barrel", "s_box", "n_bush", "n_bushLarge", "@rocks", "@mushrooms", "@buckets", "@tools", "n_grass", "n_grassLarge", "s_axe");
 
         Table(Z_RELEASE, R_RELEASE);
-    }
-
-    static void BuildPieces()
-    {
-        // rows are listed north to south; letters are rooms; hub pieces may be the lawn hub
-        // HOUSE
-        Piece(Z_HOUSE, "AB/A.", 6, false);
-        Piece(Z_HOUSE, "AA/BC", 6, false);
-        Piece(Z_HOUSE, "AB", 3, false);
-        Piece(Z_HOUSE, "ABB/A.C", 4, false);
-        Piece(Z_HOUSE, "AAB/CDB", 5, false);
-        Piece(Z_HOUSE, ".AB/CAD", 3, false);
-        // WAREHOUSE
-        Piece(Z_WAREHOUSE, "AA/AA", 5, false);
-        Piece(Z_WAREHOUSE, "AAB/AAC", 5, false);
-        Piece(Z_WAREHOUSE, "AA/AB", 3, false);
-        Piece(Z_WAREHOUSE, "AAA/AA.", 3, false);
-        // DINER
-        Piece(Z_DINER, "AAB", 5, false);
-        Piece(Z_DINER, "AA/BC", 5, false);
-        Piece(Z_DINER, "AA/AB", 4, false);
-        // LAWN
-        Piece(Z_LAWN, "AA/AA", 6, true);
-        Piece(Z_LAWN, "AAA/AA.", 4, true);
-        Piece(Z_LAWN, "AA/A.", 4, true);
-        Piece(Z_LAWN, "AAA", 3, true);
-        Piece(Z_LAWN, "AA", 5, false);
-        Piece(Z_LAWN, "A", 5, false);
-        // FOREST
-        Piece(Z_FOREST, "AA/AA", 5, false);
-        Piece(Z_FOREST, "AA/A.", 5, false);
-        Piece(Z_FOREST, "AAA/.A.", 3, false);
-        Piece(Z_FOREST, "AA", 5, false);
-        Piece(Z_FOREST, "A", 4, false);
-        // HUNTER RELEASE
-        Piece(Z_RELEASE, "A", 1, false);
     }
 }

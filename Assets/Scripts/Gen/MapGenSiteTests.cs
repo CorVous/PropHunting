@@ -1,0 +1,279 @@
+// MapGen, part 1c: the layout tests (owner decision G32; research report 16, section 8). Cheap passes over the
+// outer grid, run after the walls and doors and before any prop. A layout that fails one is drawn again (the next
+// attempt of the seed). The plan library is built to pass them; the tests catch what the site does with it.
+//   T1  a building's footprint is a rectangle, an L or a T: at most 8 outline corners, no hole, no notch, no pinch
+//   T2  no two buildings share an edge
+//   T3  no building stands on the map's edge
+//   T4  a house's front door is in its entrance room (the hall, else the living room), and a path leads from it
+//       to the lane without crossing a fence or a building
+//   T5  every house has a living room, a kitchen, a bedroom and a bathroom
+//   T6  doors inside a house only join rooms that may connect; a private room (bedroom, bathroom, office, kids'
+//       room) has one door, to the hall or the living room
+//   T7  no outside door into a private room
+//   T8  every outer cell can be reached from the hunter release
+//   T9  a house's back door opens onto its patio
+//   T10 the wood is one piece and touches no building
+//   T11 every garden bed lies along a fence
+//   T12 a diner's front door is in its dining room and its kitchen is not on the forecourt; a warehouse's front
+//       door is in its office and its loading dock has a door of its own to the outside
+//   T13 every room is one piece
+public partial class MapGen
+{
+    public const int SITE_TESTS = 13;
+    public int siteFailMask;        // tests the last layout failed (bit t - 1 for Tt)
+    public int siteFailMaskFirst;   // tests the seed's first layout failed
+
+    int[] stMark;
+
+    static bool Private(int rt) { return rt == GenData.R_BEDROOM || rt == GenData.R_BATH || rt == GenData.R_OFFICE || rt == GenData.R_KIDS; }
+    static bool PublicRoom(int rt) { return rt == GenData.R_HALL || rt == GenData.R_LIVING || rt == GenData.R_DINING || rt == GenData.R_KITCHEN; }
+
+    bool ValidateSite()
+    {
+        int fail = 0;
+        if (stMark == null || stMark.Length < W * H) stMark = new int[W * H];
+        // T1, T3: footprints
+        for (int inst = 0; inst < nInst; inst++)
+        {
+            if (!GenData.IsBuilding(instZone[inst])) continue;
+            int corners = 0;
+            bool pinch = false;
+            for (int z = 0; z <= H; z++)
+                for (int x = 0; x <= W; x++)
+                {
+                    // the four cells around the grid point (x, z)
+                    bool a = InstAt(x - 1, z - 1) == inst, b = InstAt(x, z - 1) == inst, c = InstAt(x - 1, z) == inst, d = InstAt(x, z) == inst;
+                    int n = (a ? 1 : 0) + (b ? 1 : 0) + (c ? 1 : 0) + (d ? 1 : 0);
+                    if (n == 1 || n == 3) corners++;
+                    if (n == 2 && a == d) pinch = true;
+                }
+            if (corners > 8 || pinch || Holes(inst) || Notched(inst)) fail |= 1 << 0;
+            for (int cc = 0; cc < W * H; cc++)
+            {
+                if (cellInst[cc] != inst) continue;
+                for (int dd = 0; dd < 4; dd++)
+                {
+                    int nx = cc % W + DX[dd], nz = cc / W + DZ[dd];
+                    int zn = ZoneAt(nx, nz);
+                    if (zn == GenData.Z_NONE) fail |= 1 << 2;
+                    else if (GenData.IsBuilding(zn) && cellInst[nz * W + nx] != inst) fail |= 1 << 1;
+                }
+            }
+        }
+        // the rooms of each building, their doors
+        for (int k = 0; k < nPlots; k++)
+        {
+            int bi = plotInstB[k], zone = plotZone[k];
+            bool hasL = false, hasK = false, hasB = false, hasT = false, hasH = false;
+            for (int r = 0; r < nRooms; r++)
+            {
+                if (roomInst[r] != bi) continue;
+                int rt = roomType[r];
+                hasL |= rt == GenData.R_LIVING; hasK |= rt == GenData.R_KITCHEN; hasB |= rt == GenData.R_BEDROOM; hasT |= rt == GenData.R_BATH; hasH |= rt == GenData.R_HALL;
+            }
+            if (zone == GenData.Z_HOUSE && !(hasL && hasK && hasB && hasT)) fail |= 1 << 4;
+            int frontRoom = -1, frontCell = -1;
+            bool patio = false, dockDoor = false, kitchenOnFront = false;
+            for (int c = 0; c < W * H; c++)
+            {
+                if (cellInst[c] != bi) continue;
+                int r = cellRoom[c], rt = roomType[r], x = c % W, z = c / W;
+                for (int d = 0; d < 4; d++)
+                {
+                    int nx = x + DX[d], nz = z + DZ[d];
+                    if (!InGrid(nx, nz)) continue;
+                    int n = nz * W + nx, et = EdgeType(x, z, d);
+                    int nt = cellZone[n] == GenData.Z_NONE ? 0 : roomType[cellRoom[n]];
+                    if (zone == GenData.Z_DINER && rt == GenData.R_DINER_KITCHEN && nt == GenData.R_PATIO && cellInst[n] == plotInstY[k]) kitchenOnFront = true;
+                    if (et != GenData.E_DOOR) continue;
+                    if (cellInst[n] == bi)
+                    {
+                        // T6: an interior door
+                        if (zone == GenData.Z_HOUSE && d < 2)
+                        {
+                            bool ok = (PublicRoom(rt) && PublicRoom(nt))
+                                || (Private(rt) && (nt == GenData.R_HALL || nt == GenData.R_LIVING))
+                                || (Private(nt) && (rt == GenData.R_HALL || rt == GenData.R_LIVING));
+                            if (!ok) fail |= 1 << 5;
+                        }
+                        continue;
+                    }
+                    // an outside door
+                    if (zone == GenData.Z_HOUSE && Private(rt)) fail |= 1 << 6;
+                    if (cellPlot[n] == k && nt == GenData.R_PATIO) patio = true;
+                    if (rt == GenData.R_LOADING) dockDoor = true;
+                }
+            }
+            // the plan's front door, where the site put it
+            for (int i = 0; i < nSd; i++)
+            {
+                int c = sdCell[i], d = sdDir[i];
+                if (sdKind[i] != SD_FRONT || cellInst[c] != bi || EdgeType(c % W, c / W, d) != GenData.E_DOOR) continue;
+                frontRoom = cellRoom[c]; frontCell = (c / W + DZ[d]) * W + c % W + DX[d];
+            }
+            int frt = frontRoom >= 0 ? roomType[frontRoom] : -1;
+            if (zone == GenData.Z_HOUSE)
+            {
+                if (frt != (hasH ? GenData.R_HALL : GenData.R_LIVING) || !PathToLane(frontCell)) fail |= 1 << 3;
+                if (!patio) fail |= 1 << 8;
+                // T6: one door for every private room
+                for (int r = 0; r < nRooms; r++)
+                    if (roomInst[r] == bi && Private(roomType[r]) && InteriorDoors(r) != 1) fail |= 1 << 5;
+            }
+            else if (zone == GenData.Z_DINER) { if (frt != GenData.R_DINER_DINING || kitchenOnFront) fail |= 1 << 11; }
+            else if (frt != GenData.R_WH_OFFICE || !dockDoor) fail |= 1 << 11;
+        }
+        // T8: everything reachable from the release
+        {
+            for (int c = 0; c < W * H; c++) stMark[c] = 0;
+            int qh = 0, qt = 0, start = releaseZ * W + releaseX;
+            stMark[start] = 1; queue[qt++] = start;
+            while (qh < qt)
+            {
+                int c = queue[qh++];
+                for (int d = 0; d < 4; d++)
+                {
+                    int nx = c % W + DX[d], nz = c / W + DZ[d];
+                    if (!InGrid(nx, nz)) continue;
+                    int n = nz * W + nx, et = EdgeType(c % W, c / W, d);
+                    if (stMark[n] != 0 || cellZone[n] == GenData.Z_NONE || (et != GenData.E_NONE && et != GenData.E_DOOR)) continue;
+                    stMark[n] = 1; queue[qt++] = n;
+                }
+            }
+            for (int c = 0; c < W * H; c++) if (cellZone[c] != GenData.Z_NONE && stMark[c] == 0) fail |= 1 << 7;
+        }
+        // T10: the wood
+        {
+            int pieces = 0;
+            for (int c = 0; c < W * H; c++) stMark[c] = 0;
+            for (int c = 0; c < W * H; c++)
+            {
+                if (cellZone[c] != GenData.Z_FOREST || stMark[c] != 0) continue;
+                pieces++;
+                FloodSame(c, GenData.Z_FOREST, -1);
+            }
+            if (pieces > 1) fail |= 1 << 9;
+            for (int c = 0; c < W * H; c++)
+                if (cellZone[c] == GenData.Z_FOREST)
+                    for (int d = 0; d < 4; d++) if (GenData.IsBuilding(ZoneAt(c % W + DX[d], c / W + DZ[d]))) fail |= 1 << 9;
+        }
+        // T11, T13: rooms
+        for (int r = 0; r < nRooms; r++)
+        {
+            int first = -1, cells = 0;
+            bool fence = false;
+            for (int c = 0; c < W * H; c++)
+            {
+                if (cellZone[c] == GenData.Z_NONE || cellRoom[c] != r) continue;
+                if (first < 0) first = c;
+                cells++;
+                for (int d = 0; d < 4; d++) if (EdgeType(c % W, c / W, d) == GenData.E_FENCE) fence = true;
+            }
+            if (roomType[r] == GenData.R_GARDEN && !fence) fail |= 1 << 10;
+            if (first < 0) continue;
+            for (int c = 0; c < W * H; c++) stMark[c] = 0;
+            if (FloodSame(first, -1, r) != cells) fail |= 1 << 12;
+        }
+        siteFailMask = fail;
+        if (attempt == 0) siteFailMaskFirst = fail;
+        return fail == 0;
+    }
+
+    int InstAt(int x, int z) { return InGrid(x, z) ? cellInst[z * W + x] : -1; }
+
+    // an empty cell closed in by the building on three sides: a U or a notch, not a wing
+    bool Notched(int inst)
+    {
+        for (int z = 0; z < H; z++)
+            for (int x = 0; x < W; x++)
+            {
+                if (InstAt(x, z) == inst) continue;
+                int n = 0;
+                for (int d = 0; d < 4; d++) if (InstAt(x + DX[d], z + DZ[d]) == inst) n++;
+                if (n >= 3) return true;
+            }
+        return false;
+    }
+
+    // empty cells inside a building's box that the outside cannot reach
+    bool Holes(int inst)
+    {
+        int x0 = W, z0 = H, x1 = -1, z1 = -1;
+        for (int c = 0; c < W * H; c++)
+            if (cellInst[c] == inst) { int x = c % W, z = c / W; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+        for (int z = z0; z <= z1; z++)
+            for (int x = x0; x <= x1; x++)
+            {
+                if (cellInst[z * W + x] == inst) continue;
+                // walk out in the four directions: a hole is closed in on all four
+                int closed = 0;
+                for (int d = 0; d < 4; d++)
+                {
+                    int nx = x, nz = z;
+                    while (true) { nx += DX[d]; nz += DZ[d]; if (nx < x0 || nz < z0 || nx > x1 || nz > z1) break; if (cellInst[nz * W + nx] == inst) { closed++; break; } }
+                }
+                if (closed == 4) return true;
+            }
+        return false;
+    }
+
+    // a path from an outdoor cell to the lane over open edges, never through a building
+    bool PathToLane(int start)
+    {
+        if (start < 0) return false;
+        for (int c = 0; c < W * H; c++) stMark[c] = 0;
+        int qh = 0, qt = 0;
+        stMark[start] = 1; queue[qt++] = start;
+        while (qh < qt)
+        {
+            int c = queue[qh++];
+            if (roomType[cellRoom[c]] == GenData.R_LANE) return true;
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = c % W + DX[d], nz = c / W + DZ[d];
+                if (!InGrid(nx, nz)) continue;
+                int n = nz * W + nx;
+                if (stMark[n] != 0 || cellZone[n] == GenData.Z_NONE || GenData.IsBuilding(cellZone[n]) || EdgeType(c % W, c / W, d) != GenData.E_NONE) continue;
+                stMark[n] = 1; queue[qt++] = n;
+            }
+        }
+        return false;
+    }
+
+    int InteriorDoors(int r)
+    {
+        int n = 0;
+        for (int c = 0; c < W * H; c++)
+        {
+            if (cellZone[c] == GenData.Z_NONE || cellRoom[c] != r) continue;
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = c % W + DX[d], nz = c / W + DZ[d];
+                if (InGrid(nx, nz) && EdgeType(c % W, c / W, d) == GenData.E_DOOR && cellInst[nz * W + nx] == cellInst[c]) n++;
+            }
+        }
+        return n;
+    }
+
+    // 4-connected flood over cells of a zone (zone >= 0) or of a room (room >= 0), marking stMark; returns the count
+    int FloodSame(int start, int zone, int room)
+    {
+        int qh = 0, qt = 0;
+        stMark[start] = 1; queue[qt++] = start;
+        while (qh < qt)
+        {
+            int c = queue[qh++];
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = c % W + DX[d], nz = c / W + DZ[d];
+                if (!InGrid(nx, nz)) continue;
+                int n = nz * W + nx;
+                if (stMark[n] != 0 || cellZone[n] == GenData.Z_NONE) continue;
+                if (zone >= 0 && cellZone[n] != zone) continue;
+                if (room >= 0 && cellRoom[n] != room) continue;
+                stMark[n] = 1; queue[qt++] = n;
+            }
+        }
+        return qt;
+    }
+}

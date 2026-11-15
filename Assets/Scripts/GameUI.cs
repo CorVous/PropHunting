@@ -1,9 +1,13 @@
 using UnityEngine;
 
-// All screens, drawn with Unity's immediate-mode GUI: the start panel (seed, size, mode, Generate), the
-// progress bar, the in-round display, the help panel, the Esc menu, the debug overlay and the round result.
+// All screens, drawn with Unity's immediate-mode GUI: the lobby (its hints, and the start panel on its board:
+// seed, size, density, role, Generate), the progress bar, the in-round display, the help panel, the Esc menu, the
+// debug overlay and the round result.
 public class GameUI : MonoBehaviour
 {
+    public static GameUI I;
+    void Awake() { I = this; }
+
     GUIStyle label, small, title, heading, box, button, bigButton, field, centre, bigCentre, toggleOn;
     Texture2D white, panelTex, darkTex, btnTex, btnHoverTex, btnOnTex, fieldTex;
     Font kenney;
@@ -13,17 +17,19 @@ public class GameUI : MonoBehaviour
     // prop counts at Normal density, from the generator console test (they scale with the density setting)
     static readonly string[] SizeNote =
     {
-        "S: 7 x 7 cells, about 28 used, about 130 props at Normal density. For up to 8 players.",
-        "M: 9 x 9 cells, about 52 used, about 240 props at Normal density. For 9 to 16 players.",
-        "L: 12 x 12 cells, about 85 used, about 380 props at Normal density. For 17 to 24 players.",
-        "XL: 14 x 14 cells, about 108 used, about 490 props at Normal density. For 25 to 32 players.",
+        "S: a house and a second plot (a house, a diner or a warehouse) on a lane, a wood; about 54 cells, 205 props at Normal density. For up to 8 players.",
+        "M: three or four plots, about 95 cells, 365 props at Normal density. For 9 to 16 players.",
+        "L: four or five plots (a diner and a warehouse among them), about 145 cells, 570 props at Normal density. For 17 to 24 players.",
+        "XL: five or six plots, about 190 cells, 740 props at Normal density. For 25 to 32 players.",
     };
-    static readonly string[] ModeName = { "Explore", "Hunt", "Hide" };
+    static readonly string[] ModeName = { "Explore", "Hunter", "Hider", "Drawn at random" };
+    static readonly int[] ModeOrder = { 3, 1, 2, 0 };
     static readonly string[] ModeNote =
     {
-        "Walk the map freely. Look at a prop and press E to become it; G turns you back.",
-        "You are the hunter. Bot hiders are disguised as props: find them with the dart tagger. Wrong props cost health.",
-        "You are a hider. Pick a prop, find a spot, lock in place. Bot hunters come looking after the hide phase.",
+        "Walk the map freely. Look at a prop and click to become it; the wrist panel (Esc) turns you back.",
+        "You hunt, with the other hunters (bots). Bot hiders are disguised as props: find them with the dart tagger. Wrong props cost health.",
+        "You hide, with the other hiders (bots). Pick a prop, find a spot, lock in place. Bot hunters come looking after the hide phase.",
+        "As in the game: about 1 in 4 of the players in the zone hunt, drawn at random every round; everyone else hides.",
     };
 
     static Texture2D Tex(Color c)
@@ -107,16 +113,49 @@ public class GameUI : MonoBehaviour
         W = Screen.width / s; H = Screen.height / s;
         var g = Game.I;
         if (g.state == Game.State.StartPanel) StartPanel();
+        else if (g.state == Game.State.Lobby) LobbyScreen();
         else if (g.state == Game.State.Generating) Progress();
         else Playing();
     }
 
-    // ---------------------------------------------------------------- start panel
+    // ---------------------------------------------------------------- lobby (G33)
+    void LobbyScreen()
+    {
+        var g = Game.I;
+        var lb = Lobby.I;
+        if (lb.panelOpen) { StartPanel(); return; }
+        int n = lb.Participants, hunters = Balance.Hunters(n);
+        bool inZone = lb.PlayerInZone;
+        Rect r = new Rect(12, 12, 560, 128);
+        GUI.Box(r, GUIContent.none, box);
+        GUILayout.BeginArea(new Rect(r.x + 14, r.y + 8, r.width - 28, r.height - 12));
+        GUILayout.Label("Lobby", heading);
+        GUILayout.Label("The board on the wall (walk up to it, look at it, click) holds the map: seed, size, density, your role, Generate. "
+            + "Whoever stands in the green zone takes part in the next round.", small);
+        GUILayout.Label("In the zone: " + (inZone ? "<b>you</b> and " : "") + lb.botsInZone + " bots" + (inZone ? "" : " (step in to play)")
+            + ". A round of " + n + " players has " + hunters + " hunter" + (hunters == 1 ? "" : "s") + " (1 in 4, drawn at random).", label);
+        GUILayout.EndArea();
+        string tip = lb.Hint.Length > 0 ? lb.Hint : (Cursor.lockState != CursorLockMode.Locked ? "Click to capture the mouse, then W A S D to walk" : (lb.NearBoard ? "Click the board to open it" : ""));
+        if (tip.Length > 0)
+        {
+            Fill(new Rect(W / 2 - 320, H - 120, 640, 34), new Color(0.04f, 0.05f, 0.07f, 0.8f));
+            GUI.Label(new Rect(W / 2 - 320, H - 118, 640, 30), tip, centre);
+        }
+        if (inZone)
+        {
+            Fill(new Rect(W / 2 - 200, 20, 400, 34), new Color(0.15f, 0.45f, 0.20f, 0.85f));
+            GUI.Label(new Rect(W / 2 - 200, 22, 400, 30), "You are in the zone: you take part", centre);
+        }
+    }
+
+    // ---------------------------------------------------------------- start panel (on the lobby's board)
     void StartPanel()
     {
         var g = Game.I;
-        Fill(new Rect(0, 0, W, H), new Color(0.13f, 0.17f, 0.20f, 1f));
-        float pw = 680f, ph = 748f;
+        bool lobby = g.state == Game.State.Lobby;
+        if (!lobby) Fill(new Rect(0, 0, W, H), new Color(0.13f, 0.17f, 0.20f, 1f));
+        else Fill(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.35f));
+        float pw = 680f, ph = 790f;
         Rect r = new Rect((W - pw) / 2, Mathf.Max(8f, (H - ph) / 2), pw, ph);
         GUI.Box(r, GUIContent.none, box);
         GUILayout.BeginArea(new Rect(r.x + 26, r.y + 16, r.width - 52, r.height - 28));
@@ -152,26 +191,33 @@ public class GameUI : MonoBehaviour
         GUILayout.Label(GenData.DensityName[g.density] + ": every room type's prop range at " + GenData.DensityPercent[g.density] + "%. Same seed, same buildings; only how much stands in them changes. F3 in the map shows the counts per room type.", small);
         GUILayout.Space(8);
 
-        GUILayout.Label("Mode", heading);
+        GUILayout.Label("Your role", heading);
         GUILayout.BeginHorizontal();
-        for (int i = 0; i < 3; i++)
+        foreach (int i in ModeOrder)
             if (GUILayout.Button(ModeName[i], g.mode == i ? toggleOn : button, GUILayout.Height(32))) { g.mode = i; AudioHub.I.Play("select_001", 0.5f); }
         GUILayout.EndHorizontal();
         GUILayout.Label(ModeNote[g.mode], small, GUILayout.Height(36));
         GUILayout.Space(8);
 
-        if (GUILayout.Button("Generate map", bigButton, GUILayout.Height(48))) g.Generate(false);
+        bool inZone = !lobby || Lobby.I.PlayerInZone;
+        if (GUILayout.Button(inZone ? "Generate map and start" : "Generate map (stand in the zone first)", bigButton, GUILayout.Height(48)))
+        {
+            if (lobby) Lobby.I.TryGenerate(false); else g.Generate(false);
+        }
+        if (lobby && Lobby.I.Hint.Length > 0) GUILayout.Label("<color=#ffb060>" + Lobby.I.Hint + "</color>", label);
         if (g.panelMessage.Length > 0)
         {
             GUILayout.Label("<color=#ffb060>" + g.panelMessage + "</color>", label);
-            if (g.remixOffered && GUILayout.Button("Play as a remix on generator v" + GenData.GEN_VERSION, button, GUILayout.Height(30))) g.Generate(true);
+            if (g.remixOffered && GUILayout.Button("Play as a remix on generator v" + GenData.GEN_VERSION, button, GUILayout.Height(30))) { if (lobby) Lobby.I.TryGenerate(true); else g.Generate(true); }
         }
-        else GUILayout.Label("Nothing is generated until you press Generate; every new map needs a new press.", small);
+        else GUILayout.Label("Nothing is generated until you press Generate; every new map needs a new press. "
+            + (lobby ? Lobby.I.Participants + " players in the zone take part." : ""), small);
+        if (lobby && GUILayout.Button("Close the board (Esc)", button, GUILayout.Height(30))) Lobby.I.ClosePanel();
         GUILayout.Space(8);
 
         Sliders();
         GUILayout.Space(6);
-        GUILayout.Label("Controls: W A S D move, mouse look, Shift run (as a prop), Space jump or hop, E disguise, Q lock, V third person, P third-person screen, H help, Esc menu.", small);
+        GUILayout.Label("Controls stand in for VR (G38): W A S D and the mouse for the sticks and the head, Space for the jump button, a click for pointing and the trigger, Esc for looking at the wrist panel (lock, taunt, views, the third-person screen, the menu).", small);
         GUILayout.Label("Models, sounds and fonts: Kenney (kenney.nl) and KayKit (Kay Lousberg), CC0. Sounds are stand-ins; there is no music yet.", small);
         GUILayout.EndArea();
     }
@@ -218,18 +264,18 @@ public class GameUI : MonoBehaviour
             Fill(new Rect(0, 0, W, H), new Color(0.04f, 0.05f, 0.07f, 1f));
             GUI.Label(new Rect(0, H / 2 - 70, W, 40), "The hiders are hiding", bigCentre);
             GUI.Label(new Rect(0, H / 2 - 20, W, 30), "You are held at the release point for " + Mathf.CeilToInt(rd.left) + " s.", centre);
-            GUI.Label(new Rect(0, H / 2 + 15, W, 30), "Press Enter to skip the wait: the bots are already hidden.", centre);
         }
         if (rd.phase == Round.PH_BRIEF)
         {
             Fill(new Rect(0, H / 2 - 90, W, 150), new Color(0.04f, 0.05f, 0.07f, 0.8f));
             string who = rd.mode == Game.MODE_HUNT
-                ? "You are the hunter. " + rd.startHiders + " hiders are disguised as props."
-                : "You are a hider, with " + (rd.startHiders - 1) + " others. " + rd.startHunters + " hunters are coming.";
+                ? "You hunt" + (rd.startHunters > 1 ? ", with " + (rd.startHunters - 1) + " other hunter" + (rd.startHunters > 2 ? "s" : "") : "") + ". " + rd.startHiders + " hiders are disguised as props."
+                : "You hide, with " + (rd.startHiders - 1) + " others. " + rd.startHunters + " hunter" + (rd.startHunters > 1 ? "s are" : " is") + " coming.";
+            if (rd.requested == Game.MODE_RANDOM) who = "Drawn this round: " + who;
             GUI.Label(new Rect(0, H / 2 - 80, W, 40), who, bigCentre);
             string what = rd.mode == Game.MODE_HUNT
                 ? "Hitting a real prop costs " + rd.basePenalty + " of your 100 health; at 0 you are out. A hit on a hider gives 5 back."
-                : "Look at a prop and press E to become it, find a place, stand still, press Q to lock. You will be forced to taunt now and then.";
+                : "Look at a prop and click to become it, find a place, stand still; lock and taunt are on the wrist panel (Esc). You will be forced to taunt now and then.";
             GUI.Label(new Rect(W / 2 - 430, H / 2 - 34, 860, 50), what, centre);
             GUI.Label(new Rect(0, H / 2 + 20, W, 30), "Starting in " + Mathf.CeilToInt(rd.left) + " s", centre);
         }
@@ -309,10 +355,11 @@ public class GameUI : MonoBehaviour
             Fill(new Rect(W / 2 - 420, 70, 840, 38), new Color(0.04f, 0.05f, 0.07f, 0.75f));
             GUI.Label(new Rect(W / 2 - 420, 72, 840, 34), ban, bigCentre);
         }
-        if (Cursor.lockState != CursorLockMode.Locked && cross)
-            GUI.Label(new Rect(W / 2 - 300, H - 120, 600, 26), "Click to capture the mouse (Esc releases it and opens the menu)", centre);
+        if (Cursor.lockState != CursorLockMode.Locked && cross && !wristOpen)
+            GUI.Label(new Rect(W / 2 - 300, H - 120, 600, 26), "Click to capture the mouse (Esc frees it and shows the wrist panel)", centre);
 
         if (g.helpOpen && rd.phase != Round.PH_RESULT) Help();
+        if (wristOpen && !g.menuOpen && rd.phase != Round.PH_RESULT) Wrist();
         if (g.debugOpen) DebugPanel();
         if (rd.phase == Round.PH_END || rd.phase == Round.PH_RESULT) Reveal();
         if (rd.phase == Round.PH_RESULT) Result();
@@ -333,20 +380,64 @@ public class GameUI : MonoBehaviour
         GUI.Label(new Rect(r.x + 8, r.y + 2, r.width + 200, r.height), "<color=#ffffff>" + text + "</color>", small);
     }
 
+    // Every control is a stand-in for something a VR player does (owner decision G38): the help names both.
     void Help()
     {
         var p = Game.I.player;
         string t;
+        const string move = "W A S D  move  <i>(VR: left stick)</i>\nMouse  look  <i>(VR: head, right stick turns)</i>\n";
+        const string wrist = "Esc  wrist panel: lock, taunt, views, screen, menu  <i>(VR: look at the wrist)</i>\n";
         if (p.role == Player.ROLE_HUNTER)
-            t = "<b>Hunter</b>\nW A S D  move\nMouse  look\nSpace  jump\nLeft click  fire a dart (one per press)\nLeft click on a door  open or close it\nV  third-person view\nP  third-person screen (O size, N side, hold B: move)\nH  hide this panel\nEsc or M  menu\nF3  debug overlay\n\nDarts knock loose props around. A real prop costs health; a hider flinches and you get a hit mark. Listen for taunts.";
+            t = "<b>Hunter</b>\n" + move + "Space  jump  <i>(VR: jump button)</i>\nClick  fire a dart  <i>(VR: point the tagger, trigger)</i>\nClick a door  open or close it  <i>(VR: grab the handle)</i>\n" + wrist
+                + "\nDarts knock loose props around. A real prop costs health; a hider flinches and you get a hit mark. Listen for taunts.";
         else if (p.def >= 0)
-            t = "<b>Prop</b>\nW A S D  move (Shift: run)\nMouse  look\nSpace  hop (not for large props)\nE or click  become the prop you look at\nQ  lock in place / unlock\nZ, C  turn 15 degrees while still\nR  rotation lock on or off\nT  taunt\nClick on a door  open or close it\nV  third-person view\nP  third-person screen (O size, N side, hold B: move)\nU  unstick" + (p.role == Player.ROLE_EXPLORE ? "\nG  back to the walking body" : "") + "\nH  hide this panel\nEsc or M  menu\n\nSmall props can hop onto furniture and go under or into it.";
+            t = "<b>Prop</b>\n" + move + "Shift  run  <i>(VR: stick pushed all the way)</i>\nSpace  hop, not for large props  <i>(VR: jump button)</i>\nClick a prop  become it  <i>(VR: point, trigger)</i>\nClick a door  open or close it  <i>(VR: grab the handle)</i>\n" + wrist
+                + "\nThe prop faces the way you move; standing still pins it where it is. Small props can hop onto furniture and go under or into it.";
         else
-            t = "<b>Walking</b>\nW A S D  move\nMouse  look\nSpace  jump\nE or click  become the prop you look at\nClick on a door  open or close it\nV  third-person view\nP  third-person screen (O size, N side, hold B: move)\nH  hide this panel\nEsc or M  menu\nF3  debug overlay";
-        float w = 300f, h = p.def >= 0 ? 350f : (p.role == Player.ROLE_HUNTER ? 310f : 230f);
+            t = "<b>Walking</b>\n" + move + "Space  jump  <i>(VR: jump button)</i>\nClick a prop  become it  <i>(VR: point, trigger)</i>\nClick a door  open or close it  <i>(VR: grab the handle)</i>\n" + wrist;
+        float w = 380f, h = p.def >= 0 ? 300f : (p.role == Player.ROLE_HUNTER ? 270f : 210f);
         Rect r = new Rect(W - w - 8, 8, w, h);
         GUI.Box(r, GUIContent.none, box);
         GUI.Label(new Rect(r.x + 10, r.y + 6, w - 20, h - 10), t, small);
+    }
+
+    // ---------------------------------------------------------------- the wrist panel (G38)
+    // In VR the player raises a wrist and points at a panel worn there. Here Esc frees the mouse and shows it; a
+    // click in the view outside it captures the mouse again and hides it. The round goes on meanwhile (the menu,
+    // one of its buttons, pauses it). Everything the old letter keys did is here.
+    public bool wristOpen;
+    public Rect WristRect { get { float s = Mathf.Max(0.7f, Screen.height / 860f); return new Rect(16 * s, (H - 456) * s, 330 * s, 360 * s); } }
+
+    void Wrist()
+    {
+        var g = Game.I;
+        var p = g.player;
+        var rd = g.round;
+        Rect r = new Rect(16, H - 456, 330, 360);
+        GUI.Box(r, GUIContent.none, box);
+        GUILayout.BeginArea(new Rect(r.x + 12, r.y + 8, r.width - 24, r.height - 14));
+        GUILayout.Label("Wrist panel", heading);
+        if (p.def >= 0 && p.role != Player.ROLE_DEAD)
+        {
+            if (GUILayout.Button(p.locked ? "Unlock the prop" : (p.settled ? "Lock in place" : "Lock in place (stand still first)"), button, GUILayout.Height(30))) p.ToggleLock();
+            if (p.role == Player.ROLE_HIDER && GUILayout.Button("Taunt", button, GUILayout.Height(30))) p.Taunt(false);
+            if (GUILayout.Button("Unstick", button, GUILayout.Height(30))) p.Unstick();
+            if (p.role == Player.ROLE_EXPLORE && GUILayout.Button("Back to the walking body", button, GUILayout.Height(30))) { p.ToWalker(); p.Say("Back to the walking body"); }
+        }
+        var pip = PipScreen.I;
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button(pip.On ? "Screen: on" : "Screen: off", button, GUILayout.Height(30))) pip.Toggle();
+        if (pip.On && GUILayout.Button("Size", button, GUILayout.Height(30))) pip.NextSize();
+        if (pip.On && GUILayout.Button("Side", button, GUILayout.Height(30))) pip.NextView();
+        GUILayout.EndHorizontal();
+        if (pip.On) GUILayout.Label("Drag the screen with the mouse to move it (VR: grab it).", small);
+        if (GUILayout.Button(p.third ? "View: third person (desktop only)" : "View: first person", button, GUILayout.Height(30))) p.SetThird(!p.third);
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button(g.helpOpen ? "Help: shown" : "Help: hidden", button, GUILayout.Height(30))) g.helpOpen = !g.helpOpen;
+        if (GUILayout.Button("Menu (pauses)", button, GUILayout.Height(30))) { wristOpen = false; g.ToggleMenu(); }
+        GUILayout.EndHorizontal();
+        GUILayout.Label("Click in the view to go back to playing.", small);
+        GUILayout.EndArea();
     }
 
     void DebugPanel()
@@ -450,7 +541,7 @@ public class GameUI : MonoBehaviour
         if (rd.phase == Round.PH_END)
         {
             Fill(new Rect(W / 2 - 330, H - 70, 660, 34), new Color(0.04f, 0.05f, 0.07f, 0.8f));
-            GUI.Label(new Rect(W / 2 - 330, H - 68, 660, 30), rd.endReason + ". This is where the hiders were. (Enter: results)", centre);
+            GUI.Label(new Rect(W / 2 - 330, H - 68, 660, 30), rd.endReason + ". This is where the hiders were. (Click: results)", centre);
         }
     }
 
@@ -464,20 +555,12 @@ public class GameUI : MonoBehaviour
         GUILayout.BeginArea(new Rect(r.x + 20, r.y + 12, pw - 40, ph - 20));
         GUILayout.Label("Round over: " + rd.endReason.ToLowerInvariant(), heading);
         GUILayout.Label("Hiders' survival share: <b>" + rd.survivalShare + "%</b>", bigCentre, GUILayout.Height(40));
-        GUILayout.Label("A round has no winner: the hiding side is scored by how long its hiders survived. In the full game the two teams then swap sides and the better share wins the run.", small);
+        GUILayout.Label("A run is this one round: about 1 in 4 players hunted, drawn at random, and everyone else hid. It has no winner: the hiders are scored by how long they survived.", small);
         GUILayout.Space(6);
         foreach (string line in rd.resultLines) GUILayout.Label(line, label, GUILayout.Height(22));
         GUILayout.Space(8);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Play again on this map", button, GUILayout.Height(34))) { AudioHub.I.Play("click_001", 0.5f); rd.StartRound(); }
-        if (GUILayout.Button(rd.mode == Game.MODE_HUNT ? "Swap sides: hide" : "Swap sides: hunt", button, GUILayout.Height(34)))
-        {
-            AudioHub.I.Play("click_001", 0.5f);
-            g.mode = rd.mode == Game.MODE_HUNT ? Game.MODE_HIDE : Game.MODE_HUNT;
-            rd.Begin(g.mode);
-        }
-        GUILayout.EndHorizontal();
-        if (GUILayout.Button("Back to the start panel (a new map needs Generate)", button, GUILayout.Height(34))) { AudioHub.I.Play("back_001", 0.5f); g.BackToStart(); }
+        if (GUILayout.Button(rd.requested == Game.MODE_RANDOM ? "Another round on this map (roles drawn again)" : "Another round on this map", button, GUILayout.Height(34))) { AudioHub.I.Play("click_001", 0.5f); rd.StartRound(); }
+        if (GUILayout.Button("Back to the lobby (a new map needs Generate)", button, GUILayout.Height(34))) { AudioHub.I.Play("back_001", 0.5f); g.BackToStart(); }
         GUILayout.Label("Knocked props return to their places before the next round.", small);
         GUILayout.EndArea();
     }
@@ -504,13 +587,14 @@ public class GameUI : MonoBehaviour
         GUILayout.EndHorizontal();
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("Explore this map", button, GUILayout.Height(32))) { g.mode = Game.MODE_EXPLORE; g.round.Begin(g.mode); g.menuOpen = false; }
+        if (GUILayout.Button("New round", button, GUILayout.Height(32))) { g.mode = Game.MODE_RANDOM; g.round.Begin(g.mode); g.menuOpen = false; }
         if (GUILayout.Button("Hunt here", button, GUILayout.Height(32))) { g.mode = Game.MODE_HUNT; g.round.Begin(g.mode); g.menuOpen = false; }
         if (GUILayout.Button("Hide here", button, GUILayout.Height(32))) { g.mode = Game.MODE_HIDE; g.round.Begin(g.mode); g.menuOpen = false; }
         GUILayout.EndHorizontal();
         if (GUILayout.Button(g.topView ? "Map from above: on" : "Map from above: off (debug)", button, GUILayout.Height(32))) g.SetTopView(!g.topView);
         GUILayout.Space(6);
-        if (GUILayout.Button("Back to the start panel", button, GUILayout.Height(36))) { AudioHub.I.Play("back_001", 0.5f); g.BackToStart(); }
-        GUILayout.Label("Returning keeps nothing: a new map is generated only when you press Generate there.", small);
+        if (GUILayout.Button("Back to the lobby", button, GUILayout.Height(36))) { AudioHub.I.Play("back_001", 0.5f); g.BackToStart(); }
+        GUILayout.Label("Returning keeps nothing: a new map is generated only when you press Generate on the lobby's board.", small);
         GUILayout.EndArea();
     }
 }

@@ -1,8 +1,8 @@
-// MapGen, part 2: edges between outer cells (walls, doors, windows, fences), rooms, and the inner-grid tags.
+// MapGen, part 2: edges between outer cells (the edge arrays; MapGenSite.cs decides them), rooms, and the inner-grid tags.
 public partial class MapGen
 {
     // =====================================================================================================
-    // Edges: the socket rules of 04 section 4.1.1, generated from the layout instead of authored per piece
+    // Edges: wall, door, window, fence or nothing on every side of every outer cell
     // =====================================================================================================
     public int EdgeIndex(int x, int z, int dir, out bool horizontal)
     {
@@ -31,155 +31,6 @@ public partial class MapGen
     }
 
     int DoorOff(ref GenRng rng) { return 1 + 2 * rng.Range(3); }   // door starts 0.5, 1.5 or 2.5 m along the edge
-
-    void BuildEdges()
-    {
-        GenRng rng = Rng(ST_EDGES, 0, 0);
-        for (int i = 0; i < edgeH.Length; i++) { edgeH[i] = GenData.E_NONE; edgeHOff[i] = 0; }
-        for (int i = 0; i < edgeV.Length; i++) { edgeV[i] = GenData.E_NONE; edgeVOff[i] = 0; }
-        // base type of every edge of every occupied cell
-        for (int c = 0; c < W * H; c++)
-        {
-            int za = cellZone[c];
-            if (za == GenData.Z_NONE) continue;
-            int x = c % W, z = c / W;
-            for (int d = 0; d < 4; d++)
-            {
-                int nx = x + DX[d], nz = z + DZ[d];
-                int zb = ZoneAt(nx, nz);
-                int type;
-                if (zb == GenData.Z_NONE) type = GenData.IsBuilding(za) ? GenData.E_WALL : GenData.E_FENCE;
-                else
-                {
-                    int n = nz * W + nx;
-                    if (cellInst[n] == cellInst[c]) type = cellRoom[n] == cellRoom[c] ? GenData.E_NONE : GenData.E_WALL;
-                    else if (GenData.IsBuilding(za) || GenData.IsBuilding(zb)) type = GenData.E_WALL;
-                    else if (za == GenData.Z_RELEASE || zb == GenData.Z_RELEASE) type = GenData.E_FENCE;
-                    else type = GenData.E_NONE;
-                }
-                SetEdge(x, z, d, type, 0);
-            }
-        }
-        // connections made while assembling: a doorway where a building is involved, open otherwise
-        for (int k = 0; k < nConn; k++)
-        {
-            int c = connCell[k], d = connDir[k];
-            int x = c % W, z = c / W;
-            int za = cellZone[c], zb = ZoneAt(x + DX[d], z + DZ[d]);
-            if (GenData.IsBuilding(za) || GenData.IsBuilding(zb)) SetEdge(x, z, d, GenData.E_DOOR, DoorOff(ref rng));
-            else SetEdge(x, z, d, GenData.E_NONE, 0);
-        }
-        // interior doors: a spanning tree over each building's rooms, plus a few extra
-        int[] parent = new int[26];
-        bool[] pairDone = new bool[26 * 26];
-        for (int inst = 0; inst < nInst; inst++)
-        {
-            if (!GenData.IsBuilding(instZone[inst])) continue;
-            int ne = 0;
-            for (int c = 0; c < W * H; c++)
-            {
-                if (cellInst[c] != inst) continue;
-                int x = c % W, z = c / W;
-                for (int d = 0; d < 2; d++)   // N and E only: each interior edge once
-                {
-                    int nx = x + DX[d], nz = z + DZ[d];
-                    if (!InGrid(nx, nz)) continue;
-                    int n = nz * W + nx;
-                    if (cellInst[n] == inst && cellRoom[n] != cellRoom[c]) cand[ne++] = c * 4 + d;
-                }
-            }
-            Shuffle(cand, ne, ref rng);
-            for (int i = 0; i < 26; i++) parent[i] = i;
-            for (int i = 0; i < pairDone.Length; i++) pairDone[i] = false;
-            for (int i = 0; i < ne; i++)
-            {
-                int c = cand[i] / 4, d = cand[i] % 4;
-                int x = c % W, z = c / W;
-                int ra = cellRoom[c], rb = cellRoom[(z + DZ[d]) * W + x + DX[d]];
-                int fa = ra, fb = rb;
-                while (parent[fa] != fa) fa = parent[fa];
-                while (parent[fb] != fb) fb = parent[fb];
-                int pair = ra < rb ? ra * 26 + rb : rb * 26 + ra;
-                bool extra = rng.Chance(200);
-                if (fa != fb)
-                {
-                    parent[fa] = fb;
-                    SetEdge(x, z, d, GenData.E_DOOR, DoorOff(ref rng));
-                    pairDone[pair] = true;
-                }
-                else if (!pairDone[pair] && extra)
-                {
-                    SetEdge(x, z, d, GenData.E_DOOR, DoorOff(ref rng));
-                    pairDone[pair] = true;
-                }
-            }
-        }
-        // exterior doors: two or more exits per building where the layout allows (04 section 4.1.2), a few loops
-        int loops = size == 0 ? 1 : (size == 1 ? 2 : 3);
-        for (int inst = 0; inst < nInst; inst++)
-        {
-            if (!GenData.IsBuilding(instZone[inst])) continue;
-            int ne = 0, doors = 0, doorCell = -1;
-            for (int c = 0; c < W * H; c++)
-            {
-                if (cellInst[c] != inst) continue;
-                int x = c % W, z = c / W;
-                for (int d = 0; d < 4; d++)
-                {
-                    int nx = x + DX[d], nz = z + DZ[d];
-                    if (!InGrid(nx, nz)) continue;
-                    int n = nz * W + nx;
-                    if (cellInst[n] == inst || cellInst[n] < 0) continue;
-                    int zb = cellZone[n];
-                    if (zb != GenData.Z_LAWN && !GenData.IsBuilding(zb)) continue;
-                    int t = EdgeType(x, z, d);
-                    if (t == GenData.E_DOOR) { doors++; doorCell = c; }
-                    else if (t == GenData.E_WALL) cand[ne++] = c * 4 + d;
-                }
-            }
-            Shuffle(cand, ne, ref rng);
-            if (doors < 2 && ne > 0)
-            {
-                // the candidate farthest from the existing door, preferring doors that open onto lawn
-                int best = 0, bestD = -1;
-                for (int i = 0; i < ne; i++)
-                {
-                    int c = cand[i] / 4;
-                    int dd = doorCell < 0 ? 0 : Abs(c % W - doorCell % W) + Abs(c / W - doorCell / W);
-                    int cx = c % W + DX[cand[i] % 4], cz = c / W + DZ[cand[i] % 4];
-                    if (cellZone[cz * W + cx] == GenData.Z_LAWN) dd += 2;
-                    if (dd > bestD) { bestD = dd; best = i; }
-                }
-                int cc = cand[best] / 4, d2 = cand[best] % 4;
-                SetEdge(cc % W, cc / W, d2, GenData.E_DOOR, DoorOff(ref rng));
-                cand[best] = -1;
-            }
-            for (int i = 0; i < ne; i++)
-            {
-                bool roll = rng.Chance(120);
-                if (cand[i] < 0 || !roll || loops <= 0) continue;
-                int cc = cand[i] / 4, d2 = cand[i] % 4;
-                if (EdgeType(cc % W, cc / W, d2) != GenData.E_WALL) continue;
-                SetEdge(cc % W, cc / W, d2, GenData.E_DOOR, DoorOff(ref rng));
-                loops--;
-            }
-        }
-        // windows on outside walls (WINDOW behaves like WALL for movement)
-        for (int c = 0; c < W * H; c++)
-        {
-            int za = cellZone[c];
-            if (!GenData.IsBuilding(za)) continue;
-            int x = c % W, z = c / W;
-            for (int d = 0; d < 4; d++)
-            {
-                if (EdgeType(x, z, d) != GenData.E_WALL) continue;
-                int zb = ZoneAt(x + DX[d], z + DZ[d]);
-                if (GenData.IsBuilding(zb)) continue;
-                bool roll = rng.Chance(za == GenData.Z_WAREHOUSE ? 200 : 450);
-                if (roll) SetEdge(x, z, d, GenData.E_WINDOW, 2);
-            }
-        }
-    }
 
     // =====================================================================================================
     // Rooms and their types
@@ -210,103 +61,64 @@ public partial class MapGen
                 statZoneCells[zone]++;
             }
             for (int c = 0; c < W * H; c++)
-                if (cellInst[c] == inst) cellRoom[c] = map[cellRoom[c]];
-            AssignRoomTypes(inst, first, nRooms - first);
+                if (cellInst[c] == inst) { roomPlot[map[cellRoom[c]]] = cellPlot[c]; cellRoom[c] = map[cellRoom[c]]; }
+            // the types and places the site gave the room letters (MapGenSite.cs)
+            for (int l = 0; l < 26; l++)
+                if (map[l] >= 0) { roomType[map[l]] = siteType[inst * 26 + l]; roomPlace[map[l]] = sitePlace[inst * 26 + l]; }
             statZoneRooms[zone] += nRooms - first;
         }
     }
 
-    void AssignRoomTypes(int inst, int first, int n)
+    // =====================================================================================================
+    // Entrances (G32): which of a room's doors people come in by, from the roles of the rooms it joins
+    // =====================================================================================================
+    public int[] roomEntry = new int[400];   // index into the room's door list, -1 = none
+
+    // how public a room is: the side of a door that people come from
+    static int PublicRank(int rt)
     {
-        GenRng rng = Rng(ST_ROOMTYPE, inst, 0);
-        int zone = instZone[inst];
-        // rooms of this piece by size, largest first
-        int[] order = new int[n];
-        for (int i = 0; i < n; i++) order[i] = first + i;
-        for (int i = 1; i < n; i++)
+        switch (rt)
         {
-            int k = i, v = order[i];
-            while (k > 0 && roomOuterCells[order[k - 1]] < roomOuterCells[v]) { order[k] = order[k - 1]; k--; }
-            order[k] = v;
+            case GenData.R_HALL: return 1;
+            case GenData.R_LIVING: case GenData.R_DINER_DINING: case GenData.R_STORAGE: return 2;
+            case GenData.R_DINING: return 3;
+            case GenData.R_KITCHEN: case GenData.R_DINER_KITCHEN: return 4;
+            default: return 5;
         }
-        if (zone == GenData.Z_HOUSE)
+    }
+
+    // A building's entrance room (the hall, else the living room; the dining room of a diner; a warehouse's
+    // office) is entered by its front door; every other room by the door from its most public neighbour (a
+    // bedroom from the hall, a kitchen from the dining room, a store room from the kitchen). An outdoor area is
+    // entered from the building door it has, if any (a patio from the back door).
+    void RoomEntries()
+    {
+        for (int r = 0; r < nRooms; r++)
         {
-            // living room first, then kitchen, bedroom, bathroom, then a shuffled rest
-            int[] rest = { GenData.R_OFFICE, GenData.R_DINING, GenData.R_KIDS, GenData.R_HALL, GenData.R_BEDROOM };
-            Shuffle(rest, rest.Length, ref rng);
-            int ri = 0;
-            bool r600 = rng.Chance(600), r500 = rng.Chance(500);
-            for (int i = 0; i < n; i++)
+            roomEntry[r] = -1;
+            int best = 99;
+            bool building = GenData.IsBuilding(roomZone[r]);
+            for (int k = 0; k < roomDoorCount[r]; k++)
             {
-                int r = order[i], t;
-                if (i == 0) t = (n == 1 || roomOuterCells[r] >= 2 || r600) ? GenData.R_LIVING : GenData.R_DINING;
-                else if (i == 1) t = n == 2 ? (r500 ? GenData.R_KITCHEN : GenData.R_BEDROOM) : GenData.R_KITCHEN;
-                else if (i == 2) t = GenData.R_BEDROOM;
-                else if (i == 3) t = roomOuterCells[r] == 1 ? GenData.R_BATH : rest[ri++ % rest.Length];
-                else t = rest[ri++ % rest.Length];
-                roomType[r] = t;
-            }
-        }
-        else if (zone == GenData.Z_WAREHOUSE)
-        {
-            bool loading = rng.Chance(500);
-            for (int i = 0; i < n; i++)
-                roomType[order[i]] = i == 0 ? GenData.R_STORAGE : (i == 1 ? (loading ? GenData.R_LOADING : GenData.R_WH_OFFICE) : (loading ? GenData.R_WH_OFFICE : GenData.R_LOADING));
-        }
-        else if (zone == GenData.Z_DINER)
-        {
-            for (int i = 0; i < n; i++)
-                roomType[order[i]] = i == 0 ? GenData.R_DINER_DINING : (i == 1 ? GenData.R_DINER_KITCHEN : GenData.R_DINER_STORE);
-        }
-        else if (zone == GenData.Z_LAWN)
-        {
-            bool hub = inst == 1;
-            for (int i = 0; i < n; i++)
-            {
-                int roll = rng.Range(100);
-                roomType[order[i]] = hub ? (roll < 70 ? GenData.R_LAWN_OPEN : GenData.R_PATIO)
-                    : (roll < 45 ? GenData.R_LAWN_OPEN : (roll < 70 ? GenData.R_GARDEN : (roll < 88 ? GenData.R_PATIO : GenData.R_FIREPIT)));
-            }
-        }
-        else if (zone == GenData.Z_FOREST)
-        {
-            for (int i = 0; i < n; i++)
-            {
-                bool camp = rng.Chance(350);
-                roomType[order[i]] = (roomOuterCells[order[i]] >= 2 && camp) ? GenData.R_FOREST_CLEARING : GenData.R_FOREST_DENSE;
-            }
-        }
-        else
-        {
-            for (int i = 0; i < n; i++) roomType[order[i]] = GenData.R_RELEASE;
-        }
-        // Generator 3: the room types the pieces never produced. These draws are the prop generator's own, so the
-        // types layout 1 chose stay where they were. A third room may be a kids' room instead of a bedroom; a
-        // fourth may be an office or a kids' room instead of a bathroom; a one-cell room with three or more
-        // doorways is a passage, so it is a hall.
-        if (zone == GenData.Z_HOUSE)
-        {
-            GenRng r3 = Rng(ST_ROOMTYPE3, inst, 0);
-            int third = r3.Range(100), fourth = r3.Range(100);
-            for (int i = 0; i < n; i++)
-            {
-                int r = order[i];
-                if (i == 2 && n == 3 && third < 30) roomType[r] = GenData.R_KIDS;
-                if (i == 3 && roomType[r] == GenData.R_BATH) { if (fourth < 25) roomType[r] = GenData.R_OFFICE; else if (fourth < 45) roomType[r] = GenData.R_KIDS; }
-                if (i >= 1 && n >= 3 && roomOuterCells[r] == 1 && roomType[r] != GenData.R_KITCHEN && DoorwaysOf(r) >= 3) roomType[r] = GenData.R_HALL;
+                int i = roomDoorStart[r] + k, cell = roomDoors[i], d = roomDoorDir[i];
+                int ix = cell % IW + DX[d], iz = cell / IW + DZ[d];
+                if (ix < 0 || iz < 0 || ix >= IW || iz >= IH) continue;
+                int other = innerRoom[ix + iz * IW];
+                int rank;
+                if (!building) rank = 0;                              // outdoors: the building's door
+                else if (roomDoorExt[i]) rank = IsFrontDoor(cell, d) ? 0 : 50;   // the front door, else a back door
+                else rank = other < 0 ? 60 : PublicRank(roomType[other]);
+                if (rank < best) { best = rank; roomEntry[r] = k; }
             }
         }
     }
 
-    int DoorwaysOf(int room)
+    // is the doorway at inner cell `cell`, side d, the front door of its building (MapGenSite)?
+    bool IsFrontDoor(int cell, int d)
     {
-        int n = 0;
-        for (int c = 0; c < W * H; c++)
-        {
-            if (cellRoom[c] != room || cellZone[c] == GenData.Z_NONE) continue;
-            for (int d = 0; d < 4; d++) if (EdgeType(c % W, c / W, d) == GenData.E_DOOR) n++;
-        }
-        return n;
+        int c = (cell / IW >> 3) * W + (cell % IW >> 3);
+        for (int k = 0; k < nSd; k++) if (sdKind[k] == SD_FRONT && sdCell[k] == c && sdDir[k] == d) return true;
+        return false;
     }
 
     // =====================================================================================================
@@ -425,6 +237,7 @@ public partial class MapGen
                 }
             }
         }
+        RoomEntries();
         // nothing spawns within 1.5 m of the release exit (04 section 4.7.2)
         {
             int hx = releaseX + DX[releaseDir], hz = releaseZ + DZ[releaseDir];

@@ -1,6 +1,7 @@
 // The map generator core (04-map-generation-v3, simplest faithful form for the browser prototype).
 //
-//   outer grid of 4 m cells filled with irregular zone pieces  ->  edges (walls, doors, windows, fences)
+//   outer grid of 4 m cells: plots along a lane, a building from the plan library on each, a wood  ->  edges
+//   (walls, doors, windows, fences, gates)  ->  layout tests
 //   ->  inner grid of 0.5 m cells with placement tags  ->  every room composed by the plan of its type
 //   ->  slots (chairs at tables, settings on top, items on shelves)  ->  wrong-category spawns (leaks)
 //   ->  validation (reachability, repair, seed re-roll)  ->  emit list
@@ -15,14 +16,15 @@
 // The same (seed, size, GEN_VERSION) gives the same emit list on every machine. Step() does one small unit
 // of work per call so the caller can spread generation over frames; results do not depend on the slicing.
 //
-// This file: state, stepping and the outer grid. MapGenRooms.cs: edges, rooms and inner tags.
+// This file: state and stepping. MapGenSite.cs: the outer grid (plots, buildings from the plan library, the wood),
+// its walls and doors, and the layout tests. MapGenRooms.cs: rooms and inner tags.
 // MapGenPlace.cs: low-level placement. MapGenCompose.cs: the composition primitives (wall runs, relations,
 // corners, open spots). MapGenPlans.cs: the plans of indoor rooms. MapGenOutdoor.cs: lawn and forest.
 // MapGenGroups.cs: prop groups. MapGenSlots.cs: slots and wrong-category spawns. MapGenFinish.cs: validation.
 public partial class MapGen
 {
     // ---- stages (also the PRNG substream ids) ----
-    const int ST_LAYOUT = 1, ST_EDGES = 2, ST_ROOM = 3, ST_SLOT = 4, ST_SCENERY = 5, ST_LEAK = 6, ST_SPAWN = 8, ST_ROOMTYPE = 9, ST_ROOMTYPE3 = 10;
+    const int ST_LAYOUT = 1, ST_EDGES = 2, ST_ROOM = 3, ST_SLOT = 4, ST_SCENERY = 5, ST_LEAK = 6, ST_SPAWN = 8;
 
     // ---- emit flags ----
     public const int EF_LEAK = 1, EF_COMEDIC = 2, EF_LOOSE = 4, EF_REMOVED = 8, EF_GROUP = 16, EF_INSIDE = 32, EF_ON_TOP = 64, EF_ADJACENT = 128, EF_UNDER = 256;
@@ -38,7 +40,7 @@ public partial class MapGen
     public int W, H;
     public int[] cellInst, cellZone, cellRoom;
     public int nInst;
-    public int[] instPiece = new int[160], instRot = new int[160], instX = new int[160], instZ = new int[160], instZone = new int[160];
+    public int[] instZone = new int[160];   // per instance (a building, a plot's outdoor cells, the lane, the wood, the release): its zone
     public int releaseX, releaseZ, releaseDir;   // release cell and the direction of its exit
     public int[] edgeH, edgeV, edgeHOff, edgeVOff;
 
@@ -140,9 +142,17 @@ public partial class MapGen
         density = densityIndex < 0 || densityIndex >= GenData.DensityPercent.Length ? 0 : densityIndex;
         attempt = 0; done = false; failed = false; failReason = "";
         stage = 0; cursor = 0; progressPermille = 0; statSteps = 0;
-        W = GenData.SizeGrid[size]; H = W;
+        Alloc(GenData.SizeGrid[size], GenData.SizeGrid[size]);
+        menu = new bool[GenData.nDefs]; defCopies = new int[GenData.nDefs];
+    }
+
+    // the grids for a map of w x h outer cells (the site decides its box: LayoutSite)
+    void Alloc(int w, int h)
+    {
+        if (cellZone != null && W == w && H == h) return;
+        W = w; H = h;
         IW = W * 8; IH = H * 8;
-        cellInst = new int[W * H]; cellZone = new int[W * H]; cellRoom = new int[W * H];
+        cellInst = new int[W * H]; cellZone = new int[W * H]; cellRoom = new int[W * H]; cellPlot = new int[W * H];
         edgeH = new int[W * (H + 1)]; edgeHOff = new int[W * (H + 1)];
         edgeV = new int[(W + 1) * H]; edgeVOff = new int[(W + 1) * H];
         tags = new int[IW * IH]; innerRoom = new int[IW * IH]; occ = new int[IW * IH]; flatOcc = new int[IW * IH];
@@ -151,7 +161,6 @@ public partial class MapGen
         clr = new int[IW * IH]; canopy = new int[IW * IH];
         roomCells = new int[IW * IH];
         queue = new int[IW * IH]; dist = new int[IW * IH];
-        menu = new bool[GenData.nDefs]; defCopies = new int[GenData.nDefs];
     }
 
     public void RunAll(uint seedValue, int sizeBucket) { RunAll(seedValue, sizeBucket, 0); }
@@ -176,8 +185,9 @@ public partial class MapGen
                 stage = 1; progressPermille = 80;
                 break;
             case 1:
-                BuildEdges();
                 BuildRooms();
+                BuildEdgesSite();
+                if (!ValidateSite()) { Retry("layout tests"); break; }
                 BuildTags();
                 stage = 2; cursor = 0; progressPermille = 150;
                 break;
@@ -223,7 +233,7 @@ public partial class MapGen
     // rules; the density setting is not part of any stream, so it changes how much is placed and nothing else.
     GenRng Rng(int st, int a, int b)
     {
-        int version = (st == ST_LAYOUT || st == ST_EDGES || st == ST_ROOMTYPE) ? GenData.LAYOUT_VERSION : GenData.GEN_VERSION;
+        int version = (st == ST_LAYOUT || st == ST_EDGES) ? GenData.LAYOUT_VERSION : GenData.GEN_VERSION;
         return GenRng.Sub(seed, (uint)version, st * 16 + attempt, a, b + size * 1000);
     }
 
@@ -240,353 +250,11 @@ public partial class MapGen
         }
     }
 
-    // =====================================================================================================
-    // Outer grid: zone pieces from a flow template (04 sections 4.1.2, 4.1.3)
-    // =====================================================================================================
-    int[] pcx = new int[36], pcz = new int[36];   // cells of the piece being tried
-    char[] pcl = new char[36];
-    int pcn;
-    bool[] dead;
-
-    // rotated cells of piece p: count in pcn, coordinates relative to the piece's box
-    void PieceCells(int p, int rot)
-    {
-        int w = GenData.pieceW[p], h = GenData.pieceH[p];
-        pcn = 0;
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                char c = GenData.PieceCell(p, x, y);
-                if (c == '.') continue;
-                int rx, rz;
-                if (rot == 0) { rx = x; rz = y; }
-                else if (rot == 1) { rx = h - 1 - y; rz = x; }
-                else if (rot == 2) { rx = w - 1 - x; rz = h - 1 - y; }
-                else { rx = y; rz = w - 1 - x; }
-                pcx[pcn] = rx; pcz[pcn] = rz; pcl[pcn] = c; pcn++;
-            }
-    }
-
     public bool InGrid(int x, int z) { return x >= 0 && z >= 0 && x < W && z < H; }
 
     public int ZoneAt(int x, int z) { return InGrid(x, z) ? cellZone[z * W + x] : GenData.Z_NONE; }
 
-    // may the current rotated piece (pcx/pcz) of this zone go at origin (ox, oz)?
-    bool Fits(int zone, int ox, int oz, bool isHub)
-    {
-        bool building = GenData.IsBuilding(zone);
-        for (int i = 0; i < pcn; i++)
-        {
-            int x = ox + pcx[i], z = oz + pcz[i];
-            if (!InGrid(x, z) || cellZone[z * W + x] != GenData.Z_NONE) return false;
-            for (int d = 0; d < 4; d++)
-            {
-                int nz = ZoneAt(x + DX[d], z + DZ[d]);
-                if (nz == GenData.Z_RELEASE && !isHub) return false;
-                // Forest never touches a building edge directly (04 section 4.1.1)
-                if (zone == GenData.Z_FOREST && GenData.IsBuilding(nz)) return false;
-                if (building && nz == GenData.Z_FOREST) return false;
-            }
-        }
-        return true;
-    }
-
-    int StampPiece(int piece, int rot, int ox, int oz)
-    {
-        int inst = nInst++;
-        instPiece[inst] = piece; instRot[inst] = rot; instX[inst] = ox; instZ[inst] = oz; instZone[inst] = GenData.pieceZone[piece];
-        for (int i = 0; i < pcn; i++)
-        {
-            int c = (oz + pcz[i]) * W + ox + pcx[i];
-            cellInst[c] = inst; cellZone[c] = instZone[inst];
-            cellRoom[c] = pcl[i] - 'A';   // local room letter for now; made global in BuildRooms
-        }
-        return inst;
-    }
-
-    // tree connections: outer cell + direction of the edge that must be walkable
-    int nConn;
-    int[] connCell = new int[160], connDir = new int[160];
-
-    int[] nodeZone = new int[64];
-    int nNodes;
-
-    void Node(int zone) { nodeZone[nNodes++] = zone; }
-
-    int FindPiece(int zone, string rows)
-    {
-        for (int p = 0; p < GenData.nPieces; p++)
-            if (GenData.pieceZone[p] == zone && GenData.pieceRows[p] == rows) return p;
-        return -1;
-    }
-
-    bool Layout()
-    {
-        GenRng rng = Rng(ST_LAYOUT, 0, 0);
-        for (int i = 0; i < W * H; i++) { cellInst[i] = -1; cellZone[i] = GenData.Z_NONE; cellRoom[i] = -1; }
-        nInst = 0; nConn = 0;
-
-        // hunter release on a boundary side chosen by the seed
-        int side = rng.Range(4);
-        int mid = W / 2 + rng.Between(-1, 1);
-        if (side == 0) { releaseX = mid; releaseZ = H - 1; releaseDir = 2; }
-        else if (side == 1) { releaseX = W - 1; releaseZ = mid; releaseDir = 3; }
-        else if (side == 2) { releaseX = mid; releaseZ = 0; releaseDir = 0; }
-        else { releaseX = 0; releaseZ = mid; releaseDir = 1; }
-        int relPiece = FindPiece(GenData.Z_RELEASE, "A");
-        PieceCells(relPiece, 0);
-        StampPiece(relPiece, 0, releaseX, releaseZ);
-        int hx = releaseX + DX[releaseDir], hz = releaseZ + DZ[releaseDir];
-
-        // lawn hub: must cover the cell in front of the release, as central as possible
-        int bestScore = -1000000, bp = -1, br = 0, bx = 0, bz = 0;
-        for (int p = 0; p < GenData.nPieces; p++)
-        {
-            if (GenData.pieceZone[p] != GenData.Z_LAWN || !GenData.pieceHub[p]) continue;
-            for (int rot = 0; rot < 4; rot++)
-            {
-                PieceCells(p, rot);
-                for (int e = 0; e < pcn; e++)
-                {
-                    int ox = hx - pcx[e], oz = hz - pcz[e];
-                    if (!Fits(GenData.Z_LAWN, ox, oz, true)) continue;
-                    int sx = 0, sz = 0;
-                    for (int i = 0; i < pcn; i++) { sx += (ox + pcx[i]) * 2 + 1; sz += (oz + pcz[i]) * 2 + 1; }
-                    int ddx = sx / pcn - W, ddz = sz / pcn - H;
-                    int score = -(ddx * ddx + ddz * ddz) * 4 + GenData.pieceWeight[p] + rng.Range(6);
-                    if (score > bestScore) { bestScore = score; bp = p; br = rot; bx = ox; bz = oz; }
-                }
-            }
-        }
-        if (bp < 0) return false;
-        PieceCells(bp, br);
-        StampPiece(bp, br, bx, bz);
-        connCell[nConn] = releaseZ * W + releaseX; connDir[nConn] = releaseDir; nConn++;
-
-        // flow template for the size bucket (04 section 4.1.2): buildings around the hub, forest, lawn pockets
-        nNodes = 0;
-        if (size == 0)
-        {
-            Node(GenData.Z_HOUSE);
-            if (rng.Chance(650)) Node(rng.Chance(500) ? GenData.Z_DINER : GenData.Z_WAREHOUSE);
-            Node(GenData.Z_FOREST);
-        }
-        else if (size == 1)
-        {
-            bool wh = rng.Chance(700), di = rng.Chance(700);
-            if (!wh && !di) { if (rng.Chance(500)) wh = true; else di = true; }
-            if (wh) Node(GenData.Z_WAREHOUSE);
-            Node(GenData.Z_HOUSE);
-            if (rng.Chance(500)) Node(GenData.Z_LAWN);
-            if (di) Node(GenData.Z_DINER);
-            if (rng.Chance(500)) Node(GenData.Z_HOUSE);
-            Node(GenData.Z_FOREST);
-            if (rng.Chance(500)) Node(GenData.Z_FOREST);
-        }
-        else if (size == 2)
-        {
-            Node(GenData.Z_WAREHOUSE); Node(GenData.Z_HOUSE); Node(GenData.Z_LAWN); Node(GenData.Z_DINER); Node(GenData.Z_HOUSE);
-            if (rng.Chance(500)) Node(GenData.Z_LAWN);
-            if (rng.Chance(500)) Node(GenData.Z_HOUSE);
-            Node(GenData.Z_FOREST); Node(GenData.Z_FOREST);
-            if (rng.Chance(500)) Node(GenData.Z_FOREST);
-        }
-        else
-        {
-            Node(GenData.Z_WAREHOUSE); Node(GenData.Z_HOUSE); Node(GenData.Z_LAWN); Node(GenData.Z_DINER); Node(GenData.Z_HOUSE);
-            Node(GenData.Z_LAWN);
-            if (rng.Chance(500)) Node(GenData.Z_WAREHOUSE);
-            Node(GenData.Z_HOUSE);
-            if (rng.Chance(500)) Node(GenData.Z_LAWN);
-            if (rng.Chance(500)) Node(GenData.Z_DINER);
-            if (rng.Chance(500)) Node(GenData.Z_HOUSE);
-            Node(GenData.Z_FOREST); Node(GenData.Z_FOREST); Node(GenData.Z_FOREST);
-        }
-        bool anyBuilding = false;
-        for (int n = 0; n < nNodes; n++)
-        {
-            bool ok = PlaceNode(nodeZone[n], ref rng);
-            if (ok && GenData.IsBuilding(nodeZone[n])) anyBuilding = true;
-        }
-        if (!anyBuilding) return false;
-
-        FillRemaining(ref rng);
-        return true;
-    }
-
-    // attach one piece of this zone to the frontier of a lawn (or forest, for forest) piece
-    bool PlaceNode(int zone, ref GenRng rng)
-    {
-        // frontier: (occupied parent cell, direction to an empty cell)
-        int nf = 0;
-        for (int c = 0; c < W * H; c++)
-        {
-            int z = cellZone[c];
-            bool parentOk = z == GenData.Z_LAWN || (zone == GenData.Z_FOREST && z == GenData.Z_FOREST);
-            if (!parentOk) continue;
-            for (int d = 0; d < 4; d++)
-            {
-                int x = c % W + DX[d], zz = c / W + DZ[d];
-                if (InGrid(x, zz) && cellZone[zz * W + x] == GenData.Z_NONE && nf < 1024) cand[nf++] = c * 4 + d;
-            }
-        }
-        Shuffle(cand, nf, ref rng);
-        // pieces of the zone in weighted random order
-        int[] order = new int[32];
-        int[] wts = new int[32];
-        int np = 0;
-        for (int p = 0; p < GenData.nPieces; p++)
-            if (GenData.pieceZone[p] == zone) { order[np] = p; wts[np] = GenData.pieceWeight[p]; np++; }
-        for (int i = 0; i < np; i++)
-        {
-            int total = 0;
-            for (int k = i; k < np; k++) total += wts[k];
-            int r = rng.Range(total), pick = i;
-            for (int k = i; k < np; k++) { if (r < wts[k]) { pick = k; break; } r -= wts[k]; }
-            int t = order[i]; order[i] = order[pick]; order[pick] = t;
-            t = wts[i]; wts[i] = wts[pick]; wts[pick] = t;
-        }
-        int bestScore = -1000000, bp = -1, br = 0, bx = 0, bz = 0, bconn = 0, found = 0;
-        int rot0 = rng.Range(4);
-        for (int pi = 0; pi < np && found < 8; pi++)
-        {
-            int p = order[pi];
-            for (int ri = 0; ri < 4 && found < 8; ri++)
-            {
-                int rot = (rot0 + ri) & 3;
-                PieceCells(p, rot);
-                for (int f = 0; f < nf && found < 8; f++)
-                {
-                    int pc = cand[f] / 4, d = cand[f] % 4;
-                    int tx = pc % W + DX[d], tz = pc / W + DZ[d];
-                    for (int e = 0; e < pcn && found < 8; e++)
-                    {
-                        int ox = tx - pcx[e], oz = tz - pcz[e];
-                        if (!Fits(zone, ox, oz, false)) continue;
-                        // score: compact (touching occupied cells), toward the middle, bigger pieces first
-                        int touch = 0, sx = 0, sz = 0;
-                        for (int i = 0; i < pcn; i++)
-                        {
-                            int x = ox + pcx[i], z = oz + pcz[i];
-                            sx += x * 2 + 1; sz += z * 2 + 1;
-                            for (int dd = 0; dd < 4; dd++) if (ZoneAt(x + DX[dd], z + DZ[dd]) != GenData.Z_NONE) touch++;
-                        }
-                        int ddx = sx / pcn - W, ddz = sz / pcn - H;
-                        int score = touch * 6 - (ddx * ddx + ddz * ddz) / 2 + pcn * 3 + rng.Range(8);
-                        found++;
-                        if (score > bestScore) { bestScore = score; bp = p; br = rot; bx = ox; bz = oz; bconn = pc * 4 + d; }
-                    }
-                }
-            }
-        }
-        if (bp < 0) return false;
-        PieceCells(bp, br);
-        StampPiece(bp, br, bx, bz);
-        connCell[nConn] = bconn / 4; connDir[nConn] = bconn % 4; nConn++;
-        return true;
-    }
-
-    // greedy lawn and forest filler up to the size's ground-cell target, then close enclosed holes
-    void FillRemaining(ref GenRng rng)
-    {
-        int target = GenData.SizeGroundCells[size];
-        int count = 0;
-        for (int c = 0; c < W * H; c++) if (cellZone[c] != GenData.Z_NONE && cellZone[c] != GenData.Z_RELEASE) count++;
-        dead = new bool[W * H];
-        string[] shapes = { "AA/AA", "AA", "A" };
-        int[] shapeCells = { 4, 2, 1 };
-        int guard = 400;
-        while (count < target && guard-- > 0)
-        {
-            int best = -1, bestScore = -1;
-            for (int c = 0; c < W * H; c++)
-            {
-                if (cellZone[c] != GenData.Z_NONE || dead[c]) continue;
-                int x = c % W, z = c / W;
-                int n4 = 0, n8 = 0;
-                bool nearRelease = false;
-                for (int dz = -1; dz <= 1; dz++)
-                    for (int dx = -1; dx <= 1; dx++)
-                    {
-                        if (dx == 0 && dz == 0) continue;
-                        int zn = ZoneAt(x + dx, z + dz);
-                        if (zn == GenData.Z_NONE) continue;
-                        if (zn == GenData.Z_RELEASE) { if (dx == 0 || dz == 0) nearRelease = true; continue; }
-                        n8++;
-                        if (dx == 0 || dz == 0) n4++;
-                    }
-                if (n4 == 0 || nearRelease) continue;
-                int score = n4 * 10 + n8 * 3 + rng.Range(6);
-                if (score > bestScore) { bestScore = score; best = c; }
-            }
-            if (best < 0) break;
-            int bx = best % W, bz = best / W;
-            bool nearBuilding = false, nearForest = false;
-            for (int d = 0; d < 4; d++)
-            {
-                int zn = ZoneAt(bx + DX[d], bz + DZ[d]);
-                if (GenData.IsBuilding(zn)) nearBuilding = true;
-                if (zn == GenData.Z_FOREST) nearForest = true;
-            }
-            int zone = nearBuilding ? GenData.Z_LAWN : (rng.Chance(nearForest ? 700 : 450) ? GenData.Z_FOREST : GenData.Z_LAWN);
-            // biggest filler piece (2x2, 2x1, 1x1) that fits around the cell and within the budget
-            int placed = 0;
-            for (int pass = 0; pass < 2 && placed == 0; pass++)
-            {
-                int zn = pass == 0 ? zone : GenData.Z_LAWN;   // the forest rule can block a forest cell: fall back to lawn
-                if (pass == 1 && zone == GenData.Z_LAWN) break;
-                for (int si = 0; si < 3 && placed == 0; si++)
-                {
-                    if (shapeCells[si] > target - count) continue;
-                    int p = FindPiece(zn, shapes[si]);
-                    if (p < 0) continue;
-                    int r0 = rng.Range(4);
-                    for (int ri = 0; ri < 4 && placed == 0; ri++)
-                    {
-                        PieceCells(p, (r0 + ri) & 3);
-                        int e0 = rng.Range(pcn);
-                        for (int ei = 0; ei < pcn && placed == 0; ei++)
-                        {
-                            int e = (e0 + ei) % pcn;
-                            int ox = bx - pcx[e], oz = bz - pcz[e];
-                            if (!Fits(zn, ox, oz, false)) continue;
-                            StampPiece(p, (r0 + ri) & 3, ox, oz);
-                            placed = pcn;
-                        }
-                    }
-                }
-            }
-            if (placed == 0) dead[best] = true;
-            count += placed;
-        }
-
-        // holes: empty cells that the outside cannot reach become lawn
-        int qh = 0, qt = 0;
-        int[] mark = new int[W * H];
-        for (int c = 0; c < W * H; c++)
-        {
-            int x = c % W, z = c / W;
-            if ((x == 0 || z == 0 || x == W - 1 || z == H - 1) && cellZone[c] == GenData.Z_NONE) { mark[c] = 1; queue[qt++] = c; }
-        }
-        while (qh < qt)
-        {
-            int c = queue[qh++];
-            for (int d = 0; d < 4; d++)
-            {
-                int x = c % W + DX[d], z = c / W + DZ[d];
-                if (!InGrid(x, z)) continue;
-                int n = z * W + x;
-                if (mark[n] == 0 && cellZone[n] == GenData.Z_NONE) { mark[n] = 1; queue[qt++] = n; }
-            }
-        }
-        int lawn1 = FindPiece(GenData.Z_LAWN, "A");
-        for (int c = 0; c < W * H; c++)
-        {
-            if (cellZone[c] != GenData.Z_NONE || mark[c] != 0) continue;
-            PieceCells(lawn1, 0);
-            StampPiece(lawn1, 0, c % W, c / W);
-        }
-        statGroundCells = 0;
-        for (int c = 0; c < W * H; c++) if (cellZone[c] != GenData.Z_NONE && cellZone[c] != GenData.Z_RELEASE) statGroundCells++;
-    }
+    // The outer grid: plots along a lane (MapGenSite.cs). Layout 1's zone pieces glued to a lawn hub are gone
+    // (generator 4 and its build are kept for comparison: prototype/before-build-v3, git 54693ba).
+    bool Layout() { return LayoutSite(); }
 }

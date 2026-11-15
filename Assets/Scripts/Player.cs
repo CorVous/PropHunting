@@ -19,7 +19,7 @@ public partial class Player : MonoBehaviour
     public int def = -1;                // disguise def, -1 = walking body
     public int disguiseClass;           // 0 tiny, 1 medium, 2 large
     public float eye = Balance.HunterEye;
-    public bool locked, rotationLock = true, settled;
+    public bool locked, settled;
     float stillTime;
     Vector3 lastPos;
     public int health, maxHealth;
@@ -139,21 +139,23 @@ public partial class Player : MonoBehaviour
     // ---------------------------------------------------------------- frame
     void Update()
     {
-        if (!active || Game.I.state != Game.State.Playing) return;
-        bool paused = Game.I.menuOpen || Game.I.round.InputBlocked;
+        bool lobby = Game.I.state == Game.State.Lobby;
+        if (!active || (Game.I.state != Game.State.Playing && !lobby)) return;
+        bool paused = Game.I.menuOpen || Game.I.round.InputBlocked || (lobby && Lobby.I.panelOpen);
         float dt = Mathf.Min(Time.deltaTime, 0.1f);
 
         if (!paused)
         {
-            if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked)
+            // a click captures the mouse, unless it is on the wrist panel or on the third-person screen (dragging it)
+            Vector2 gp = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+            bool onPanel = (GameUI.I.wristOpen && GameUI.I.WristRect.Contains(gp)) || PipScreen.I.Contains(gp);
+            if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked && !onPanel)
             {
+                GameUI.I.wristOpen = false;
                 Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false;
                 captureClickFrame = Time.frameCount;   // this click only captures the mouse
             }
-            if (!PipScreen.I.grabbing) Look();   // B held: the mouse moves the third-person screen
-            if (Input.GetKeyDown(KeyCode.V)) SetThird(!third);
-            float wheel = Input.GetAxis("Mouse ScrollWheel");
-            if (third && Mathf.Abs(wheel) > 0.001f) thirdDist = Mathf.Clamp(thirdDist - wheel * 2.5f, 1.2f, 6f);
+            Look();
         }
 
         // input
@@ -182,12 +184,9 @@ public partial class Player : MonoBehaviour
         else speed = Balance.HiderRun[disguiseClass] * (run ? 1f : Balance.DesktopWalkFactor);
         wish *= speed;
 
-        // the prop turns with the view unless it is pinned with rotation lock on (05 section 3.6.5)
-        if (def >= 0)
-        {
-            bool pinned = settled || locked;
-            if (!pinned || !rotationLock) body.TryYaw(camYaw);
-        }
+        // the prop faces the way the hider turned it by looking while moving; pinned, it keeps its facing and the
+        // view looks around freely (G38: no turn keys, no rotation lock, no facing rounding)
+        if (def >= 0 && !settled && !locked) body.TryYaw(camYaw);
 
         // sub-steps keep sweeps short on slow frames
         float left = dt;
@@ -205,7 +204,7 @@ public partial class Player : MonoBehaviour
         Footsteps(wish, run, dt);
         UpdateVisual();
         UpdateCamera();
-        if (!paused) UpdateActions(dt);
+        if (!paused && !lobby) UpdateActions(dt);   // in the lobby E is for the board
         else ClearAim();
         lastPos = body.pos;
     }
@@ -228,14 +227,9 @@ public partial class Player : MonoBehaviour
         if (moveInput && !locked) { settled = false; stillTime = 0f; }
         if (!body.grounded || moved > 0.01f * Mathf.Max(1f, dt / 0.016f)) { stillTime = 0f; if (!locked) settled = false; }
         else stillTime += dt;
-        if (!settled && !locked && body.grounded && stillTime >= Balance.SettleTime && Time.time >= noSettleUntil)
-        {
-            settled = true;
-            // quantised pose: 1 cm, 256 yaw steps; then an empty hiding socket within 0.3 m takes the prop
-            body.pos = new Vector3(Mathf.Round(body.pos.x * 100f) / 100f, body.pos.y, Mathf.Round(body.pos.z * 100f) / 100f);
-            body.yaw = Mathf.Round(body.yaw / (360f / 256f)) * (360f / 256f);
-            Game.I.round.SnapToSocket(this);
-        }
+        // settling only pins the prop where the hider left it: no snapping into a slot and no rounding of its
+        // position or facing (owner decisions G37, G38); it rests on whatever is under it
+        if (!settled && !locked && body.grounded && stillTime >= Balance.SettleTime && Time.time >= noSettleUntil) settled = true;
     }
 
     public void Unpin(float noSettleFor)
@@ -393,8 +387,6 @@ public partial class Player : MonoBehaviour
         else if (k == "lock") testLock = true;
         else if (k == "take") TryTake();
         else if (k == "taunt") Taunt(false);
-        else if (k == "left") TurnPinned(-Balance.TurnStepDeg);
-        else if (k == "right") TurnPinned(Balance.TurnStepDeg);
     }
 
     public string StatusLine()

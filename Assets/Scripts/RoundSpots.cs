@@ -60,25 +60,6 @@ public partial class Round
         return c >= 0 && Map.gen.occ[c] == 0 && Map.gen.walk[c] == 1;   // walk 1: no prop reaches into the cell
     }
 
-    // a hider's prop that settles within 0.3 m of an empty socket accepting its type is pinned into it
-    public void SnapToSocket(Player p)
-    {
-        if (p.def < 0) return;
-        int tags = GenData.defTags[p.def];
-        if (tags == 0) return;
-        foreach (var s in socks)
-        {
-            if ((s.accept & tags) == 0 || s.size < GenData.defSizeClass[p.def] || !SockFree(s)) continue;
-            Vector3 d = s.pos - p.body.pos;
-            if (new Vector2(d.x, d.z).magnitude > 0.3f || Mathf.Abs(d.y) > 0.2f) continue;
-            if (!p.body.Fits(s.pos + Vector3.up * 0.01f, s.yaw)) continue;
-            p.body.pos = s.pos; p.body.yaw = s.yaw;
-            p.Say("Snapped into the empty place", 2f);
-            AudioHub.I.Play("tick_001", 0.5f);
-            return;
-        }
-    }
-
     string HostName(int host)
     {
         return GameUI.DefName(Map.gen.emitDef[host]).ToLowerInvariant();
