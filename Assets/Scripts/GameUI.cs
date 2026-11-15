@@ -203,7 +203,7 @@ public class GameUI : MonoBehaviour
         // the hunter is held and sees nothing while the hiders hide
         if (rd.phase == Round.PH_HIDE && p.role == Player.ROLE_HUNTER)
         {
-            Fill(new Rect(0, 0, W, H), new Color(0.04f, 0.05f, 0.07f, 0.97f));
+            Fill(new Rect(0, 0, W, H), new Color(0.04f, 0.05f, 0.07f, 1f));
             GUI.Label(new Rect(0, H / 2 - 70, W, 40), "The hiders are hiding", bigCentre);
             GUI.Label(new Rect(0, H / 2 - 20, W, 30), "You are held at the release point for " + Mathf.CeilToInt(rd.left) + " s.", centre);
             GUI.Label(new Rect(0, H / 2 + 15, W, 30), "Press Enter to skip the wait: the bots are already hidden.", centre);
@@ -423,9 +423,9 @@ public class GameUI : MonoBehaviour
     {
         var g = Game.I;
         Fill(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.45f));
-        float pw = 520f, ph = 420f;
+        float pw = 660f, ph = 420f;
         Rect r = new Rect((W - pw) / 2, (H - ph) / 2, pw, ph);
-        GUI.Box(r, GUIContent.none, box);
+        Fill(r, new Color(0.08f, 0.10f, 0.12f, 1f));
         GUILayout.BeginArea(new Rect(r.x + 24, r.y + 14, pw - 48, ph - 24));
         GUILayout.Label("Menu", title, GUILayout.Height(40));
         GUILayout.Label("Seed " + g.seedCode + " (" + GenData.SizeName[g.map.gen.size] + "). The round is paused while the menu is open.", small);

@@ -430,9 +430,9 @@ public static class GenData
         // ===== Kenney Furniture Kit (House) =====
         D("k_table", "table", K, 0, A_CENTER, FL_SOLID | IN, 1); Col(C_TABLE); SlotsDining(false, 900);
         D("k_tableCoffee", "tableCoffee", K, 0, A_CENTER, FL_SOLID | IN, 1); Col(C_TABLE); SlotsTop(2, I_DECOR | I_FOOD | I_TABLEWARE, SZ_M, 450);
-        D("k_chair", "chair", K, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0);
-        D("k_chairCushion", "chairCushion", K, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0);
-        D("k_chairDesk", "chairDesk", K, I_DESKCHAIR, A_SLOT_ONLY, FL_LIGHT | IN, 1); Fp(1, 1);
+        D("k_chair", "chair", K, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0); Col(C_SEAT);
+        D("k_chairCushion", "chairCushion", K, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0); Col(C_SEAT);
+        D("k_chairDesk", "chairDesk", K, I_DESKCHAIR, A_SLOT_ONLY, FL_LIGHT | IN, 1); Col(C_SEAT); Fp(1, 1);
         D("k_sofa", "loungeSofa", K, 0, A_WALL, FL_SOLID | BOTH, 2); Col(C_SEAT); Clear(1);
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, -defSx[cur] / 4, defTopY[cur], 60, 0, SZ_M, I_PILLOW | I_TOY, 350); Slot(g, S_ON_TOP, defSx[cur] / 4, defTopY[cur], 60, 0, SZ_M, I_PILLOW | I_TOY, 350); }
         D("k_loungeChair", "loungeChair", K, 0, A_WALL, FL_SOLID | BOTH, 1); Col(C_SEAT); Clear(1);
@@ -480,7 +480,7 @@ public static class GenData
         D("k_toaster", "toaster", K, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 1);
         D("k_microwave", "kitchenMicrowave", K, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 1);
         D("k_coffeeMachine", "kitchenCoffeeMachine", K, I_KITCHENWARE, A_SLOT_ONLY, BOTH, 1);
-        D("k_bench", "bench", K, 0, A_WALL, BOTH, 0);
+        D("k_bench", "bench", K, 0, A_WALL, BOTH, 0); Col(C_SEAT);
         D("k_coatRack", "coatRackStanding", K, 0, A_CORNER, FL_LIGHT | IN, 1);
         D("k_pillow", "pillow", K, I_PILLOW, A_SLOT_ONLY, FL_LIGHT | BOTH, 0);
         D("k_speaker", "speaker", K, 0, A_WALL, FL_LIGHT | BOTH, 1);
@@ -511,7 +511,7 @@ public static class GenData
         D("q_armchair", "armchair", 550, 0, A_WALL, FL_SOLID | BOTH, 1); Col(C_SEAT); Clear(1);
         D("q_couch", "couch", 700, 0, A_WALL, FL_SOLID | BOTH, 2); Col(C_SEAT); Clear(1);
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, -defSx[cur] / 4, defTopY[cur], 80, 0, SZ_M, I_PILLOW | I_TOY, 400); Slot(g, S_ON_TOP, defSx[cur] / 4, defTopY[cur], 80, 0, SZ_M, I_PILLOW | I_TOY, 300); }
-        D("q_chair", "chair_A", 750, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0);
+        D("q_chair", "chair_A", 750, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0); Col(C_SEAT);
         D("q_stool", "chair_stool", 700, I_STOOL | I_SEAT_OUT, A_ANY, FL_LIGHT | BOTH, 0);
         D("q_table", "table_medium", 750, 0, A_CENTER, FL_SOLID | IN, 1); Col(C_TABLE); SlotsDining(true, 850);
         D("q_tableLow", "table_low", 600, 0, A_CENTER, FL_SOLID | IN, 1); Col(C_TABLE); SlotsTop(2, I_DECOR | I_FOOD | I_TABLEWARE, SZ_M, 450);
@@ -530,7 +530,7 @@ public static class GenData
         D("q_books", "book_set", 450, I_DECOR, A_SLOT_ONLY, BOTH, 0);
 
         // ===== KayKit Restaurant Bits (Diner) =====
-        D("r_chair", "restaurant_chair_A", 750, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0);
+        D("r_chair", "restaurant_chair_A", 750, I_CHAIR, A_SLOT_ONLY, FL_COMMON | FL_LIGHT | BOTH, 0); Col(C_SEAT);
         D("r_stool", "restaurant_chair_stool", 700, I_STOOL | I_SEAT_OUT, A_ANY, FL_LIGHT | BOTH, 0);
         D("r_table", "kitchentable_A", 750, 0, A_CENTER, FL_SOLID | IN, 1); Col(C_TABLE); SlotsDining(true, 900);
         D("r_tableRound", "table_round_A_small", 750, 0, A_CENTER, FL_SOLID | BOTH, 1); Col(C_TABLE); SlotsDining(true, 600);

@@ -15,8 +15,7 @@ mergeInto(LibraryManager.library, {
     window.__phAudio = { ctx: ctx, master: master, buffers: {}, loaded: 0, failed: 0 };
     // browsers start an audio context suspended until the user does something
     var resume = function () { if (ctx.state !== 'running') ctx.resume(); };
-    window.addEventListener('mousedown', resume);
-    window.addEventListener('keydown', resume);
+    ['mousedown', 'pointerdown', 'click', 'keydown', 'touchend'].forEach(function (n) { window.addEventListener(n, resume, true); });
   },
 
   PH_AudioLoad: function (namePtr, urlPtr) {
@@ -42,6 +41,7 @@ mergeInto(LibraryManager.library, {
     if (!a) return 0;
     var buffer = a.buffers[UTF8ToString(namePtr)];
     if (!buffer) return 0;
+    if (a.ctx.state !== 'running') { a.ctx.resume(); return 0; }   // nothing queues up while the browser holds audio back
     var src = a.ctx.createBufferSource();
     src.buffer = buffer;
     src.playbackRate.value = rate;
