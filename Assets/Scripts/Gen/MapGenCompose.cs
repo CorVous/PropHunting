@@ -162,6 +162,16 @@ public partial class MapGen
                     if (Abs(emitX[e] - px) < hx + ox - 10 && Abs(emitZ[e] - pz) < hz + oz - 10) return false;
                     if (g0 < 0) break;
                 }
+                // the members of its composition set may share its cells without holding one (a lamp beside a sofa)
+                int key = emitSet[o] >= 0 ? emitSet[o] : o;
+                for (int e = key; e < nEmit; e++)
+                {
+                    if ((e != key && emitSet[e] != key) || e == o || e == self || emitParent[e] >= 0 || (emitFlags[e] & EF_REMOVED) != 0) continue;
+                    if (Has(emitDef[e], GenData.FL_FLAT) || Has(emitDef[e], GenData.FL_DECOR)) continue;
+                    int ox, oz;
+                    HalfExtents(emitDef[e], emitYaw[e], out ox, out oz);
+                    if (Abs(emitX[e] - px) < hx + ox - 10 && Abs(emitZ[e] - pz) < hz + oz - 10) return false;
+                }
             }
         return true;
     }

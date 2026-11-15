@@ -130,6 +130,13 @@ public partial class MapGen
                 int i = z * IW + x;
                 if (occ[i] == e + 1) occ[i] = 0;
                 if (flatOcc[i] == e + 1) flatOcc[i] = 0;
+                // a set-mate that shared the cell (a lamp beside its armchair) holds it now, so later neighbours see it
+                if (occ[i] == 0)
+                    for (int o = roomEmitStart[emitRoom[e]]; o < nEmit; o++)
+                    {
+                        if (o == e || (emitFlags[o] & EF_REMOVED) != 0 || (emitParent[o] >= 0 && (emitFlags[o] & EF_ADJACENT) == 0) || Has(emitDef[o], GenData.FL_FLAT) || Has(emitDef[o], GenData.FL_DECOR)) continue;
+                        if (x >= emitRX[o] && x < emitRX[o] + emitRW[o] && z >= emitRZ[o] && z < emitRZ[o] + emitRD[o]) { occ[i] = o + 1; break; }
+                    }
             }
         // children (and theirs) go with it; they always come later in the list
         for (int c = e + 1; c < nEmit; c++)

@@ -130,7 +130,7 @@ public partial class Player
         string cn = cls == 1 ? "tiny" : (cls == 2 ? "medium" : "large");
         string t = GameUI.DefName(d) + " · " + cn + " · " + Balance.HiderHealth[cls - 1] + " HP";
         if (!onMenu && role == ROLE_HIDER) return t + " · not a disguise this round";
-        return t + (onMenu ? "" : " (too few copies for the round menu)") + " · E: disguise";
+        return t + " · E: disguise";
     }
 
     // ---------------------------------------------------------------- disguise

@@ -364,14 +364,20 @@ public partial class MapGen
             e = WallKeep(sv, WM_NEAR, lx, lz, WIN_AVOID, EF_MANDATORY, ref r);
             if (e >= 0) haveV = true;
         }
+        // no wall has 1.4 m for the diner's units: the narrower domestic sink and stove
+        if (!haveS) { int e = WallKeep(Dn("k_sink"), WM_NEAR, lx, lz, WIN_ANY, EF_MANDATORY, ref r); if (e >= 0) { haveS = true; lx = emitX[e]; lz = emitZ[e]; } }
+        if (!haveV) haveV = WallKeep(Dn("k_stove"), WM_NEAR, lx, lz, WIN_AVOID, EF_MANDATORY, ref r) >= 0;
         if (!haveS) MandFail(1);
         if (!haveV) MandFail(1);
         GenRng r2 = SR(2);
         // the fridge near the line if a wall has the room: these units are 1.4 m wide and up to 1.6 m deep, and a
-        // kitchen of 4 x 4 m with two doors often has no third place with its front free (the store room has one)
-        if (WallKeep(fr, WM_NEAR, lx, lz, WIN_NEVER, 0, ref r2) < 0) WallKeep(fr, WM_ANY, 0, 0, WIN_ANY, 0, ref r2);
+        // kitchen of 4 x 4 m with two doors often has no third place with its front free (the store room has one);
+        // then the narrower domestic fridge, and a narrower cabinet for the counter
+        if (WallKeep(fr, WM_NEAR, lx, lz, WIN_NEVER, 0, ref r2) < 0 && WallKeep(fr, WM_ANY, 0, 0, WIN_ANY, 0, ref r2) < 0)
+            WallAny(WM_NEAR, lx, lz, WIN_ANY, 0, ref r2, "k_fridge", null, null);
         GenRng r3 = SR(3);
-        if (r3.Chance(800) && Fit(1)) WallKeep(ct, WM_NEAR, lx, lz, WIN_ANY, 0, ref r3);
+        if (r3.Chance(800) && Fit(1) && WallKeep(ct, WM_NEAR, lx, lz, WIN_ANY, 0, ref r3) < 0)
+            WallAny(WM_NEAR, lx, lz, WIN_ANY, 0, ref r3, "k_counterDrawer", "k_counter", null);
         GenRng r4 = SR(4);
         int dx, dz;
         MainDoor(room, out dx, out dz);

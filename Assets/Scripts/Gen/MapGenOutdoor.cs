@@ -166,18 +166,37 @@ public partial class MapGen
     // were taken, or one where pieces were taken back for the walkway) is filled up with what stands at the edge
     // of such a place: a planted stretch of fence, a bush, a group of rocks, an island of planting on open ground;
     // in a forest undergrowth, rocks and stumps. These may pass the area's cover limit, never its walkway.
+    // The fill may end up to 2 over the minimum, so a pair of rocks can close the last gap. A forest pocket whose
+    // trees leave no room for its undergrowth gives up its last tree (never its only one) and tries again.
     void FillToMinimum()
     {
         int room = pRoom, type = roomType[room];
         bool forest = type == GenData.R_FOREST_DENSE || type == GenData.R_FOREST_CLEARING;
         int saved = roomFloorTarget[room];
-        if (roomFloorTarget[room] < roomFloorMin[room]) roomFloorTarget[room] = roomFloorMin[room];
+        if (roomFloorTarget[room] < roomFloorMin[room] + 2) roomFloorTarget[room] = roomFloorMin[room] + 2;
         coverExempt = true;
+        for (int pass = 0; pass < 3; pass++)
+        {
+            FillPass(pass, forest);
+            if (roomFloor[room] >= roomFloorMin[room] || !forest || roomTrees[room] <= 1) break;
+            int tree = -1;
+            for (int e = nEmit - 1; e >= roomEmitStart[room] && tree < 0; e--)
+                if (emitRoom[e] == room && (emitFlags[e] & EF_REMOVED) == 0 && Has(emitDef[e], GenData.FL_SCENERY)) tree = e;
+            if (tree < 0) break;
+            Remove(tree);
+        }
+        coverExempt = false; walkNarrow = false;
+        roomFloorTarget[room] = saved > roomFloor[room] ? saved : roomFloor[room];
+    }
+
+    void FillPass(int pass, bool forest)
+    {
+        int room = pRoom, type = roomType[room];
         ClearBans();
         for (int k = 0; k < 24 && roomFloor[room] < roomFloorMin[room]; k++)
         {
             walkNarrow = k >= 8;   // first with the full walkway width, then passable is enough
-            GenRng r = SR(200 + k);
+            GenRng r = SR(200 + pass * 24 + k);
             int first = nEmit, how = k % 4;
             if (how == 0 && !forest) { if (Border(2500, type != GenData.R_FIREPIT, WM_ANY, 0, 0, ref r) > 0) continue; }
             if (how <= 1)
@@ -209,8 +228,6 @@ public partial class MapGen
                 if (CountInRoom(fDef[0], room) < ScaledCap(GenData.defRoomCap[fDef[0]], room) && FormAt(GenData.GL_ROW, 0, GenData.A_OUT_EDGE, WM_ANY, 0, 0, 0, ref r) >= 0) Keep(first, false);
             }
         }
-        coverExempt = false; walkNarrow = false;
-        roomFloorTarget[room] = saved > roomFloor[room] ? saved : roomFloor[room];
     }
 
     // ---- trees -------------------------------------------------------------------------------------------
@@ -312,10 +329,11 @@ public partial class MapGen
         int first = nEmit;
         int bench = WallPlace(Pick(ref r, "k_bench", 6, "k_benchCushion", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r);
         if (bench < 0 || !Keep(first, false)) return;
-        if (r.Chance(450) && Fit(1))
+        int pot = Dn("n_potSmall");
+        if (r.Chance(450) && Fit(1) && CountInRoom(pot, pRoom) < ScaledCap(GenData.defRoomCap[pot], pRoom))
         {
             first = nEmit;
-            if (RelBeside(Dn("n_potSmall"), bench, 0, 90, 0, ref r) >= 0) Keep(first, false);
+            if (RelBeside(pot, bench, 0, 90, 0, ref r) >= 0) Keep(first, false);
         }
     }
 

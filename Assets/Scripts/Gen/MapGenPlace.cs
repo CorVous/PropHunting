@@ -474,7 +474,7 @@ public partial class MapGen
     void PopulateRoom(int room)
     {
         roomEmitStart[room] = nEmit;
-        pRoom = room; looseUsed = 0;
+        pRoom = room; looseUsed = 0; borderColour = 0;   // nothing carries over from the last room or the last map
         int type = roomType[room];
         if (type == GenData.R_RELEASE || GenData.FindTable(roomZone[room], type) < 0) return;
         GenRng rng = Rng(ST_ROOM, room, 0);

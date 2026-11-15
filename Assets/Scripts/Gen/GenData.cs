@@ -5,11 +5,12 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 3;
+    public const int GEN_VERSION = 4;
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
-    // the prop rules change (generators 1, 2 and 3 share layout 1: the same seed can be compared before and after).
-    // Bump it when Layout or BuildEdges change. Room types: the draws of layout 1 are kept; what generator 3
-    // decides on top of them (kids' room, office, hall) draws from GEN_VERSION (MapGen.AssignRoomTypes).
+    // the prop rules change (generators 1 to 4 share layout 1: the same seed keeps its buildings and walls).
+    // Bump it when Layout or BuildEdges change. Room types: the draws of layout 1 are kept; what generator 3 and
+    // later decide on top of them (kids' room, office, hall) draws from GEN_VERSION (MapGen.AssignRoomTypes), so a
+    // room of one seed may change between those types from one generator version to the next.
     public const int LAYOUT_VERSION = 1;
 
     public const int CELL_MM = 4000;      // outer cell
@@ -1011,7 +1012,7 @@ public static class GenData
 
         Native(Z_DINER, R_DINER_DINING, "r_table", "r_tableRound", "k_table", "k_plant", "q_cactus", "q_cabinet", "q_lampStanding", "k_trashcan", "k_bench", "k_benchCushion", "r_stool",
             "k_stool", "k_bar", "k_coatRack", "k_doormat", "q_couch", "q_tableLow", "n_planter", "@pots");
-        Native(Z_DINER, R_DINER_KITCHEN, "r_counter", "r_counterSink", "r_stove", "r_fridge", "@crates", "k_trashcan", "@cleaning");
+        Native(Z_DINER, R_DINER_KITCHEN, "r_counter", "r_counterSink", "r_stove", "r_fridge", "k_fridge", "k_counter", "k_counterDrawer", "@crates", "k_trashcan", "@cleaning");
         Native(Z_DINER, R_DINER_STORE, "r_fridge", "@crates", "@barrels", "gen_rackPantry", "w_pallet", "@boxes", "@sacks");
 
         Native(Z_LAWN, R_LAWN_OPEN, "n_treeFat", "n_treeOak", "n_bush", "n_bushDetailed", "n_bushLarge", "@rocks", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_sign", "k_bench",
