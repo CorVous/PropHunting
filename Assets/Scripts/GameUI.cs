@@ -116,7 +116,7 @@ public class GameUI : MonoBehaviour
     {
         var g = Game.I;
         Fill(new Rect(0, 0, W, H), new Color(0.13f, 0.17f, 0.20f, 1f));
-        float pw = 680f, ph = 720f;
+        float pw = 680f, ph = 748f;
         Rect r = new Rect((W - pw) / 2, Mathf.Max(8f, (H - ph) / 2), pw, ph);
         GUI.Box(r, GUIContent.none, box);
         GUILayout.BeginArea(new Rect(r.x + 26, r.y + 16, r.width - 52, r.height - 28));

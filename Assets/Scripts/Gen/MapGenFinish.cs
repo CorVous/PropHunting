@@ -194,7 +194,7 @@ public partial class MapGen
         for (int k = 0; k < nSpawns; k++) spawnCell[k] = cand[k];
 
         // counts for the statistics and the tuning overlay (G24): floor and on-furniture props per room type and zone
-        statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0;
+        statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0; statGroups = 0;
         for (int i = 0; i < 64; i++) { statTypeRooms[i] = 0; statTypeCells[i] = 0; statTypeFloor[i] = 0; statTypeTop[i] = 0; }
         for (int i = 0; i < 8; i++) { statZoneFloor[i] = 0; statZoneTop[i] = 0; }
         for (int r = 0; r < nRooms; r++)
@@ -208,6 +208,7 @@ public partial class MapGen
             if (Has(d, GenData.FL_DECOR)) { statDecor++; continue; }
             if (Has(d, GenData.FL_SCENERY)) { statScenery++; continue; }
             statProps++;
+            if (emitGroup[e] == e && emitGrp[e] >= 0) statGroups++;
             if (emitParent[e] >= 0) statSlotItems++;
             int r = emitRoom[e], t = roomType[r] & 63, z = roomZone[r] & 7;
             if (OnFloor(e)) { statFloor++; statTypeFloor[t]++; statZoneFloor[z]++; }

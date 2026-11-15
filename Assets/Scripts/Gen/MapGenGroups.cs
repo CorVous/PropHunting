@@ -67,7 +67,6 @@ public partial class MapGen
             if (leader < 0) anchor = GenData.A_WALL;
         }
         if (leader < 0) leader = PlaceFormationAt(GenData.grpLayout[g], GenData.grpGapMm[g], room, anchor, flags, g, ref rng);
-        if (leader >= 0) statGroups++;
         return leader >= 0;
     }
 
@@ -312,17 +311,24 @@ public partial class MapGen
     }
 
     // A single copy of a group's member type (a disguise quota copy): it joins a group of that kind that is
-    // already in the room, or stands where such a group would. Returns the emit index or -1.
+    // already in the room while the room holds fewer props of the kind than one full group, or stands where
+    // such a group would when the room has none. A room that already has a full group takes no copy: the
+    // copy goes to another room. Returns the emit index or -1.
     int PlaceGroupCopy(int g, int def, int room, int anchor, int flags, ref GenRng rng)
     {
+        int have = 0;
+        for (int e = roomEmitStart[room]; e < nEmit; e++)
+            if (emitRoom[e] == room && emitGrp[e] == g && (emitFlags[e] & EF_REMOVED) == 0) have++;
+        if (have >= GenData.grpMax[g]) return -1;
         fN = 1; fDef[0] = def;
         BuildFormation(GenData.GL_ROW, GenData.grpGapMm[g], ref rng);
-        for (int e = roomEmitStart[room]; e < nEmit; e++)
+        for (int e = roomEmitStart[room]; e < nEmit && have > 0; e++)
         {
             if (emitRoom[e] != room || emitGroup[e] != e || emitGrp[e] != g || (emitFlags[e] & EF_REMOVED) != 0) continue;
             int j = BesideHost(e, room, flags, g, GenData.grpGapMm[g], ref rng);
             if (j >= 0) return j;
         }
+        if (have > 0) return -1;
         fN = 1; fDef[0] = def;
         int leader = -1;
         if (anchor == GenData.A_BESIDE)
