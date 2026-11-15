@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1b1f24; color: #e8e8e8;
+                 font-family: system-ui, "Segoe UI", sans-serif; }
+    #unity-canvas { display: block; width: 100vw; height: 100vh; background: #1b1f24; outline: none; }
+    #ph-loading { position: fixed; left: 0; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column;
+                  align-items: center; justify-content: center; pointer-events: none; }
+    #ph-loading h1 { font-size: 28px; margin: 0 0 6px 0; font-weight: 600; }
+    #ph-loading p { margin: 4px 0; opacity: 0.8; font-size: 15px; }
+    #ph-bar { width: 360px; max-width: 70vw; height: 14px; border: 2px solid #e8e8e8; border-radius: 8px; margin-top: 14px; }
+    #ph-fill { height: 100%; width: 0%; background: #7cc46a; border-radius: 5px; }
+    #ph-error { position: fixed; left: 0; right: 0; top: 0; background: #a33; color: #fff; padding: 10px 14px; display: none;
+                font-size: 15px; white-space: pre-wrap; z-index: 5; }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="ph-loading">
+    <h1>{{{ PRODUCT_NAME }}}</h1>
+    <p id="ph-status">Loading...</p>
+    <div id="ph-bar"><div id="ph-fill"></div></div>
+    <p>Desktop browser, mouse and keyboard.</p>
+  </div>
+  <div id="ph-error"></div>
+  <script>
+    // Page log, readable by test tools as window.__phlog. With ?diag=1 the last lines are also mirrored
+    // into the URL fragment, which can be read even while the page's main thread is busy.
+    window.__phlog = [];
+    (function () {
+      var diag = /[?&]diag=1/.test(location.search), marks = 0, tail = [];
+      function add(kind, args) {
+        var s = kind + ' ' + Array.prototype.map.call(args, function (a) { return String(a); }).join(' ');
+        if (s.length > 600) s = s.slice(0, 600);
+        window.__phlog.push(s);
+        if (window.__phlog.length > 400) window.__phlog.shift();
+        if (diag && marks < 150) {
+          marks++; tail.push(s.slice(0, 120)); if (tail.length > 4) tail.shift();
+          try { history.replaceState(null, '', '#' + encodeURIComponent(marks + '|' + tail.join(' || '))); } catch (e) {}
+        }
+      }
+      ['log', 'warn', 'error'].forEach(function (k) {
+        var o = console[k];
+        console[k] = function () { add(k[0].toUpperCase(), arguments); return o.apply(console, arguments); };
+      });
+      window.addEventListener('error', function (e) { add('X', [e.message, e.filename + ':' + e.lineno]); });
+      window.__phmark = function (s) { add('M', [s]); };
+    })();
+
+    var canvas = document.querySelector("#unity-canvas");
+    var errBox = document.querySelector("#ph-error");
+    function showError(msg) { errBox.style.display = 'block'; errBox.textContent = msg; }
+    function unityShowBanner(msg, type) {
+      window.__phlog.push('BANNER ' + type + ' ' + msg);
+      if (type == 'error') showError(msg);
+    }
+    var buildUrl = "Build";
+    var config = {
+      dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+      frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+      codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#if MEMORY_FILENAME
+      memoryUrl: buildUrl + "/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+      symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+      productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+      productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+      showBanner: unityShowBanner,
+      // builds are replaced often while prototyping: never serve a stale copy from the browser's storage
+      cacheControl: function (url) { return "no-store"; },
+    };
+    var script = document.createElement("script");
+    script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+    script.onload = function () {
+      window.__phmark('loader loaded');
+      createUnityInstance(canvas, config, function (progress) {
+        document.querySelector("#ph-fill").style.width = Math.round(100 * progress) + "%";
+        if (progress >= 0.9) document.querySelector("#ph-status").textContent = "Starting...";
+      }).then(function (instance) {
+        window.__phunity = instance;
+        window.__phmark('unity instance ready');
+        document.querySelector("#ph-loading").style.display = "none";
+        canvas.focus();
+      }).catch(function (message) {
+        window.__phmark('unity failed: ' + message);
+        showError("The game could not start: " + message);
+      });
+    };
+    script.onerror = function () { showError("Could not load " + script.src); };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>
