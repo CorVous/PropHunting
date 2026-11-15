@@ -15,7 +15,7 @@ public class MapBuilder
     public bool built, failed;
     public float progress;
     public string phase = "";
-    public double genMs, buildMs;
+    public double genMs, buildMs, wallMs;   // time spent generating and building, and wall-clock time from the press
     public int colliderCount, rendererCount;
 
     int stage, cursor;
@@ -123,12 +123,19 @@ public class MapBuilder
     public bool Step(float budgetMs)
     {
         if (built || failed) return true;
+        // a time budget, and a cap on units of work so the slicing also holds where the browser's timer is coarse
         watch.Reset(); watch.Start();
-        while (watch.Elapsed.TotalMilliseconds < budgetMs)
+        bool finished = false;
+        bool wasGen = stage == 0;
+        for (int units = 0; units < 48 && watch.Elapsed.TotalMilliseconds < budgetMs; units++)
         {
-            if (StepOne()) { built = !failed; total.Stop(); return true; }
+            if (StepOne()) { finished = true; break; }
+            if (wasGen != (stage == 0)) break;   // generation and building are timed apart
         }
-        return false;
+        watch.Stop();
+        if (wasGen) genMs += watch.Elapsed.TotalMilliseconds; else buildMs += watch.Elapsed.TotalMilliseconds;
+        if (finished) { built = !failed; total.Stop(); wallMs = total.Elapsed.TotalMilliseconds; }
+        return finished;
     }
 
     bool StepOne()
@@ -140,7 +147,6 @@ public class MapBuilder
                 if (gen.Step())
                 {
                     if (gen.failed) { failed = true; phase = "Generation failed: " + gen.failReason; return true; }
-                    genMs = total.Elapsed.TotalMilliseconds;
                     props = new PropInstance[gen.nEmit]; objects = new GameObject[gen.nEmit];
                     ground = new MeshBuf(); walls = new MeshBuf(); roofs = new MeshBuf();
                     stage = 1; cursor = 0; phase = "Laying floors";
@@ -169,7 +175,6 @@ public class MapBuilder
                 break;
             case 4:
                 Physics.SyncTransforms();
-                buildMs = total.Elapsed.TotalMilliseconds - genMs;
                 progress = 1f;
                 phase = "Ready";
                 return true;
@@ -272,9 +277,10 @@ public class MapBuilder
             WallPiece(horizontal, ex, ez, lo, d0, 0f, h, colA, colB, true);
             WallPiece(horizontal, ex, ez, d1, hi, 0f, h, colA, colB, true);
             WallPiece(horizontal, ex, ez, d0, d1, dh, h, colA, colB, true);
-            Trim(horizontal, ex, ez, d0 - 0.06f, d0, 0f, dh, Frame);
-            Trim(horizontal, ex, ez, d1, d1 + 0.06f, 0f, dh, Frame);
-            Trim(horizontal, ex, ez, d0 - 0.06f, d1 + 0.06f, dh, dh + 0.06f, Frame);
+            float e = 0.004f;   // trims stand a little proud of the wall pieces they frame
+            Trim(horizontal, ex, ez, d0 - 0.06f, d0 + e, 0f, dh, Frame);
+            Trim(horizontal, ex, ez, d1 - e, d1 + 0.06f, 0f, dh, Frame);
+            Trim(horizontal, ex, ez, d0 - 0.06f, d1 + 0.06f, dh - e, dh + 0.06f, Frame);
         }
         else if (type == GenData.E_WINDOW)
         {
@@ -283,10 +289,11 @@ public class MapBuilder
             WallPiece(horizontal, ex, ez, w1, hi, 0f, h, colA, colB, false);
             WallPiece(horizontal, ex, ez, w0, w1, 0f, sill, colA, colB, false);
             WallPiece(horizontal, ex, ez, w0, w1, head, h, colA, colB, false);
-            Trim(horizontal, ex, ez, w0 - 0.05f, w1 + 0.05f, sill - 0.05f, sill, WindowFrame);
-            Trim(horizontal, ex, ez, w0 - 0.05f, w1 + 0.05f, head, head + 0.05f, WindowFrame);
-            Trim(horizontal, ex, ez, w0 - 0.05f, w0, sill, head, WindowFrame);
-            Trim(horizontal, ex, ez, w1, w1 + 0.05f, sill, head, WindowFrame);
+            float e = 0.004f;
+            Trim(horizontal, ex, ez, w0 - 0.05f, w1 + 0.05f, sill - 0.05f, sill + e, WindowFrame);
+            Trim(horizontal, ex, ez, w0 - 0.05f, w1 + 0.05f, head - e, head + 0.05f, WindowFrame);
+            Trim(horizontal, ex, ez, w0 - 0.05f, w0 + e, sill, head, WindowFrame);
+            Trim(horizontal, ex, ez, w1 - e, w1 + 0.05f, sill, head, WindowFrame);
             Trim(horizontal, ex, ez, (w0 + w1) / 2 - 0.02f, (w0 + w1) / 2 + 0.02f, sill, head, WindowFrame);
             // a window is a wall for movement and for darts (04 section 4.1.1): one collider for the whole edge
             if (horizontal) Collider(new Vector3(ex + lo, 0, ez - WALL_HALF), new Vector3(ex + hi, h, ez + WALL_HALF), "WindowWall");

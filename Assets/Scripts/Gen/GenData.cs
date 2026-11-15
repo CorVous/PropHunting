@@ -364,7 +364,9 @@ public static class GenData
     static int Table(int zone, int room, int densityPermille, int clutterMin, int clutterMax)
     {
         int t = nTables++;
-        tableZone[t] = zone; tableRoom[t] = room; tableDensity[t] = densityPermille;
+        // densities and clutter are tuned up from the first values so prop counts reach 04 section 4.7.7's ranges
+        tableZone[t] = zone; tableRoom[t] = room; tableDensity[t] = densityPermille * 130 / 100;
+        clutterMin += 1; clutterMax += 3;
         tableEntryStart[t] = nEntries; tableEntryCount[t] = 0;
         tableClutterMin[t] = clutterMin; tableClutterMax[t] = clutterMax;
         tableClutterStart[t] = 0; tableClutterCount[t] = 0;

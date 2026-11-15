@@ -507,7 +507,7 @@ public partial class Round : MonoBehaviour
     }
 
     // commands for the build checks: round skip | round end | round goto <i> | round restart
-    public string Cmd(string[] a)
+    public string RoundCommand(string[] a)
     {
         if (a.Length < 2) return "?";
         if (a[1] == "skip") { left = Mathf.Min(left, 0.2f); return "skipped"; }

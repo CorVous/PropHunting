@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 
 // Sounds: Kenney's CC0 audio packs from the owner's mirror, as stand-ins (taunts in particular: the mirror has
 // no taunt, ambience or music tracks, so taunts are jingles and synth sounds, and there is no music).
@@ -34,14 +36,43 @@ public class AudioHub : MonoBehaviour
         AudioListener.volume = volume;
     }
 
+    // The clips are the packs' own .ogg files in StreamingAssets, decoded by the browser at run time
+    // (the Linux editor cannot encode audio for WebGL without ffmpeg, so they are not imported assets).
+    public int loaded, failed, wanted;
+
+    void Start()
+    {
+        var index = Resources.Load<TextAsset>("PropHunt/audio_index");
+        if (index == null) { Debug.LogWarning("[prophunt] audio_index.txt is missing"); return; }
+        string[] names = index.text.Split('\n');
+        var queue = new Queue<string>();
+        foreach (string n in names) if (n.Trim().Length > 0) queue.Enqueue(n.Trim());
+        wanted = queue.Count;
+        for (int i = 0; i < 4; i++) StartCoroutine(LoadWorker(queue));
+    }
+
+    IEnumerator LoadWorker(Queue<string> queue)
+    {
+        while (queue.Count > 0)
+        {
+            string name = queue.Dequeue();
+            string url = Application.streamingAssetsPath + "/PropHunt/Audio/" + name + ".ogg";
+            using (var req = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.OGGVORBIS))
+            {
+                yield return req.SendWebRequest();
+                AudioClip c = null;
+                if (req.result == UnityWebRequest.Result.Success) c = DownloadHandlerAudioClip.GetContent(req);
+                if (c != null) { c.name = name; clips[name] = c; loaded++; }
+                else { failed++; Debug.LogWarning("[prophunt] sound " + name + " did not load: " + req.error); }
+            }
+            if (loaded + failed == wanted) Debug.Log("[prophunt] sounds loaded " + loaded + " of " + wanted);
+        }
+    }
+
     AudioClip Clip(string name)
     {
         AudioClip c;
-        if (clips.TryGetValue(name, out c)) return c;
-        c = Resources.Load<AudioClip>("PropHunt/Audio/" + name);
-        if (c == null) Debug.LogWarning("[prophunt] missing sound " + name);
-        clips[name] = c;
-        return c;
+        return clips.TryGetValue(name, out c) ? c : null;
     }
 
     public void SetVolume(float v)

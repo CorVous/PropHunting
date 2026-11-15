@@ -69,14 +69,14 @@ public class Game : MonoBehaviour
         sun = sunGo.AddComponent<Light>();
         sun.type = LightType.Directional;
         sun.color = new Color(1f, 0.96f, 0.88f);
-        sun.intensity = 0.8f;
+        sun.intensity = 0.62f;
         sun.shadows = LightShadows.None;
         sunGo.transform.rotation = Quaternion.Euler(52f, 38f, 0f);
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.50f, 0.56f, 0.64f);
-        RenderSettings.ambientEquatorColor = new Color(0.40f, 0.42f, 0.44f);
-        RenderSettings.ambientGroundColor = new Color(0.30f, 0.29f, 0.27f);
+        RenderSettings.ambientSkyColor = new Color(0.62f, 0.66f, 0.72f);
+        RenderSettings.ambientEquatorColor = new Color(0.52f, 0.53f, 0.54f);
+        RenderSettings.ambientGroundColor = new Color(0.50f, 0.48f, 0.45f);
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.Linear;
         RenderSettings.fogColor = cam.backgroundColor;
@@ -177,7 +177,7 @@ public class Game : MonoBehaviour
         return "seed " + seedCode + " size " + GenData.SizeName[g.size] + " hash " + g.mapHash.ToString("X8") + " cells " + g.statGroundCells
             + " rooms " + g.nRooms + " props " + g.statProps + " scenery " + g.statScenery + " slotItems " + g.statSlotItems
             + " leaks " + g.statLeakPlausible + "+" + g.statLeakComedic + " menu " + g.menuCount + " sockets " + g.nSockets
-            + " rerolls " + g.attempt + " repairs " + g.statRepairs + " genMs " + map.genMs.ToString("0") + " buildMs " + map.buildMs.ToString("0")
+            + " rerolls " + g.attempt + " repairs " + g.statRepairs + " genMs " + map.genMs.ToString("0") + " buildMs " + map.buildMs.ToString("0") + " wallMs " + map.wallMs.ToString("0")
             + " frames " + genFrames + " renderers " + map.rendererCount + " colliders " + map.colliderCount;
     }
 
@@ -309,7 +309,8 @@ public class Game : MonoBehaviour
                 case "debug": debugOpen = a.Length < 2 || a[1] != "0"; break;
                 case "start": BackToStart(); break;
                 case "find": r = player.FindProp(a[1]); break;
-                case "round": r = round.Cmd(a); break;
+                case "round": r = round.RoundCommand(a); break;
+                case "hud": ui.hidden = a.Length > 1 && a[1] == "0"; break;
                 case "timescale": Time.timeScale = float.Parse(a[1]); break;
                 default: r = "unknown command"; break;
             }

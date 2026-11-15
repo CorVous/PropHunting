@@ -95,8 +95,11 @@ public class GameUI : MonoBehaviour
         GUI.color = old;
     }
 
+    public bool hidden;   // for clean screenshots in the build checks
+
     void OnGUI()
     {
+        if (hidden) return;
         Styles();
         float s = Mathf.Max(0.7f, Screen.height / 860f);
         GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
@@ -223,8 +226,9 @@ public class GameUI : MonoBehaviour
         string stats = "Seed <b>" + g.seedCode + "</b>   size " + GenData.SizeName[gen.size] + "   generator v" + GenData.GEN_VERSION
             + "\n" + gen.statProps + " props (" + gen.statSlotItems + " in slots), " + gen.statScenery + " trees, " + gen.nRooms + " rooms, "
             + (gen.statLeakPlausible + gen.statLeakComedic) + " out-of-place props (" + gen.statLeakComedic + " comedic), " + gen.menuCount + " disguise types";
-        GUI.Box(new Rect(8, 8, 560, 50), GUIContent.none, box);
-        GUI.Label(new Rect(16, 11, 548, 46), stats, small);
+        float sw = Mathf.Min(560f, W / 2 - 170f);
+        GUI.Box(new Rect(8, 8, sw, sw < 520f ? 66 : 50), GUIContent.none, box);
+        GUI.Label(new Rect(16, 11, sw - 12, sw < 520f ? 62 : 46), stats, small);
 
         // top centre: the round
         if (rd.phase != Round.PH_NONE)
@@ -354,13 +358,13 @@ public class GameUI : MonoBehaviour
                 + (gen.emitParent[e] >= 0 ? " in a slot of " + GenData.defId[gen.emitDef[gen.emitParent[e]]] : "") + "  " + p.aimDist.ToString("0.0") + " m";
         }
         string text = "<b>Debug</b>  " + g.fps.ToString("0") + " fps   " + Screen.width + " x " + Screen.height
-            + "\nMap hash " + gen.mapHash.ToString("X8") + "   generated in " + g.map.genMs.ToString("0") + " ms, built in " + g.map.buildMs.ToString("0") + " ms over " + g.genFrames + " frames"
+            + "\nMap hash " + gen.mapHash.ToString("X8") + "   generated in " + g.map.genMs.ToString("0") + " ms, built in " + g.map.buildMs.ToString("0") + " ms, over " + g.genFrames + " frames (" + g.map.wallMs.ToString("0") + " ms)"
             + "\nCells " + gen.statGroundCells + ": House " + gen.statZoneCells[1] + ", Warehouse " + gen.statZoneCells[2] + ", Diner " + gen.statZoneCells[3] + ", Lawn " + gen.statZoneCells[4] + ", Forest " + gen.statZoneCells[5]
             + "\nEmits " + gen.nEmit + ": props " + gen.statProps + ", slot items " + gen.statSlotItems + ", quota copies " + gen.statQuotaAdded + ", leaks " + gen.statLeakPlausible + " plausible + " + gen.statLeakComedic + " comedic"
             + "\nHiding sockets " + gen.nSockets + ", seed re-rolls " + gen.attempt + ", repairs " + gen.statRepairs + ", renderers " + g.map.rendererCount + ", colliders " + g.map.colliderCount
             + "\nPlayer " + p.body.pos.x.ToString("0.00") + ", " + p.body.pos.y.ToString("0.00") + ", " + p.body.pos.z.ToString("0.00") + "  eye " + p.eye.ToString("0.00") + (p.body.grounded ? "  grounded" : "  in the air")
             + "\n" + where + aim;
-        Rect r = new Rect(8, 64, 640, 190);
+        Rect r = new Rect(8, 82, 640, 190);
         GUI.Box(r, GUIContent.none, box);
         GUI.Label(new Rect(r.x + 8, r.y + 4, r.width - 16, r.height - 8), text, small);
     }

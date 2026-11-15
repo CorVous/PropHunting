@@ -75,7 +75,7 @@ public partial class Player
         // a soft highlight on the prop a hider could take, on the hider's own screen only (05 section 3.8)
         Highlight(CanDisguise && aimDoor == null && aimProp != null && aimDist <= Balance.TakeRange ? aimProp : null);
 
-        bool use = Input.GetMouseButtonDown(0) && Cursor.lockState == CursorLockMode.Locked;
+        bool use = Input.GetMouseButtonDown(0) && Cursor.lockState == CursorLockMode.Locked && Time.frameCount != captureClickFrame;
         if (testUse) { use = true; testUse = false; }
         if (use)
         {

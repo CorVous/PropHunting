@@ -26,10 +26,23 @@ public partial class Round
         socks.Add(s);
     }
 
+    readonly List<int> surfaceHosts = new List<int>();   // emits with a top that small things stand on
+
     void BuildSockets()
     {
         socks.Clear();
         var g = Map.gen;
+        surfaceHosts.Clear();
+        for (int e = 0; e < g.nEmit; e++)
+        {
+            int d = g.emitDef[e];
+            if (g.emitParent[e] >= 0 || (GenData.defFlags[d] & GenData.FL_SOLID) == 0) continue;
+            if (GenData.defTopY[d] < 250 || GenData.defTopY[d] > 1300) continue;
+            bool top = false;
+            for (int k = GenData.defSlotStart[d]; k < GenData.defSlotStart[d] + GenData.defSlotCount[d]; k++)
+                if (GenData.slotType[k] == GenData.S_ON_TOP) top = true;
+            if (top) surfaceHosts.Add(e);
+        }
         for (int k = 0; k < g.nSockets; k++) AddSock(g.socketHost[k], g.socketSlot[k], true);
         for (int k = 0; k < g.nFree; k++) AddSock(g.freeHost[k], g.freeSlot[k], false);
     }
@@ -107,8 +120,35 @@ public partial class Round
                 return true;
             }
         }
-        // 2. a floor cell matching the type's anchor, in a room where the type is native if possible
+        // 2. small things that live on furniture: a free place on some table top, counter or cabinet
+        if (GenData.defAnchor[def] == GenData.A_SLOT_ONLY && GenData.defSizeClass[def] <= GenData.SZ_M && surfaceHosts.Count > 0)
+        {
+            float half = Mathf.Max(GenData.defSx[def], GenData.defSz[def]) / 2000f;
+            for (int attempt = 0; attempt < 60; attempt++)
+            {
+                int host = surfaceHosts[Random.Range(0, surfaceHosts.Count)];
+                int hd = g.emitDef[host];
+                Transform ht = Map.objects[host].transform;
+                if (Map.props[host] != null && Map.props[host].displaced) continue;
+                if (Vector3.Distance(ht.position, rel) < 6f) continue;
+                float mx = GenData.defSx[hd] / 2000f - half - 0.06f, mz = GenData.defSz[hd] / 2000f - half - 0.06f;
+                if (mx < 0.02f || mz < 0.02f) continue;
+                Vector3 local = new Vector3(Random.Range(-mx, mx), GenData.defTopY[hd] / 1000f, Random.Range(-mz, mz));
+                Vector3 p = ht.position + ht.rotation * local;
+                bool clear = true;
+                for (int e = 0; e < g.nEmit && clear; e++)
+                    if (g.emitParent[e] == host && Vector3.Distance(Map.objects[e].transform.position, p) < half + 0.16f) clear = false;
+                foreach (var h in hiders) if (h != null && h.alive && Vector3.Distance(h.transform.position, p) < half + 0.25f) clear = false;
+                if (!clear) continue;
+                pos = p; yaw = Random.Range(0f, 360f);
+                note = "on a " + HostName(host) + " in the " + RoomNameAt(pos);
+                return true;
+            }
+        }
+        // 3. a floor cell matching the type's anchor, in a room where the type is native if possible
+        //    (a chair with no table to go to stands against a wall)
         int anchor = GenData.defAnchor[def];
+        if (anchor == GenData.A_SLOT_ONLY) anchor = GenData.A_WALL;
         int w = GenData.defW[def], d = GenData.defD[def];
         float sx = GenData.defSx[def] / 1000f, sz = GenData.defSz[def] / 1000f;
         int n = g.IW * g.IH;

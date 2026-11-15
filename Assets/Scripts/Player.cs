@@ -34,6 +34,7 @@ public partial class Player : MonoBehaviour
     MeshRenderer visualRend;
     float stepAccum;
     float shuffleTimer;
+    int captureClickFrame = -1;
 
     // simulated input for the build checks (Game.Cmd)
     float testWalkUntil, testForward, testRight;
@@ -147,6 +148,7 @@ public partial class Player : MonoBehaviour
             if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked)
             {
                 Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false;
+                captureClickFrame = Time.frameCount;   // this click only captures the mouse
             }
             Look();
             if (Input.GetKeyDown(KeyCode.V)) SetThird(!third);

@@ -367,8 +367,18 @@ public partial class MapGen
                         if (roomCovered[room] * 1000 > roomEligible[room] * (GenData.tableDensity[table] * 12 / 10 + 60)) continue;
                         int anchor = GenData.defAnchor[d];
                         int es = GenData.tableEntryStart[table], n = GenData.tableEntryCount[table];
+                        int roomMax = 1;
                         for (int q = es; q < es + n; q++)
-                            if (GenData.entryDef[q] == d && GenData.entryAnchor[q] >= 0) anchor = GenData.entryAnchor[q];
+                            if (GenData.entryDef[q] == d)
+                            {
+                                if (GenData.entryAnchor[q] >= 0) anchor = GenData.entryAnchor[q];
+                                roomMax = EntryMax(q, roomOuterCells[room]);
+                            }
+                        // never more copies in a room than its table allows (no bathroom with four toilets)
+                        int have = 0;
+                        for (int q = 0; q < nEmit; q++)
+                            if (emitDef[q] == d && emitRoom[q] == room && emitParent[q] < 0 && (emitFlags[q] & EF_REMOVED) == 0) have++;
+                        if (have >= roomMax) continue;
                         if (anchor == GenData.A_SLOT_ONLY) anchor = GenData.IsBuilding(roomZone[room]) ? GenData.A_ANY : GenData.A_OUT_OPEN;
                         e = TryPlace(d, room, anchor, EF_QUOTA, ref rng);
                     }
