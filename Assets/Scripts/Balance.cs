@@ -81,7 +81,9 @@ public static class Balance
     public static readonly int[] BotHiders = { 3, 4, 5, 6 };     // hunt mode: bot hiders by map size
     public static readonly int[] BotHunters = { 1, 2, 2, 3 };    // hide mode: bot hunters by map size
     public const float BotHunterSight = 9f;          // how far a bot hunter notices a moving prop
-    public const float BotHunterGuessInterval = 11f;  // seconds between a bot hunter's guesses at still props
+    public const float BotHunterGuessInterval = 30f;  // seconds between a bot hunter's idle guesses at still props on patrol
+    public const int BotHunterIdleGuessHealth = 60;  // no idle guesses at or below this health
+    public const float BotHunterNoiseHit = 0.35f;    // chance that a guess after a taunt picks the hider, if it is in view
     public const float BotHunterAimError = 0.25f;    // metres of aim scatter at 10 m
     public const float BotHiderMoveChance = 0.35f;   // chance that a bot hider relocates after a forced taunt
 

@@ -33,7 +33,7 @@ public class BotHunter : MonoBehaviour
     public void Hear(Vector3 pos)
     {
         if (!alive || state == IDLE) return;
-        noisePos = pos; state = INVESTIGATE; guessesLeft = 2;
+        noisePos = pos; state = INVESTIGATE; guessesLeft = 1;
         GoTo(pos);
     }
 
@@ -168,11 +168,16 @@ public class BotHunter : MonoBehaviour
     void GuessNear(Vector3 centre, float radius, bool afterNoise)
     {
         if (Time.time < nextShot) return;
+        // a guess costs health when it is wrong (G17): no guess that could put this hunter out, and no idle
+        // guesses on patrol once health is low
+        int penalty = Game.I.round.Penalty;
+        if (health <= penalty || (!afterNoise && health <= Balance.BotHunterIdleGuessHealth)) return;
         var pl = Game.I.player;
         int n = Physics.OverlapSphereNonAlloc(centre + Vector3.up * 0.5f, radius, near, (1 << Layers.Prop) | (1 << Layers.Solid) | (1 << Layers.Hider) | (1 << Layers.HiderSolid), QueryTriggerInteraction.Ignore);
         float total = 0f;
         var cands = new List<Vector3>();
         var weights = new List<float>();
+        var hiderAt = new List<int>();
         for (int i = 0; i < n; i++)
         {
             var pi = near[i].GetComponentInParent<PropInstance>();
@@ -181,19 +186,28 @@ public class BotHunter : MonoBehaviour
             if (pi != null && (GenData.defDisguise[pi.def] == 0 || !Game.I.map.gen.menu[pi.def])) continue;   // not a possible disguise
             Vector3 c = near[i].bounds.center;
             if (!Sees(c)) continue;
-            float w = bh != null ? (afterNoise ? 2f : 1f) : 1f;
-            cands.Add(c); weights.Add(w); total += w;
+            if (bh != null) hiderAt.Add(cands.Count);
+            cands.Add(c); weights.Add(1f); total += 1f;
         }
         if (pl.role == Player.ROLE_HIDER && pl.def >= 0)
         {
             Vector3 c = pl.body.Centre;
             if (Vector3.Distance(c, centre) < radius + 0.5f && Sees(c))
             {
-                float w = afterNoise ? 2f : (pl.settled || pl.locked ? 1f : 6f);
+                float w = pl.settled || pl.locked ? 1f : 6f;
+                hiderAt.Add(cands.Count);
                 cands.Add(c); weights.Add(w); total += w;
             }
         }
         if (cands.Count == 0) return;
+        if (afterNoise && hiderAt.Count > 0 && hiderAt.Count < cands.Count)
+        {
+            // the sound gave the place away: the hiders standing there share BotHunterNoiseHit of the guess
+            float props = total;
+            foreach (int i in hiderAt) props -= weights[i];
+            float each = props * Balance.BotHunterNoiseHit / (1f - Balance.BotHunterNoiseHit) / hiderAt.Count;
+            foreach (int i in hiderAt) { total += each - weights[i]; weights[i] = each; }
+        }
         float r = Random.value * total;
         for (int i = 0; i < cands.Count; i++)
         {
