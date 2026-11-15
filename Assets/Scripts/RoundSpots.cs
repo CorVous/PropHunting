@@ -57,7 +57,7 @@ public partial class Round
         if (s.used) return false;
         if (s.type != GenData.S_ADJACENT) return true;
         int c = Map.CellAt(s.pos);
-        return c >= 0 && Map.gen.occ[c] == 0 && Map.gen.walk[c] == 1;
+        return c >= 0 && Map.gen.occ[c] == 0 && Map.gen.walk[c] == 1;   // walk 1: no prop reaches into the cell
     }
 
     // a hider's prop that settles within 0.3 m of an empty socket accepting its type is pinned into it
@@ -150,10 +150,40 @@ public partial class Round
                 return true;
             }
         }
-        // 3. a floor cell matching the type's anchor, in a room where the type is native if possible
-        //    (a chair with no table to go to stands against a wall)
+        // 3. a type that stands in groups joins one (G25): a free cell right next to a real copy of its type or of
+        //    another kind of its prop group, so a hider bucket stands in the row of buckets
+        bool loose = (GenData.defFlags[def] & GenData.FL_LOOSE) != 0;
+        if ((loose || GenData.defKin[def] >= 0) && GenData.defAnchor[def] != GenData.A_SLOT_ONLY)
+        {
+            for (int attempt = 0; attempt < 80; attempt++)
+            {
+                int e = Random.Range(0, g.nEmit);
+                int ed = g.emitDef[e];
+                if (g.emitParent[e] >= 0 || (ed != def && (GenData.defKin[def] < 0 || GenData.defKin[ed] != GenData.defKin[def]))) continue;
+                if (Map.props[e] != null && Map.props[e].displaced) continue;
+                int ex = Mathf.FloorToInt(g.emitX[e] / 500f), ez = Mathf.FloorToInt(g.emitZ[e] / 500f);
+                int k = Random.Range(0, 4);
+                int cx = ex + MapGen.DX[k], cz = ez + MapGen.DZ[k];
+                if (cx < 0 || cz < 0 || cx >= g.IW || cz >= g.IH) continue;
+                int i = cz * g.IW + cx;
+                int room = g.emitRoom[e];
+                if (g.walk[i] != 1 || g.reach[i] == 0 || !RectClear(cx, cz, 1, 1, room, -1)) continue;
+                // close to the real one: a third of the way from the cell's centre towards it
+                Vector3 centre = new Vector3((cx + 0.5f) * 0.5f, 0f, (cz + 0.5f) * 0.5f);
+                Vector3 real = new Vector3(g.emitX[e], 0f, g.emitZ[e]) / 1000f;
+                if (Vector3.Distance(centre, rel) < 6f) continue;
+                pos = Vector3.Lerp(centre, real, 0.3f);
+                if (Vector3.Distance(pos, real) < (GenData.defSx[def] + GenData.defSx[ed]) / 2000f + 0.04f) pos = centre;
+                yaw = g.emitYaw[e] + Random.Range(-8f, 8f);
+                note = "next to a " + HostName(e) + " in the " + RoomNameAt(pos);
+                return true;
+            }
+        }
+        // 4. a floor cell matching the type's anchor, in a room where the type is native if possible
+        //    (a chair with no table to go to stands against a wall). Small loose things and things that stand
+        //    beside others keep to the walls: they never stand alone in the open.
         int anchor = GenData.defAnchor[def];
-        if (anchor == GenData.A_SLOT_ONLY) anchor = GenData.A_WALL;
+        if (anchor == GenData.A_SLOT_ONLY || anchor == GenData.A_BESIDE || anchor == GenData.A_DOOR_SIDE || anchor == GenData.A_BUILDING) anchor = GenData.A_WALL;
         int w = GenData.defW[def], d = GenData.defD[def];
         float sx = GenData.defSx[def] / 1000f, sz = GenData.defSz[def] / 1000f;
         int n = g.IW * g.IH;
@@ -161,7 +191,7 @@ public partial class Round
         {
             int i = Random.Range(0, n);
             int t = g.tags[i];
-            if ((t & GenData.T_FLOOR) == 0 || g.reach[i] == 0 || g.occ[i] != 0) continue;
+            if ((t & GenData.T_FLOOR) == 0 || g.reach[i] == 0 || g.occ[i] != 0 || g.solid[i] != 0) continue;
             int room = g.innerRoom[i];
             if (attempt < 400 && !g.IsNativeRoom(def, room)) continue;
             bool outdoor = (t & GenData.T_OUTDOOR) != 0;
@@ -171,7 +201,7 @@ public partial class Round
             Vector3 centre = new Vector3((cx + 0.5f) * 0.5f, 0f, (cz + 0.5f) * 0.5f);
             if (Vector3.Distance(centre, rel) < 6f) continue;
             int rot, x0, z0, gw, gd;
-            bool wall = (anchor == GenData.A_WALL || anchor == GenData.A_OUT_EDGE || anchor == GenData.A_CORNER) && attempt < 500;
+            bool wall = (anchor == GenData.A_WALL || anchor == GenData.A_OUT_EDGE || anchor == GenData.A_CORNER) && (attempt < 500 || loose);
             int wd = -1;
             if (wall)
             {
@@ -221,7 +251,7 @@ public partial class Round
             {
                 int i = z * g.IW + x;
                 int t = g.tags[i];
-                if ((t & GenData.T_FLOOR) == 0 || g.innerRoom[i] != room || g.occ[i] != 0 || g.reserve[i] != 0) return false;
+                if ((t & GenData.T_FLOOR) == 0 || g.innerRoom[i] != room || g.occ[i] != 0 || g.solid[i] != 0 || g.reserve[i] != 0) return false;
                 if ((t & (GenData.T_DOOR_CLEAR | GenData.T_NO_SPAWN | GenData.T_PATH | GenData.T_SWING)) != 0) return false;
                 if (wallDir >= 0)
                 {

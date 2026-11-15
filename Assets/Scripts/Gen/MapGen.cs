@@ -5,6 +5,10 @@
 //   ->  slots (chairs at tables, settings on top, items on shelves)  ->  wrong-category spawns (leaks)
 //   ->  disguise quotas  ->  validation (reachability, repair, seed re-roll)  ->  emit list
 //
+// Prop rules (owner decisions G24 to G26): every room type has a range of props for its floor area, every type
+// a cap per room, related props stand together as groups, small loose things never stand alone in the open, and
+// every prop is an obstacle for the reachability check.
+//
 // Deterministic: integer maths, flat arrays, its own PRNG with substreams; no UnityEngine, no physics, no time.
 // The same (seed, size, GEN_VERSION) gives the same emit list on every machine. Step() does one small unit
 // of work per call so the caller can spread generation over frames; results do not depend on the slicing.
@@ -14,14 +18,16 @@
 public partial class MapGen
 {
     // ---- stages (also the PRNG substream ids) ----
-    const int ST_LAYOUT = 1, ST_EDGES = 2, ST_ROOM = 3, ST_SLOT = 4, ST_CLUTTER = 5, ST_LEAK = 6, ST_QUOTA = 7, ST_SPAWN = 8, ST_ROOMTYPE = 9;
+    const int ST_LAYOUT = 1, ST_EDGES = 2, ST_ROOM = 3, ST_SLOT = 4, ST_SCENERY = 5, ST_LEAK = 6, ST_QUOTA = 7, ST_SPAWN = 8, ST_ROOMTYPE = 9;
 
     // ---- emit flags ----
-    public const int EF_LEAK = 1, EF_COMEDIC = 2, EF_QUOTA = 4, EF_REMOVED = 8, EF_CLUTTER = 16, EF_INSIDE = 32, EF_ON_TOP = 64, EF_ADJACENT = 128, EF_UNDER = 256;
+    public const int EF_LEAK = 1, EF_COMEDIC = 2, EF_QUOTA = 4, EF_REMOVED = 8, EF_GROUP = 16, EF_INSIDE = 32, EF_ON_TOP = 64, EF_ADJACENT = 128, EF_UNDER = 256;
+    public const int EF_MANDATORY = 512;
 
     // ---- inputs ----
     public uint seed;
     public int size;
+    public int density;          // index into GenData.DensityPercent (0 = Normal); scales the prop ranges, not the layout
     public int attempt;          // seed re-rolls after a failed validation (deterministic)
 
     // ---- outer grid ----
@@ -40,13 +46,19 @@ public partial class MapGen
     public int[] roomCells;      // inner cell indices grouped by room
     public int[] roomDoorStart = new int[400], roomDoorCount = new int[400];
     public int[] roomDoors = new int[3200];      // inner cell just inside each door, 8 per room
-    public int[] roomLeaks = new int[400], roomSlotItems = new int[400], roomCovered = new int[400], roomEligible = new int[400];
+    public int[] roomLeaks = new int[400];
+    // prop counts per room (G24): what stands on the floor, what sits on, in or under furniture, trees; and the
+    // room's rolled floor target, its floor maximum and its on-furniture cap at the map's density
+    public int[] roomFloor = new int[400], roomTop = new int[400], roomTrees = new int[400];
+    public int[] roomFloorTarget = new int[400], roomFloorMax = new int[400], roomTopCap = new int[400], roomTopFactor = new int[400];
+    public int[] roomCoverMax = new int[400];   // floor cells of the room that props and trees may block
 
     // ---- inner grid ----
     public int IW, IH;
     public int[] tags;
     public int[] innerRoom;
     public int[] occ;            // emit index + 1 of the object standing on the cell, 0 = free
+    public int[] solid;          // how many props' real outlines reach into the cell: every prop is an obstacle (G26)
     public int[] flatOcc;        // rugs
     public byte[] reserve;       // 1 = kept clear (front clearance, door swing)
     public byte[] walk;          // after Finish(): 0 no floor, 1 walkable, 2 blocked by a solid prop
@@ -59,6 +71,8 @@ public partial class MapGen
     public int[] emitYaw = new int[MAX_EMIT], emitParent = new int[MAX_EMIT], emitRoom = new int[MAX_EMIT], emitFlags = new int[MAX_EMIT];
     public int[] emitRX = new int[MAX_EMIT], emitRZ = new int[MAX_EMIT], emitRW = new int[MAX_EMIT], emitRD = new int[MAX_EMIT];
     public int[] emitRot = new int[MAX_EMIT], emitDepth = new int[MAX_EMIT], emitSlot = new int[MAX_EMIT];
+    public int[] emitGroup = new int[MAX_EMIT];   // prop group: the emit index of the group's first member, -1 = not in a group
+    public int[] emitGrp = new int[MAX_EMIT];     // which prop group (GenData.grpId index), -1 = none
 
     // free slots and hiding sockets left by the slot pass
     public int nFree;
@@ -78,8 +92,10 @@ public partial class MapGen
 
     // ---- statistics ----
     public int statProps, statScenery, statDecor, statSlotItems, statLeakPlausible, statLeakComedic, statQuotaAdded;
-    public int statRepairs, statGroundCells, statSteps, statMandatoryFail, statClutter;
-    public int[] statZoneCells = new int[8], statZoneRooms = new int[8];
+    public int statRepairs, statGroundCells, statSteps, statMandatoryFail, statGroups, statFloor, statTop, statWalkRejects;
+    public int[] statZoneCells = new int[8], statZoneRooms = new int[8], statZoneFloor = new int[8], statZoneTop = new int[8];
+    // per room type (index = GenData.R_*): rooms, floor cells, floor props, props on furniture
+    public int[] statTypeRooms = new int[64], statTypeCells = new int[64], statTypeFloor = new int[64], statTypeTop = new int[64];
 
     // ---- stepping ----
     int stage, cursor;
@@ -107,9 +123,12 @@ public partial class MapGen
         }
     }
 
-    public void Begin(uint seedValue, int sizeBucket)
+    public void Begin(uint seedValue, int sizeBucket) { Begin(seedValue, sizeBucket, 0); }
+
+    public void Begin(uint seedValue, int sizeBucket, int densityIndex)
     {
         seed = seedValue; size = sizeBucket;
+        density = densityIndex < 0 || densityIndex >= GenData.DensityPercent.Length ? 0 : densityIndex;
         attempt = 0; done = false; failed = false; failReason = "";
         stage = 0; cursor = 0; progressPermille = 0; statSteps = 0;
         W = GenData.SizeGrid[size]; H = W;
@@ -118,15 +137,18 @@ public partial class MapGen
         edgeH = new int[W * (H + 1)]; edgeHOff = new int[W * (H + 1)];
         edgeV = new int[(W + 1) * H]; edgeVOff = new int[(W + 1) * H];
         tags = new int[IW * IH]; innerRoom = new int[IW * IH]; occ = new int[IW * IH]; flatOcc = new int[IW * IH];
+        solid = new int[IW * IH];
         reserve = new byte[IW * IH]; walk = new byte[IW * IH]; reach = new byte[IW * IH];
         roomCells = new int[IW * IH];
         queue = new int[IW * IH]; dist = new int[IW * IH];
         menu = new bool[GenData.nDefs]; defCopies = new int[GenData.nDefs];
     }
 
-    public void RunAll(uint seedValue, int sizeBucket)
+    public void RunAll(uint seedValue, int sizeBucket) { RunAll(seedValue, sizeBucket, 0); }
+
+    public void RunAll(uint seedValue, int sizeBucket, int densityIndex)
     {
-        Begin(seedValue, sizeBucket);
+        Begin(seedValue, sizeBucket, densityIndex);
         while (!Step()) { }
     }
 
@@ -138,7 +160,7 @@ public partial class MapGen
         switch (stage)
         {
             case 0:
-                statRepairs = 0; statMandatoryFail = 0; statClutter = 0; statLeakComedic = 0; statLeakPlausible = 0; statQuotaAdded = 0;
+                statRepairs = 0; statMandatoryFail = 0; statGroups = 0; statWalkRejects = 0; statLeakComedic = 0; statLeakPlausible = 0; statQuotaAdded = 0;
                 if (!Layout()) { Retry("layout"); break; }
                 stage = 1; progressPermille = 80;
                 break;
@@ -190,9 +212,12 @@ public partial class MapGen
         stage = 0; cursor = 0; progressPermille = 0;
     }
 
+    // The layout stages draw from their own version, so the buildings of a seed survive a change of the prop
+    // rules; the density setting is not part of any stream, so it changes how much is placed and nothing else.
     GenRng Rng(int st, int a, int b)
     {
-        return GenRng.Sub(seed, (uint)GenData.GEN_VERSION, st * 16 + attempt, a, b + size * 1000);
+        int version = (st == ST_LAYOUT || st == ST_EDGES || st == ST_ROOMTYPE) ? GenData.LAYOUT_VERSION : GenData.GEN_VERSION;
+        return GenRng.Sub(seed, (uint)version, st * 16 + attempt, a, b + size * 1000);
     }
 
     static int Abs(int v) { return v < 0 ? -v : v; }

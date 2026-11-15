@@ -10,6 +10,7 @@ no credit is required; it is given here with thanks.
 | Pack | Maker | Used for | Items used | Licence | Source |
 |---|---|---|---|---|---|
 | KayKit : Furniture Bits 1.0 (`furniture-bits`) | KayKit (Kay Lousberg) | models | 18 | CC0-1.0 | https://kaylousberg.itch.io/furniture-bits |
+| KayKit - Medieval Hexagon Pack 1.0 (`kaykit-medieval-hexagon`) | KayKit (Kay Lousberg) | models | 2 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-medieval-hexagon |
 | Kenney: Blaster Kit (`kenney-blaster-kit`) | Kenney | models | 2 | CC0-1.0 | https://kenney.nl/assets/blaster-kit |
 | Kenney: Cube Pets (`kenney-cube-pets`) | Kenney | models | 5 | CC0-1.0 | https://kenney.nl/assets/cube-pets |
 | Kenney: Digital Audio (`kenney-digital-audio`) | Kenney | sounds | 12 | CC0-1.0 | https://kenney.nl/assets/digital-audio |
@@ -19,13 +20,14 @@ no credit is required; it is given here with thanks.
 | Kenney: Interface Sounds (`kenney-interface-sounds`) | Kenney | sounds | 18 | CC0-1.0 | https://kenney.nl/assets/interface-sounds |
 | Kenney: Kenney Fonts (`kenney-kenney-fonts`) | Kenney | font | 2 | CC0-1.0 | https://kenney.nl/assets/kenney-fonts |
 | Kenney: Music Jingles (`kenney-music-jingles`) | Kenney | sounds | 9 | CC0-1.0 | https://kenney.nl/assets/music-jingles |
-| Kenney: Nature Kit (`kenney-nature-kit`) | Kenney | models | 37 | CC0-1.0 | https://kenney.nl/assets/nature-kit |
+| Kenney: Nature Kit (`kenney-nature-kit`) | Kenney | models | 46 | CC0-1.0 | https://kenney.nl/assets/nature-kit |
 | Kenney: RPG Audio (`kenney-rpg-audio`) | Kenney | sounds | 6 | CC0-1.0 | https://kenney.nl/assets/rpg-audio |
-| Kenney: Survival Kit (`kenney-survival-kit`) | Kenney | models | 12 | CC0-1.0 | https://kenney.nl/assets/survival-kit |
+| Kenney: Survival Kit (`kenney-survival-kit`) | Kenney | models | 20 | CC0-1.0 | https://kenney.nl/assets/survival-kit |
 | Kenney: Voiceover Pack (`kenney-voiceover-pack`) | Kenney | sounds | 8 | CC0-1.0 | https://kenney.nl/assets/voiceover-pack |
-| KayKit : Prototype Bits 1.1 (`prototype-bits`) | KayKit (Kay Lousberg) | models | 8 | CC0-1.0 | https://kaylousberg.itch.io/prototype-bits |
-| KayKit : Resource Bits 1.0 (`resource-bits`) | KayKit (Kay Lousberg) | models | 15 | CC0-1.0 | https://kaylousberg.itch.io/resource-bits |
-| KayKit : Restaurant Bits 1.0 (`restaurant-bits`) | KayKit (Kay Lousberg) | models | 27 | CC0-1.0 | https://kaylousberg.itch.io/restaurant-bits |
+| KayKit : Prototype Bits 1.1 (`prototype-bits`) | KayKit (Kay Lousberg) | models | 9 | CC0-1.0 | https://kaylousberg.itch.io/prototype-bits |
+| KayKit : Resource Bits 1.0 (`resource-bits`) | KayKit (Kay Lousberg) | models | 20 | CC0-1.0 | https://kaylousberg.itch.io/resource-bits |
+| KayKit : Restaurant Bits 1.0 (`restaurant-bits`) | KayKit (Kay Lousberg) | models | 30 | CC0-1.0 | https://kaylousberg.itch.io/restaurant-bits |
+| KayKit : RPG Tools Bits 1.0 (`rpg-tools-bits`) | KayKit (Kay Lousberg) | models | 1 | CC0-1.0 | https://kaylousberg.itch.io/rpg-tools-bits |
 
 The models were converted from the packs' glTF/GLB files to vertex-coloured meshes by `prototype/tools/convert_models.py`;
 the look is unchanged apart from the flat shading of the prototype's shader. The wardrobe and the warehouse rack are

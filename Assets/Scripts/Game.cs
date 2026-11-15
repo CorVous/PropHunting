@@ -21,6 +21,7 @@ public class Game : MonoBehaviour
     // the host's request (start panel)
     public string seedText = "";
     public int size = 0;
+    public int density = 0;             // GenData.DensityName index: scales the prop ranges (G24), part of the seed code
     public int mode = MODE_EXPLORE;
     public string panelMessage = "";
     public bool remixOffered;
@@ -99,17 +100,34 @@ public class Game : MonoBehaviour
     {
         // the only use of a non-deterministic source: picking a fresh seed
         uint s = (uint)System.DateTime.UtcNow.Ticks ^ ((uint)Random.Range(0, int.MaxValue) * 2654435761u);
-        seedText = SeedCode.Encode(GenData.GEN_VERSION, size, GenRng.Mix(s));
+        seedText = SeedCode.Encode(GenData.GEN_VERSION, size, GenRng.Mix(s), density);
         panelMessage = ""; remixOffered = false;
     }
 
-    // the size buttons re-write the code in the field, because the size is part of it (04 section 6.1)
+    // the size and density buttons re-write the code in the field, because both are part of it (04 section 6.1)
     public void SetSize(int newSize)
     {
         size = newSize;
+        Recode();
+    }
+
+    public void SetDensity(int newDensity)
+    {
+        density = Mathf.Clamp(newDensity, 0, GenData.DensityPercent.Length - 1);
+        Recode();
+    }
+
+    void Recode()
+    {
         int v, sz; uint sd;
         int st = SeedCode.Decode(seedText, GenData.GEN_VERSION, out v, out sz, out sd);
-        if (st == SeedCode.OK) seedText = SeedCode.Encode(GenData.GEN_VERSION, size, sd);
+        if (st == SeedCode.OK) seedText = SeedCode.Encode(GenData.GEN_VERSION, size, sd, density);
+    }
+
+    static int DensityFromFlags(int flags)
+    {
+        int d = flags & SeedCode.DENSITY_MASK;
+        return d < GenData.DensityPercent.Length ? d : 0;
     }
 
     // Reads the seed field. Returns true if a map can be generated from it.
@@ -119,11 +137,12 @@ public class Game : MonoBehaviour
         uint plain;
         if (t.Length > 0 && t.Length <= 10 && uint.TryParse(t, out plain))
         {
-            seed = plain; seedCode = SeedCode.Encode(GenData.GEN_VERSION, size, seed);
+            // a plain number takes the size and the density chosen on the panel
+            seed = plain; seedCode = SeedCode.Encode(GenData.GEN_VERSION, size, seed, density);
             return true;
         }
-        int v, sz; uint sd;
-        int st = SeedCode.Decode(t, GenData.GEN_VERSION, out v, out sz, out sd);
+        int v, sz, fl; uint sd;
+        int st = SeedCode.Decode(t, GenData.GEN_VERSION, out v, out sz, out sd, out fl);
         remixOffered = false;
         if (st == SeedCode.TYPO) { panelMessage = "Typo in the code. A code looks like v" + GenData.GEN_VERSION + "-XXXX-XXXX-XXXX (or type a plain number)."; return false; }
         if (st == SeedCode.NEWER) { panelMessage = "This code needs a newer generator (v" + v + "). This build runs v" + GenData.GEN_VERSION + "."; return false; }
@@ -133,8 +152,8 @@ public class Game : MonoBehaviour
             remixOffered = true;
             return false;
         }
-        seed = sd; size = sz;
-        seedCode = SeedCode.Encode(GenData.GEN_VERSION, size, seed);
+        seed = sd; size = sz; density = DensityFromFlags(fl);
+        seedCode = SeedCode.Encode(GenData.GEN_VERSION, size, seed, density);
         return true;
     }
 
@@ -145,7 +164,7 @@ public class Game : MonoBehaviour
         panelMessage = "";
         round.Stop();
         player.Deactivate();
-        map.Begin(seed, size);
+        map.Begin(seed, size, density);
         state = State.Generating;
         genFrames = 0;
         menuOpen = false;
@@ -176,8 +195,9 @@ public class Game : MonoBehaviour
     public string StatsLine()
     {
         var g = map.gen;
-        return "seed " + seedCode + " size " + GenData.SizeName[g.size] + " hash " + g.mapHash.ToString("X8") + " cells " + g.statGroundCells
-            + " rooms " + g.nRooms + " props " + g.statProps + " scenery " + g.statScenery + " slotItems " + g.statSlotItems
+        return "seed " + seedCode + " size " + GenData.SizeName[g.size] + " density " + GenData.DensityName[g.density] + " hash " + g.mapHash.ToString("X8") + " cells " + g.statGroundCells
+            + " rooms " + g.nRooms + " props " + g.statProps + " floor " + g.statFloor + " onFurniture " + g.statTop + " groups " + g.statGroups
+            + " scenery " + g.statScenery + " slotItems " + g.statSlotItems
             + " leaks " + g.statLeakPlausible + "+" + g.statLeakComedic + " menu " + g.menuCount + " sockets " + g.nSockets
             + " rerolls " + g.attempt + " repairs " + g.statRepairs + " genMs " + map.genMs.ToString("0") + " buildMs " + map.buildMs.ToString("0") + " wallMs " + map.wallMs.ToString("0")
             + " frames " + genFrames + " renderers " + map.rendererCount + " colliders " + map.colliderCount;
@@ -270,6 +290,7 @@ public class Game : MonoBehaviour
             string s = v.ToUpperInvariant();
             for (int i = 0; i < 4; i++) if (GenData.SizeName[i] == s) SetSize(i);
         }
+        if (opts.TryGetValue("density", out v)) SetDensityByName(v);
         if (opts.TryGetValue("mode", out v))
         {
             string m = v.ToLowerInvariant();
@@ -303,7 +324,8 @@ public class Game : MonoBehaviour
                 case "status":
                     r = "state " + state + " mode " + mode + " " + (map.built ? StatsLine() : map.phase) + " | " + player.StatusLine() + " | " + round.StatusLine() + " fps " + fps.ToString("0.0");
                     break;
-                case "generate": seedText = a[1]; if (a.Length > 2) SetSizeByName(a[2]); if (a.Length > 3) mode = int.Parse(a[3]); Generate(true); break;
+                case "generate": seedText = a[1]; if (a.Length > 2) SetSizeByName(a[2]); if (a.Length > 3) mode = int.Parse(a[3]); if (a.Length > 4) SetDensityByName(a[4]); Generate(true); break;
+                case "rooms": r = RoomStats(); break;
                 case "top": SetTopView(a.Length < 2 || a[1] != "0"); break;
                 case "frame": SetTopView(true); FrameTop(float.Parse(a[1]), float.Parse(a[2]), float.Parse(a[3])); break;
                 case "tp": player.Teleport(new Vector3(float.Parse(a[1]), a.Length > 3 ? float.Parse(a[3]) : 0.05f, float.Parse(a[2]))); break;
@@ -332,5 +354,30 @@ public class Game : MonoBehaviour
     void SetSizeByName(string s)
     {
         for (int i = 0; i < 4; i++) if (GenData.SizeName[i] == s.ToUpperInvariant()) size = i;
+    }
+
+    // "sparse", "very dense", "verydense", an index 0 to 4 in panel order, or a percentage such as 70
+    void SetDensityByName(string s)
+    {
+        string t = s.ToLowerInvariant().Replace(" ", "").Replace("-", "").Replace("_", "");
+        for (int i = 0; i < GenData.DensityName.Length; i++)
+        {
+            if (GenData.DensityName[i].ToLowerInvariant().Replace(" ", "") == t || GenData.DensityPercent[i].ToString() == t) { SetDensity(i); return; }
+        }
+        int n;
+        if (int.TryParse(t, out n) && n >= 0 && n < GenData.DensityOrder.Length) SetDensity(GenData.DensityOrder[n]);
+    }
+
+    // per room type: rooms, floor area, props on the floor and on furniture (for the build checks)
+    public string RoomStats()
+    {
+        var g = map.gen;
+        var sb = new System.Text.StringBuilder();
+        for (int t = 0; t < 64; t++)
+        {
+            if (g.statTypeRooms[t] == 0 || t == GenData.R_RELEASE) continue;
+            sb.Append(GenData.RoomName(t) + ": " + g.statTypeRooms[t] + " rooms " + g.statTypeCells[t] / 4 + " m2 floor " + g.statTypeFloor[t] + " furniture " + g.statTypeTop[t] + " | ");
+        }
+        return sb.ToString();
     }
 }

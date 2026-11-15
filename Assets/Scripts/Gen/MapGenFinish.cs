@@ -17,13 +17,14 @@ public partial class MapGen
         return along >= off && along < off + GenData.DOOR_CELLS;
     }
 
+    // Every prop is an obstacle, whatever its size (G26): a cell is blocked when any prop's real outline
+    // reaches more than 5 cm into it (MapGen.Account). Rugs and grass do not count.
     public bool SolidAt(int i)
     {
-        int o = occ[i];
-        return o > 0 && Has(emitDef[o - 1], GenData.FL_SOLID) && (emitFlags[o - 1] & EF_REMOVED) == 0;
+        return solid[i] > 0;
     }
 
-    // flood fill over inner cells from the hunter release; solid props block, small loose props do not
+    // flood fill over inner cells from the hunter release
     void Flood()
     {
         int n = IW * IH;
@@ -45,8 +46,11 @@ public partial class MapGen
         }
     }
 
-    // Pass: at least 60% of every room's free cells are reachable. Repair: remove the last solid object of the
-    // room and re-run, up to 10 times; then the seed is re-rolled (attempt + 1, still deterministic).
+    // Pass: in every room no more free cells are unreachable from the hunter release than a room may have sealed
+    // off (SealedAllowance). Every placement has already kept its own room walkable (RoomWalkable), so this
+    // only fails when rooms do not connect. Repair: remove the last object placed on the
+    // room's floor that is not one of its mandatory pieces (a whole group at once), else the last mandatory one,
+    // and re-run, up to 10 times; then the seed is re-rolled (attempt + 1, still deterministic).
     bool Validate()
     {
         for (int repair = 0; repair <= 10; repair++)
@@ -63,16 +67,18 @@ public partial class MapGen
                     free++;
                     if (reach[i] != 0) ok++;
                 }
-                if (free > 0 && ok * 100 < free * 60) bad = r;
+                if (free - ok > SealedAllowance(r)) bad = r;
             }
             if (bad < 0) return true;
             int victim = -1;
-            for (int e = nEmit - 1; e >= 0; e--)
-            {
-                if (emitRoom[e] != bad || emitParent[e] >= 0 || (emitFlags[e] & EF_REMOVED) != 0) continue;
-                if (!Has(emitDef[e], GenData.FL_SOLID)) continue;
-                victim = e; break;
-            }
+            for (int pass = 0; pass < 2 && victim < 0; pass++)
+                for (int e = nEmit - 1; e >= 0 && victim < 0; e--)
+                {
+                    if (emitRoom[e] != bad || emitParent[e] >= 0 || (emitFlags[e] & EF_REMOVED) != 0) continue;
+                    if (Has(emitDef[e], GenData.FL_FLAT) || Has(emitDef[e], GenData.FL_DECOR)) continue;
+                    if (pass == 0 && (emitFlags[e] & EF_MANDATORY) != 0) continue;
+                    victim = e;
+                }
             if (victim < 0) return false;
             Remove(victim);
             statRepairs++;
@@ -80,8 +86,22 @@ public partial class MapGen
         return false;
     }
 
+    // a member of a prop group takes the whole group with it
     void Remove(int e)
     {
+        if ((emitFlags[e] & EF_REMOVED) != 0) return;
+        int g = emitGroup[e];
+        if (g >= 0 && g != e) { Remove(g); return; }
+        RemoveOne(e);
+        if (g == e)
+            for (int c = e + 1; c < nEmit; c++)
+                if (emitGroup[c] == e) RemoveOne(c);
+    }
+
+    void RemoveOne(int e)
+    {
+        if ((emitFlags[e] & EF_REMOVED) != 0) return;
+        Account(e, -1);
         emitFlags[e] |= EF_REMOVED;
         for (int z = emitRZ[e]; z < emitRZ[e] + emitRD[e]; z++)
             for (int x = emitRX[e]; x < emitRX[e] + emitRW[e]; x++)
@@ -110,16 +130,28 @@ public partial class MapGen
                 emitParent[m] = emitParent[e]; emitRoom[m] = emitRoom[e]; emitFlags[m] = emitFlags[e];
                 emitRX[m] = emitRX[e]; emitRZ[m] = emitRZ[e]; emitRW[m] = emitRW[e]; emitRD[m] = emitRD[e];
                 emitRot[m] = emitRot[e]; emitDepth[m] = emitDepth[e]; emitSlot[m] = emitSlot[e];
+                emitGroup[m] = emitGroup[e]; emitGrp[m] = emitGrp[e];
             }
             m++;
         }
-        for (int e = 0; e < m; e++) if (emitParent[e] >= 0) emitParent[e] = remap[emitParent[e]];
+        for (int e = 0; e < m; e++)
+        {
+            if (emitParent[e] >= 0) emitParent[e] = remap[emitParent[e]];
+            if (emitGroup[e] >= 0) emitGroup[e] = remap[emitGroup[e]];
+        }
         int n = IW * IH;
         for (int i = 0; i < n; i++)
         {
             if (occ[i] > 0) occ[i] = remap[occ[i] - 1] + 1;
             if (flatOcc[i] > 0) flatOcc[i] = remap[flatOcc[i] - 1] + 1;
         }
+        int nf = 0;
+        for (int k = 0; k < nFree; k++)
+        {
+            int h = freeHost[k] < 0 ? -1 : remap[freeHost[k]];
+            if (h >= 0) { freeHost[nf] = h; freeSlot[nf] = freeSlot[k]; nf++; }
+        }
+        nFree = nf;
         int ns = 0;
         for (int k = 0; k < nSockets; k++)
         {
@@ -132,10 +164,11 @@ public partial class MapGen
         // quota recount after repairs, so the menu is exact
         for (int d = 0; d < GenData.nDefs; d++) defCopies[d] = 0;
         for (int e = 0; e < nEmit; e++) defCopies[emitDef[e]]++;
+        CountKin();
         menuCount = 0;
         for (int d = 0; d < GenData.nDefs; d++)
         {
-            if (menu[d] && defCopies[d] < GenData.defMinCopies[d]) menu[d] = false;
+            if (menu[d] && (defCopies[d] == 0 || Copies(d) < Need(d, 0))) menu[d] = false;
             if (menu[d]) menuCount++;
         }
 
@@ -150,7 +183,7 @@ public partial class MapGen
         for (int i = 0; i < n; i++)
         {
             bool keep = (rng.NextU() & 7) == 0;   // thin out evenly
-            if (reach[i] == 0 || occ[i] != 0 || !keep || nc >= cand.Length) continue;
+            if (reach[i] == 0 || occ[i] != 0 || solid[i] != 0 || !keep || nc >= cand.Length) continue;
             if ((tags[i] & (GenData.T_NO_SPAWN | GenData.T_DOOR_CLEAR)) != 0) continue;
             int dx = i % IW - rx, dz = i / IW - rz;
             if (dx * dx + dz * dz < 12 * 12) continue;
@@ -160,14 +193,25 @@ public partial class MapGen
         nSpawns = nc < spawnCell.Length ? nc : spawnCell.Length;
         for (int k = 0; k < nSpawns; k++) spawnCell[k] = cand[k];
 
-        statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0;
+        // counts for the statistics and the tuning overlay (G24): floor and on-furniture props per room type and zone
+        statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0;
+        for (int i = 0; i < 64; i++) { statTypeRooms[i] = 0; statTypeCells[i] = 0; statTypeFloor[i] = 0; statTypeTop[i] = 0; }
+        for (int i = 0; i < 8; i++) { statZoneFloor[i] = 0; statZoneTop[i] = 0; }
+        for (int r = 0; r < nRooms; r++)
+        {
+            int t = roomType[r] & 63;
+            statTypeRooms[t]++; statTypeCells[t] += roomCellCount[r];
+        }
         for (int e = 0; e < nEmit; e++)
         {
             int d = emitDef[e];
-            if (Has(d, GenData.FL_DECOR)) statDecor++;
-            else if (Has(d, GenData.FL_SCENERY)) statScenery++;
-            else statProps++;
+            if (Has(d, GenData.FL_DECOR)) { statDecor++; continue; }
+            if (Has(d, GenData.FL_SCENERY)) { statScenery++; continue; }
+            statProps++;
             if (emitParent[e] >= 0) statSlotItems++;
+            int r = emitRoom[e], t = roomType[r] & 63, z = roomZone[r] & 7;
+            if (OnFloor(e)) { statFloor++; statTypeFloor[t]++; statZoneFloor[z]++; }
+            else { statTop++; statTypeTop[t]++; statZoneTop[z]++; }
         }
 
         // FNV-1a over everything that defines the map: the golden-seed hash of 04 section 6.3
@@ -183,6 +227,89 @@ public partial class MapGen
             h2 = Fnv(h2, emitYaw[e]); h2 = Fnv(h2, emitParent[e]); h2 = Fnv(h2, emitFlags[e]);
         }
         mapHash = h2;
+    }
+
+    // =====================================================================================================
+    // Walkways (G26): with every prop solid, each placement has to leave its room walkable
+    // =====================================================================================================
+    int walkStamp = 1 << 20;
+    int walkBlocked;   // blocked cells of the room at the last RoomWalkable call
+
+    // free cells of a room that may be cut off from the rest in all
+    public int SealedAllowance(int room)
+    {
+        int a = roomCellCount[room] * GenData.SEALED_SHARE / 100;
+        return a > GenData.SEALED_POCKET ? a : GenData.SEALED_POCKET;
+    }
+
+    // Is the room's free floor still in one piece? Checked from a doorway cell (or any free cell outdoors) over
+    // the cells no prop reaches into. Small sealed pockets are allowed (the corner behind a plant, the gap
+    // between a campfire and its seats): none larger than SEALED_POCKET cells, and SealedAllowance in all.
+    bool RoomWalkable(int room)
+    {
+        int s = roomCellStart[room], n = roomCellCount[room];
+        int start = -1, free = 0;
+        for (int k = s; k < s + n; k++)
+        {
+            int i = roomCells[k];
+            if (solid[i] > 0) continue;
+            free++;
+            if (start < 0 || ((tags[i] & GenData.T_DOOR_CLEAR) != 0 && (tags[start] & GenData.T_DOOR_CLEAR) == 0)) start = i;
+        }
+        walkBlocked = n - free;
+        if (start < 0) return false;
+        walkStamp++;
+        int seen = FloodRoom(room, start);
+        if (seen == free) return true;
+        if (free - seen > SealedAllowance(room)) return false;
+        for (int k = s; k < s + n; k++)
+        {
+            int i = roomCells[k];
+            if (solid[i] > 0 || dist[i] == walkStamp) continue;
+            if (FloodRoom(room, i) > GenData.SEALED_POCKET) return false;
+        }
+        return true;
+    }
+
+    // marks the free cells of the room connected to `start` with walkStamp; returns how many
+    int FloodRoom(int room, int start)
+    {
+        int qh = 0, qt = 0;
+        dist[start] = walkStamp; queue[qt++] = start;
+        while (qh < qt)
+        {
+            int i = queue[qh++];
+            int ix = i % IW, iz = i / IW;
+            for (int d = 0; d < 4; d++)
+            {
+                int jx = ix + DX[d], jz = iz + DZ[d];
+                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
+                int j = jz * IW + jx;
+                if (innerRoom[j] != room || solid[j] > 0 || dist[j] == walkStamp) continue;
+                dist[j] = walkStamp; queue[qt++] = j;
+            }
+        }
+        return qt;
+    }
+
+    // Keeps what was placed since emit index `first` if the room is still walkable and, unless the piece is
+    // exempt (mandatory pieces and wrong-category spawns), not blocked beyond its cover. If not, the chairs and
+    // seats that came with a new host are given up one by one, last first; if that does not help, everything
+    // placed since `first` is taken away again.
+    bool KeepIfWalkable(int room, int first, bool exempt)
+    {
+        if (RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room])) return true;
+        for (int c = nEmit - 1; c > first; c--)
+        {
+            if (emitParent[c] < first || (emitFlags[c] & EF_REMOVED) != 0) continue;
+            Remove(c);
+            if (RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room])) return true;
+        }
+        for (int e = first; e < nEmit; e++)
+            if (emitParent[e] < 0) Remove(e);
+        statWalkRejects++;
+        RoomWalkable(room);   // walkBlocked is the room's again, without what was taken away
+        return false;
     }
 
     static uint Fnv(uint h, int v)

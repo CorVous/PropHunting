@@ -40,7 +40,7 @@ public class BotHider : MonoBehaviour
         gameObject.AddComponent<MeshFilter>().sharedMesh = ModelLibrary.mesh[GenData.defModel[def]];
         gameObject.AddComponent<MeshRenderer>().sharedMaterial = ModelLibrary.lit;
         PropColliders.Build(gameObject, def);
-        gameObject.layer = (GenData.defFlags[def] & GenData.FL_SOLID) != 0 ? Layers.HiderSolid : Layers.Hider;
+        gameObject.layer = Layers.HiderSolid;   // as solid as the real prop, whatever its size (G26)
         lastSeenPos = pos;
     }
 
@@ -95,7 +95,7 @@ public class BotHider : MonoBehaviour
                 moving = false;
                 transform.position = finalPos;
                 if (hasYawTarget) transform.rotation = Quaternion.Euler(0f, yawTarget, 0f);
-                gameObject.layer = (GenData.defFlags[def] & GenData.FL_SOLID) != 0 ? Layers.HiderSolid : Layers.Hider;
+                gameObject.layer = Layers.HiderSolid;
             }
         }
     }

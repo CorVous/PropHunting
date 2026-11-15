@@ -1,6 +1,9 @@
-// MapGen, part 3: placing objects in rooms from the spawn tables (04 section 4.3.3).
+// MapGen, part 3: placing objects in rooms from the spawn tables (04 section 4.3.3), up to each room type's
+// range of props (G24). MapGenGroups.cs places prop groups and things that stand beside other things (G25).
 public partial class MapGen
 {
+    const int SOLID_TOL = 50;   // mm a prop may reach into a cell and leave it walkable (the walking body is 0.4 m, a cell 0.5 m)
+
     int Emit(int def, int x, int y, int z, int yaw, int parent, int room, int flags)
     {
         if (nEmit >= MAX_EMIT) return -1;
@@ -9,16 +12,77 @@ public partial class MapGen
         emitYaw[e] = ((yaw % 360) + 360) % 360;
         emitParent[e] = parent; emitRoom[e] = room; emitFlags[e] = flags;
         emitRX[e] = 0; emitRZ[e] = 0; emitRW[e] = 0; emitRD[e] = 0; emitRot[e] = 0; emitSlot[e] = -1;
+        emitGroup[e] = -1; emitGrp[e] = -1;
         emitDepth[e] = parent < 0 ? 0 : emitDepth[parent] + 1;
         return e;
     }
 
+    // what stands on the floor: placed objects, chairs and seats next to their host, rugs under a table
+    public bool OnFloor(int e)
+    {
+        return emitParent[e] < 0 || (emitFlags[e] & (EF_ADJACENT | EF_UNDER)) != 0;
+    }
+
+    // half the size of the def's outline along x and z when turned by yaw (a tree counts as its trunk)
+    void HalfExtents(int def, int yaw, out int hx, out int hz)
+    {
+        if (Has(def, GenData.FL_SCENERY)) { hx = 220; hz = 220; return; }
+        int a = ((yaw % 360) + 360) % 360;
+        int sn = Abs(sinTab[a]), cs = Abs(sinTab[(a + 90) % 360]);
+        int sx = GenData.defSx[def], sz = GenData.defSz[def];
+        hx = (sx * cs + sz * sn) / 8192;
+        hz = (sx * sn + sz * cs) / 8192;
+    }
+
+    // Every object passes through here when it is placed (+1) and when a repair removes it (-1): the room's
+    // counts, and the cells its real outline reaches into. Those cells are obstacles for the reachability
+    // check and for bots, whatever the size of the prop (G26).
+    void Account(int e, int sign)
+    {
+        int def = emitDef[e], room = emitRoom[e];
+        if (Has(def, GenData.FL_DECOR)) return;
+        bool floor = OnFloor(e);
+        if (Has(def, GenData.FL_SCENERY)) roomTrees[room] += sign;
+        else if (floor) roomFloor[room] += sign;
+        else roomTop[room] += sign;
+        if (!floor || Has(def, GenData.FL_FLAT)) return;   // rugs are walked over
+        // the cells the turned outline reaches into by more than the tolerance: the cell's centre lies inside
+        // the outline grown by half a cell less the tolerance
+        int hx, hz;
+        HalfExtents(def, emitYaw[e], out hx, out hz);
+        int x0 = FloorDiv(emitX[e] - hx, GenData.INNER_MM), x1 = FloorDiv(emitX[e] + hx, GenData.INNER_MM);
+        int z0 = FloorDiv(emitZ[e] - hz, GenData.INNER_MM), z1 = FloorDiv(emitZ[e] + hz, GenData.INNER_MM);
+        bool tree = Has(def, GenData.FL_SCENERY);
+        int grow = GenData.INNER_MM / 2 - SOLID_TOL;
+        int lim_x = (tree ? 220 : GenData.defSx[def] / 2) + grow, lim_z = (tree ? 220 : GenData.defSz[def] / 2) + grow;
+        int a = emitYaw[e], sn = sinTab[a], cs = sinTab[(a + 90) % 360];
+        int marked = 0;
+        for (int z = z0; z <= z1; z++)
+            for (int x = x0; x <= x1; x++)
+            {
+                if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
+                int dx = x * GenData.INNER_MM + GenData.INNER_MM / 2 - emitX[e], dz = z * GenData.INNER_MM + GenData.INNER_MM / 2 - emitZ[e];
+                int lx = (dx * cs - dz * sn) / 4096, lz = (dx * sn + dz * cs) / 4096;
+                if (Abs(lx) > lim_x || Abs(lz) > lim_z) continue;
+                solid[z * IW + x] += sign;
+                marked++;
+            }
+        if (marked == 0)
+        {
+            // smaller than the tolerance: it still takes its own cell
+            int cx = FloorDiv(emitX[e], GenData.INNER_MM), cz = FloorDiv(emitZ[e], GenData.INNER_MM);
+            if (cx >= 0 && cz >= 0 && cx < IW && cz < IH) solid[cz * IW + cx] += sign;
+        }
+    }
+
     // every cell of the rectangle is free floor of this room
-    bool RectFree(int x0, int z0, int gw, int gd, int room, int def)
+    bool RectFree(int x0, int z0, int gw, int gd, int room, int def) { return RectFree(x0, z0, gw, gd, room, def, -1); }
+
+    // ignore: an emit whose own cells count as free (the host a group stands right next to)
+    bool RectFree(int x0, int z0, int gw, int gd, int room, int def, int ignore)
     {
         if (x0 < 0 || z0 < 0 || x0 + gw > IW || z0 + gd > IH) return false;
         bool flat = Has(def, GenData.FL_FLAT);
-        bool small = gw == 1 && gd == 1 && !Has(def, GenData.FL_SOLID);
         for (int z = z0; z < z0 + gd; z++)
             for (int x = x0; x < x0 + gw; x++)
             {
@@ -28,9 +92,9 @@ public partial class MapGen
                 if ((t & (GenData.T_BLOCKED | GenData.T_NO_SPAWN)) != 0) return false;
                 if (flat) { if (flatOcc[i] != 0) return false; continue; }
                 if ((t & (GenData.T_DOOR_CLEAR | GenData.T_SWING)) != 0) return false;
-                if (occ[i] != 0 || reserve[i] != 0) return false;
-                // only low or small items go on PATH
-                if ((t & GenData.T_PATH) != 0 && !small) return false;
+                if ((occ[i] != 0 && occ[i] != ignore + 1) || reserve[i] != 0) return false;
+                // nothing stands on PATH: every prop is solid now, so the walkway between a room's doors stays clear
+                if ((t & GenData.T_PATH) != 0) return false;
             }
         return true;
     }
@@ -120,6 +184,7 @@ public partial class MapGen
         int e = Emit(def, px, 0, pz, yaw, -1, room, flags);
         if (e < 0) return -1;
         emitRX[e] = x0; emitRZ[e] = z0; emitRW[e] = gw; emitRD[e] = gd; emitRot[e] = rot;
+        Account(e, 1);
         bool flat = Has(def, GenData.FL_FLAT);
         bool decor = Has(def, GenData.FL_DECOR);
         for (int z = z0; z < z0 + gd; z++)
@@ -128,13 +193,35 @@ public partial class MapGen
                 if (flat) flatOcc[z * IW + x] = e + 1;
                 else if (!decor) occ[z * IW + x] = e + 1;
             }
-        if (!flat && !decor) roomCovered[room] += gw * gd;
         int clear = GenData.defClear[def];
         if (clear > 0) ReserveFront(x0, z0, gw, gd, rot, clear, Has(def, GenData.FL_OPENABLE));
         return e;
     }
 
     int Jitter(ref GenRng rng, int range) { return range <= 0 ? 0 : rng.Between(-range, range); }
+
+    // the tag a cell needs for an anchor
+    static int NeedTags(int anchor)
+    {
+        switch (anchor)
+        {
+            case GenData.A_WALL: return GenData.T_WALL_ANY;
+            case GenData.A_OUT_EDGE: return GenData.T_EDGE_OUTDOOR;
+            case GenData.A_DOOR_SIDE: return GenData.T_DOOR_SIDE;
+            case GenData.A_BUILDING: return GenData.T_BY_BUILDING;
+            case GenData.A_CORNER: return GenData.T_CORNER;
+            case GenData.A_CENTER: return GenData.T_CENTER;
+            case GenData.A_SOFT: return GenData.T_SOFT_GROUND;
+            case GenData.A_COVERED: return GenData.T_COVERED;
+        }
+        return GenData.T_FLOOR;
+    }
+
+    // anchors where the object's back stands against a wall, a fence or a building
+    static bool WallAnchor(int anchor)
+    {
+        return anchor == GenData.A_WALL || anchor == GenData.A_OUT_EDGE || anchor == GenData.A_DOOR_SIDE || anchor == GenData.A_BUILDING || anchor == GenData.A_CORNER;
+    }
 
     // 04 section 4.3.3 tryPlace: up to 24 shuffled cells matching the anchor. Returns the emit index or -1.
     int TryPlace(int def, int room, int anchor, int flags, ref GenRng rng)
@@ -145,17 +232,8 @@ public partial class MapGen
         bool flatDef = Has(def, GenData.FL_FLAT) || Has(def, GenData.FL_DECOR);
         bool fixture = Has(def, GenData.FL_FIXTURE) && anchor == GenData.A_WALL;
         int s = roomCellStart[room], n = roomCellCount[room];
-        int need;
-        switch (anchor)
-        {
-            case GenData.A_WALL: need = GenData.T_WALL_ANY; break;
-            case GenData.A_OUT_EDGE: need = GenData.T_EDGE_OUTDOOR; break;
-            case GenData.A_CORNER: need = GenData.T_CORNER; break;
-            case GenData.A_CENTER: need = GenData.T_CENTER; break;
-            case GenData.A_SOFT: need = GenData.T_SOFT_GROUND; break;
-            case GenData.A_COVERED: need = GenData.T_COVERED; break;
-            default: need = GenData.T_FLOOR; break;
-        }
+        int need = NeedTags(anchor);
+        bool wallAnchor = WallAnchor(anchor) && anchor != GenData.A_CORNER;
         int nc = 0;
         for (int k = s; k < s + n && nc < cand.Length; k++)
         {
@@ -190,7 +268,7 @@ public partial class MapGen
         for (int k = 0; k < tries; k++)
         {
             int i = cand[k], cx = i % IW, cz = i / IW, t = tags[i];
-            if (anchor == GenData.A_WALL || anchor == GenData.A_OUT_EDGE)
+            if (wallAnchor)
             {
                 int d0 = rng.Range(4);
                 for (int di = 0; di < 4; di++)
@@ -281,15 +359,27 @@ public partial class MapGen
                 else rot = r4;
                 int gw = (rot & 1) == 0 ? w : d, gd = (rot & 1) == 0 ? d : w;
                 int x0 = anchor == GenData.A_CENTER ? cx - gw / 2 : cx, z0 = anchor == GenData.A_CENTER ? cz - gd / 2 : cz;
+                int px = (2 * x0 + gw) * GenData.INNER_MM / 2, pz = (2 * z0 + gd) * GenData.INNER_MM / 2;
+                int jr = GenData.defJitPos[def] * 10;
+                px += Jitter(ref rng, jr); pz += Jitter(ref rng, jr);
+                int yaw = rot * 90 + Jitter(ref rng, GenData.defJitYaw[def]);
+                if (!flatDef)
+                {
+                    // the cells the object really covers once it is turned and shifted, so that a turned tent
+                    // or log never reaches through a wall or into the next room
+                    int hx, hz;
+                    HalfExtents(def, yaw, out hx, out hz);
+                    x0 = FloorDiv(px - hx + SOLID_TOL, GenData.INNER_MM); z0 = FloorDiv(pz - hz + SOLID_TOL, GenData.INNER_MM);
+                    int x1 = FloorDiv(px + hx - SOLID_TOL - 1, GenData.INNER_MM), z1 = FloorDiv(pz + hz - SOLID_TOL - 1, GenData.INNER_MM);
+                    if (x1 < x0) { x0 = FloorDiv(px, GenData.INNER_MM); x1 = x0; }
+                    if (z1 < z0) { z0 = FloorDiv(pz, GenData.INNER_MM); z1 = z0; }
+                    gw = x1 - x0 + 1; gd = z1 - z0 + 1;
+                }
                 if (!RectFree(x0, z0, gw, gd, room, def)) continue;
                 if (HasChairSlots(def) && !RingFree(x0, z0, gw, gd, room)) continue;
                 int clear = GenData.defClear[def];
                 if (clear > 0 && !FrontFree(x0, z0, gw, gd, rot, clear)) continue;
                 if (!SpacingOk(def, x0, z0)) continue;
-                int px = (2 * x0 + gw) * GenData.INNER_MM / 2, pz = (2 * z0 + gd) * GenData.INNER_MM / 2;
-                int jr = GenData.defJitPos[def] * 10;
-                px += Jitter(ref rng, jr); pz += Jitter(ref rng, jr);
-                int yaw = rot * 90 + Jitter(ref rng, GenData.defJitYaw[def]);
                 return StampObject(def, room, x0, z0, gw, gd, rot, px, pz, yaw, flags);
             }
         }
@@ -302,7 +392,10 @@ public partial class MapGen
         int placed = 0;
         int alongWalls = rng.Between(2, 4);
         for (int i = 0; i < alongWalls && placed < max; i++)
-            if (TryPlace(def, room, GenData.A_WALL, 0, ref rng) >= 0) placed++;
+        {
+            int first = nEmit;
+            if (TryPlace(def, room, GenData.A_WALL, 0, ref rng) >= 0 && KeepIfWalkable(room, first, false)) placed++;
+        }
         int x0 = roomX0[room], z0 = roomZ0[room], x1 = roomX1[room], z1 = roomZ1[room];
         bool alongX = (x1 - x0) >= (z1 - z0);
         int len = GenData.defW[def];
@@ -320,7 +413,9 @@ public partial class MapGen
                 if (!RectFree(rx, rz, gw, gd, room, def)) { inRow = 0; continue; }
                 int rot = alongX ? ((row & 1) == 0 ? 0 : 2) : ((row & 1) == 0 ? 1 : 3);
                 int px = (2 * rx + gw) * GenData.INNER_MM / 2, pz = (2 * rz + gd) * GenData.INNER_MM / 2;
+                int first = nEmit;
                 StampObject(def, room, rx, rz, gw, gd, rot, px, pz, rot * 90, 0);
+                if (!KeepIfWalkable(room, first, false)) { inRow = 0; continue; }
                 placed++; inRow++;
             }
         }
@@ -329,33 +424,147 @@ public partial class MapGen
 
     int rackDefCache = -1;
 
-    int EntryMax(int e, int cellsScale)
+    // A cap written for a 16 m2 room, for this room: larger rooms hold more, and a density above Normal loosens
+    // the caps that allow more than one, so the higher floor targets can be met.
+    public int ScaledCap(int cap, int room)
     {
-        // rooms of several outer cells take proportionally more of the entries that allow more than one
-        int max = GenData.entryMax[e];
-        return (max > 1 && cellsScale > 2) ? max * ((cellsScale + 1) / 2) : max;
+        int c = cap * (3 + roomOuterCells[room]) / 4;
+        int pct = GenData.DensityPercent[density];
+        if (cap > 1 && pct > 100) c = (c * pct + 50) / 100;
+        return c < 1 ? 1 : c;
+    }
+
+    // the cap of a table entry in this room; one-of-a-kind pieces (one table, one bed, one sofa) never scale
+    int EntryCap(int e, int room)
+    {
+        return GenData.entryGroup[e] > 0 ? GenData.entryMax[e] : ScaledCap(GenData.entryMax[e], room);
+    }
+
+    // a number per 100 m2 of the range table, for this room's floor area (4 inner cells are 1 m2)
+    int PerArea(int per100, int room, bool scaled)
+    {
+        int pct = scaled ? GenData.DensityPercent[density] : 100;
+        return (per100 * roomCellCount[room] * pct + 20000) / 40000;
+    }
+
+    // copies of a type standing on the floor of a room
+    int CountInRoom(int def, int room)
+    {
+        int n = 0;
+        for (int e = roomEmitStart[room]; e < nEmit; e++)
+            if (emitDef[e] == def && emitRoom[e] == room && (emitFlags[e] & EF_REMOVED) == 0 && OnFloor(e)) n++;
+        return n;
+    }
+
+    int[] roomEmitStart = new int[400];   // every emit of a room has an index at or above this
+
+    // floor props an entry adds at least: a host brings its chairs, a group its smallest size
+    int UnitSize(int e)
+    {
+        int g = GenData.entryGrp[e];
+        if (g >= 0) return GenData.grpMin[g];
+        int def = GenData.entryDef[e], n = 1;
+        for (int i = GenData.defSlotStart[def]; i < GenData.defSlotStart[def] + GenData.defSlotCount[def]; i++)
+            if (GenData.slotType[i] == GenData.S_ADJACENT) n++;
+        return n;
+    }
+
+    static bool SceneryOrDecor(int def)
+    {
+        return (GenData.defFlags[def] & (GenData.FL_SCENERY | GenData.FL_DECOR)) != 0;
+    }
+
+    // Places one single def by its "where" rule. Returns the emit index or -1.
+    int PlaceSingle(int def, int room, int anchor, int flags, ref GenRng rng)
+    {
+        if (anchor == GenData.A_SLOT_ONLY) anchor = GenData.A_WALL;
+        // a small loose thing on its own keeps to a wall, a fence or a neighbour, whatever its table says (G25)
+        if (Has(def, GenData.FL_LOOSE) && !WallAnchor(anchor) && anchor != GenData.A_BESIDE) anchor = GenData.A_WALL;
+        if (anchor == GenData.A_BESIDE)
+        {
+            fN = 1; fDef[0] = def;
+            int e = PlaceFormationBeside(GenData.GL_ROW, 0, GenData.defBeside[def], room, flags, -1, ref rng);
+            if (e >= 0) return e;
+            anchor = GenData.A_WALL;   // nothing to stand beside: a wall or the fence, never alone in the open
+        }
+        return TryPlace(def, room, anchor, flags, ref rng);
+    }
+
+    // Places entry i of the room's table: a single def or a prop group of at most `room for` members.
+    // Chairs and seats of a new host are placed at once, because they stand on the floor and count there.
+    // Returns how many floor props were added (0 = no place found).
+    int PlaceEntry(int e, int room, int flags, int roomFor, ref GenRng rng)
+    {
+        int before = roomFloor[room], first = nEmit;
+        int g = GenData.entryGrp[e];
+        bool ok;
+        if (g >= 0)
+        {
+            int n = rng.Between(GenData.grpMin[g], GenData.grpMax[g]);
+            if (n > roomFor) n = roomFor;
+            ok = PlaceGroup(g, room, GenData.entryAnchor[e] >= 0 ? GenData.entryAnchor[e] : GenData.grpAnchor[g], n, flags, ref rng);
+        }
+        else
+        {
+            int def = GenData.entryDef[e];
+            ok = PlaceSingle(def, room, GenData.entryAnchor[e] >= 0 ? GenData.entryAnchor[e] : GenData.defAnchor[def], flags, ref rng) >= 0;
+        }
+        if (!ok) return 0;
+        for (int h = first; h < nEmit; h++) FillSlots(h, 0);
+        if (!KeepIfWalkable(room, first, (flags & EF_MANDATORY) != 0)) return 0;
+        int added = roomFloor[room] - before;
+        return added > 0 ? added : 1;
+    }
+
+    // weighted pick among the table's scenery (trees) or decoration (grass) entries
+    void PlaceScenery(int room, int table, int flagBit, int count, ref GenRng rng)
+    {
+        int es = GenData.tableEntryStart[table], ec = GenData.tableEntryCount[table];
+        int total = 0;
+        for (int i = 0; i < ec; i++) if (Has(GenData.entryDef[es + i], flagBit) && GenData.entryGrp[es + i] < 0) total += GenData.entryWeight[es + i];
+        if (total == 0) return;
+        int placed = 0;
+        for (int tries = count * 3; tries > 0 && placed < count; tries--)
+        {
+            int r = rng.Range(total), pick = -1;
+            for (int i = 0; i < ec; i++)
+            {
+                int e = es + i;
+                if (!Has(GenData.entryDef[e], flagBit) || GenData.entryGrp[e] >= 0) continue;
+                if (r < GenData.entryWeight[e]) { pick = e; break; }
+                r -= GenData.entryWeight[e];
+            }
+            if (pick < 0) break;
+            int def = GenData.entryDef[pick], first = nEmit;
+            if (TryPlace(def, room, GenData.entryAnchor[pick] >= 0 ? GenData.entryAnchor[pick] : GenData.defAnchor[def], 0, ref rng) < 0) continue;
+            if (flagBit == GenData.FL_DECOR || KeepIfWalkable(room, first, false)) placed++;
+        }
     }
 
     void PopulateRoom(int room)
     {
+        roomEmitStart[room] = nEmit;
         int table = GenData.FindTable(roomZone[room], roomType[room]);
         if (table < 0) return;
         if (rackDefCache < 0) rackDefCache = GenData.FindDef("gen_rack");
         GenRng rng = Rng(ST_ROOM, room, 0);
-        int s = roomCellStart[room], n = roomCellCount[room];
-        int eligible = 0;
-        for (int k = s; k < s + n; k++)
-        {
-            int t = tags[roomCells[k]];
-            if ((t & GenData.T_FLOOR) != 0 && (t & (GenData.T_BLOCKED | GenData.T_DOOR_CLEAR | GenData.T_NO_SPAWN)) == 0) eligible++;
-        }
-        roomEligible[room] = eligible;
+        GenRng srng = Rng(ST_SCENERY, room, 0);
+        int type = roomType[room];
+        // the room's numbers from the range table (G24), for its floor area and the map's density
+        int lo = PerArea(GenData.rangeFloorMin[type], room, true);
+        roomFloorMax[room] = PerArea(GenData.rangeFloorMax[type], room, true);
+        roomFloorTarget[room] = rng.Between(lo, roomFloorMax[room]);
+        roomTopCap[room] = PerArea(GenData.rangeTopMax[type], room, true);
+        int cover = GenData.rangeCover[type] * GenData.DensityPercent[density] / 100;
+        roomCoverMax[room] = roomCellCount[room] * (cover > 70 ? 70 : cover) / 100;
+        int trees = srng.Between(PerArea(GenData.rangeTreeMin[type], room, false), PerArea(GenData.rangeTreeMax[type], room, false));
+        int grass = srng.Between(PerArea(GenData.rangeDecorMin[type], room, false), PerArea(GenData.rangeDecorMax[type], room, false));
+
         int es = GenData.tableEntryStart[table], ec = GenData.tableEntryCount[table];
         if (ec > entryCount.Length) ec = entryCount.Length;
         for (int i = 0; i < ec; i++) entryCount[i] = 0;
         for (int i = 0; i < groupCount.Length; i++) groupCount[i] = 0;
         int firstEmit = nEmit;
-        int cellsScale = roomOuterCells[room];
 
         // exclusive groups (one table, one bed, one sofa): one member is chosen up front by weight
         for (int g = 1; g < groupCount.Length; g++)
@@ -387,72 +596,55 @@ public partial class MapGen
             int i = order[oi], e = es + i, def = GenData.entryDef[e];
             int g = GenData.entryGroup[e];
             if (g > 0 && groupCount[g] != i + 1) continue;
-            int anchor = GenData.entryAnchor[e] >= 0 ? GenData.entryAnchor[e] : GenData.defAnchor[def];
-            if (def == rackDefCache && roomType[room] == GenData.R_STORAGE)
+            if (GenData.entryGrp[e] < 0 && SceneryOrDecor(def)) continue;
+            if (GenData.entryGrp[e] < 0 && def == rackDefCache && roomType[room] == GenData.R_STORAGE)
             {
-                entryCount[i] += PlaceRackRows(room, def, cellsScale >= 4 ? GenData.entryMax[e] : 4, ref rng);
+                entryCount[i] += PlaceRackRows(room, def, ScaledCap(GenData.entryMax[e], room), ref rng);
                 continue;
             }
             for (int k = 0; k < GenData.entryMin[e]; k++)
             {
-                if (TryPlace(def, room, anchor, 0, ref rng) >= 0) entryCount[i]++;
+                if (PlaceEntry(e, room, EF_MANDATORY, 99, ref rng) > 0) entryCount[i]++;
                 else { statMandatoryFail++; break; }
             }
         }
-        // 2. weighted fill up to the density target
-        int attempts = 4 * eligible / 8 + 4;
-        int targetCells = eligible * GenData.tableDensity[table] / 1000;
-        while (attempts-- > 0 && roomCovered[room] < targetCells)
+        // 2. trees, before the rest: other things stand around and beside them
+        PlaceScenery(room, table, GenData.FL_SCENERY, trees, ref srng);
+        // 3. weighted fill up to the room's floor target; an entry is skipped when its type is at its cap or
+        //    when what it brings (a table and its chairs, a whole group) no longer fits under the target
+        int attempts = 4 * ec + 8;
+        RoomWalkable(room);
+        while (attempts-- > 0 && roomFloor[room] < roomFloorTarget[room] && walkBlocked < roomCoverMax[room])
         {
+            int roomFor = roomFloorTarget[room] - roomFloor[room];
             int total = 0;
             for (int i = 0; i < ec; i++)
-            {
-                int e = es + i, g = GenData.entryGroup[e];
-                if (entryCount[i] >= EntryMax(e, cellsScale) || (g > 0 && groupCount[g] != i + 1)) continue;
-                total += GenData.entryWeight[e];
-            }
+                if (Fillable(es + i, i, room, roomFor)) total += GenData.entryWeight[es + i];
             if (total == 0) break;
             int r = rng.Range(total), pick = -1;
             for (int i = 0; i < ec; i++)
             {
-                int e = es + i, g = GenData.entryGroup[e];
-                if (entryCount[i] >= EntryMax(e, cellsScale) || (g > 0 && groupCount[g] != i + 1)) continue;
-                if (r < GenData.entryWeight[e]) { pick = i; break; }
-                r -= GenData.entryWeight[e];
+                if (!Fillable(es + i, i, room, roomFor)) continue;
+                if (r < GenData.entryWeight[es + i]) { pick = i; break; }
+                r -= GenData.entryWeight[es + i];
             }
             if (pick < 0) break;
-            int def = GenData.entryDef[es + pick];
-            int anchor = GenData.entryAnchor[es + pick] >= 0 ? GenData.entryAnchor[es + pick] : GenData.defAnchor[def];
-            if (TryPlace(def, room, anchor, 0, ref rng) >= 0) entryCount[pick]++;
+            if (PlaceEntry(es + pick, room, 0, roomFor, ref rng) > 0) entryCount[pick]++;
         }
-        // 3. slots of every placed host, breadth first (children are appended and reached later in the loop)
+        // 4. what sits on, in and under the furniture, thinned evenly to the room's cap
+        SetTopFactor(room, firstEmit);
         for (int h = firstEmit; h < nEmit; h++)
-            if (emitRoom[h] == room) FillSlots(h);
-        // 4. clutter: small items at floor edges
-        int cc = GenData.tableClutterCount[table];
-        if (cc > 0)
-        {
-            GenRng crng = Rng(ST_CLUTTER, room, 0);
-            int count = crng.Between(GenData.tableClutterMin[table], GenData.tableClutterMax[table]) * (cellsScale > 2 ? (cellsScale + 1) / 2 : 1);
-            int cs = GenData.tableClutterStart[table];
-            int total = 0;
-            for (int i = 0; i < cc; i++) total += GenData.entryWeight[cs + i];
-            bool outdoor = !GenData.IsBuilding(roomZone[room]);
-            for (int k = 0; k < count; k++)
-            {
-                int r = crng.Range(total), pick = 0;
-                for (int i = 0; i < cc; i++) { if (r < GenData.entryWeight[cs + i]) { pick = i; break; } r -= GenData.entryWeight[cs + i]; }
-                int def = GenData.entryDef[cs + pick];
-                int anchor = GenData.defAnchor[def];
-                bool atWall = crng.Chance(650);
-                if (anchor == GenData.A_ANY || anchor == GenData.A_SLOT_ONLY) anchor = outdoor ? GenData.A_OUT_OPEN : (atWall ? GenData.A_WALL : GenData.A_ANY);
-                int before = nEmit;
-                if (TryPlace(def, room, anchor, EF_CLUTTER, ref crng) >= 0)
-                {
-                    statClutter++;
-                    for (int h = before; h < nEmit; h++) FillSlots(h);
-                }
-            }
-        }
+            if (emitRoom[h] == room) FillSlots(h, 1);
+        // 5. grass tufts
+        PlaceScenery(room, table, GenData.FL_DECOR, grass, ref srng);
+    }
+
+    bool Fillable(int e, int i, int room, int roomFor)
+    {
+        int g = GenData.entryGroup[e];
+        if (GenData.entryWeight[e] <= 0 || (g > 0 && groupCount[g] != i + 1)) return false;
+        if (GenData.entryGrp[e] < 0 && SceneryOrDecor(GenData.entryDef[e])) return false;
+        if (entryCount[i] >= EntryCap(e, room)) return false;
+        return UnitSize(e) <= roomFor;
     }
 }

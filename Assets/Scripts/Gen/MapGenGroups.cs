@@ -1,0 +1,336 @@
+// MapGen, part 3b: prop groups and "beside" placement (owner decision G25).
+//
+// A formation is one to six props laid out together in millimetres, not in whole cells, so its members stand
+// close: a ROW side by side with their backs on one line, or a CLUSTER of two short rows. It is placed as a
+// unit against a wall, a fence or a building, beside another object, or on open ground, and it is removed as a
+// unit. A single def that must stand beside something (a bedside table, a bucket by the workbench) is a
+// formation of one.
+public partial class MapGen
+{
+    const int MAXF = 6;
+    int fN;                                   // members of the formation being placed
+    int[] fDef = new int[MAXF];
+    int[] fX = new int[MAXF], fZ = new int[MAXF], fYaw = new int[MAXF];   // local: x along the row, z from the back line
+    int[] fWX = new int[MAXF], fWZ = new int[MAXF];
+    int fLen, fDep;
+    bool fTall;
+    bool[] fUsed = new bool[32];
+
+    // Draws up to n members for a group in this room: a def is not repeated while unused ones are left, and
+    // never beyond its cap in the room. Returns the number drawn (in fDef).
+    int ChooseMembers(int g, int room, int n, ref GenRng rng)
+    {
+        int ms = GenData.grpMemberStart[g], mc = GenData.grpMemberCount[g];
+        if (n > MAXF) n = MAXF;
+        if (mc > fUsed.Length) mc = fUsed.Length;
+        for (int m = 0; m < mc; m++) fUsed[m] = false;
+        fN = 0;
+        while (fN < n)
+        {
+            int total = 0;
+            bool fresh = true;
+            for (int pass = 0; pass < 2 && total == 0; pass++)
+            {
+                fresh = pass == 0;
+                for (int m = 0; m < mc; m++)
+                    if (MemberOk(g, m, room, fresh)) total += GenData.grpMemberWeight[ms + m];
+            }
+            if (total == 0) break;
+            int r = rng.Range(total);
+            for (int m = 0; m < mc; m++)
+            {
+                if (!MemberOk(g, m, room, fresh)) continue;
+                if (r < GenData.grpMemberWeight[ms + m]) { fUsed[m] = true; fDef[fN++] = GenData.grpMemberDef[ms + m]; break; }
+                r -= GenData.grpMemberWeight[ms + m];
+            }
+        }
+        return fN;
+    }
+
+    bool MemberOk(int g, int m, int room, bool fresh)
+    {
+        if (fresh && fUsed[m]) return false;
+        int def = GenData.grpMemberDef[GenData.grpMemberStart[g] + m];
+        int have = CountInRoom(def, room);
+        for (int i = 0; i < fN; i++) if (fDef[i] == def) have++;
+        return have < ScaledCap(GenData.defRoomCap[def], room);
+    }
+
+    // Places n members of prop group g in the room. A_BESIDE falls back to a wall or the fence.
+    bool PlaceGroup(int g, int room, int anchor, int n, int flags, ref GenRng rng)
+    {
+        if (ChooseMembers(g, room, n, ref rng) < (n < GenData.grpMin[g] ? n : GenData.grpMin[g]) || fN == 0) return false;
+        int leader = -1;
+        if (anchor == GenData.A_BESIDE)
+        {
+            leader = PlaceFormationBeside(GenData.grpLayout[g], GenData.grpGapMm[g], GenData.grpBeside[g], room, flags, g, ref rng);
+            if (leader < 0) anchor = GenData.A_WALL;
+        }
+        if (leader < 0) leader = PlaceFormationAt(GenData.grpLayout[g], GenData.grpGapMm[g], room, anchor, flags, g, ref rng);
+        if (leader >= 0) statGroups++;
+        return leader >= 0;
+    }
+
+    // local layout of fDef[0 .. fN-1]
+    void BuildFormation(int layout, int gap, ref GenRng rng)
+    {
+        fTall = false;
+        for (int i = 0; i < fN; i++) if (GenData.defSy[fDef[i]] >= 1200) fTall = true;
+        if (layout == GenData.GL_ROW || fN < 3)
+        {
+            int x = 0;
+            fDep = 0;
+            for (int i = 0; i < fN; i++)
+            {
+                int d = fDef[i], sx = GenData.defSx[d], sz = GenData.defSz[d];
+                fX[i] = x + sx / 2; fZ[i] = sz / 2 + rng.Range(31);
+                fYaw[i] = Jitter(ref rng, Min(GenData.defJitYaw[d], 8));
+                x += sx + gap;
+                if (sz + 30 > fDep) fDep = sz + 30;
+            }
+            fLen = x - gap;
+            return;
+        }
+        // a clump: a back row and a front row, the shorter one centred on the longer; members may face anywhere
+        int nb = (fN + 1) / 2;
+        int xb = 0, depBack = 0, xf = 0, depFront = 0;
+        for (int i = 0; i < fN; i++)
+        {
+            int d = fDef[i];
+            int s = GenData.defSx[d] > GenData.defSz[d] ? GenData.defSx[d] : GenData.defSz[d];
+            fYaw[i] = Jitter(ref rng, GenData.defJitYaw[d]);
+            int j = rng.Range(41);
+            if (i < nb) { fX[i] = xb + s / 2; fZ[i] = s / 2 + j; xb += s + gap; if (s + 40 > depBack) depBack = s + 40; }
+            else { fX[i] = xf + s / 2; fZ[i] = s / 2 + j; xf += s + gap; if (s + 40 > depFront) depFront = s + 40; }
+        }
+        int lenB = xb - gap, lenF = xf - gap;
+        fLen = lenB > lenF ? lenB : lenF;
+        for (int i = 0; i < fN; i++)
+        {
+            if (i < nb) fX[i] += (fLen - lenB) / 2;
+            else { fX[i] += (fLen - lenF) / 2; fZ[i] += depBack + gap; }
+        }
+        fDep = depBack + gap + depFront;
+    }
+
+    // Stamps the built formation: rot is the way it faces (its back is on the other side), a0 the low end of
+    // its extent along the row and back the coordinate of its back line, both in mm. With wallDir >= 0 the
+    // whole back row has to stand against that wall. host: an emit whose cells the formation may share.
+    // Returns the first member's emit index, or -1 when it does not fit.
+    int StampFormation(int room, int rot, int a0, int back, int wallDir, int flags, int grp, int host)
+    {
+        int minX = 1 << 30, minZ = 1 << 30, maxX = -(1 << 30), maxZ = -(1 << 30);
+        for (int i = 0; i < fN; i++)
+        {
+            int lx = fX[i], lz = fZ[i], wx, wz;
+            if (rot == 0) { wx = a0 + lx; wz = back + lz; }
+            else if (rot == 2) { wx = a0 + fLen - lx; wz = back - lz; }
+            else if (rot == 1) { wx = back + lz; wz = a0 + fLen - lx; }
+            else { wx = back - lz; wz = a0 + lx; }
+            fWX[i] = wx; fWZ[i] = wz;
+            int hx, hz;
+            HalfExtents(fDef[i], rot * 90 + fYaw[i], out hx, out hz);
+            if (wx - hx < minX) minX = wx - hx;
+            if (wx + hx > maxX) maxX = wx + hx;
+            if (wz - hz < minZ) minZ = wz - hz;
+            if (wz + hz > maxZ) maxZ = wz + hz;
+        }
+        int x0 = FloorDiv(minX + SOLID_TOL, GenData.INNER_MM), x1 = FloorDiv(maxX - SOLID_TOL - 1, GenData.INNER_MM);
+        int z0 = FloorDiv(minZ + SOLID_TOL, GenData.INNER_MM), z1 = FloorDiv(maxZ - SOLID_TOL - 1, GenData.INNER_MM);
+        if (x1 < x0) { x0 = FloorDiv((minX + maxX) / 2, GenData.INNER_MM); x1 = x0; }
+        if (z1 < z0) { z0 = FloorDiv((minZ + maxZ) / 2, GenData.INNER_MM); z1 = z0; }
+        int gw = x1 - x0 + 1, gd = z1 - z0 + 1;
+        if (!RectFree(x0, z0, gw, gd, room, fDef[0], host)) return -1;
+        if (wallDir >= 0)
+        {
+            int span = (wallDir == 0 || wallDir == 2) ? gw : gd;
+            for (int a = 0; a < span; a++)
+            {
+                int bx = (wallDir == 2 || wallDir == 0) ? x0 + a : (wallDir == 3 ? x0 : x1);
+                int bz = wallDir == 2 ? z0 : (wallDir == 0 ? z1 : z0 + a);
+                int bt = tags[bz * IW + bx];
+                if ((bt & WallBit(wallDir)) == 0) return -1;
+                if (fTall && (bt & GenData.T_WINDOW_WALL) != 0) return -1;
+            }
+        }
+        int leader = -1;
+        for (int i = 0; i < fN; i++)
+        {
+            int e = Emit(fDef[i], fWX[i], 0, fWZ[i], rot * 90 + fYaw[i], -1, room, flags | (grp >= 0 ? EF_GROUP : 0));
+            if (e < 0) break;
+            emitRot[e] = rot;
+            if (leader < 0)
+            {
+                leader = e;
+                emitRX[e] = x0; emitRZ[e] = z0; emitRW[e] = gw; emitRD[e] = gd;
+            }
+            else { emitRX[e] = FloorDiv(fWX[i], GenData.INNER_MM); emitRZ[e] = FloorDiv(fWZ[i], GenData.INNER_MM); }
+            if (grp >= 0) { emitGroup[e] = leader; emitGrp[e] = grp; }
+            Account(e, 1);
+        }
+        if (leader < 0) return -1;
+        for (int z = z0; z <= z1; z++)
+            for (int x = x0; x <= x1; x++)
+                if (occ[z * IW + x] == 0) occ[z * IW + x] = leader + 1;
+        return leader;
+    }
+
+    // the formation on cells that match the anchor: against a wall, or centred on a cell of open ground
+    int PlaceFormationAt(int layout, int gap, int room, int anchor, int flags, int grp, ref GenRng rng)
+    {
+        BuildFormation(layout, gap, ref rng);
+        int need = NeedTags(anchor);
+        bool wall = WallAnchor(anchor);
+        int s = roomCellStart[room], n = roomCellCount[room];
+        int nc = 0;
+        for (int k = s; k < s + n && nc < cand.Length; k++)
+        {
+            int i = roomCells[k], t = tags[i];
+            if ((t & need) == 0 || occ[i] != 0) continue;
+            if (wall && (t & GenData.T_WALL_ANY) == 0) continue;
+            if (anchor == GenData.A_OUT_OPEN && ((t & GenData.T_OUTDOOR) == 0 || (t & GenData.T_WALL_ANY) != 0)) continue;
+            cand[nc++] = i;
+        }
+        if (nc == 0) return -1;
+        Shuffle(cand, nc, ref rng);
+        int tries = nc < 24 ? nc : 24;
+        int cells = (fLen + GenData.INNER_MM - 1) / GenData.INNER_MM;
+        for (int k = 0; k < tries; k++)
+        {
+            int i = cand[k], cx = i % IW, cz = i / IW, t = tags[i];
+            if (wall)
+            {
+                int d0 = rng.Range(4), o0 = rng.Range(cells);
+                for (int di = 0; di < 4; di++)
+                {
+                    int wd = (d0 + di) & 3;
+                    if ((t & WallBit(wd)) == 0) continue;
+                    int rot = (wd + 2) & 3;
+                    int off = GenData.WALL_HALF_MM + 20;
+                    int back = wd == 2 ? cz * GenData.INNER_MM + off : (wd == 0 ? (cz + 1) * GenData.INNER_MM - off
+                        : (wd == 3 ? cx * GenData.INNER_MM + off : (cx + 1) * GenData.INNER_MM - off));
+                    for (int oi = 0; oi < cells; oi++)
+                    {
+                        int first = ((wd == 0 || wd == 2) ? cx : cz) - (o0 + oi) % cells;
+                        int a0 = first * GenData.INNER_MM + (cells * GenData.INNER_MM - fLen) / 2;
+                        int e = StampFormation(room, rot, a0, back, wd, flags, grp, -1);
+                        if (e >= 0) return e;
+                    }
+                }
+            }
+            else
+            {
+                int rot = rng.Range(4);
+                int mx = cx * GenData.INNER_MM + GenData.INNER_MM / 2, mz = cz * GenData.INNER_MM + GenData.INNER_MM / 2;
+                int along = (rot == 0 || rot == 2) ? mx : mz, deep = (rot == 0 || rot == 2) ? mz : mx;
+                int back = (rot == 0 || rot == 1) ? deep - fDep / 2 : deep + fDep / 2;
+                int e = StampFormation(room, rot, along - fLen / 2, back, -1, flags, grp, -1);
+                if (e >= 0) return e;
+            }
+        }
+        return -1;
+    }
+
+    // the outline of a placed object (a whole group for a group's first member), in mm
+    void HostBox(int h, out int x0, out int z0, out int x1, out int z1)
+    {
+        x0 = 1 << 30; z0 = 1 << 30; x1 = -(1 << 30); z1 = -(1 << 30);
+        int last = emitGroup[h] == h ? nEmit - 1 : h;
+        for (int e = h; e <= last; e++)
+        {
+            if (e != h && emitGroup[e] != h) continue;
+            int hx, hz;
+            HalfExtents(emitDef[e], emitYaw[e], out hx, out hz);
+            if (emitX[e] - hx < x0) x0 = emitX[e] - hx;
+            if (emitX[e] + hx > x1) x1 = emitX[e] + hx;
+            if (emitZ[e] - hz < z0) z0 = emitZ[e] - hz;
+            if (emitZ[e] + hz > z1) z1 = emitZ[e] + hz;
+        }
+    }
+
+    int[] hostCand = new int[64];
+
+    // The formation beside an object of one of the wanted kinds in this room. A host that stands against a
+    // wall gets it in line: on its left or right, backs on the same wall. A free-standing host (a tree, a
+    // campfire, a tent) gets it on any side but its front, facing away. Returns the first emit or -1.
+    int PlaceFormationBeside(int layout, int gap, int kinds, int room, int flags, int grp, ref GenRng rng)
+    {
+        if (kinds == 0) return -1;
+        BuildFormation(layout, gap, ref rng);
+        int nh = 0;
+        for (int e = roomEmitStart[room]; e < nEmit && nh < hostCand.Length; e++)
+        {
+            if (emitRoom[e] != room || emitParent[e] >= 0 || (emitFlags[e] & EF_REMOVED) != 0) continue;
+            if ((GenData.defKind[emitDef[e]] & kinds) == 0 || emitGroup[e] >= 0) continue;
+            hostCand[nh++] = e;
+        }
+        Shuffle(hostCand, nh, ref rng);
+        if (nh > 6) nh = 6;
+        for (int k = 0; k < nh; k++)
+        {
+            int e = BesideHost(hostCand[k], room, flags, grp, 60, ref rng);
+            if (e >= 0) return e;
+        }
+        return -1;
+    }
+
+    int BesideHost(int h, int room, int flags, int grp, int gap, ref GenRng rng)
+    {
+        int hd = emitDef[h], hrot = emitRot[h];
+        int x0, z0, x1, z1;
+        HostBox(h, out x0, out z0, out x1, out z1);
+        // does the host stand with its back against a wall?
+        int wd = (hrot + 2) & 3;
+        int bx = wd == 1 ? emitRX[h] + emitRW[h] - 1 : emitRX[h], bz = wd == 0 ? emitRZ[h] + emitRD[h] - 1 : emitRZ[h];
+        bool atWall = emitRW[h] > 0 && (tags[bz * IW + bx] & WallBit(wd)) != 0;
+        if (atWall)
+        {
+            int back = hrot == 0 ? z0 : (hrot == 2 ? z1 : (hrot == 1 ? x0 : x1));
+            int lo = (hrot == 0 || hrot == 2) ? x0 : z0, hi = (hrot == 0 || hrot == 2) ? x1 : z1;
+            int s0 = rng.Range(2);
+            for (int si = 0; si < 2; si++)
+            {
+                int a0 = ((s0 + si) & 1) == 0 ? hi + gap : lo - gap - fLen;
+                int e = StampFormation(room, hrot, a0, back, wd, flags, grp, h);
+                if (e >= 0) return e;
+            }
+            return -1;
+        }
+        bool hasFront = GenData.defClear[hd] > 0 || Has(hd, GenData.FL_SEEINTO) || Has(hd, GenData.FL_OPENABLE);
+        int away = (GenData.defKind[hd] & GenData.K_FIRE) != 0 ? 450 : gap;   // not in the fire, and not on its seats
+        int d0 = rng.Range(4);
+        for (int di = 0; di < 4; di++)
+        {
+            int rot = (d0 + di) & 3;
+            if (hasFront && rot == hrot) continue;
+            int back = rot == 0 ? z1 + away : (rot == 2 ? z0 - away : (rot == 1 ? x1 + away : x0 - away));
+            int mid = (rot == 0 || rot == 2) ? (x0 + x1) / 2 : (z0 + z1) / 2;
+            int e = StampFormation(room, rot, mid - fLen / 2, back, -1, flags, grp, h);
+            if (e >= 0) return e;
+        }
+        return -1;
+    }
+
+    // A single copy of a group's member type (a disguise quota copy): it joins a group of that kind that is
+    // already in the room, or stands where such a group would. Returns the emit index or -1.
+    int PlaceGroupCopy(int g, int def, int room, int anchor, int flags, ref GenRng rng)
+    {
+        fN = 1; fDef[0] = def;
+        BuildFormation(GenData.GL_ROW, GenData.grpGapMm[g], ref rng);
+        for (int e = roomEmitStart[room]; e < nEmit; e++)
+        {
+            if (emitRoom[e] != room || emitGroup[e] != e || emitGrp[e] != g || (emitFlags[e] & EF_REMOVED) != 0) continue;
+            int j = BesideHost(e, room, flags, g, GenData.grpGapMm[g], ref rng);
+            if (j >= 0) return j;
+        }
+        fN = 1; fDef[0] = def;
+        int leader = -1;
+        if (anchor == GenData.A_BESIDE)
+        {
+            leader = PlaceFormationBeside(GenData.GL_ROW, GenData.grpGapMm[g], GenData.grpBeside[g], room, flags, g, ref rng);
+            if (leader < 0) anchor = GenData.A_WALL;
+        }
+        if (leader < 0) leader = PlaceFormationAt(GenData.GL_ROW, GenData.grpGapMm[g], room, anchor, flags, g, ref rng);
+        return leader;
+    }
+}

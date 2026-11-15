@@ -5,15 +5,17 @@ using UnityEngine;
 public static class Layers
 {
     public const int Arch = 11;         // walls, floors, roofs, fences, tree trunks
-    public const int Solid = 8;         // solid furniture: blocks players and prop bodies
-    public const int Prop = 13;         // small loose props: darts hit them, movement passes through
+    public const int Solid = 8;         // furniture: blocks players and prop bodies, the third-person camera and bots' sight
+    public const int Prop = 13;         // small props: block players and prop bodies too (G26), but not the camera or sight
     public const int Door = 14;         // doors and lids of openables
-    public const int Hider = 22;        // disguise hitboxes of non-solid types
-    public const int HiderSolid = 23;   // disguise hitboxes of solid types (block while pinned)
+    public const int Hider = 22;        // a disguise while it moves, and the player's own hitbox: darts hit it, nothing walks into it
+    public const int HiderSolid = 23;   // a bot's disguise standing still: as solid as the real prop it copies
     public const int Tumble = 24;       // knocked props while they fly: nothing blocks on them
     public const int Body = 2;          // helper colliders of the casts' own bodies (Ignore Raycast)
 
-    public const int MoveMask = (1 << Arch) | (1 << Solid) | (1 << Door) | (1 << HiderSolid);
+    // Every prop is solid, small ones included (G26). Walking still never moves one (D12): bodies are moved by
+    // casts and push nothing. Low props are stepped onto within the body's step height (BoxBody).
+    public const int MoveMask = (1 << Arch) | (1 << Solid) | (1 << Prop) | (1 << Door) | (1 << HiderSolid);
     public const int DartMask = (1 << Arch) | (1 << Solid) | (1 << Prop) | (1 << Door) | (1 << Hider) | (1 << HiderSolid) | (1 << Tumble);
     public const int AimMask = DartMask;
     public const int CameraMask = (1 << Arch) | (1 << Solid) | (1 << Door);

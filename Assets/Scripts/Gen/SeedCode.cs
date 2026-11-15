@@ -1,6 +1,8 @@
 // Shareable, versioned seed codes (04 section 6.1).
-// 60 bits: genVersion 10 | size 3 | seed 32 | flags 7 (reserved) | crc8 8, written as 12 Crockford base32
+// 60 bits: genVersion 10 | size 3 | seed 32 | flags 7 | crc8 8, written as 12 Crockford base32
 // characters with a readable copy of the version in front: v1-K7QM-4XT9-2BRA.
+// Flags: bits 0 to 2 hold the prop density setting (GenData.DensityName index, 0 = Normal), the rest is reserved.
+// A code therefore reproduces a map with its density.
 public static class SeedCode
 {
     public const int OK = 0;         // same version: exact replay
@@ -22,9 +24,13 @@ public static class SeedCode
         return crc;
     }
 
-    public static string Encode(int genVersion, int size, uint seed)
+    public const int DENSITY_MASK = 7;
+
+    public static string Encode(int genVersion, int size, uint seed) { return Encode(genVersion, size, seed, 0); }
+
+    public static string Encode(int genVersion, int size, uint seed, int flags)
     {
-        ulong body = ((ulong)(uint)(genVersion & 0x3FF) << 42) | ((ulong)(uint)(size & 7) << 39) | ((ulong)seed << 7);
+        ulong body = ((ulong)(uint)(genVersion & 0x3FF) << 42) | ((ulong)(uint)(size & 7) << 39) | ((ulong)seed << 7) | (ulong)(uint)(flags & 0x7F);
         ulong bits = (body << 8) | Crc8(body);
         char[] c = new char[12];
         for (int i = 0; i < 12; i++)
@@ -33,10 +39,16 @@ public static class SeedCode
         return "v" + genVersion + "-" + s.Substring(0, 4) + "-" + s.Substring(4, 4) + "-" + s.Substring(8, 4);
     }
 
-    // Returns OK / TYPO / OLDER / NEWER. On OK and OLDER the out values are set.
     public static int Decode(string text, int currentVersion, out int genVersion, out int size, out uint seed)
     {
-        genVersion = 0; size = 0; seed = 0;
+        int flags;
+        return Decode(text, currentVersion, out genVersion, out size, out seed, out flags);
+    }
+
+    // Returns OK / TYPO / OLDER / NEWER. On OK and OLDER the out values are set.
+    public static int Decode(string text, int currentVersion, out int genVersion, out int size, out uint seed, out int flags)
+    {
+        genVersion = 0; size = 0; seed = 0; flags = 0;
         if (text == null) return TYPO;
         string t = text.Trim().ToUpperInvariant();
         // drop the readable "vN-" prefix: the version inside the code is what counts
@@ -66,6 +78,7 @@ public static class SeedCode
         genVersion = (int)((body >> 42) & 0x3FF);
         size = (int)((body >> 39) & 7);
         seed = (uint)((body >> 7) & 0xFFFFFFFFu);
+        flags = (int)(body & 0x7F);
         if (size > 3) return TYPO;
         if (genVersion > currentVersion) return NEWER;
         if (genVersion < currentVersion) return OLDER;

@@ -97,7 +97,7 @@ public class MapBuilder
         return C(128, 128, 128);
     }
 
-    public void Begin(uint seed, int size)
+    public void Begin(uint seed, int size, int density)
     {
         Clear();
         ModelLibrary.Load();
@@ -105,7 +105,7 @@ public class MapBuilder
         archRoot = new GameObject("Architecture").transform; archRoot.SetParent(root.transform, false);
         roofRoot = new GameObject("Roofs").transform; roofRoot.SetParent(root.transform, false);
         propRoot = new GameObject("Props").transform; propRoot.SetParent(root.transform, false);
-        gen.Begin(seed, size);
+        gen.Begin(seed, size, density);
         stage = 0; cursor = 0; built = false; failed = false; progress = 0f;
         genMs = 0; buildMs = 0; colliderCount = 0; rendererCount = 0;
         total.Reset(); total.Start();

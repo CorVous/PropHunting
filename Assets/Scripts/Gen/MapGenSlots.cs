@@ -28,7 +28,6 @@ public partial class MapGen
         return -1;
     }
 
-    bool[] slotFilled = new bool[64];
     bool[] groupUsed = new bool[16];
 
     void AddFree(int host, int sl)
@@ -36,20 +35,53 @@ public partial class MapGen
         if (nFree < freeHost.Length) { freeHost[nFree] = host; freeSlot[nFree] = sl; nFree++; }
     }
 
+    // is there a child of the host in this slot?
+    bool SlotTaken(int host, int sl)
+    {
+        for (int e = host + 1; e < nEmit; e++)
+            if (emitParent[e] == host && emitSlot[e] == sl && (emitFlags[e] & EF_REMOVED) == 0) return true;
+        return false;
+    }
+
+    // How strongly this room's on-furniture slots are thinned so their expected number meets the room's cap
+    // (G24): every slot keeps its place in the scene, each is just filled less often. Above Normal density the
+    // factor may pass 1000 and fill chances rise.
+    void SetTopFactor(int room, int firstEmit)
+    {
+        long expected = 0;   // sum of fill chances, per mille
+        for (int h = firstEmit; h < nEmit; h++)
+        {
+            if (emitRoom[h] != room || (emitFlags[h] & EF_REMOVED) != 0) continue;
+            int def = emitDef[h];
+            int s0 = GenData.defSlotStart[def], ns = GenData.defSlotCount[def], g0 = GenData.defGroupStart[def];
+            for (int i = s0; i < s0 + ns; i++)
+            {
+                if (GenData.slotType[i] == GenData.S_ADJACENT) continue;
+                int g = g0 + GenData.slotGroup[i];
+                // place settings follow the chairs and the occasion: about half of them appear
+                expected += GenData.groupMode[g] == GenData.G_MIRROR_OF ? 480 : GenData.slotFill[i] * GenData.groupChance[g] / 1000;
+            }
+        }
+        int most = GenData.DensityPercent[density] * 10;
+        long f = expected <= 0 ? most : (long)roomTopCap[room] * 1000000 / expected;
+        roomTopFactor[room] = (int)(f > most ? most : f);
+    }
+
     // 04 section 4.4.2 fillSlots, without recursion: children are appended to the emit list and the caller's
     // loop reaches them later (depth is limited to 2, chances are damped by 0.7 per level).
-    void FillSlots(int host)
+    // Pass 0 fills the ADJACENT slots (chairs and seats: they stand on the floor and count towards the room's
+    // floor range), pass 1 everything on, in and under the host (thinned to the room's on-furniture cap).
+    void FillSlots(int host, int pass)
     {
         int def = emitDef[host];
         int ns = GenData.defSlotCount[def];
         if (ns == 0) return;
         int depth = emitDepth[host];
-        if (depth > 2) return;
+        if (depth > 2 || (emitFlags[host] & EF_REMOVED) != 0) return;
         int room = emitRoom[host];
-        GenRng rng = Rng(ST_SLOT, host, 0);
+        GenRng rng = Rng(ST_SLOT, host, pass);
         int s0 = GenData.defSlotStart[def], g0 = GenData.defGroupStart[def], ng = GenData.defGroupCount[def];
         int damp = depth == 0 ? 1000 : (depth == 1 ? 700 : 490);
-        for (int i = 0; i < ns && i < slotFilled.Length; i++) slotFilled[i] = false;
         for (int g = 0; g < ng && g < groupUsed.Length; g++)
         {
             groupUsed[g] = false;
@@ -65,29 +97,32 @@ public partial class MapGen
                 int sl = s0 + i;
                 if (GenData.slotGroup[sl] != g) continue;
                 int k = ordinal++;
-                int p = GenData.slotFill[sl] * damp / 1000;
+                bool adjacent = GenData.slotType[sl] == GenData.S_ADJACENT;
                 int hideRoll = rng.Range(1000), fillRoll = rng.Range(1000);
+                if (adjacent != (pass == 0)) continue;
                 if (!roll)
                 {
                     if (mode == GenData.G_INDEPENDENT) AddFree(host, sl);
                     continue;
                 }
+                int p = GenData.slotFill[sl] * damp / 1000;
                 if (mode == GenData.G_MIRROR_OF)
                 {
                     // the k-th setting follows the k-th chair
                     int rg = GenData.groupRef[g0 + g], seen = 0, mirror = -1;
                     for (int j = 0; j < ns; j++)
                         if (GenData.slotGroup[s0 + j] == rg) { if (seen == k) { mirror = j; break; } seen++; }
-                    bool present = mirror >= 0 && slotFilled[mirror];
+                    bool present = mirror >= 0 && SlotTaken(host, s0 + mirror);
                     p = !present ? 0 : (occasion < 450 ? 1000 : (occasion < 750 ? 500 : 0));
                 }
+                if (!adjacent) p = p * roomTopFactor[room] / 1000;
                 if (GenData.slotHiding[sl] && hideRoll < GenData.HIDING_SOCKET_PERMILLE)
                 {
                     // left empty on purpose for a hider to complete the scene (04 section 4.7.4)
                     if (nSockets < socketHost.Length) { socketHost[nSockets] = host; socketSlot[nSockets] = sl; nSockets++; }
                     continue;
                 }
-                if (fillRoll >= p || roomSlotItems[room] >= GenData.ROOM_SLOT_ITEM_CAP)
+                if (fillRoll >= p || (!adjacent && roomTop[room] >= roomTopCap[room]))
                 {
                     if (mode != GenData.G_MIRROR_OF) AddFree(host, sl);
                     continue;
@@ -101,12 +136,8 @@ public partial class MapGen
                 else cd = PickDef(GenData.slotAccept[sl], GenData.slotSize[sl], ref rng);
                 if (cd < 0) continue;
                 int child = EmitInSlot(host, sl, cd, 0, ref rng);
-                if (child >= 0)
-                {
-                    slotFilled[i] = true; groupUsed[g] = true;
-                    roomSlotItems[room]++;
-                }
-                else if (GenData.slotType[sl] != GenData.S_ADJACENT) AddFree(host, sl);
+                if (child >= 0) groupUsed[g] = true;
+                else if (!adjacent) AddFree(host, sl);
             }
         }
     }
@@ -138,6 +169,7 @@ public partial class MapGen
             emitSlot[e] = sl;
             emitRX[e] = cx; emitRZ[e] = cz; emitRW[e] = 1; emitRD[e] = 1; emitRot[e] = (emitRot[host] + GenData.slotYaw[sl] / 90) & 3;
             occ[ci] = e + 1;
+            Account(e, 1);
             return e;
         }
         else
@@ -154,6 +186,7 @@ public partial class MapGen
             emitSlot[e] = sl;
             emitRX[e] = FloorDiv(wx, GenData.INNER_MM); emitRZ[e] = FloorDiv(wz, GenData.INNER_MM); emitRW[e] = 0; emitRD[e] = 0;
             emitRot[e] = emitRot[host];
+            Account(e, 1);
             return e;
         }
     }
@@ -185,11 +218,17 @@ public partial class MapGen
         nativeZones = new int[GenData.nDefs];
         for (int t = 0; t < GenData.nTables; t++)
         {
-            int es = GenData.tableEntryStart[t], n = GenData.tableEntryCount[t] + GenData.tableClutterCount[t];
+            int es = GenData.tableEntryStart[t], n = GenData.tableEntryCount[t];
             for (int e = es; e < es + n; e++)
             {
-                nativeIn[GenData.entryDef[e] * 64 + t] = true;
-                nativeZones[GenData.entryDef[e]] |= 1 << GenData.tableZone[t];
+                int g = GenData.entryGrp[e];
+                int ms = g < 0 ? 0 : GenData.grpMemberStart[g], mc = g < 0 ? 1 : GenData.grpMemberCount[g];
+                for (int m = 0; m < mc; m++)
+                {
+                    int d = g < 0 ? GenData.entryDef[e] : GenData.grpMemberDef[ms + m];
+                    nativeIn[d * 64 + t] = true;
+                    nativeZones[d] |= 1 << GenData.tableZone[t];
+                }
             }
         }
     }
@@ -236,7 +275,7 @@ public partial class MapGen
                 if (pick < roomCellCount[r]) { room = r; break; }
                 pick -= roomCellCount[r];
             }
-            if (room < 0 || roomLeaks[room] >= 2) continue;
+            if (room < 0 || roomLeaks[room] >= GenData.LEAK_ROOM_MAX) continue;
             int zone = roomZone[room];
             bool outdoor = !GenData.IsBuilding(zone);
             int table = GenData.FindTable(zone, roomType[room]);
@@ -254,6 +293,7 @@ public partial class MapGen
             if (def < 0) continue;
             int flags = EF_LEAK | (comedic ? EF_COMEDIC : 0);
             int e = -1;
+            int first = nEmit;
             // small slot-only things may sit on a free surface instead of the floor
             bool onSurface = rng.Chance(600);
             if (GenData.defAnchor[def] == GenData.A_SLOT_ONLY && GenData.defSizeClass[def] <= GenData.SZ_M && onSurface && nFree > 0)
@@ -262,7 +302,7 @@ public partial class MapGen
                 for (int k = 0; k < nFree && e < 0; k++)
                 {
                     int f = (f0 + k) % nFree;
-                    if (freeHost[f] < 0 || emitRoom[freeHost[f]] != room) continue;
+                    if (freeHost[f] < 0 || emitRoom[freeHost[f]] != room || (emitFlags[freeHost[f]] & EF_REMOVED) != 0) continue;
                     int sl = freeSlot[f];
                     if (GenData.slotType[sl] != GenData.S_ON_TOP || GenData.slotSize[sl] < GenData.defSizeClass[def]) continue;
                     e = EmitInSlot(freeHost[f], sl, def, flags, ref rng);
@@ -271,27 +311,60 @@ public partial class MapGen
             }
             if (e < 0)
             {
-                // the def's own anchor first, then the fallback (a wall-anchored def in a forest falls back to
-                // any floor); comedic leaks prefer visible cells
                 int own = GenData.defAnchor[def];
+                // things that live on furniture and are smaller than a chair stay on furniture
+                if (own == GenData.A_SLOT_ONLY && GenData.defSizeClass[def] <= GenData.SZ_M) continue;
+                // comedic leaks prefer visible cells. Everything else follows its own rule: against a wall or
+                // the fence, or beside what it belongs with. Only furniture-sized things fall back to open floor
+                // (a wall-anchored def in a forest); small loose things never stand alone in the open (G25).
                 int visible = outdoor ? GenData.A_OUT_OPEN : GenData.A_CENTER;
                 int fallback = outdoor ? GenData.A_OUT_OPEN : GenData.A_ANY;
-                if (own == GenData.A_SLOT_ONLY) own = fallback;
                 if (comedic) e = TryPlace(def, room, visible, flags, ref rng);
-                if (e < 0) e = TryPlace(def, room, own, flags, ref rng);
-                if (e < 0) e = TryPlace(def, room, fallback, flags, ref rng);
+                if (e < 0) e = PlaceSingle(def, room, own, flags, ref rng);
+                if (e < 0 && !Has(def, GenData.FL_LOOSE)) e = TryPlace(def, room, fallback, flags, ref rng);
             }
             if (e < 0) continue;
+            for (int h = first; h < nEmit; h++) FillSlots(h, 0);
+            if (emitParent[e] < 0 && !KeepIfWalkable(room, first, true)) continue;
             roomLeaks[room]++;
             placed++;
             if (comedic) statLeakComedic++; else statLeakPlausible++;
-            for (int h = e; h < nEmit; h++) FillSlots(h);
+            for (int h = first; h < nEmit; h++) FillSlots(h, 1);
         }
     }
 
     // =====================================================================================================
-    // Disguise quotas (04 section 4.7.3): enough copies of a type, or it is not on the menu
+    // Disguise quotas (04 section 4.7.3, as changed by G25): enough copies of a type, or it is not on the menu
     // =====================================================================================================
+    // A type needs GenData.QuotaCopies copies on the map (3, or 2 for large types). The quota pass may add the
+    // missing copies, but the room rules come first: at most one added copy per room, only in a room where the
+    // type is native and below its cap, placed by the type's own "where" rule (a group member joins or starts a
+    // group), and the room may pass its floor maximum by QUOTA_ROOM_ALLOWANCE only. A type that cannot reach its
+    // copies under those rules stays off the menu, and the copies tried for it are taken away again.
+    int Need(int d, int perType)
+    {
+        int min = GenData.defKin[d] >= 0 ? GenData.QUOTA_GROUP_COPIES : GenData.defMinCopies[d];
+        return min > perType ? min : perType;
+    }
+
+    // The copies that count for a type: its own, or for a kind of a prop group all the props of that group on
+    // the map (GenData.QUOTA_GROUP_COPIES). Uses defCopies, so count first.
+    int[] kinCopies = new int[64];
+
+    void CountKin()
+    {
+        for (int g = 0; g < kinCopies.Length; g++) kinCopies[g] = 0;
+        for (int d = 0; d < GenData.nDefs; d++)
+            if (GenData.defKin[d] >= 0) kinCopies[GenData.defKin[d]] += defCopies[d];
+    }
+
+    public int Copies(int d)
+    {
+        return GenData.defKin[d] >= 0 ? kinCopies[GenData.defKin[d]] : defCopies[d];
+    }
+
+    int[] quotaAdded = new int[16];
+
     void Quotas()
     {
         BuildNative();
@@ -303,103 +376,109 @@ public partial class MapGen
         {
             if ((emitFlags[e] & EF_REMOVED) != 0) continue;
             defCopies[emitDef[e]]++;
-            props++;
+            if (!SceneryOrDecor(emitDef[e])) props++;
         }
         int types = 0;
         for (int d = 0; d < nd; d++) if (GenData.defDisguise[d] > 0 && defCopies[d] > 0) types++;
         if (types == 0) return;
+        CountKin();
         int hiders = GenData.SizeHiders[size];
-        int perType = (hiders + types - 1) / types + 2;
-        int budget = props * 45 / 100;      // quota copies may add at most 45% to the map
+        int perType = (hiders + types - 1) / types + 1;
+        int budget = props * GenData.QUOTA_BUDGET_PERCENT / 100;
+        if (budget < GenData.QUOTA_BUDGET_MIN) budget = GenData.QUOTA_BUDGET_MIN;
         // types that miss the fewest copies first, so the budget buys as many menu types as possible
         int[] order = new int[nd];
         int no = 0;
         for (int d = 0; d < nd; d++)
         {
-            if (GenData.defDisguise[d] == 0 || defCopies[d] == 0) continue;
-            int need0 = GenData.defMinCopies[d] > perType ? GenData.defMinCopies[d] : perType;
-            if (defCopies[d] >= need0) continue;
+            if (GenData.defDisguise[d] == 0 || defCopies[d] == 0 || Copies(d) >= Need(d, perType)) continue;
             int k = no++;
-            int miss = need0 - defCopies[d];
-            while (k > 0)
-            {
-                int o = order[k - 1];
-                int needO = GenData.defMinCopies[o] > perType ? GenData.defMinCopies[o] : perType;
-                if (needO - defCopies[o] <= miss) break;
-                order[k] = o; k--;
-            }
+            int miss = Need(d, perType) - Copies(d);
+            while (k > 0 && Need(order[k - 1], perType) - Copies(order[k - 1]) > miss) { order[k] = order[k - 1]; k--; }
             order[k] = d;
         }
         for (int oi = 0; oi < no; oi++)
         {
             int d = order[oi];
-            int need = GenData.defMinCopies[d] > perType ? GenData.defMinCopies[d] : perType;
-            int tries = (need - defCopies[d]) * 6;
-            while (defCopies[d] < need && tries-- > 0 && budget > 0)
+            int missing = Need(d, perType) - Copies(d);
+            int r0 = rng.Range(nRooms);
+            if (missing <= 0 || missing > budget || missing > quotaAdded.Length) continue;
+            int na = 0;
+            for (int k = 0; k < nRooms && na < missing; k++)
             {
-                int e = -1;
-                if (GenData.defAnchor[d] == GenData.A_SLOT_ONLY)
-                {
-                    // a free slot that accepts this type
-                    if (nFree == 0) break;
-                    int f0 = rng.Range(nFree);
-                    for (int k = 0; k < nFree && e < 0; k++)
-                    {
-                        int f = (f0 + k) % nFree;
-                        if (freeHost[f] < 0) continue;
-                        int sl = freeSlot[f];
-                        if ((GenData.slotAccept[sl] & GenData.defTags[d]) == 0 || GenData.slotSize[sl] < GenData.defSizeClass[d]) continue;
-                        if (roomSlotItems[emitRoom[freeHost[f]]] >= GenData.ROOM_SLOT_ITEM_CAP + 14) continue;
-                        e = EmitInSlot(freeHost[f], sl, d, EF_QUOTA, ref rng);
-                        if (e >= 0) { freeHost[f] = -1; roomSlotItems[emitRoom[e]]++; }
-                    }
-                    if (e < 0) break;
-                }
-                else
-                {
-                    // a room where the type is native (density cap relaxed by 20%)
-                    int r0 = rng.Range(nRooms);
-                    for (int k = 0; k < nRooms && e < 0; k++)
-                    {
-                        int room = (r0 + k) % nRooms;
-                        int table = GenData.FindTable(roomZone[room], roomType[room]);
-                        if (table < 0 || !nativeIn[d * 64 + table]) continue;
-                        if (roomCovered[room] * 1000 > roomEligible[room] * (GenData.tableDensity[table] * 12 / 10 + 60)) continue;
-                        int anchor = GenData.defAnchor[d];
-                        int es = GenData.tableEntryStart[table], n = GenData.tableEntryCount[table];
-                        int roomMax = 1;
-                        for (int q = es; q < es + n; q++)
-                            if (GenData.entryDef[q] == d)
-                            {
-                                if (GenData.entryAnchor[q] >= 0) anchor = GenData.entryAnchor[q];
-                                roomMax = EntryMax(q, roomOuterCells[room]);
-                            }
-                        // never more copies in a room than its table allows (no bathroom with four toilets)
-                        int have = 0;
-                        for (int q = 0; q < nEmit; q++)
-                            if (emitDef[q] == d && emitRoom[q] == room && emitParent[q] < 0 && (emitFlags[q] & EF_REMOVED) == 0) have++;
-                        if (have >= roomMax) continue;
-                        if (anchor == GenData.A_SLOT_ONLY) anchor = GenData.IsBuilding(roomZone[room]) ? GenData.A_ANY : GenData.A_OUT_OPEN;
-                        e = TryPlace(d, room, anchor, EF_QUOTA, ref rng);
-                    }
-                    if (e < 0) break;
-                    for (int h = e; h < nEmit; h++) FillSlots(h);
-                }
-                defCopies[d]++; statQuotaAdded++; budget--;
+                int room = (r0 + k) % nRooms;
+                if (roomZone[room] == GenData.Z_RELEASE) continue;
+                int e = QuotaCopy(d, room, ref rng);
+                if (e >= 0) quotaAdded[na++] = e;
             }
+            if (na < missing)
+            {
+                for (int i = 0; i < na; i++) Remove(quotaAdded[i]);
+                continue;
+            }
+            defCopies[d] += na; statQuotaAdded += na; budget -= na;
+            if (GenData.defKin[d] >= 0) kinCopies[GenData.defKin[d]] += na;
         }
         // recount (hosts added for a quota bring children) and build the menu
         for (int d = 0; d < nd; d++) defCopies[d] = 0;
         for (int e = 0; e < nEmit; e++) if ((emitFlags[e] & EF_REMOVED) == 0) defCopies[emitDef[e]]++;
+        CountKin();
         types = 0;
         for (int d = 0; d < nd; d++) if (GenData.defDisguise[d] > 0 && defCopies[d] > 0) types++;
-        perType = (hiders + types - 1) / (types > 0 ? types : 1) + 2;
+        perType = (hiders + types - 1) / (types > 0 ? types : 1) + 1;
         menuCount = 0;
         for (int d = 0; d < nd; d++)
         {
             if (GenData.defDisguise[d] == 0) continue;
-            int need = GenData.defMinCopies[d] > perType ? GenData.defMinCopies[d] : perType;
-            if (defCopies[d] >= need) { menu[d] = true; menuCount++; }
+            if (defCopies[d] > 0 && Copies(d) >= Need(d, perType)) { menu[d] = true; menuCount++; }
         }
+    }
+
+    // one more copy of def d in this room, if the room's rules allow it. Returns the emit index or -1.
+    int QuotaCopy(int d, int room, ref GenRng rng)
+    {
+        if (GenData.defAnchor[d] == GenData.A_SLOT_ONLY)
+        {
+            // a free place on, in or at furniture of this room that takes the type
+            for (int f = 0; f < nFree; f++)
+            {
+                int host = freeHost[f];
+                if (host < 0 || emitRoom[host] != room || (emitFlags[host] & EF_REMOVED) != 0) continue;
+                int sl = freeSlot[f];
+                if ((GenData.slotAccept[sl] & GenData.defTags[d]) == 0 || GenData.slotSize[sl] < GenData.defSizeClass[d]) continue;
+                bool adjacent = GenData.slotType[sl] == GenData.S_ADJACENT;
+                if (adjacent ? roomFloor[room] >= roomFloorMax[room] + GenData.QUOTA_ROOM_ALLOWANCE : roomTop[room] >= roomTopCap[room] + 2) return -1;
+                int c = EmitInSlot(host, sl, d, EF_QUOTA, ref rng);
+                if (c < 0) continue;
+                if (adjacent && !RoomWalkable(room)) { Remove(c); statWalkRejects++; return -1; }
+                freeHost[f] = -1;
+                return c;
+            }
+            return -1;
+        }
+        int table = GenData.FindTable(roomZone[room], roomType[room]);
+        if (table < 0 || !nativeIn[d * 64 + table]) return -1;
+        if (roomFloor[room] >= roomFloorMax[room] + GenData.QUOTA_ROOM_ALLOWANCE) return -1;
+        // how the type is native here: an entry of its own, or as a member of a prop group
+        int es = GenData.tableEntryStart[table], n = GenData.tableEntryCount[table];
+        int entry = -1;
+        for (int q = es; q < es + n && entry < 0; q++)
+            if (GenData.entryGrp[q] < 0 ? GenData.entryDef[q] == d : GenData.GrpHas(GenData.entryGrp[q], d)) entry = q;
+        if (entry < 0) return -1;
+        int grp = GenData.entryGrp[entry];
+        int cap = grp < 0 ? EntryCap(entry, room) : ScaledCap(GenData.defRoomCap[d], room);
+        if (CountInRoom(d, room) >= cap) return -1;
+        // one table, one bed, one sofa: not next to another member of its exclusive group
+        int xg = GenData.entryGroup[entry];
+        for (int q = es; q < es + n && xg > 0; q++)
+            if (q != entry && GenData.entryGroup[q] == xg && CountInRoom(GenData.entryDef[q], room) > 0) return -1;
+        int first = nEmit, e;
+        if (grp < 0) e = PlaceSingle(d, room, GenData.entryAnchor[entry] >= 0 ? GenData.entryAnchor[entry] : GenData.defAnchor[d], EF_QUOTA, ref rng);
+        else e = PlaceGroupCopy(grp, d, room, GenData.entryAnchor[entry] >= 0 ? GenData.entryAnchor[entry] : GenData.grpAnchor[grp], EF_QUOTA, ref rng);
+        if (e < 0) return -1;
+        for (int h = first; h < nEmit; h++) FillSlots(h, 0);
+        if (!KeepIfWalkable(room, first, false)) return -1;
+        for (int h = first; h < nEmit; h++) FillSlots(h, 1);
+        return e;
     }
 }

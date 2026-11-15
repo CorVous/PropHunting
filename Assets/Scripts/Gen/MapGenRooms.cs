@@ -202,7 +202,8 @@ public partial class MapGen
                 {
                     map[l] = nRooms;
                     roomZone[nRooms] = zone; roomInst[nRooms] = inst; roomType[nRooms] = 0; roomOuterCells[nRooms] = 0;
-                    roomLeaks[nRooms] = 0; roomSlotItems[nRooms] = 0; roomCovered[nRooms] = 0; roomEligible[nRooms] = 0;
+                    roomLeaks[nRooms] = 0; roomFloor[nRooms] = 0; roomTop[nRooms] = 0; roomTrees[nRooms] = 0;
+                    roomFloorTarget[nRooms] = 0; roomFloorMax[nRooms] = 0; roomTopCap[nRooms] = 0; roomTopFactor[nRooms] = 1000;
                     nRooms++;
                 }
                 roomOuterCells[map[l]]++;
@@ -292,7 +293,7 @@ public partial class MapGen
     void BuildTags()
     {
         int n = IW * IH;
-        for (int i = 0; i < n; i++) { tags[i] = 0; innerRoom[i] = -1; occ[i] = 0; flatOcc[i] = 0; reserve[i] = 0; walk[i] = 0; reach[i] = 0; }
+        for (int i = 0; i < n; i++) { tags[i] = 0; innerRoom[i] = -1; occ[i] = 0; flatOcc[i] = 0; solid[i] = 0; reserve[i] = 0; walk[i] = 0; reach[i] = 0; }
         for (int r = 0; r < nRooms; r++) { roomDoorCount[r] = 0; roomDoorStart[r] = r * 8; roomX0[r] = 1 << 20; roomZ0[r] = 1 << 20; roomX1[r] = -1; roomZ1[r] = -1; }
         nEmit = 0; nFree = 0; nSockets = 0;
 
@@ -325,6 +326,7 @@ public partial class MapGen
                         }
                         t |= WallBit(d);
                         if (et == GenData.E_WINDOW) t |= GenData.T_WINDOW_WALL;
+                        if (et != GenData.E_FENCE && (t & GenData.T_OUTDOOR) != 0) t |= GenData.T_BY_BUILDING;
                     }
                     if ((t & GenData.T_WALL_ANY) != 0 && (t & GenData.T_OUTDOOR) != 0) t |= GenData.T_EDGE_OUTDOOR;
                     if ((t & (GenData.T_WALL_N | GenData.T_WALL_S)) != 0 && (t & (GenData.T_WALL_E | GenData.T_WALL_W)) != 0) t |= GenData.T_CORNER;
@@ -356,6 +358,18 @@ public partial class MapGen
                         else { lx = depth; lz = a; }
                         tags[(cz * 8 + lz) * IW + cx * 8 + lx] |= GenData.T_DOOR_CLEAR;
                     }
+                }
+                // the wall cells right beside the keep-clear cells: where things flank a doorway
+                for (int side = 0; side < 2; side++)
+                {
+                    int a = side == 0 ? off - 2 : off + GenData.DOOR_CELLS + 1;
+                    if (a < 0 || a > 7) continue;
+                    int lx, lz;
+                    if (d == 0) { lx = a; lz = 7; }
+                    else if (d == 2) { lx = a; lz = 0; }
+                    else if (d == 1) { lx = 7; lz = a; }
+                    else { lx = 0; lz = a; }
+                    tags[(cz * 8 + lz) * IW + cx * 8 + lx] |= GenData.T_DOOR_SIDE;
                 }
                 int room = cellRoom[c];
                 if (roomDoorCount[room] < 8)

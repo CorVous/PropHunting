@@ -1,7 +1,8 @@
 using UnityEngine;
 
 // The collider set of a prop definition (05 N16), simplified to boxes derived from the model's bounds and
-// its flat surfaces. Generated props and disguises use the same set, so a dart that passes under a hider's
+// its flat surfaces. Every prop has one, small props and items in furniture slots included (G26): one box
+// for most, several for tables, seats, shelves and hollow furniture. Only grass tufts (ground cover) have none. Generated props and disguises use the same set, so a dart that passes under a hider's
 // table misses it exactly as it would miss a real one. All sizes are in model units: the object's uniform
 // scale turns them into metres.
 public static class PropColliders
@@ -104,8 +105,8 @@ public static class PropColliders
                 break;
             }
             case GenData.C_NONE:
-                // rugs: a thin slab that darts hit and nothing walks into
-                Add(go, mn, new Vector3(mx.x, Mathf.Max(mx.y, mn.y + 3f * cm), mx.z));
+                // rugs: a slab 3 cm high whatever the model's thickness, so every body's step height takes it
+                Add(go, mn, new Vector3(mx.x, mn.y + 3f * cm, mx.z));
                 break;
             default:
                 Add(go, mn, new Vector3(mx.x, Mathf.Max(mx.y, mn.y + 2f * cm), mx.z));

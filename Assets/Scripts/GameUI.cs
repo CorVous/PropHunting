@@ -10,12 +10,13 @@ public class GameUI : MonoBehaviour
     bool stylesReady;
     float W, H;
 
+    // prop counts at Normal density, from the generator console test (they scale with the density setting)
     static readonly string[] SizeNote =
     {
-        "S: 7 x 7 cells, about 28 used, 250 to 400 props. For up to 8 players.",
-        "M: 9 x 9 cells, about 52 used, 400 to 650 props. For 9 to 16 players.",
-        "L: 12 x 12 cells, about 85 used, 600 to 900 props. For 17 to 24 players.",
-        "XL: 14 x 14 cells, about 108 used, 800 to 1,100 props. For 25 to 32 players.",
+        "S: 7 x 7 cells, about 28 used, about 130 props at Normal density. For up to 8 players.",
+        "M: 9 x 9 cells, about 52 used, about 235 props at Normal density. For 9 to 16 players.",
+        "L: 12 x 12 cells, about 85 used, about 370 props at Normal density. For 17 to 24 players.",
+        "XL: 14 x 14 cells, about 108 used, about 490 props at Normal density. For 25 to 32 players.",
     };
     static readonly string[] ModeName = { "Explore", "Hunt", "Hide" };
     static readonly string[] ModeNote =
@@ -115,7 +116,7 @@ public class GameUI : MonoBehaviour
     {
         var g = Game.I;
         Fill(new Rect(0, 0, W, H), new Color(0.13f, 0.17f, 0.20f, 1f));
-        float pw = 680f, ph = 640f;
+        float pw = 680f, ph = 720f;
         Rect r = new Rect((W - pw) / 2, Mathf.Max(8f, (H - ph) / 2), pw, ph);
         GUI.Box(r, GUIContent.none, box);
         GUILayout.BeginArea(new Rect(r.x + 26, r.y + 16, r.width - 52, r.height - 28));
@@ -129,7 +130,7 @@ public class GameUI : MonoBehaviour
         g.seedText = GUILayout.TextField(g.seedText, 24, field, GUILayout.Height(34), GUILayout.Width(330));
         if (GUILayout.Button("New random seed", button, GUILayout.Height(34))) { g.NewRandomSeed(); AudioHub.I.Play("click_001", 0.5f); }
         GUILayout.EndHorizontal();
-        GUILayout.Label("Generator version " + GenData.GEN_VERSION + ". The code holds the version, the size and the seed.", small);
+        GUILayout.Label("Generator version " + GenData.GEN_VERSION + ". The code holds the version, the size, the prop density and the seed.", small);
         GUILayout.Space(8);
 
         GUILayout.Label("Map size", heading);
@@ -138,6 +139,17 @@ public class GameUI : MonoBehaviour
             if (GUILayout.Button(GenData.SizeName[i], g.size == i ? toggleOn : button, GUILayout.Height(32))) { g.SetSize(i); AudioHub.I.Play("select_001", 0.5f); }
         GUILayout.EndHorizontal();
         GUILayout.Label(SizeNote[g.size], small);
+        GUILayout.Space(8);
+
+        GUILayout.Label("Prop density", heading);
+        GUILayout.BeginHorizontal();
+        for (int k = 0; k < GenData.DensityOrder.Length; k++)
+        {
+            int d = GenData.DensityOrder[k];
+            if (GUILayout.Button(GenData.DensityName[d], g.density == d ? toggleOn : button, GUILayout.Height(32))) { g.SetDensity(d); AudioHub.I.Play("select_001", 0.5f); }
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.Label(GenData.DensityName[g.density] + ": every room type's prop range at " + GenData.DensityPercent[g.density] + "%. Same seed, same buildings; only how much stands in them changes. F3 in the map shows the counts per room type.", small);
         GUILayout.Space(8);
 
         GUILayout.Label("Mode", heading);
@@ -223,12 +235,17 @@ public class GameUI : MonoBehaviour
         }
 
         // top left: the seed and basic generation statistics, always on screen
-        string stats = "Seed <b>" + g.seedCode + "</b>   size " + GenData.SizeName[gen.size] + "   generator v" + GenData.GEN_VERSION
-            + "\n" + gen.statProps + " props (" + gen.statSlotItems + " in slots), " + gen.statScenery + " trees, " + gen.nRooms + " rooms, "
-            + (gen.statLeakPlausible + gen.statLeakComedic) + " out-of-place props (" + gen.statLeakComedic + " comedic), " + gen.menuCount + " disguise types";
-        float sw = Mathf.Min(560f, W / 2 - 170f);
-        GUI.Box(new Rect(8, 8, sw, sw < 520f ? 66 : 50), GUIContent.none, box);
-        GUI.Label(new Rect(16, 11, sw - 12, sw < 520f ? 62 : 46), stats, small);
+        // top left: the seed and the prop counts, always on screen: on the floor + on furniture, in all and by zone
+        string zones = "";
+        for (int z = GenData.Z_HOUSE; z <= GenData.Z_FOREST; z++)
+            if (gen.statZoneCells[z] > 0) zones += (zones.Length > 0 ? ", " : "") + GenData.ZoneName[z] + " " + gen.statZoneFloor[z] + "+" + gen.statZoneTop[z];
+        string stats = "Seed <b>" + g.seedCode + "</b>   size " + GenData.SizeName[gen.size] + "   density " + GenData.DensityName[gen.density] + "   generator v" + GenData.GEN_VERSION
+            + "\n" + gen.statProps + " props: " + gen.statFloor + " on the floor + " + gen.statTop + " on furniture, " + gen.statScenery + " trees, " + gen.nRooms + " rooms, "
+            + (gen.statLeakPlausible + gen.statLeakComedic) + " out of place (" + gen.statLeakComedic + " comedic), " + gen.menuCount + " disguise types"
+            + "\nBy zone, floor + furniture: " + zones + "   (F3: per room type)";
+        float sw = Mathf.Min(600f, W / 2 - 170f);
+        GUI.Box(new Rect(8, 8, sw, sw < 560f ? 100 : 68), GUIContent.none, box);
+        GUI.Label(new Rect(16, 11, sw - 12, sw < 560f ? 96 : 64), stats, small);
 
         // top centre: the round
         if (rd.phase != Round.PH_NONE)
@@ -343,7 +360,10 @@ public class GameUI : MonoBehaviour
         {
             int room = gen.innerRoom[cell];
             int t = gen.tags[cell];
-            where = GenData.ZoneName[gen.roomZone[room]] + " / " + GenData.RoomName(gen.roomType[room]) + " (room " + room + ")  cell " + (cell % gen.IW) + "," + (cell / gen.IW)
+            int rt = gen.roomType[room];
+            where = "This room: " + gen.roomCellCount[room] / 4 + " m2, " + gen.roomFloor[room] + " props on the floor (target " + gen.roomFloorTarget[room] + ", range up to " + gen.roomFloorMax[room]
+                + "), " + gen.roomTop[room] + " on furniture (cap " + gen.roomTopCap[room] + ")" + (gen.roomTrees[room] > 0 ? ", " + gen.roomTrees[room] + " trees" : "") + "\n"
+                + GenData.ZoneName[gen.roomZone[room]] + " / " + GenData.RoomName(rt) + " (room " + room + ")  cell " + (cell % gen.IW) + "," + (cell / gen.IW)
                 + "  tags" + ((t & GenData.T_WALL_ANY) != 0 ? " WALL" : "") + ((t & GenData.T_CORNER) != 0 ? " CORNER" : "") + ((t & GenData.T_CENTER) != 0 ? " CENTER" : "")
                 + ((t & GenData.T_DOOR_CLEAR) != 0 ? " DOOR_CLEAR" : "") + ((t & GenData.T_PATH) != 0 ? " PATH" : "") + ((t & GenData.T_OUTDOOR) != 0 ? " OUTDOOR" : "")
                 + ((t & GenData.T_SOFT_GROUND) != 0 ? " SOFT" : "") + ((t & GenData.T_NO_SPAWN) != 0 ? " NO_SPAWN" : "");
@@ -360,13 +380,47 @@ public class GameUI : MonoBehaviour
         string text = "<b>Debug</b>  " + g.fps.ToString("0") + " fps   " + Screen.width + " x " + Screen.height
             + "\nMap hash " + gen.mapHash.ToString("X8") + "   generated in " + g.map.genMs.ToString("0") + " ms, built in " + g.map.buildMs.ToString("0") + " ms, over " + g.genFrames + " frames (" + g.map.wallMs.ToString("0") + " ms)"
             + "\nCells " + gen.statGroundCells + ": House " + gen.statZoneCells[1] + ", Warehouse " + gen.statZoneCells[2] + ", Diner " + gen.statZoneCells[3] + ", Lawn " + gen.statZoneCells[4] + ", Forest " + gen.statZoneCells[5]
-            + "\nEmits " + gen.nEmit + ": props " + gen.statProps + ", slot items " + gen.statSlotItems + ", quota copies " + gen.statQuotaAdded + ", leaks " + gen.statLeakPlausible + " plausible + " + gen.statLeakComedic + " comedic"
+            + "\nEmits " + gen.nEmit + ": props " + gen.statProps + " (" + gen.statFloor + " floor, " + gen.statTop + " furniture), prop groups " + gen.statGroups + ", quota copies " + gen.statQuotaAdded + ", leaks " + gen.statLeakPlausible + " plausible + " + gen.statLeakComedic + " comedic"
             + "\nHiding sockets " + gen.nSockets + ", seed re-rolls " + gen.attempt + ", repairs " + gen.statRepairs + ", renderers " + g.map.rendererCount + ", colliders " + g.map.colliderCount
             + "\nPlayer " + p.body.pos.x.ToString("0.00") + ", " + p.body.pos.y.ToString("0.00") + ", " + p.body.pos.z.ToString("0.00") + "  eye " + p.eye.ToString("0.00") + (p.body.grounded ? "  grounded" : "  in the air")
             + "\n" + where + aim;
-        Rect r = new Rect(8, 82, 640, 190);
+        Rect r = new Rect(8, 116, 700, 208);
         GUI.Box(r, GUIContent.none, box);
         GUI.Label(new Rect(r.x + 8, r.y + 4, r.width - 16, r.height - 8), text, small);
+        RoomTypeTable(r.x, r.yMax + 6);
+    }
+
+    // The tuning table (G24): per room type on this map, what stands on the floor and on furniture, per room
+    // and per 100 m2, next to the range the generator aims for at this map's density.
+    void RoomTypeTable(float x, float y)
+    {
+        var gen = Game.I.map.gen;
+        int rows = 0;
+        for (int t = 0; t < 64; t++) if (gen.statTypeRooms[t] > 0 && t != GenData.R_RELEASE) rows++;
+        float[] col = { 8, 150, 200, 262, 372, 470, 580 };
+        Rect r = new Rect(x, y, 700, 44 + rows * 17);
+        GUI.Box(r, GUIContent.none, box);
+        int pct = GenData.DensityPercent[gen.density];
+        GUI.Label(new Rect(r.x + 8, r.y + 3, 690, 20), "<b>Props per room type</b>   density " + GenData.DensityName[gen.density] + " (" + pct + "% of the Normal ranges)", small);
+        string[] head = { "Room type", "Rooms", "Area m2", "On the floor", "per 100 m2", "range per 100 m2", "On furniture (max)" };
+        for (int c = 0; c < head.Length; c++) GUI.Label(new Rect(r.x + col[c], r.y + 21, 140, 20), "<color=#9fb4c8>" + head[c] + "</color>", small);
+        float ry = r.y + 38;
+        for (int t = 0; t < 64; t++)
+        {
+            if (gen.statTypeRooms[t] == 0 || t == GenData.R_RELEASE) continue;
+            int m2 = gen.statTypeCells[t] / 4;
+            int per = m2 > 0 ? gen.statTypeFloor[t] * 100 / m2 : 0;
+            int lo = GenData.rangeFloorMin[t] * pct / 100, hi = GenData.rangeFloorMax[t] * pct / 100;
+            // outside the range: mandatory pieces and chairs in small rooms push it up, the cover cap holds it down
+            string mark = per > hi ? "#ffb060" : (per < lo ? "#8fc8ff" : "#e8e8e8");
+            string[] cells =
+            {
+                GenData.RoomName(t), gen.statTypeRooms[t].ToString(), m2.ToString(), gen.statTypeFloor[t].ToString(),
+                "<color=" + mark + ">" + per + "</color>", lo + " to " + hi, gen.statTypeTop[t] + " (" + GenData.rangeTopMax[t] * pct / 100 * m2 / 100 + ")",
+            };
+            for (int c = 0; c < cells.Length; c++) GUI.Label(new Rect(r.x + col[c], ry, 150, 20), cells[c], small);
+            ry += 17;
+        }
     }
 
     // labels over the map from above: where every hider was
