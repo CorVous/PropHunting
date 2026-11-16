@@ -78,7 +78,8 @@ public class PHSlot : UdonSharpBehaviour
     public void StartHiding()
     {
         hiding = true;
-        station.PlayerMobility = VRCStation.Mobility.Mobile;
+        // Immobilize on the hider's client too: PHHiderBody moves the station, and the seated player with it
+        station.PlayerMobility = VRCStation.Mobility.Immobilize;
         nextSit = 0f;
         Send();
     }
@@ -147,20 +148,20 @@ public class PHSlot : UdonSharpBehaviour
         VRCPlayerApi me = Networking.LocalPlayer;
         bool z = game.InLobbyZone(me.GetPosition());
         if (z != inZone) { inZone = z; Send(); }
-        // the station follows the player, so a re-seat leaves them where they are
-        station.transform.SetPositionAndRotation(me.GetPosition(), me.GetRotation());
+        PHHiderBody body = game.local != null ? game.local.body : null;
+        if (hiding && body != null && body.active)
+        {
+            // the hider's body moves the station (and the seated player with it)
+            station.transform.SetPositionAndRotation(body.pos, Quaternion.Euler(0f, body.stationYaw, 0f));
+            if ((body.pos - propPos).sqrMagnitude > 0.0004f) { propPos = body.pos; Send(); }
+            if (Mathf.Abs(Mathf.DeltaAngle(body.yaw, propYaw)) > 1f) { propYaw = body.yaw; Send(); }
+        }
+        // otherwise the station follows the player, so sitting down leaves them where they are
+        else station.transform.SetPositionAndRotation(me.GetPosition(), me.GetRotation());
         if (hiding && !seated && Time.time >= nextSit)
         {
             nextSit = Time.time + 3f;
             station.UseStation(me);
-        }
-        if (hiding && def >= 0)
-        {
-            Vector3 p = me.GetPosition();
-            if ((p - propPos).sqrMagnitude > 0.0004f) { propPos = p; Send(); }
-            // the prop turns with the player in 15 degree steps (05 section 3.6)
-            float yaw = Mathf.Round(me.GetRotation().eulerAngles.y / 15f) * 15f;
-            if (Mathf.Abs(Mathf.DeltaAngle(yaw, propYaw)) > 1f) { propYaw = yaw; Send(); }
         }
     }
 
@@ -190,6 +191,13 @@ public class PHSlot : UdonSharpBehaviour
                 // the owner's own prop must not block the owner; for everyone else its colliders are the target
                 Collider[] cols = proxy.GetComponentsInChildren<Collider>(true);
                 for (int i = 0; i < cols.Length; i++) cols[i].enabled = !mine;
+                // the hider never sees their own prop in first person (it would fill the view): it goes on the
+                // MirrorReflection layer, which VRChat's own camera skips and the third-person view renders
+                if (mine)
+                {
+                    Transform[] parts = proxy.GetComponentsInChildren<Transform>(true);
+                    for (int i = 0; i < parts.Length; i++) parts[i].gameObject.layer = 18;
+                }
             }
         }
         if (proxy == null) return;

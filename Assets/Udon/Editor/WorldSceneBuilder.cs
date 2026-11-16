@@ -96,6 +96,10 @@ public static class WorldSceneBuilder
         local.sound = BuildAudio(gameGo.transform);
         BuildHud(localGo.transform, local);
         game.local = local;
+        var body = localGo.AddUdonSharpComponent<PHHiderBody>();
+        body.game = game; body.local = local;
+        UdonSharpEditorUtility.CopyProxyToUdon(body);
+        local.body = body;
         GenData.Build();
         local.defNames = new string[GenData.nDefs];
         for (int d = 0; d < GenData.nDefs; d++) local.defNames[d] = DefName(GenData.defId[d]);

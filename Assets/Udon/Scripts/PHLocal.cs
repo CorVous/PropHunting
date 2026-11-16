@@ -18,6 +18,7 @@ public class PHLocal : UdonSharpBehaviour
     public TextMeshProUGUI hud;          // head-locked text
     public Transform hudRoot;
     public PHAudio sound;
+    public PHHiderBody body;             // the hider's prop-shaped body (custom controller in the station)
     public TextMeshPro panelText;
     public TextMeshPro resultsText;      // the last round's results, on the lobby wall
     public Material beaconGreen, beaconRed;
@@ -65,6 +66,7 @@ public class PHLocal : UdonSharpBehaviour
             case PHGame.PH_LOBBY:
                 ShowReveal(false);
                 if (s != null) s.StopHiding();
+                body.End();
                 RestoreEye();
                 SetPropLayer(LAYER_PROPS_SOLID);
                 SetFrozen(false);
@@ -93,16 +95,18 @@ public class PHLocal : UdonSharpBehaviour
                         int c = game.gen.spawnCell[Random.Range(0, game.gen.nSpawns)];
                         at = new Vector3((c % game.gen.IW + 0.5f) * 0.5f, 0f, (c / game.gen.IW + 0.5f) * 0.5f);
                     }
-                    me.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+                    float facing = Random.Range(0, 24) * 15f;
+                    me.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
+                    body.Begin(at, facing);
+                    body.frozen = true;
                     changesLeft = HUNT_CHANGES;
                     StartingDisguise();
                     if (s != null) s.StartHiding();
-                    SetFrozen(true);
                     Say("You hide. Look at a prop and click (trigger) to become it.", 6f);
                 }
                 break;
             case PHGame.PH_HIDE:
-                if (role == PHGame.ROLE_HIDER) SetFrozen(false);
+                if (role == PHGame.ROLE_HIDER) body.frozen = false;
                 break;
             case PHGame.PH_HUNT:
                 sound.Play("go", 0.8f);
@@ -219,20 +223,29 @@ public class PHLocal : UdonSharpBehaviour
         for (int d = 0; d < n; d++) if (d < game.gen.menu.Length && game.gen.menu[d]) { SetDisguise(d); return; }
     }
 
-    void SetDisguise(int d)
+    // Become a prop of this type, unless its box has no room here (05 section 3.7)
+    bool SetDisguise(int d)
     {
         PHSlot s = Me();
-        if (s == null) return;
+        if (s == null) return false;
+        if (s.def >= 0 && body.active)
+        {
+            int old = s.def;
+            body.SetProp(d);
+            if (!body.Fits(body.pos, body.yaw)) { body.SetProp(old); Say("No room for that here.", 2f); return false; }
+        }
         int cls = Mathf.Clamp(game.gen.defDisguise[d] - 1, 0, 3);
         int oldMax = s.maxHealth;
         s.maxHealth = hiderHealth[cls];
         s.health = oldMax > 0 ? Mathf.Max(1, Mathf.RoundToInt((float)s.health / oldMax * s.maxHealth)) : s.maxHealth;
         s.def = d; s.lastDef = d;
-        s.propPos = Networking.LocalPlayer.GetPosition();
-        s.propYaw = Mathf.Round(Networking.LocalPlayer.GetRotation().eulerAngles.y / 15f) * 15f;
+        body.SetProp(d);
+        s.propPos = body.pos;
+        s.propYaw = body.yaw;
         s.Send();
         float h = game.gen.defSy[d] / 1000f;
         SetEye(h > 2.5f ? 1.6f : Mathf.Clamp(Mathf.Round(0.9f * h / 0.05f) * 0.05f, 0.25f, 2.0f));
+        return true;
     }
 
     void SetEye(float eye)
@@ -313,13 +326,20 @@ public class PHLocal : UdonSharpBehaviour
     public void PilotTaunt() { Taunt(); }
     public int Role() { return role; }
 
-    bool Aim(out RaycastHit hit, float range)
+    // what the last Aim hit (Udon does not write an out parameter through to a field or another out parameter)
+    RaycastHit hit;
+
+    bool Aim(float range)
     {
-        if (aimOverride) return Physics.SphereCast(aimOrigin, 0.04f, aimDir, out hit, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
+        RaycastHit r;
+        bool any;
+        if (aimOverride) { any = Physics.SphereCast(aimOrigin, 0.04f, aimDir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore); hit = r; return any; }
         VRCPlayerApi me = Networking.LocalPlayer;
         VRCPlayerApi.TrackingData t = me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
         Vector3 dir = me.IsUserInVR() ? t.rotation * Vector3.forward : t.rotation * Vector3.forward;
-        return Physics.SphereCast(t.position, 0.04f, dir, out hit, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
+        any = Physics.SphereCast(t.position, 0.04f, dir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
+        hit = r;
+        return any;
     }
 
     // the emit index of a map prop that was hit, or -1
@@ -346,8 +366,7 @@ public class PHLocal : UdonSharpBehaviour
 
     void TryTakeDisguise()
     {
-        RaycastHit hit;
-        if (!Aim(out hit, TAKE_RANGE)) return;
+        if (!Aim(TAKE_RANGE)) return;
         int e = EmitOf(hit.collider.transform);
         if (e < 0) return;
         int d = game.gen.emitDef[e];
@@ -358,8 +377,8 @@ public class PHLocal : UdonSharpBehaviour
             if (Time.time - lastChange < HUNT_CHANGE_COOLDOWN) return;
             changesLeft--;
         }
+        if (!SetDisguise(d)) { if (game.phase == PHGame.PH_HUNT) changesLeft++; return; }
         lastChange = Time.time;
-        SetDisguise(d);
         Say("You are a " + DefName(d).ToLower(), 2f);
     }
 
@@ -369,8 +388,7 @@ public class PHLocal : UdonSharpBehaviour
         if (s == null || s.hunterOut || Time.time < nextDart) return;
         nextDart = Time.time + DART_INTERVAL;
         sound.Play("switch_002", 0.5f);
-        RaycastHit hit;
-        if (!Aim(out hit, DART_RANGE)) return;
+        if (!Aim(DART_RANGE)) return;
         int damage = game.Endgame ? DART_DAMAGE * 2 : DART_DAMAGE;
         int h = HiderOf(hit.collider.transform);
         if (h >= 0)
@@ -448,6 +466,7 @@ public class PHLocal : UdonSharpBehaviour
             Say("You were caught! You stay hidden as a ghost until the round ends.", 5f);
             sound.Play("you_lose", 0.8f);
             s.def = -1; s.Send();
+            body.SetGhost();
             RestoreEye();
         }
         else Say("Hit! " + (s != null ? s.health.ToString() : "?") + " health left. Move!", 2.5f);
