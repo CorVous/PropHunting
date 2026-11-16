@@ -101,7 +101,7 @@ public class Lobby : MonoBehaviour
     // START: only while the player stands in the zone; the round takes the host's settings
     public void TryGenerate(bool acceptOlder)
     {
-        if (!Game.I.isHost) { Say("Only the host can start a round."); return; }
+        if (!Game.I.isHost) return;   // a guest's press does nothing (G51)
         if (!PlayerInZone)
         {
             Say("Stand in the green zone to take part: a round starts with the players in it.");

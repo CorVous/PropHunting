@@ -134,7 +134,7 @@ public class GameUI : MonoBehaviour
         GUILayout.Label("In the zone: " + (inZone ? "<b>you</b> and " : "") + lb.botsInZone + " bots" + (inZone ? "" : " (step in to play)")
             + ". A round of " + n + " players has " + hunters + " hunter" + (hunters == 1 ? "" : "s") + " (1 in 4, drawn at random).", label);
         GUILayout.EndArea();
-        string tip = lb.Hint.Length > 0 ? lb.Hint : (Cursor.lockState != CursorLockMode.Locked ? "Click to capture the mouse, then W A S D to walk" : (lb.Aim() == 2 ? (g.isHost ? "Click to press this button" : "Only the host can change these") : ""));
+        string tip = lb.Hint.Length > 0 ? lb.Hint : (Cursor.lockState != CursorLockMode.Locked ? "Click to capture the mouse, then W A S D to walk" : (lb.Aim() == 2 && g.isHost ? "Click to press this button" : ""));
         if (tip.Length > 0)
         {
             Fill(new Rect(W / 2 - 320, H - 120, 640, 34), new Color(0.04f, 0.05f, 0.07f, 0.8f));

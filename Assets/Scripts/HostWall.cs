@@ -47,7 +47,7 @@ public class HostWall
     {
         root = parent; origin = wallCentre; faceZ = wallCentre.z - 0.04f;
         var g = Game.I;
-        Dynamic(0f, 5.08f, 0.07f, () => g.isHost ? "HOST: YOU" : "HOST: PLAYER 1 (NOT YOU)", new Color(1f, 0.85f, 0.4f));
+        Dynamic(0f, 5.08f, 0.07f, () => g.isHost ? "HOST: YOU" : "HOST: PLAYER 1", new Color(1f, 0.85f, 0.4f));
 
         // START on top, under the host's name, where the players standing at the front do not hide it
         float r6 = 4.55f, r1 = 3.98f, r2 = 3.56f, r3 = 3.14f, r4 = 2.72f, r5 = 2.3f;
@@ -101,7 +101,6 @@ public class HostWall
         Dynamic(4.3f, r5, SmallSize, () => "(TEST AID)", Info);
 
         Add("start", 0f, r6, 5f, () => false, () => Lobby.I.TryGenerate(false), "START", 0.11f, 0.56f, StartCol);
-        Dynamic(4.6f, r6, SmallSize, () => g.isHost ? "" : "HOST ONLY", Info);
     }
 
     void Add(string name, float x, float y, float w, Func<bool> on, Action act, string label, float size = LabelSize, float h = 0.36f, Color32 off = default(Color32))
