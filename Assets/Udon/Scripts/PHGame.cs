@@ -320,6 +320,8 @@ public class PHGame : UdonSharpBehaviour
     public bool InLobbyZone(Vector3 p)
     {
         if (lobbyZone == null) return false;
-        return lobbyZone.bounds.Contains(p);
+        // the square on the floor counts, whatever the height (a player stands at the box's bottom face)
+        Bounds b = lobbyZone.bounds;
+        return p.x >= b.min.x && p.x <= b.max.x && p.z >= b.min.z && p.z <= b.max.z && p.y >= b.min.y - 1f && p.y <= b.max.y;
     }
 }

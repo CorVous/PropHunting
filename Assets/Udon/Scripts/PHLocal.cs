@@ -50,7 +50,8 @@ public class PHLocal : UdonSharpBehaviour
     Vector3 checkPos;
     public const float FORCED_WARNING = 3f, FORCED_MOVED = 4f;
 
-    PHSlot Me() { return slotIndex >= 0 ? game.slots[slotIndex] : null; }
+    // the slot the host gave this player (it can arrive after the phase that needs it)
+    PHSlot Me() { slotIndex = game.SlotOf(Networking.LocalPlayer.playerId); return slotIndex >= 0 ? game.slots[slotIndex] : null; }
 
     void Say(string text, float seconds) { notice = text; noticeUntil = Time.time + seconds; }
 
@@ -320,6 +321,7 @@ public class PHLocal : UdonSharpBehaviour
 
     // the test pilot aims for its client (PHTestPilot): a ray instead of the head or hand
     [HideInInspector] public bool aimOverride;
+    [HideInInspector] public string lastHitName = "";
     [HideInInspector] public Vector3 aimOrigin, aimDir;
 
     public void PilotFire() { Fire(); }
@@ -389,7 +391,9 @@ public class PHLocal : UdonSharpBehaviour
         if (s == null || s.hunterOut || Time.time < nextDart) return;
         nextDart = Time.time + DART_INTERVAL;
         sound.Play("switch_002", 0.5f);
+        lastHitName = "nothing";
         if (!Aim(DART_RANGE)) return;
+        lastHitName = hit.collider.gameObject.name + " (" + hit.collider.transform.root.name + ")";
         int damage = game.Endgame ? DART_DAMAGE * 2 : DART_DAMAGE;
         int h = HiderOf(hit.collider.transform);
         if (h >= 0)

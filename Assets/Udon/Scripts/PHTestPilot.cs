@@ -84,8 +84,22 @@ public class PHTestPilot : UdonSharpBehaviour
         {
             PHSlot s = game.slots[i];
             if (game.slotPlayer[i] == 0 || game.slotRole[i] != PHGame.ROLE_HIDER || s.caught || !s.hiding || s.def < 0) continue;
+            // the middle of the prop as this client draws it
             Vector3 target = s.propPos + Vector3.up * 0.3f;
-            Vector3 from = target + new Vector3(0f, 1.2f, -2.5f);
+            Transform proxy = s.proxyRoot.Find("Hider" + i);
+            if (proxy != null)
+            {
+                Renderer r = proxy.GetComponentInChildren<Renderer>();
+                if (r != null) target = r.bounds.center;
+            }
+            // from a clear side within 1.5 m (walls are everywhere indoors), else from just above
+            Vector3 from = target + Vector3.up * 0.9f;
+            for (int k = 0; k < 8; k++)
+            {
+                float ang = k * 45f * Mathf.Deg2Rad;
+                Vector3 c = target + new Vector3(Mathf.Sin(ang) * 1.5f, 0.4f, Mathf.Cos(ang) * 1.5f);
+                if (!Physics.Linecast(c, target + (c - target).normalized * 0.4f, 1 << 11, QueryTriggerInteraction.Ignore)) { from = c; break; }
+            }
             me.TeleportTo(new Vector3(from.x, s.propPos.y + 0.1f, from.z), Quaternion.identity);
             Shoot(from, target, "HIDER slot" + i);
             return;
@@ -99,7 +113,7 @@ public class PHTestPilot : UdonSharpBehaviour
         local.PilotFire();
         local.aimOverride = false;
         PHSlot me = game.LocalSlot();
-        Log("SHOT at " + what + " -> hits=" + (me != null ? me.hits : -1) + " wrong=" + (me != null ? me.wrongProps : -1) + " hp=" + (me != null ? me.hunterHealth : -1));
+        Log("SHOT at " + what + " hit " + local.lastHitName + " -> hits=" + (me != null ? me.hits : -1) + " wrong=" + (me != null ? me.wrongProps : -1) + " hp=" + (me != null ? me.hunterHealth : -1));
     }
 
     void Snapshot()

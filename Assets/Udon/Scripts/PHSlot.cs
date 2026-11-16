@@ -132,7 +132,10 @@ public class PHSlot : UdonSharpBehaviour
     void Update()
     {
         if (game == null) return;
-        bool mine = Networking.IsOwner(gameObject) && game.slotPlayer[index] == Networking.LocalPlayer.playerId && Networking.LocalPlayer.playerId != 0;
+        int myId = Networking.LocalPlayer.playerId;
+        // the player the host gave this slot takes it over (the host owns every slot until then)
+        if (game.slotPlayer[index] == myId && myId != 0 && !Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);
+        bool mine = Networking.IsOwner(gameObject) && game.slotPlayer[index] == myId && myId != 0;
         if (mine) UpdateOwner(); else UpdateRemote();
         UpdateProxy(mine);
         if (mine && dirty && Time.time >= nextSend)

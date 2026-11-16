@@ -5,6 +5,7 @@
 #   .\Launch-Clients.ps1 -Count 1 -RoomId 12345   # add a late joiner to an existing instance
 param(
     [int]$Count = 2,
+    [int]$FirstProfile = 0,   # each client needs its own VRChat profile (--profile=N), or a second one crashes
     [string]$RoomId = "",
     [string]$World = "",
     [string]$VRChat = "C:\Program Files (x86)\Steam\steamapps\common\VRChat\VRChat.exe",
@@ -27,7 +28,7 @@ $logDir = Join-Path $env:USERPROFILE "AppData\LocalLow\VRChat\VRChat"
 for ($i = 0; $i -lt $Count; $i++) {
     $before = @(Get-ChildItem $logDir -Filter "output_log*" | Select-Object -ExpandProperty Name)
     $clientArgs = @(
-        "--url=$url", "--no-vr", "--enable-debug-gui", "--enable-sdk-log-levels", "--enable-udon-debug-logging",
+        "--url=$url", "--profile=$($FirstProfile + $i)", "--no-vr", "--enable-debug-gui", "--enable-sdk-log-levels", "--enable-udon-debug-logging",
         "-screen-fullscreen", "0", "-screen-width", "$Width", "-screen-height", "$Height"
     )
     Start-Process -FilePath $VRChat -ArgumentList $clientArgs -WorkingDirectory (Split-Path $VRChat) | Out-Null
