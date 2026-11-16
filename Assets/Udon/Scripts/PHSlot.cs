@@ -19,6 +19,7 @@ public class PHSlot : UdonSharpBehaviour
     public int index;
     public VRCStation station;
     public Transform proxyRoot;
+    public const int HIDER_SELF = 23;   // a user layer: the reference camera leaves it out, the third-person camera draws it
     public GameObject beacon;          // the reveal's marker: green survived, red caught
     public Renderer beaconRenderer;
     public Vector3 parkAt = new Vector3(0f, -400f, 0f);
@@ -195,11 +196,11 @@ public class PHSlot : UdonSharpBehaviour
                 Collider[] cols = proxy.GetComponentsInChildren<Collider>(true);
                 for (int i = 0; i < cols.Length; i++) cols[i].enabled = !mine;
                 // the hider never sees their own prop in first person (it would fill the view): it goes on the
-                // MirrorReflection layer, which VRChat's own camera skips and the third-person view renders
+                // HIDER_SELF layer, which the reference camera leaves out and only the third-person camera draws
                 if (mine)
                 {
                     Transform[] parts = proxy.GetComponentsInChildren<Transform>(true);
-                    for (int i = 0; i < parts.Length; i++) parts[i].gameObject.layer = 18;
+                    for (int i = 0; i < parts.Length; i++) parts[i].gameObject.layer = HIDER_SELF;
                 }
             }
         }

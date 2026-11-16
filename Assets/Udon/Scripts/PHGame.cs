@@ -142,7 +142,6 @@ public class PHGame : UdonSharpBehaviour
             + "\nProps: " + densityName[densityChoice]
             + "\nRound: " + roundLengthName[roundLength]
             + "\nForced taunt every " + tauntInterval + " s"
-            + "\nWrong prop: -" + wrongPenalty + " health"
             + "\nIn the zone: " + Participants() + " (" + Hunters(Mathf.Max(1, Participants())) + " hunt)"
             + (phase != PH_LOBBY ? "\nA round is on." : "");
     }

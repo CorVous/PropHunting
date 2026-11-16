@@ -82,6 +82,16 @@ public static class WorldSceneBuilder
         var descriptor = vrcWorld.AddComponent<VRCSceneDescriptor>();
         descriptor.spawns = new[] { spawn.transform };
         descriptor.RespawnHeightY = -50f;
+        // the reference camera gives the players' cameras their settings: everything but the hider's own prop
+        // (layer PHSlot.HIDER_SELF), which only the third-person camera draws
+        var refCam = new GameObject("ReferenceCamera");
+        refCam.transform.SetParent(vrcWorld.transform, false);
+        var rc = refCam.AddComponent<Camera>();
+        rc.enabled = false;
+        rc.cullingMask = ~(1 << PHSlot.HIDER_SELF);
+        rc.nearClipPlane = 0.02f; rc.farClipPlane = 400f;
+        rc.clearFlags = CameraClearFlags.Skybox;
+        descriptor.ReferenceCamera = refCam;
         vrcWorld.AddComponent<VRC.Core.PipelineManager>();
 
         // ---- the game
@@ -171,7 +181,6 @@ public static class WorldSceneBuilder
         Row(canvas, game, "Props", nameof(PHGame.PanelDensity), new[] { "Normal", "Sparse", "Dense", "V. sparse", "V. dense" }, new[] { 0, 1, 2, 3, 4 }, 90f);
         Row(canvas, game, "Round", nameof(PHGame.PanelRoundLength), new[] { "Short", "Normal", "Long" }, new[] { 0, 1, 2 }, 20f);
         Row(canvas, game, "Taunt every", nameof(PHGame.PanelTaunt), new[] { "30 s", "40 s", "60 s" }, new[] { 30, 40, 60 }, -50f);
-        Row(canvas, game, "Wrong prop", nameof(PHGame.PanelPenalty), new[] { "-5", "-10", "-15" }, new[] { 5, 10, 15 }, -120f);
         UiButton(canvas, game, "START", nameof(PHGame.StartRound), 0, new Vector2(-260f, -215f), new Vector2(300f, 80f), new Color(0.85f, 0.32f, 0.22f));
         var settings = PanelText(canvas, "", new Vector2(650f, 20f), new Vector2(440f, 380f), 30f, TextAlignmentOptions.TopLeft);
         local.panelUiText = settings;
@@ -224,7 +233,9 @@ public static class WorldSceneBuilder
         var cam = camGo.AddComponent<Camera>();
         cam.targetTexture = rt; cam.fieldOfView = 60f; cam.nearClipPlane = 0.05f; cam.farClipPlane = 120f;
         cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.56f, 0.76f, 0.93f);
-        cam.cullingMask = ~((1 << 5) | (1 << 10) | (1 << 12) | (1 << 19) | (1 << 9));
+        // no players (9 Player, 10 PlayerLocal, 18 MirrorReflection: the local avatar's copy for mirrors), no UI;
+        // the hider's own prop is on layer HIDER_SELF, which only this camera draws
+        cam.cullingMask = ~((1 << 5) | (1 << 9) | (1 << 10) | (1 << 12) | (1 << 18) | (1 << 19));
         cam.enabled = false;
         view.pipCam = cam;
         var pipMat = Mat2("PipDisplay", Shader.Find("Unlit/Texture"));
