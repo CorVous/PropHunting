@@ -4,6 +4,7 @@ public partial class MapGenUdon
 {
     // the baked tables' sizes (not referenced by the generator itself, so not generated)
     [UnityEngine.HideInInspector] public int nGrps;
+    [UnityEngine.HideInInspector] public int[] ZoneWallMm;
     [UnityEngine.HideInInspector] public int[] tableRoom;
     [UnityEngine.HideInInspector] public string[] defId;
 

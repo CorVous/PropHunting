@@ -7,6 +7,7 @@ using UnityEngine;
 public class MapGenBench : UdonSharpBehaviour
 {
     public MapGenUdon gen;
+    public MapBuilderUdon builder;
     public uint benchSeed = 12345u;
     public int benchSize = 1;
     public int benchDensity = 0;
@@ -47,6 +48,7 @@ public class MapGenBench : UdonSharpBehaviour
         workMs += sw.Elapsed.TotalMilliseconds;
         if (!finished) return;
         running = false;
+        if (builder != null && !gen.failed) builder.BeginBuild();
         Debug.Log("[MapGenBench] done failed=" + gen.failed + " hash " + gen.mapHash.ToString("X8") + " expected " + expectedHash.ToString("X8")
             + (gen.mapHash == expectedHash ? " MATCH" : " MISMATCH") + " emits " + gen.nEmit + " rerolls " + gen.attempt
             + " | work " + workMs.ToString("0") + " ms, wall " + ((Time.realtimeSinceStartup - startTime) * 1000f).ToString("0")
