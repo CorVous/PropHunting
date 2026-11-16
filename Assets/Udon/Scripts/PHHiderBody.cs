@@ -10,7 +10,7 @@ using VRC.Udon.Common;
 // draws the synced prop instead (PHSlot).
 //   input: Udon's move events (VR thumbstick, desktop WASD) relative to where the head looks; Shift runs on
 //          desktop (55% without it, as the prototype); jump hops (tiny and medium props), with a ledge assist;
-//          look input and the head past a dead zone turn the body
+//          the VR right stick or Q/E turn the seated player; the prop faces where the head looks
 //   the prop turns with the body in 15 degree steps, and only where its box fits (TryYaw)
 // A caught hider (a ghost) moves as a person-sized box through everything but the architecture.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -103,13 +103,13 @@ public class PHHiderBody : UdonSharpBehaviour
         jumpPressed = false;
         if (frozen) { v = 0f; h = 0f; jump = false; }
 
-        // turning: look input (desktop mouse, VR right stick), and the body follows the head past 40 degrees
         Quaternion headRot = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation;
         Vector3 fwd = headRot * Vector3.forward; fwd.y = 0f;
         float headYaw = fwd.sqrMagnitude > 1e-4f ? Mathf.Atan2(fwd.x, fwd.z) * Mathf.Rad2Deg : stationYaw;
-        stationYaw += look * 120f * dt;
-        float rel = Mathf.DeltaAngle(stationYaw, headYaw);
-        if (Mathf.Abs(rel) > 40f) stationYaw += Mathf.Sign(rel) * Mathf.Min(Mathf.Abs(rel) - 40f, 360f * dt);
+        // Turning the station turns the seated player's view with it, so the station never chases the head (that
+        // fed back on itself and spun). It turns only on turn input: the VR right stick, Q and E on desktop.
+        float turn = vr ? look : ((Input.GetKey(KeyCode.E) ? 1f : 0f) - (Input.GetKey(KeyCode.Q) ? 1f : 0f));
+        if (Mathf.Abs(turn) > 0.1f) stationYaw += turn * 120f * dt;
 
         Vector3 right = new Vector3(fwd.z, 0f, -fwd.x);
         Vector3 wish = (fwd.normalized * v + right.normalized * h);
