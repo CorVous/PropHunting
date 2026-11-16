@@ -33,6 +33,7 @@ public partial class Player : MonoBehaviour
     MeshFilter visualMesh;
     MeshRenderer visualRend;
     int captureClickFrame = -1;
+    public bool CaptureClick { get { return Time.frameCount == captureClickFrame; } }   // this frame's click only captured the mouse
 
     // simulated input for the build checks (Game.Cmd)
     float testWalkUntil, testForward, testRight;

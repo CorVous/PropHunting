@@ -1,51 +1,80 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
-// The host panel drawn on the lobby's north wall, right behind the play zone (owner decisions G50, G51: "the start
-// zone right next to a wall, with a start button on the ui for the host, and all settings visible (but not
-// interactable) for everyone else"). Every setting and START is a button in the world, always visible to everyone
-// and used in place by the host: point at it and click (in VR: point and pull the trigger, or touch it, G38).
-// Nothing opens an overlay. Everyone else sees the same settings and gets no hover and no click. The text reads
-// from anywhere in the zone (letters about 14 cm high, up to 12 m away). In this single-player prototype the
-// player is the host unless the prototype aid "You are the host" is switched off. The prototype's own aids (role, players in the zone, typing a seed, volume,
-// mouse speed) are not here: they are in the lobby's screen overlay (GameUI.LobbyAids), shown while the mouse is free.
+// The host panel on the lobby's north wall, right behind the play zone (owner decisions G50, G51, G55). Every
+// setting and START is a button, always visible to everyone and used in place by the host: point at it and click
+// (in VR: point and pull the trigger, or touch it). Nothing opens an overlay. Everyone else sees the same panel and
+// gets no hover and no click. The text reads from anywhere in the zone (capitals about 19 cm high, up to 12 m away).
+//
+// G55: the panel is a world-space Unity UI canvas (uGUI, TextMeshPro text), set up the way VRChat's VRC_UiShape page
+// asks, so that in the VRChat world it only needs a VRC_UiShape component and its buttons wired to Udon:
+//   render mode World Space; scale 0.01 (1 canvas unit = 1 cm); layer Default, not UI; a BoxCollider the size of the
+//   canvas on the canvas object; a GraphicRaycaster; Navigation None on every button; text is never a raycast target;
+//   the canvas's z-forward points into the wall, away from the people reading it. Nothing scrolls.
+// No VRChat type is referenced here: the WebGL player leaves those assemblies out. In the browser an EventSystem with
+// CentrePointerModule points with the centre of the screen while the mouse is captured, and only for the host.
+// In this single-player prototype the player is the host unless the prototype aid "You are the host" is switched
+// off. The prototype's own aids (role, players in the zone, typing a seed, volume, mouse speed) are not here: they
+// are in the lobby's screen overlay (GameUI.LobbyAids), shown while the mouse is free.
 public class HostWall
 {
-    class Button
+    class Entry
     {
-        public float x, y, w, h;               // centre and size on the wall, metres (x along the wall, y up)
-        public Func<bool> on;                  // drawn as selected
-        public Action act;
-        public Mesh mesh;
-        public Color32 shown, off;
         public string name;
+        public Button button;
+        public Image image;
+        public Func<bool> on;                  // drawn as selected
+        public Color32 off, shown;
     }
 
-    class Text
+    class Live
     {
-        public TextMesh tm;
+        public TextMeshProUGUI tm;
         public Func<string> get;
     }
 
-    readonly List<Button> buttons = new List<Button>();
-    readonly List<Text> texts = new List<Text>();
-    Vector3 origin;          // world position of the wall's centre line at the floor
-    float faceZ;             // world z of the buttons' faces
-    Transform root;
-    Button hovered;
+    readonly List<Entry> entries = new List<Entry>();
+    readonly List<Live> texts = new List<Live>();
+    Canvas canvas;
+    float midY;              // height of the canvas's centre above the floor, metres
 
-    public const float HalfW = 6.5f, Y0 = 2.0f, Y1 = 5.35f, Reach = 20f;
-    static readonly Color32 Off = new Color32(58, 72, 92, 255), On = new Color32(70, 150, 88, 255), StartCol = new Color32(46, 140, 70, 255);
+    public const float HalfW = 6.5f, Y0 = 2.0f, Y1 = 5.35f;
+    // the buttons' colours are tinted by 0.82 when not pointed at (ColorBlock.normalColor), so these are a little
+    // brighter than the colours they show
+    static readonly Color32 Off = new Color32(71, 88, 112, 255), On = new Color32(85, 183, 107, 255), StartCol = new Color32(56, 171, 85, 255);
     static readonly Color Info = new Color(0.85f, 0.9f, 1f);
-    const float LabelSize = 0.06f, SmallSize = 0.055f;
+    // sizes as before G55, in the old text meshes' character size; Em turns one into a TextMeshPro font size in cm
+    const float LabelSize = 0.06f, SmallSize = 0.055f, Em = 470f;
 
-    // wallCentre: world point on the wall's face (z) at x = 0, y = 0; the wall looks towards -z. Two columns of
-    // settings over a full-width START row, all above head height (the zone lies right in front of the wall, so the
-    // players standing in it must not hide the lower rows), letters about 14 cm high, readable across the zone.
+    // wallCentre: world point on the board's face at x = 0, y = 0; the room is on its -z side. Two columns of
+    // settings under a full-width START row, all above head height (the zone lies right in front of the wall, so the
+    // players standing in it must not hide the lower rows).
     public void Build(Transform parent, Vector3 wallCentre)
     {
-        root = parent; origin = wallCentre; faceZ = wallCentre.z - 0.04f;
+        midY = (Y0 + Y1) / 2f;
+        var go = new GameObject("HostPanelCanvas", typeof(RectTransform));
+        go.layer = 0;                                                   // Default: VRChat ignores canvases on UI
+        go.transform.SetParent(parent, false);
+        go.transform.position = wallCentre + new Vector3(0f, midY, -0.02f);
+        go.transform.rotation = Quaternion.identity;                    // z-forward into the wall, away from the reader
+        go.transform.localScale = Vector3.one * 0.01f;
+        canvas = go.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.worldCamera = Game.I.cam;
+        var rt = go.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(HalfW * 200f, (Y1 - Y0) * 100f);
+        go.AddComponent<GraphicRaycaster>();
+        // the collider VRChat's pointer looks for: the canvas's own size, 2 cm deep, behind its face (a trigger, so
+        // nothing walks into it and no physics query of the game sees it)
+        var bc = go.AddComponent<BoxCollider>();
+        bc.size = new Vector3(rt.sizeDelta.x, rt.sizeDelta.y, 2f);
+        bc.center = new Vector3(0f, 0f, 1f);
+        bc.isTrigger = true;
+
         var g = Game.I;
         Dynamic(0f, 5.08f, 0.07f, () => g.isHost ? "HOST: YOU" : "HOST: PLAYER 1", new Color(1f, 0.85f, 0.4f));
 
@@ -103,99 +132,130 @@ public class HostWall
         Add("start", 0f, r6, 5f, () => false, () => Lobby.I.TryGenerate(false), "START", 0.11f, 0.56f, StartCol);
     }
 
+    // a position on the wall (metres along it, metres above the floor) in canvas units
+    Vector2 At(float x, float y) { return new Vector2(x * 100f, (y - midY) * 100f); }
+
+    static RectTransform Rect(string name, Transform parent, Vector2 pos, Vector2 size)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.layer = parent.gameObject.layer;
+        go.transform.SetParent(parent, false);
+        var r = go.GetComponent<RectTransform>();
+        r.anchorMin = r.anchorMax = r.pivot = new Vector2(0.5f, 0.5f);
+        r.anchoredPosition = pos; r.sizeDelta = size;
+        return r;
+    }
+
     void Add(string name, float x, float y, float w, Func<bool> on, Action act, string label, float size = LabelSize, float h = 0.36f, Color32 off = default(Color32))
     {
         if (off.a == 0) off = Off;
-        var b = new Button { name = name, x = x, y = y, w = w, h = h, on = on, act = act, off = off };
-        var mb = new MeshBuf();
-        Vector3 c = origin + new Vector3(x, y, 0f);
-        mb.Box(new Vector3(c.x - w / 2, c.y - b.h / 2, faceZ), new Vector3(c.x + w / 2, c.y + b.h / 2, origin.z), off, off, off, MeshBuf.FACE_ALL & ~MeshBuf.FACE_ZP);
-        var go = mb.ToObject("HostButton " + name, root, ModelLibrary.lit);
-        b.mesh = go.GetComponent<MeshFilter>().sharedMesh;
-        b.shown = off;
-        buttons.Add(b);
-        Label(label, x, y, size, Color.white);
+        var r = Rect("Button " + name, canvas.transform, At(x, y), new Vector2(w * 100f, h * 100f));
+        var img = r.gameObject.AddComponent<Image>();
+        img.color = off;
+        var b = r.gameObject.AddComponent<Button>();
+        b.targetGraphic = img;
+        b.navigation = new Navigation { mode = Navigation.Mode.None };    // VRChat: moving must never work the UI
+        var cb = b.colors;
+        cb.normalColor = cb.selectedColor = cb.disabledColor = new Color(0.82f, 0.82f, 0.82f);
+        cb.highlightedColor = Color.white; cb.pressedColor = new Color(0.68f, 0.68f, 0.68f);
+        cb.fadeDuration = 0.05f;
+        b.colors = cb;
+        b.onClick.AddListener(() => { act(); AudioHub.I.Play("select_001", 0.5f); });
+        entries.Add(new Entry { name = name, button = b, image = img, on = on, off = off, shown = off });
+        Text(r, label, size, Color.white, w);
+    }
+
+    TextMeshProUGUI Label(string text, float x, float y, float size, Color col)
+    {
+        var r = Rect("Text", canvas.transform, At(x, y), new Vector2(400f, 60f));
+        return Text(r, text, size, col, 0f);
     }
 
     void Dynamic(float x, float y, float size, Func<string> get, Color col)
     {
-        texts.Add(new Text { tm = Label(get(), x, y, size, col), get = get });
+        texts.Add(new Live { tm = Label(get(), x, y, size, col), get = get });
     }
 
-    TextMesh Label(string text, float x, float y, float size, Color col)
+    // a text on rect r (a button's label is a child of the button, filling it)
+    static TextMeshProUGUI Text(RectTransform r, string text, float size, Color col, float w)
     {
-        var go = new GameObject("HostLabel");
-        go.transform.SetParent(root, false);
-        go.transform.position = origin + new Vector3(x, y, -0.06f);
-        go.transform.rotation = Quaternion.identity;   // a text mesh is read from -z: from the room
-        var tm = go.AddComponent<TextMesh>();
-        var font = Resources.Load<Font>("PropHunt/Fonts/KenneyFuture");
-        if (font != null) { tm.font = font; go.GetComponent<MeshRenderer>().sharedMaterial = TextMaterial(font); }
-        tm.text = text; tm.characterSize = size; tm.fontSize = 48; tm.anchor = TextAnchor.MiddleCenter; tm.alignment = TextAlignment.Center; tm.color = col;
-        return tm;
+        RectTransform tr = r;
+        if (w > 0f) { tr = Rect("Label", r, Vector2.zero, r.sizeDelta); }
+        var t = tr.gameObject.AddComponent<TextMeshProUGUI>();
+        t.font = Font;
+        t.fontSize = size * Em;
+        t.color = col;
+        t.alignment = TextAlignmentOptions.Center;
+        t.enableWordWrapping = false;
+        t.overflowMode = TextOverflowModes.Overflow;
+        t.raycastTarget = false;          // text never takes the pointer from a button under it
+        t.text = text;
+        return t;
     }
 
-    // a font's material that is depth-tested (PropText.shader): Unity's own draws text on top of everything
-    static Material textMat;
-    public static Material TextMaterial(Font font)
+    // Kenney Future as a TextMeshPro font, made once at run time from the font file (no editor to bake an SDF asset
+    // in this headless pipeline); TextMeshPro's own default font if that fails
+    static TMP_FontAsset font;
+    public static TMP_FontAsset Font
     {
-        if (textMat == null)
+        get
         {
-            textMat = new Material(Shader.Find("PropHunt/Text3D"));
-            textMat.mainTexture = font.material.mainTexture;
-        }
-        return textMat;
-    }
-
-    // the button the view points at, within reach, or null
-    Button Aimed()
-    {
-        Transform ct = Game.I.cam.transform;
-        Vector3 o = ct.position, f = ct.forward;
-        if (f.z < 0.05f) return null;
-        float u = (faceZ - o.z) / f.z;
-        if (u <= 0f || u > Reach) return null;
-        Vector3 h = o + f * u - origin;
-        foreach (var b in buttons)
-            if (Mathf.Abs(h.x - b.x) <= b.w / 2 && Mathf.Abs(h.y - b.y) <= b.h / 2) return b;
-        return null;
-    }
-
-    public bool Pointing { get { return Aimed() != null; } }
-
-    // every frame in the lobby: the hovered button lit, states and texts brought up to date; a click presses. Only
-    // the host's pointing does anything (G51): everyone else reads the settings but gets no hover and no click.
-    public void Tick(bool click)
-    {
-        hovered = Cursor.lockState == CursorLockMode.Locked && Game.I.isHost ? Aimed() : null;
-        if (click && hovered != null)
-        {
-            hovered.act();
-            AudioHub.I.Play("select_001", 0.5f);
-        }
-        foreach (var b in buttons)
-        {
-            Color32 c = b.on() ? On : b.off;
-            if (b == hovered) c = new Color32((byte)Mathf.Min(255, c.r + 40), (byte)Mathf.Min(255, c.g + 40), (byte)Mathf.Min(255, c.b + 40), 255);
-            if (!c.Equals(b.shown))
+            if (font == null)
             {
-                var cols = new Color32[b.mesh.vertexCount];
-                for (int i = 0; i < cols.Length; i++) cols[i] = c;
-                b.mesh.colors32 = cols;
-                b.shown = c;
+                var f = Resources.Load<Font>("PropHunt/Fonts/KenneyFuture");
+                if (f != null) font = TMP_FontAsset.CreateFontAsset(f);
+                if (font == null) font = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
             }
+            return font;
+        }
+    }
+
+    // A text in the lobby that is not part of the panel (the zone's floor, the sign by the way in): its own small
+    // world-space canvas, the same text and scale as the panel's. pos: world position; a canvas is read from -z,
+    // rot turns it to face the room or up from the floor; size in the old text meshes' character size.
+    public static TextMeshProUGUI WorldLabel(Transform parent, string text, Vector3 pos, Quaternion rot, float size, Color col)
+    {
+        var go = new GameObject("LobbyLabel", typeof(RectTransform));
+        go.layer = 0;
+        go.transform.SetParent(parent, false);
+        go.transform.position = pos; go.transform.rotation = rot; go.transform.localScale = Vector3.one * 0.01f;
+        var c = go.AddComponent<Canvas>();
+        c.renderMode = RenderMode.WorldSpace;
+        var rt = go.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(1000f, 120f);
+        return Text(rt, text, size, col, 0f);
+    }
+
+    // every frame in the lobby: the selected settings lit, the texts brought up to date; a guest's buttons do not
+    // take the pointer (CentrePointerModule only points for the host; disabled buttons look the same)
+    public void Tick()
+    {
+        bool host = Game.I.isHost;
+        foreach (var e in entries)
+        {
+            if (e.button.interactable != host) e.button.interactable = host;
+            Color32 c = e.on() ? On : e.off;
+            if (!c.Equals(e.shown)) { e.image.color = c; e.shown = c; }
         }
         foreach (var t in texts) { string s = t.get(); if (t.tm.text != s) t.tm.text = s; }
+    }
+
+    // is a game object one of this panel's buttons?
+    public bool Owns(GameObject go)
+    {
+        if (go == null) return false;
+        foreach (var e in entries) if (e.button.gameObject == go) return true;
+        return false;
     }
 
     // test hook: the yaw and pitch from an eye position to a named button (the aim is then clicked for real)
     public bool AimAt(string name, Vector3 eye, out float yaw, out float pitch)
     {
         yaw = pitch = 0f;
-        foreach (var b in buttons)
+        foreach (var e in entries)
         {
-            if (b.name != name) continue;
-            Vector3 d = origin + new Vector3(b.x, b.y, faceZ - origin.z) - eye;
+            if (e.name != name) continue;
+            Vector3 d = e.button.transform.position - eye;
             yaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
             pitch = -Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg;
             return true;
@@ -203,5 +263,5 @@ public class HostWall
         return false;
     }
 
-    public string Names() { var s = new List<string>(); foreach (var b in buttons) s.Add(b.name); return string.Join(", ", s.ToArray()); }
+    public string Names() { var s = new List<string>(); foreach (var e in entries) s.Add(e.name); return string.Join(", ", s.ToArray()); }
 }

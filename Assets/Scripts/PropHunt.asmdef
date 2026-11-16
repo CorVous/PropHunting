@@ -1,7 +1,10 @@
 {
     "name": "PropHunt",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

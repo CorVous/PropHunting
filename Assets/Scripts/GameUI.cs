@@ -261,7 +261,7 @@ public class GameUI : MonoBehaviour
 
         Sliders();
         GUILayout.Space(6);
-        GUILayout.Label("Controls stand in for VR (G38): W A S D and the mouse for the sticks and the head, Space for the jump button, a click for pointing and the trigger, Esc for looking at the wrist panel (lock, taunt, views, the third-person screen, the menu).", small);
+        GUILayout.Label("Controls stand in for VR: W A S D and the mouse for the sticks and the head, Space for the jump button, a click for pointing and the trigger, Esc for looking at the wrist panel (lock, taunt, views, the third-person screen, the menu).", small);
         GUILayout.Label("Models, sounds and fonts: Kenney (kenney.nl) and KayKit (Kay Lousberg), CC0. Sounds are stand-ins; there is no music yet.", small);
         GUILayout.EndArea();
     }
@@ -591,7 +591,7 @@ public class GameUI : MonoBehaviour
         if (rd.phase == Round.PH_END)
         {
             Fill(new Rect(W / 2 - 330, H - 70, 660, 34), new Color(0.04f, 0.05f, 0.07f, 0.8f));
-            GUI.Label(new Rect(W / 2 - 330, H - 68, 660, 30), rd.Winner + ": " + rd.endReason.ToLowerInvariant() + ". This is where the hiders were. (Click: results)", centre);
+            GUI.Label(new Rect(W / 2 - 330, H - 68, 660, 30), rd.Winner + ". " + rd.endReason + ". This is where the hiders were. (Click: results)", centre);
         }
     }
 
@@ -599,13 +599,12 @@ public class GameUI : MonoBehaviour
     {
         var g = Game.I;
         var rd = g.round;
-        float pw = 620f, ph = 210f + rd.resultLines.Count * 24f + 150f;
+        float pw = 620f, ph = 150f + rd.resultLines.Count * 24f + 150f;
         Rect r = new Rect(W - pw - 16, 70, pw, ph);
         GUI.Box(r, GUIContent.none, box);
         GUILayout.BeginArea(new Rect(r.x + 20, r.y + 12, pw - 40, ph - 20));
         GUILayout.Label("<b>" + rd.Winner.ToUpperInvariant() + "</b>", title, GUILayout.Height(44));
-        GUILayout.Label("Round over: " + rd.endReason.ToLowerInvariant() + (rd.hidersWin && rd.HuntersAlive > 0 ? ", with a hider uncaught" : "") + ".", heading);
-        GUILayout.Label("A run is this one round: about 1 in 4 players hunted, drawn at random, and everyone else hid. Any hider uncaught at the end, or every hunter out: the hiders win; every hider caught: the hunters win (G54). Below, personal figures: how long each hider survived (hiders' survival share " + rd.survivalShare + "%).", small);
+        GUILayout.Label(rd.endReason, heading);
         GUILayout.Space(6);
         foreach (string line in rd.resultLines) GUILayout.Label(line, label, GUILayout.Height(22));
         GUILayout.Space(8);
@@ -634,7 +633,7 @@ public class GameUI : MonoBehaviour
         if (GUILayout.Button(g.helpOpen ? "Help panel: shown" : "Help panel: hidden", button, GUILayout.Height(32))) g.helpOpen = !g.helpOpen;
         if (GUILayout.Button(g.debugOpen ? "Debug: shown" : "Debug: hidden", button, GUILayout.Height(32))) g.debugOpen = !g.debugOpen;
         GUILayout.EndHorizontal();
-        GUILayout.Label("Testing aids, not the game's flow (a run is one round, then a new map, G34): play this map again as", small);
+        GUILayout.Label("Testing aids, not the game's flow (a run is one round, then a new map): play this map again as", small);
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("Explore this map", button, GUILayout.Height(32))) { g.mode = Game.MODE_EXPLORE; g.round.Begin(g.mode); g.menuOpen = false; }
         if (GUILayout.Button("New round", button, GUILayout.Height(32))) { g.mode = Game.MODE_RANDOM; g.round.Begin(g.mode); g.menuOpen = false; }

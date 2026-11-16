@@ -4,7 +4,7 @@ using UnityEngine;
 // The lobby (owner decisions G33, G43, G50, G51): the room the player starts in, away from any map.
 //   the zone (G43, G51): an 11 x 11 m green square right against the north wall, big enough for a full instance of
 //     32 players standing about 1.9 m apart (121 m2); whoever stands in it takes part in the next round
-//   the host panel on that wall (G50, G51, HostWall.cs): every setting and the START button, drawn on the wall and
+//   the host panel on that wall (G50, G51, G55; HostWall.cs, a world-space UI canvas): every setting and START, on the wall and
 //     used in place by the host (point and click; in VR point and pull the trigger, G38); everyone else reads it.
 //     START only works while the player stands in the zone.
 //   the sign on the south wall, by the way in, says where everything is.
@@ -47,8 +47,8 @@ public class Lobby : MonoBehaviour
     // everyone taking part: the player and the bots in the zone
     public int Participants { get { return 1 + botsInZone; } }
 
-    // what the view points at: 2 a button of the host panel, 0 nothing
-    public int Aim() { return hostWall != null && hostWall.Pointing ? 2 : 0; }
+    // what the view points at: 2 a button of the host panel, 0 nothing (only ever 2 for the host)
+    public int Aim() { return hostWall != null && hostWall.Owns(CentrePointerModule.Hovered) ? 2 : 0; }
 
     public void Say(string text) { hint = text; hintUntil = Time.time + 3f; }
     public string Hint { get { return Time.time < hintUntil ? hint : ""; } }
@@ -73,10 +73,8 @@ public class Lobby : MonoBehaviour
     {
         var g = Game.I;
         if (g.state != Game.State.Lobby) return;
-        // a click (the mouse captured) on a button of the host wall does what it says, START included
-        bool click = Input.GetMouseButtonDown(0) && Cursor.lockState == CursorLockMode.Locked;
-        if (hostWall != null) hostWall.Tick(click);
-        if (g.state != Game.State.Lobby) return;
+        // the host panel's state; its buttons are pressed through the EventSystem (CentrePointerModule)
+        if (hostWall != null) hostWall.Tick();
         // the bots look at the panel
         Vector3 b = Origin + new Vector3(0f, 0f, RoomD / 2);
         foreach (var bot in bots)
@@ -211,6 +209,12 @@ public class Lobby : MonoBehaviour
         Label("Stand in the green zone to take part", b + new Vector3(0f, 1.62f, 0.1f), facing, 0.022f, new Color(0.7f, 1f, 0.7f));
         Label("Settings and START: the host panel", b + new Vector3(0f, 1.38f, 0.1f), facing, 0.018f, Color.white);
         Label("on the far wall, above the zone", b + new Vector3(0f, 1.16f, 0.1f), facing, 0.018f, Color.white);
+        if (UnityEngine.EventSystems.EventSystem.current == null)
+        {
+            var es = new GameObject("EventSystem");
+            es.AddComponent<UnityEngine.EventSystems.EventSystem>().sendNavigationEvents = false;
+            es.AddComponent<CentrePointerModule>();
+        }
         hostWall = new HostWall();
         hostWall.Build(root.transform, Origin + hp + new Vector3(0f, 0f, -0.14f));
         // benches and plants for those who watch
@@ -230,18 +234,11 @@ public class Lobby : MonoBehaviour
         bc.center = (mn + mx) * 0.5f; bc.size = mx - mn;
     }
 
-    TextMesh Label(string text, Vector3 local, Quaternion rot, float size, Color col)
+    // a text in the room (G55: TextMeshPro on a world-space canvas, like the host panel); rot turns it to face into
+    // the room (the sign) or up (the floor)
+    void Label(string text, Vector3 local, Quaternion rot, float size, Color col)
     {
-        var go = new GameObject("LobbyLabel");
-        go.transform.SetParent(root.transform, false);
-        go.transform.position = Origin + local;
-        // a text mesh is read from -z: rot turns it to face into the room (the board) or up (the floor)
-        go.transform.rotation = rot;
-        var tm = go.AddComponent<TextMesh>();
-        var font = Resources.Load<Font>("PropHunt/Fonts/KenneyFuture");
-        if (font != null) { tm.font = font; go.GetComponent<MeshRenderer>().sharedMaterial = HostWall.TextMaterial(font); }
-        tm.text = text; tm.characterSize = size; tm.fontSize = 48; tm.anchor = TextAnchor.MiddleCenter; tm.alignment = TextAlignment.Center; tm.color = col;
-        return tm;
+        HostWall.WorldLabel(root.transform, text, Origin + local, rot, size, col);
     }
 
     void Prop(string model, Vector3 local, float yaw, float scale)

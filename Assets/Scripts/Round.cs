@@ -307,7 +307,7 @@ public partial class Round : MonoBehaviour
         // the end of the round
         if (HidersAlive == 0) EndRound("Every hider was caught");
         else if (HuntersAlive == 0) EndRound("Every hunter is out");
-        else if (left <= 0f) EndRound("Time is up");
+        else if (left <= 0f) EndRound("Time's up: a hider was still uncaught");
     }
 
     public int statSkipped;          // forced taunts skipped this round because the hider had moved (G47)
