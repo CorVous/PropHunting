@@ -304,8 +304,18 @@ public class PHLocal : UdonSharpBehaviour
         Taunt();
     }
 
+    // the test pilot aims for its client (PHTestPilot): a ray instead of the head or hand
+    [HideInInspector] public bool aimOverride;
+    [HideInInspector] public Vector3 aimOrigin, aimDir;
+
+    public void PilotFire() { Fire(); }
+    public void PilotTake() { TryTakeDisguise(); }
+    public void PilotTaunt() { Taunt(); }
+    public int Role() { return role; }
+
     bool Aim(out RaycastHit hit, float range)
     {
+        if (aimOverride) return Physics.SphereCast(aimOrigin, 0.04f, aimDir, out hit, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
         VRCPlayerApi me = Networking.LocalPlayer;
         VRCPlayerApi.TrackingData t = me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
         Vector3 dir = me.IsUserInVR() ? t.rotation * Vector3.forward : t.rotation * Vector3.forward;
@@ -396,6 +406,7 @@ public class PHLocal : UdonSharpBehaviour
 
     Vector3 Aim0()
     {
+        if (aimOverride) return aimOrigin;
         VRCPlayerApi me = Networking.LocalPlayer;
         return (me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head)).position;
     }
