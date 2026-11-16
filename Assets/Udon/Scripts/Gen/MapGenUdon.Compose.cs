@@ -378,7 +378,6 @@ public partial class MapGenUdon
                 }
             }
         }
-        if (!found && TraceRoom == room) System.Console.Error.WriteLine("  no stretch of wall for " + lenMm + " x " + depMm + " mm with " + clearCells + " cells clear in front");
         return found;
     }
 
@@ -652,7 +651,6 @@ public partial class MapGenUdon
             if (score > bestScore) { bestScore = score; best = i; }
         }
         osAvoid = 0;
-        if (best < 0 && TraceRoom == room) System.Console.Error.WriteLine("  no open spot with clearance " + minClr);
         return best;
     }
 

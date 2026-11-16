@@ -68,7 +68,7 @@ def convert(text, fields, used):
 
     # trace output: whole statements guarded by TraceRoom, and bare Console lines
     text = re.sub(r"^[ \t]*(?:else\s+)?if\s*\(TraceRoom[^\n]*\n", lambda m: "", text, flags=re.M)
-    text = re.sub(r"^[ \t]*System\.Console\.[^\n]*\n", "", text, flags=re.M)
+    text = re.sub(r"^[^\n]*System\.Console\.[^\n]*\n", "", text, flags=re.M)
     text = re.sub(r"\bpublic static int TraceRoom = -1;", "int TraceRoom = -1;", text)
 
     # class declaration
@@ -103,12 +103,47 @@ def convert(text, fields, used):
     text = re.sub(r"\b(public |private )?static (?!class)", lambda m: (m.group(1) or ""), text)
     text = re.sub(r"\breadonly\s+", "", text)
 
+    # Udon has no remainder for uint: UMod (MapGenUdon.Rng.cs)
+    text = re.sub(r"(Hash32\([^;]*?\)) % (\d+u)", r"UMod(\1, \2)", text)
+
+    # Udon's int -> uint cast is checked (it throws for a negative int); U32 keeps the bits as C# does
+    text = u32_casts(text)
+
     # reference equality on strings
     text = text.replace("(object)dnId[i] == (object)id", "dnId[i] == id")
 
     # exceptions
     text = re.sub(r"throw new System\.Exception\(([^;]*)\);", r"{ UnityEngine.Debug.LogError(\1); }", text)
     return text
+
+
+
+def u32_casts(text):
+    """(uint)X -> U32(X) for X a name, member access, indexing or a parenthesised expression."""
+    out, i = [], 0
+    while True:
+        j = text.find("(uint)", i)
+        if j < 0:
+            out.append(text[i:])
+            return "".join(out)
+        out.append(text[i:j])
+        k = j + len("(uint)")
+        if k < len(text) and text[k] == "(":
+            depth, e = 0, k
+            while True:
+                if text[e] == "(":
+                    depth += 1
+                elif text[e] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                e += 1
+            out.append("U32" + text[k:e + 1])
+            i = e + 1
+        else:
+            m = re.match(r"[\w.]+(\[[^\]]*\])?", text[k:])
+            out.append("U32(" + m.group(0) + ")")
+            i = k + m.end()
 
 
 def main():

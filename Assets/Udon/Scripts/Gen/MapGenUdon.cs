@@ -240,7 +240,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     uint[] Rng(int st, int a, int b)
     {
         int version = (st == ST_LAYOUT || st == ST_EDGES) ? GenData.LAYOUT_VERSION : GenData.GEN_VERSION;
-        return RngSub(seed, (uint)version, st * 16 + attempt, a, b + size * 1000);
+        return RngSub(seed, U32(version), st * 16 + attempt, a, b + size * 1000);
     }
 
     int Abs(int v) { return v < 0 ? -v : v; }

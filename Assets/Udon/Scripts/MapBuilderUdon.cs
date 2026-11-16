@@ -114,10 +114,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     Color32 Vary(Color32 c, int ix, int iz, int amount)
     {
-        uint h = Mix((uint)(ix * 73856093) ^ (uint)(iz * 19349663));
-        int d = (int)(h % (uint)(2 * amount + 1)) - amount;
+        uint h = Mix(U32(ix * 73856093) ^ U32(iz * 19349663));
+        uint m = (uint)(2 * amount + 1);
+        int d = (int)(h - (h / m) * m) - amount;
         return C(Mathf.Clamp(c.r + d, 0, 255), Mathf.Clamp(c.g + d, 0, 255), Mathf.Clamp(c.b + d, 0, 255));
     }
+
+    uint U32(int v) { return v >= 0 ? (uint)v : ((uint)(v & 0x7FFFFFFF) | 0x80000000u); }
 
     uint Mix(uint h)
     {

@@ -21,6 +21,12 @@ public partial class MapGenUdon
         return h;
     }
 
+    // (uint)v without Udon's overflow check: the same bits as C#'s unchecked cast
+    uint U32(int v) { return v >= 0 ? (uint)v : ((uint)(v & 0x7FFFFFFF) | 0x80000000u); }
+
+    // a % b for uint: Udon exposes uint division but no uint remainder
+    uint UMod(uint a, uint b) { return a - (a / b) * b; }
+
     uint[] RngNew(uint s)
     {
         uint[] r = new uint[1];
@@ -30,7 +36,7 @@ public partial class MapGenUdon
 
     uint[] RngSub(uint seedValue, uint version, int stageId, int a, int b)
     {
-        return RngNew(Hash32(seedValue, version, (uint)stageId, (uint)a, (uint)b));
+        return RngNew(Hash32(seedValue, version, U32(stageId), U32(a), U32(b)));
     }
 
     uint RngNextU(uint[] r)
@@ -47,7 +53,7 @@ public partial class MapGenUdon
     int RngRange(uint[] r, int n)
     {
         if (n <= 1) return 0;
-        return (int)((RngNextU(r) >> 4) % (uint)n);
+        return (int)UMod(RngNextU(r) >> 4, U32(n));
     }
 
     // lo .. hi inclusive

@@ -520,14 +520,14 @@ public partial class MapGenUdon
                     if (gj != g) break;
                 }
             if (other == 0) continue;
-            uint h = Hash32(seed, (uint)GenData.GEN_VERSION, 77, (uint)i, (uint)size) % 100u;
+            uint h = UMod(Hash32(seed, U32(GenData.GEN_VERSION), 77, U32(i), U32(size)), 100u);
             if (h < (away == 1 ? 38u : 14u)) ground[i] = (byte)other;
         }
     }
 
     uint Fnv(uint h, int v)
     {
-        uint u = (uint)v;
+        uint u = U32(v);
         for (int i = 0; i < 4; i++) { h ^= (u >> (i * 8)) & 0xFF; h *= 16777619u; }
         return h;
     }

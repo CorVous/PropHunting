@@ -872,7 +872,7 @@ public partial class MapGenUdon
                 if (firstOpen < 0) firstOpen = inner;
                 bool h;
                 int ei = EdgeIndex(cx, cz, d, out h);
-                if ((Hash32(seed, (uint)GenData.GEN_VERSION, 91, (uint)(ei * 2 + (h ? 1 : 0)), (uint)size) & 1) != 0) continue;
+                if ((Hash32(seed, U32(GenData.GEN_VERSION), 91, U32(ei * 2 + (h ? 1 : 0)), U32(size)) & 1) != 0) continue;
                 if (nGate < gateCell.Length) gateCell[nGate++] = inner;
             }
         }
