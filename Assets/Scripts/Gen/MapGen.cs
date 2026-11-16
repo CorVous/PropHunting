@@ -161,6 +161,7 @@ public partial class MapGen
         clr = new int[IW * IH]; canopy = new int[IW * IH];
         roomCells = new int[IW * IH];
         queue = new int[IW * IH]; dist = new int[IW * IH];
+        wideMark = new int[IW * IH]; wideStamp = 0;
     }
 
     public void RunAll(uint seedValue, int sizeBucket) { RunAll(seedValue, sizeBucket, 0); }
@@ -189,6 +190,7 @@ public partial class MapGen
                 BuildEdgesSite();
                 if (!ValidateSite()) { Retry("layout tests"); break; }
                 BuildTags();
+                ResetExits();
                 stage = 2; cursor = 0; progressPermille = 150;
                 break;
             case 2:

@@ -49,18 +49,33 @@ public partial class MapGenUdon
         return x;
     }
 
-    // 0 .. n-1
+    // 0 .. n-1 (RngNextU, UMod and U32 written out: the generator draws thousands of numbers per room, and in
+    // Udon every call costs)
     int RngRange(uint[] r, int n)
     {
         if (n <= 1) return 0;
-        return (int)UMod(RngNextU(r) >> 4, U32(n));
+        uint x = r[0];
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        r[0] = x;
+        x = x >> 4;
+        uint un = (uint)n;
+        return (int)(x - (x / un) * un);
     }
 
     // lo .. hi inclusive
     int RngBetween(uint[] r, int lo, int hi)
     {
         if (hi <= lo) return lo;
-        return lo + RngRange(r, hi - lo + 1);
+        uint x = r[0];
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        r[0] = x;
+        x = x >> 4;
+        uint un = (uint)(hi - lo + 1);
+        return lo + (int)(x - (x / un) * un);
     }
 
     bool RngChance(uint[] r, int permille)

@@ -305,7 +305,9 @@ public partial class MapGenUdon
     // is the wall on side d of this inner cell a window's opening? (1 m to 3 m along a 4 m edge)
     bool WindowAt(int ix, int iz, int d)
     {
-        if (EdgeType(ix >> 3, iz >> 3, d) != GenData.E_WINDOW) return false;
+        int x = ix >> 3, z = iz >> 3;
+        int et = d == 0 ? edgeH[(z + 1) * W + x] : (d == 2 ? edgeH[z * W + x] : (d == 1 ? edgeV[z * (W + 1) + x + 1] : edgeV[z * (W + 1) + x]));
+        if (et != GenData.E_WINDOW) return false;
         int along = (d == 0 || d == 2) ? (ix & 7) : (iz & 7);
         return along >= 2 && along <= 5;
     }

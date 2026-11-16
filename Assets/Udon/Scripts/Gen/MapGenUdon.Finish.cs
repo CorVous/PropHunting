@@ -289,6 +289,7 @@ public partial class MapGenUdon
     bool RoomWalkable(int room)
     {
         int s = roomCellStart[room], n = roomCellCount[room];
+        BuildWide(room);
         int start = -1, free = 0;
         for (int k = s; k < s + n; k++)
         {
@@ -300,7 +301,7 @@ public partial class MapGenUdon
             {
                 bool dNew = (tags[i] & GenData.T_DOOR_CLEAR) != 0, dOld = (tags[start] & GenData.T_DOOR_CLEAR) != 0;
                 better = dNew && !dOld;
-                if (!better && dNew == dOld && !WideCell(room, start) && WideCell(room, i)) better = true;
+                if (!better && dNew == dOld && wideMark[start] != wideStamp && wideMark[i] == wideStamp) better = true;
             }
             if (better) start = i;
         }
@@ -317,15 +318,11 @@ public partial class MapGenUdon
             while (qh < qt)
             {
                 int i = queue[qh++];
-                int ix = i % IW, iz = i / IW;
-                for (int d = 0; d < 4; d++)
-                {
-                    int jx = ix + DX[d], jz = iz + DZ[d];
-                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
-                    int j = jz * IW + jx;
-                    if (innerRoom[j] != room || solid[j] > 0 || dist[j] == walkStamp || WideCell(room, j)) continue;
-                    dist[j] = walkStamp; queue[qt++] = j; seen++;
-                }
+                int ix = i % IW, iz = i / IW, j;
+                if (iz + 1 < IH) { j = i + IW; if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && wideMark[j] != wideStamp) { dist[j] = walkStamp; queue[qt++] = j; seen++; } }
+                if (ix + 1 < IW) { j = i + 1; if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && wideMark[j] != wideStamp) { dist[j] = walkStamp; queue[qt++] = j; seen++; } }
+                if (iz > 0) { j = i - IW; if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && wideMark[j] != wideStamp) { dist[j] = walkStamp; queue[qt++] = j; seen++; } }
+                if (ix > 0) { j = i - 1; if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && wideMark[j] != wideStamp) { dist[j] = walkStamp; queue[qt++] = j; seen++; } }
             }
             if (seen * 2 >= free || (tags[start] & GenData.T_DOOR_CLEAR) != 0) break;
             // an area without a door (outdoors) was entered in a small corner: start again in the rest of it
@@ -333,7 +330,7 @@ public partial class MapGenUdon
             for (int k = s; k < s + n && other < 0; k++)
             {
                 int i = roomCells[k];
-                if (solid[i] == 0 && dist[i] != walkStamp && WideCell(room, i)) other = i;
+                if (solid[i] == 0 && dist[i] != walkStamp && wideMark[i] == wideStamp) other = i;
             }
             if (other < 0) break;
             start = other;
@@ -359,22 +356,50 @@ public partial class MapGenUdon
     // that holds the only way in would seal the rest of the room off from the map.
     int[] exitAll = new int[24], exitMain = new int[24];
 
-    bool ExitsJoined(int room)
+    // per room: its cells' steps into a neighbouring room (cell, neighbour), built on first use
+    int[] exitStart, exitCount, exitCell, exitTo;
+    int exitN;
+
+    void ResetExits()
     {
-        int nAll = 0, nMain = 0;
+        if (exitStart == null || exitStart.Length < 400) { exitStart = new int[400]; exitCount = new int[400]; }
+        for (int r = 0; r < exitStart.Length; r++) exitStart[r] = -1;
+        if (exitCell == null || exitCell.Length < IW * IH) { exitCell = new int[IW * IH]; exitTo = new int[IW * IH]; }
+        exitN = 0;
+    }
+
+    void ListExits(int room)
+    {
+        exitStart[room] = exitN; exitCount[room] = 0;
         int s = roomCellStart[room], n = roomCellCount[room];
         for (int k = s; k < s + n; k++)
         {
             int i = roomCells[k];
-            if (solid[i] > 0) continue;
-            // only the room's border cells can have a way out
             int ix = i % IW, iz = i / IW;
             for (int d = 0; d < 4; d++)
             {
                 int jx = ix + DX[d], jz = iz + DZ[d];
                 if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
                 int j = jz * IW + jx, other = innerRoom[j];
-                if (other == room || other < 0 || solid[j] > 0 || !CanStep(ix, iz, d)) continue;
+                if (other == room || other < 0 || !CanStep(ix, iz, d)) continue;
+                if (exitN >= exitCell.Length) return;
+                exitCell[exitN] = i; exitTo[exitN] = j; exitN++; exitCount[room]++;
+            }
+        }
+    }
+
+    bool ExitsJoined(int room)
+    {
+        int nAll = 0, nMain = 0;
+        // only the room's border cells can have a way out: their steps into other rooms, listed once per room
+        // (the rooms and their walls do not change while it is furnished), in the order the cells come
+        if (exitStart[room] < 0) ListExits(room);
+        int e0 = exitStart[room], e1 = e0 + exitCount[room];
+        for (int x = e0; x < e1; x++)
+        {
+            int i = exitCell[x], j = exitTo[x], other = innerRoom[j];
+            if (solid[i] > 0 || solid[j] > 0) continue;
+            {
                 bool main = dist[i] == walkStamp, have = false;
                 for (int q = 0; q < nAll && !have; q++) have = exitAll[q] == other;
                 if (!have && nAll < exitAll.Length) exitAll[nAll++] = other;
@@ -388,6 +413,29 @@ public partial class MapGenUdon
     }
 
     // does the free cell lie in a free square of 2 x 2 cells of its room?
+    // The wide floor of the room, all at once (the same cells WideCell finds one by one, without a call per
+    // cell: the walkability test runs after every placement, and in Udon calls are what cost): every free 2 x 2
+    // square of the room marks its four cells with wideStamp. Valid until the room's props change.
+    int[] wideMark;
+    int wideStamp;
+
+    void BuildWide(int room)
+    {
+        wideStamp++;
+        int s = roomCellStart[room], n = roomCellCount[room];
+        for (int k = s; k < s + n; k++)
+        {
+            int a = roomCells[k];
+            if (solid[a] > 0) continue;
+            int ax = a % IW, az = a / IW;
+            if (ax + 1 >= IW || az + 1 >= IH) continue;
+            int b = a + 1, c = a + IW, d = a + IW + 1;
+            if (innerRoom[b] != room || innerRoom[c] != room || innerRoom[d] != room) continue;
+            if (solid[b] > 0 || solid[c] > 0 || solid[d] > 0) continue;
+            wideMark[a] = wideStamp; wideMark[b] = wideStamp; wideMark[c] = wideStamp; wideMark[d] = wideStamp;
+        }
+    }
+
     bool WideCell(int room, int i)
     {
         int ix = i % IW, iz = i / IW;
@@ -409,18 +457,31 @@ public partial class MapGenUdon
     {
         int qh = 0, qt = 0;
         dist[start] = walkStamp; queue[qt++] = start;
+        // the four neighbours written out (N, E, S, W): this is the generator's hottest loop, and in Udon every
+        // array read and loop step is a call
         while (qh < qt)
         {
             int i = queue[qh++];
-            int ix = i % IW, iz = i / IW;
-            for (int d = 0; d < 4; d++)
+            int ix = i % IW, iz = i / IW, j;
+            if (iz + 1 < IH)
             {
-                int jx = ix + DX[d], jz = iz + DZ[d];
-                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
-                int j = jz * IW + jx;
-                if (innerRoom[j] != room || solid[j] > 0 || dist[j] == walkStamp) continue;
-                if (wide != 0 && !WideCell(room, j)) continue;
-                dist[j] = walkStamp; queue[qt++] = j;
+                j = i + IW;
+                if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && (wide == 0 || wideMark[j] == wideStamp)) { dist[j] = walkStamp; queue[qt++] = j; }
+            }
+            if (ix + 1 < IW)
+            {
+                j = i + 1;
+                if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && (wide == 0 || wideMark[j] == wideStamp)) { dist[j] = walkStamp; queue[qt++] = j; }
+            }
+            if (iz > 0)
+            {
+                j = i - IW;
+                if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && (wide == 0 || wideMark[j] == wideStamp)) { dist[j] = walkStamp; queue[qt++] = j; }
+            }
+            if (ix > 0)
+            {
+                j = i - 1;
+                if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && (wide == 0 || wideMark[j] == wideStamp)) { dist[j] = walkStamp; queue[qt++] = j; }
             }
         }
         return qt;

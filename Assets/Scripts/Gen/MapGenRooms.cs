@@ -12,10 +12,13 @@ public partial class MapGen
         horizontal = false; return z * (W + 1) + x;
     }
 
+    // EdgeIndex written out: this runs thousands of times per room, and in Udon every call costs
     public int EdgeType(int x, int z, int dir)
     {
-        bool h; int i = EdgeIndex(x, z, dir, out h);
-        return h ? edgeH[i] : edgeV[i];
+        if (dir == 0) return edgeH[(z + 1) * W + x];
+        if (dir == 2) return edgeH[z * W + x];
+        if (dir == 1) return edgeV[z * (W + 1) + x + 1];
+        return edgeV[z * (W + 1) + x];
     }
 
     public int EdgeOff(int x, int z, int dir)
