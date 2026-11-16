@@ -8,9 +8,10 @@ using VRC.Udon.Common;
 // The hider sits in their own Immobilize station (station parking); this moves that station on the hider's
 // client, and VRChat keeps the seated player with it. Every other client parks its copy of the station and
 // draws the synced prop instead (PHSlot).
-//   input: Udon's move events (VR thumbstick, desktop WASD) relative to where the head looks; Shift runs on
+//   input: Udon's move events (VR thumbstick, desktop WASD) along the facing; Shift runs on
 //          desktop (55% without it, as the prototype); jump hops (tiny and medium props), with a ledge assist;
-//          the VR right stick or Q/E turn the seated player; the prop faces where the head looks
+//          the VR right stick or the desktop mouse turn the seated player and the prop; the head and the
+//          playspace never move or turn it
 //   the prop turns with the body in 15 degree steps, and only where its box fits (TryYaw)
 // A caught hider (a ghost) moves as a person-sized box through everything but the architecture.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -103,22 +104,25 @@ public class PHHiderBody : UdonSharpBehaviour
         jumpPressed = false;
         if (frozen) { v = 0f; h = 0f; jump = false; }
 
-        Quaternion headRot = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation;
-        Vector3 fwd = headRot * Vector3.forward; fwd.y = 0f;
-        float headYaw = fwd.sqrMagnitude > 1e-4f ? Mathf.Atan2(fwd.x, fwd.z) * Mathf.Rad2Deg : stationYaw;
-        // Turning the station turns the seated player's view with it, so the station never chases the head (that
-        // fed back on itself and spun). It turns only on turn input: the VR right stick, Q and E on desktop.
-        float turn = vr ? look : ((Input.GetKey(KeyCode.E) ? 1f : 0f) - (Input.GetKey(KeyCode.Q) ? 1f : 0f));
-        if (Mathf.Abs(turn) > 0.1f) stationYaw += turn * 120f * dt;
-
-        Vector3 right = new Vector3(fwd.z, 0f, -fwd.x);
-        Vector3 wish = (fwd.normalized * v + right.normalized * h);
+        // Only inputs move and turn the prop, never the head or the playspace (Cor): the VR right stick or the
+        // desktop mouse turns the station (and the seated player's view with it), and the move input goes along
+        // the station's facing.
+        if (!frozen)
+        {
+            if (vr) { if (Mathf.Abs(look) > 0.1f) stationYaw += look * 120f * dt; }
+            else stationYaw += Input.GetAxisRaw("Mouse X") * 2.2f;
+        }
+        stationYaw = Mathf.Repeat(stationYaw, 360f);
+        Quaternion facing = Quaternion.Euler(0f, stationYaw, 0f);
+        Vector3 fwd = facing * Vector3.forward;
+        Vector3 right = facing * Vector3.right;
+        Vector3 wish = fwd * v + right * h;
         if (wish.sqrMagnitude > 1f) wish.Normalize();
         bool run = vr || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         wish *= speed * (run ? 1f : DESKTOP_WALK);
 
-        // the prop faces the way the hider looks, in 15 degree steps, where it fits
-        if (!ghost && !frozen) TryYaw(Mathf.Round(headYaw / 15f) * 15f);
+        // the prop faces the way the hider has turned, in 15 degree steps, where it fits
+        if (!ghost && !frozen) TryYaw(Mathf.Round(stationYaw / 15f) * 15f);
 
         float left = dt;
         while (left > 1e-5f)
