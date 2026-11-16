@@ -70,6 +70,17 @@ public static class PropPrefabBaker
         go.AddComponent<MeshRenderer>().sharedMaterial = mat;
         go.layer = LAYER_PROP;
         BuildColliders(go, def, model, sc);
+        // knockable props carry a kinematic rigidbody that a dart's knock switches on (PHKnock)
+        int fl = GenData.defFlags[def];
+        if ((fl & (GenData.FL_DECOR | GenData.FL_HEAVY | GenData.FL_FIXTURE | GenData.FL_SCENERY)) == 0)
+        {
+            var rb = go.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.mass = GenData.defMassKg[def];
+            rb.drag = 0.2f; rb.angularDrag = 0.6f;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rb.interpolation = RigidbodyInterpolation.None;   // interpolation would pull a fresh instance back to the origin
+        }
         int k = 0;
         if ((GenData.defFlags[def] & GenData.FL_OPENABLE) != 0)
             for (int pm = 0; pm < mesh.Length; pm++)

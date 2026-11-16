@@ -126,6 +126,20 @@ public static class WorldSceneBuilder
         }
         game.slots = slots;
 
+        var knocksRoot = new GameObject("Knocks");
+        knocksRoot.transform.SetParent(gameGo.transform, false);
+        var knocks = new PHKnock[16];
+        for (int i = 0; i < knocks.Length; i++)
+        {
+            var go = new GameObject("Knock" + i);
+            go.transform.SetParent(knocksRoot.transform, false);
+            var k = go.AddUdonSharpComponent<PHKnock>();
+            k.game = game;
+            UdonSharpEditorUtility.CopyProxyToUdon(k);
+            knocks[i] = k;
+        }
+        game.knocks = knocks;
+
         // START, on the north wall above the zone (host only; the game checks)
         var start = Box(lobby.transform, "StartButton", new Vector3(0f, 1.4f, RoomD / 2 - 0.15f), new Vector3(1.2f, 0.5f, 0.2f), buttonMat, true);
         var btn = start.AddUdonSharpComponent<PHButton>();

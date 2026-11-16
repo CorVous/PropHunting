@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8641967162935583701}
   - component: {fileID: 3209831684288235302}
   - component: {fileID: 1611020414296667293}
+  - component: {fileID: 811361269753237598}
   m_Layer: 11
   m_Name: 054_f_pizzaBox
   m_TagString: Untagged
@@ -41,7 +42,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5520838906306860429}
-  m_Mesh: {fileID: -2089259466437871518, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -471487562388410538, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &3209831684288235302
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,3 +106,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.94179994, y: 0.8816255, z: 0.95180005}
   m_Center: {x: 0, y: 0.44081274, z: 0}
+--- !u!54 &811361269753237598
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5520838906306860429}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3

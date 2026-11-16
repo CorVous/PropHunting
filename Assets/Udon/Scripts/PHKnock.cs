@@ -1,0 +1,111 @@
+using UdonSharp;
+using UnityEngine;
+using VRC.SDKBase;
+
+// One knocked prop at a time (04 section 4.8, D12): a pool of these carries a dart's knock to everyone.
+// The hunter whose dart knocked the prop owns the knock and runs its physics; everyone else moves their copy of
+// the prop to the synced pose. Updates go out only while the prop moves (about 8 a second); once it rests one
+// last update carries the final pose and nothing more is sent. The knock keeps that pose (late joiners get it)
+// until the pool reuses it for another prop or a new round starts (props go home, D11).
+[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+public class PHKnock : UdonSharpBehaviour
+{
+    public PHGame game;
+    public const float SETTLE_TIME = 4f, SEND_INTERVAL = 0.12f;
+    public const float KNOCK_SPEED_LIGHT = 5.5f, KNOCK_SPEED = 3.2f;
+
+    [UdonSynced] public int emit = -1;
+    [UdonSynced] public int round = -1;
+    [UdonSynced] public Vector3 pos;
+    [UdonSynced] public Quaternion rot;
+    [UdonSynced] public bool moving;
+
+    [HideInInspector] public float lastUsed;
+    Rigidbody body;          // owner: the prop's rigidbody while it flies
+    float knockedAt, nextSend;
+    int shownEmit = -1;
+
+    public bool Busy { get { return moving && round == game.round; } }
+
+    // the owner starts a knock: the prop flies from the dart's hit
+    public void Knock(int e, Vector3 dir, Vector3 point)
+    {
+        GameObject go = game.builder.objects[e];
+        if (go == null) return;
+        if (!Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);
+        if (emit != e && emit >= 0 && round == game.round) Release();   // the pool reuses the oldest knock
+        emit = e; round = game.round; shownEmit = e;
+        lastUsed = Time.time;
+        body = go.GetComponent<Rigidbody>();
+        if (body == null) return;
+        body.isKinematic = false;
+        bool light = (game.gen.defFlags[game.gen.emitDef[e]] & GenData.FL_LIGHT) != 0;
+        float mass = body.mass;
+        float speed = (light ? KNOCK_SPEED_LIGHT : KNOCK_SPEED) * Mathf.Clamp(8f / (mass + 4f), 0.5f, 1.2f);
+        Vector3 push = (dir.normalized + Vector3.up * 0.45f).normalized * speed;
+        body.AddForceAtPosition(push * mass, point, ForceMode.Impulse);
+        body.AddTorque(Random.insideUnitSphere * mass * 0.4f, ForceMode.Impulse);
+        knockedAt = Time.time;
+        moving = true;
+        Capture();
+        nextSend = Time.time + SEND_INTERVAL;
+        RequestSerialization();
+    }
+
+    void Capture()
+    {
+        Transform t = game.builder.objects[emit].transform;
+        pos = t.position; rot = t.rotation;
+    }
+
+    // stop simulating the old prop where it lies (only on the owner's client, which was running it)
+    void Release()
+    {
+        if (body != null) { body.isKinematic = true; body = null; }
+    }
+
+    void Update()
+    {
+        if (game == null || emit < 0 || game.builder.objects == null || emit >= game.builder.objects.Length) return;
+        if (round != game.round) return;
+        bool owner = Networking.IsOwner(gameObject);
+        if (owner && body != null && moving)
+        {
+            float t = Time.time - knockedAt;
+            Transform tr = game.builder.objects[emit].transform;
+            bool done = t > SETTLE_TIME || (t > 0.4f && body.IsSleeping()) || tr.position.y < -3f;
+            if (done)
+            {
+                body.velocity = Vector3.zero; body.angularVelocity = Vector3.zero;
+                body.isKinematic = true; body = null;
+                moving = false;
+                Capture();
+                RequestSerialization();   // the last update: the pose it rests in
+                return;
+            }
+            if (Time.time >= nextSend)
+            {
+                nextSend = Time.time + SEND_INTERVAL;
+                Capture();
+                RequestSerialization();
+            }
+            return;
+        }
+        if (owner && body == null && !moving) return;
+        // everyone else: follow the synced pose
+        GameObject go = game.builder.objects[emit];
+        if (go == null) return;
+        Transform g = go.transform;
+        if (!moving) { g.SetPositionAndRotation(pos, rot); return; }
+        float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
+        g.SetPositionAndRotation(Vector3.Lerp(g.position, pos, k), Quaternion.Slerp(g.rotation, rot, k));
+    }
+
+    public override void OnDeserialization()
+    {
+        // a knock of another prop took this one over: the old prop stays where it lay
+        shownEmit = emit;
+        if (!moving && emit >= 0 && round == game.round && game.builder.objects != null && emit < game.builder.objects.Length && game.builder.objects[emit] != null)
+            game.builder.objects[emit].transform.SetPositionAndRotation(pos, rot);
+    }
+}

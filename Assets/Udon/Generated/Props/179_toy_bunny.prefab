@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 558443843010130728}
   - component: {fileID: 8581647844165729806}
   - component: {fileID: 5932556426319791090}
+  - component: {fileID: 4679990859848978322}
   m_Layer: 11
   m_Name: 179_toy_bunny
   m_TagString: Untagged
@@ -41,7 +42,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6645127625453568168}
-  m_Mesh: {fileID: 1614791885611064335, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 4342333954688137910, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &8581647844165729806
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,3 +106,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.25, y: 2.0100446, z: 1.3298249}
   m_Center: {x: 0, y: 1.0050223, z: 0}
+--- !u!54 &4679990859848978322
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6645127625453568168}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3

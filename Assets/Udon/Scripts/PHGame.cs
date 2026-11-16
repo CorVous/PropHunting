@@ -20,6 +20,7 @@ public class PHGame : UdonSharpBehaviour
     public MapBuilderUdon builder;
     public PHSlot[] slots;
     public PHLocal local;
+    public PHKnock[] knocks;            // the pool of synced prop knocks
     public BoxCollider lobbyZone;
     public Transform lobbySpawn;
     public int minPlayers = 2;          // START needs this many in the zone (1 for solo tests: everyone hides)
@@ -273,6 +274,25 @@ public class PHGame : UdonSharpBehaviour
 
     // ------------------------------------------------------------------ helpers for everyone
     public int RoleOf(int slot) { return slot >= 0 && slot < slotRole.Length ? slotRole[slot] : ROLE_NONE; }
+
+    // a knock for a new prop: a free one, else the one used longest ago
+    public PHKnock FreeKnock()
+    {
+        PHKnock best = null;
+        for (int i = 0; i < knocks.Length; i++)
+        {
+            PHKnock k = knocks[i];
+            if (k.Busy) continue;
+            if (best == null || k.lastUsed < best.lastUsed) best = k;
+        }
+        return best;
+    }
+
+    public PHKnock KnockOf(int emit)
+    {
+        for (int i = 0; i < knocks.Length; i++) if (knocks[i].emit == emit && knocks[i].round == round) return knocks[i];
+        return null;
+    }
 
     public bool InLobbyZone(Vector3 p)
     {

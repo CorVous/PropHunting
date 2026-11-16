@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 265190514495436109}
   - component: {fileID: 1156023817918186647}
   - component: {fileID: 7535021630472712642}
+  - component: {fileID: 76586366900936442}
   m_Layer: 11
   m_Name: 205_n_flowerYellowB
   m_TagString: Untagged
@@ -41,7 +42,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 421297613161860776}
-  m_Mesh: {fileID: 1447994961657045945, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 575614962410634684, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &1156023817918186647
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,3 +106,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.20733458, y: 0.1585, z: 0.23917954}
   m_Center: {x: 0, y: 0.07925, z: 0}
+--- !u!54 &76586366900936442
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 421297613161860776}
+  serializedVersion: 4
+  m_Mass: 4
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3

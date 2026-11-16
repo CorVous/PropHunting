@@ -64,3 +64,9 @@ crashlytics-build.properties
 /[Oo]bj/
 /[Uu]ser[Ss]ettings/
 *.unitypackage
+
+# local tools and ClientSim data
+.vscode/
+ClientSimStorage/
+Assets/Screenshots/
+Assets/Screenshots.meta

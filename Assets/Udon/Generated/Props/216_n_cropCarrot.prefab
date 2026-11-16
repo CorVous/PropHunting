@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8507246056219080343}
   - component: {fileID: 393342557028503028}
   - component: {fileID: 3658141063705884779}
+  - component: {fileID: 1738427928737306511}
   m_Layer: 11
   m_Name: 216_n_cropCarrot
   m_TagString: Untagged
@@ -41,7 +42,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8947935413014877204}
-  m_Mesh: {fileID: -8644012719268464756, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 4227476574163640479, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &393342557028503028
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,3 +106,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.34314197, y: 0.6194037, z: 0.34314197}
   m_Center: {x: 0, y: 0.30970186, z: 0}
+--- !u!54 &1738427928737306511
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8947935413014877204}
+  serializedVersion: 4
+  m_Mass: 8
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3

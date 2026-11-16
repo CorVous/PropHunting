@@ -262,6 +262,7 @@ public class PHLocal : UdonSharpBehaviour
         }
         int e = EmitOf(hit.collider.transform);
         if (e < 0) return;   // a wall or a door: nothing happens
+        KnockProp(e, hit.point - Aim0(), hit.point);
         // a real prop: it costs health (G17), but the same prop again within 5 s costs nothing
         if (e == lastCharged && Time.time - lastChargedAt < WRONG_SAME_WINDOW) return;
         lastCharged = e; lastChargedAt = Time.time;
@@ -274,6 +275,31 @@ public class PHLocal : UdonSharpBehaviour
         else Say("Just a " + game.gen.defId[game.gen.emitDef[e]] + ". -" + penalty + " health", 2f);
         s.Send();
         if (sfx != null && wrongClip != null) sfx.PlayOneShot(wrongClip, 0.7f);
+    }
+
+    Vector3 Aim0()
+    {
+        VRCPlayerApi me = Networking.LocalPlayer;
+        return (me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head)).position;
+    }
+
+    // a dart knocks a real prop (04 section 4.8): LIGHT and KNOCKABLE props fly, heavy ones only thud
+    void KnockProp(int e, Vector3 dir, Vector3 point)
+    {
+        int fl = game.gen.defFlags[game.gen.emitDef[e]];
+        if ((fl & (GenData.FL_HEAVY | GenData.FL_FIXTURE | GenData.FL_SCENERY)) != 0) return;
+        PHKnock k = game.KnockOf(e);
+        if (k != null && k.Busy) return;   // already flying
+        if (k == null) k = game.FreeKnock();
+        if (k != null) k.Knock(e, dir, point);
+    }
+
+    // test aid (editor, MCP): knock prop testKnockEmit as if a dart hit it from the south
+    [HideInInspector] public int testKnockEmit;
+    public void TestKnock()
+    {
+        GameObject go = game.builder.objects[testKnockEmit];
+        if (go != null) KnockProp(testKnockEmit, Vector3.forward, go.transform.position + Vector3.up * 0.2f);
     }
 
     void Taunt()

@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 100181556866139180}
   - component: {fileID: 6297618629897872840}
   - component: {fileID: 853707850176852919}
+  - component: {fileID: 729227072390383532}
   m_Layer: 11
   m_Name: 001_k_tableCoffee
   m_TagString: Untagged
@@ -45,7 +46,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9175224320803997410}
-  m_Mesh: {fileID: 8404430440489813980, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 4051067313965896244, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &1747496069470906273
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -193,3 +194,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.036000013, y: 0.20500001, z: 0.036}
   m_Center: {x: 0.30249804, y: 0.10250001, z: 0.17199999}
+--- !u!54 &729227072390383532
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9175224320803997410}
+  serializedVersion: 4
+  m_Mass: 17
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
