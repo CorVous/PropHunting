@@ -96,7 +96,14 @@ public static class WorldSceneBuilder
         local.sound = BuildAudio(gameGo.transform);
         BuildHud(localGo.transform, local);
         game.local = local;
+        GenData.Build();
+        local.defNames = new string[GenData.nDefs];
+        for (int d = 0; d < GenData.nDefs; d++) local.defNames[d] = DefName(GenData.defId[d]);
 
+        var beaconsRoot = new GameObject("Beacons").transform;
+        beaconsRoot.SetParent(gameGo.transform, false);
+        local.beaconGreen = Mat("BeaconGreen", new Color(0.2f, 0.9f, 0.3f));
+        local.beaconRed = Mat("BeaconRed", new Color(0.95f, 0.25f, 0.2f));
         var hidersRoot = new GameObject("Hiders").transform;
         hidersRoot.SetParent(gameGo.transform, false);
         var slots = new PHSlot[SLOTS];
@@ -120,6 +127,14 @@ public static class WorldSceneBuilder
             var voice = voiceGo.AddComponent<AudioSource>();
             voice.spatialBlend = 1f; voice.rolloffMode = AudioRolloffMode.Linear; voice.maxDistance = 20f; voice.playOnAwake = false;
             slot.voice = voice;
+            var beacon = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            beacon.name = "Beacon" + i;
+            Object.DestroyImmediate(beacon.GetComponent<Collider>());
+            beacon.transform.SetParent(beaconsRoot, false);
+            beacon.transform.localScale = new Vector3(0.25f, 15f, 0.25f);   // a 30 m beam, centred at ground level
+            beacon.GetComponent<MeshRenderer>().sharedMaterial = local.beaconGreen;
+            beacon.SetActive(false);
+            slot.beacon = beacon; slot.beaconRenderer = beacon.GetComponent<MeshRenderer>();
             UdonSharpEditorUtility.CopyProxyToUdon(slot);
             slots[i] = slot;
         }
@@ -154,11 +169,33 @@ public static class WorldSceneBuilder
         settings.alignment = TextAlignmentOptions.TopLeft;
         settings.rectTransform.sizeDelta = new Vector2(7f, 3f);
         local.panelText = settings;
+        // the last round's results, on the west wall
+        var results = Label(lobby.transform, "No round played yet.", new Vector3(-RoomW / 2 + 0.05f, 2.8f, 0f), 0.24f, 14f);
+        results.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+        results.alignment = TextAlignmentOptions.TopLeft;
+        results.rectTransform.sizeDelta = new Vector2(14f, 4f);
+        local.resultsText = results;
 
         UdonSharpEditorUtility.CopyProxyToUdon(local);
         UdonSharpEditorUtility.CopyProxyToUdon(game);
         EditorSceneManager.MarkSceneDirty(world.scene);
         Debug.Log("[prophunt] built the world scene: lobby, " + SLOTS + " slots");
+    }
+
+    // the prototype's GameUI.DefName: "k_chairCushion" -> "Chair cushion"
+    static string DefName(string id)
+    {
+        int us = id.IndexOf('_');
+        if (us >= 0 && us <= 4) id = id.Substring(us + 1);
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < id.Length; i++)
+        {
+            char c = id[i];
+            if (c == '_') { sb.Append(' '); continue; }
+            if (i > 0 && char.IsUpper(c) && !char.IsUpper(id[i - 1])) sb.Append(' ');
+            sb.Append(i == 0 ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c));
+        }
+        return sb.ToString();
     }
 
     static void BuildHud(Transform parent, PHLocal local)

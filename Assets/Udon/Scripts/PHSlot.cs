@@ -19,6 +19,8 @@ public class PHSlot : UdonSharpBehaviour
     public int index;
     public VRCStation station;
     public Transform proxyRoot;
+    public GameObject beacon;          // the reveal's marker: green survived, red caught
+    public Renderer beaconRenderer;
     public Vector3 parkAt = new Vector3(0f, -400f, 0f);
     public AudioSource voice;          // taunts play here, at the prop
 
@@ -26,6 +28,7 @@ public class PHSlot : UdonSharpBehaviour
     [UdonSynced] public bool inZone;
     [UdonSynced] public int readyRound = -1;
     [UdonSynced] public int def = -1;                 // disguise, -1 = none
+    [UdonSynced] public int lastDef = -1;             // the disguise worn last (for the reveal, after a catch)
     [UdonSynced] public Vector3 propPos;
     [UdonSynced] public float propYaw;
     [UdonSynced] public bool hiding;                  // seated and hidden this round
@@ -66,7 +69,7 @@ public class PHSlot : UdonSharpBehaviour
     public void ResetFor(int r, int role)
     {
         round = r;
-        def = -1; hiding = false; caught = false; survivedMs = 0;
+        def = -1; lastDef = -1; hiding = false; caught = false; survivedMs = 0;
         health = 0; maxHealth = 0;
         hunterHealth = 100; hunterOut = false; wrongProps = 0; hits = 0; catches = 0;
         Send();

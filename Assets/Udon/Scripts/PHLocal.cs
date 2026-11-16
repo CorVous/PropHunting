@@ -18,7 +18,10 @@ public class PHLocal : UdonSharpBehaviour
     public TextMeshProUGUI hud;          // head-locked text
     public Transform hudRoot;
     public PHAudio sound;
-    public TextMeshPro panelText;        // the host panel's settings, for everyone to read
+    public TextMeshPro panelText;
+    public TextMeshPro resultsText;      // the last round's results, on the lobby wall
+    public Material beaconGreen, beaconRed;
+    public string[] defNames;            // readable names of the defs ("k_chairCushion" -> "Chair cushion"), baked        // the host panel's settings, for everyone to read
     float nextPanel;
 
     // ---- balance (Balance.cs)
@@ -60,6 +63,7 @@ public class PHLocal : UdonSharpBehaviour
         switch (phase)
         {
             case PHGame.PH_LOBBY:
+                ShowReveal(false);
                 if (s != null) s.StopHiding();
                 RestoreEye();
                 SetPropLayer(LAYER_PROPS_SOLID);
@@ -112,6 +116,7 @@ public class PHLocal : UdonSharpBehaviour
                 }
                 break;
             case PHGame.PH_END:
+                ShowReveal(true);
                 sound.Play("time_over", 0.8f);
                 if (role != PHGame.ROLE_NONE) sound.Play((role == PHGame.ROLE_HIDER) == game.hidersWin ? "you_win" : "game_over", 0.8f);
                 SetFrozen(true);
@@ -121,6 +126,59 @@ public class PHLocal : UdonSharpBehaviour
     }
 
     public void OnSlotChanged(PHSlot s) { }
+
+    // ------------------------------------------------------------------ the reveal (prototype Round.EndRound)
+    // The roofs come off and a beam marks every hider: green survived, red caught. The results go on the HUD for
+    // the reveal and stay on the lobby wall.
+    void ShowReveal(bool on)
+    {
+        game.builder.ShowRoofs(!on);
+        for (int i = 0; i < game.slots.Length; i++)
+        {
+            PHSlot s = game.slots[i];
+            if (s.beacon == null) continue;
+            bool show = on && game.slotPlayer[i] != 0 && game.slotRole[i] == PHGame.ROLE_HIDER;
+            s.beacon.SetActive(show);
+            if (!show) continue;
+            s.beacon.transform.position = new Vector3(s.propPos.x, 0f, s.propPos.z);
+            s.beaconRenderer.sharedMaterial = s.caught ? beaconRed : beaconGreen;
+        }
+        if (on && resultsText != null) resultsText.text = Results();
+    }
+
+    public string DefName(int d) { return defNames != null && d >= 0 && d < defNames.Length ? defNames[d] : game.gen.defId[d]; }
+
+    string Name(int playerId)
+    {
+        VRCPlayerApi p = VRCPlayerApi.GetPlayerById(playerId);
+        return Utilities.IsValid(p) ? p.displayName : "Player " + playerId;
+    }
+
+    string Clock(int ms) { int t = Mathf.Max(0, Mathf.RoundToInt(ms / 1000f)); return (t / 60) + ":" + (t % 60).ToString("00"); }
+
+    string Results()
+    {
+        string r = (game.hidersWin ? "Hiders win" : "Hunters win") + ": " + game.endReason;
+        float huntMs = game.HuntLength * 1000f, sum = 0f;
+        int n = 0;
+        for (int i = 0; i < game.slots.Length; i++)
+        {
+            if (game.slotPlayer[i] == 0 || game.slotRole[i] != PHGame.ROLE_HIDER) continue;
+            PHSlot s = game.slots[i];
+            string what = s.lastDef >= 0 ? DefName(s.lastDef).ToLower() : "prop";
+            r += "\n" + Name(game.slotPlayer[i]) + ": " + what + (s.caught ? " - caught after " + Clock(s.survivedMs) : " - survived");
+            sum += s.caught ? s.survivedMs : huntMs; n++;
+        }
+        for (int i = 0; i < game.slots.Length; i++)
+        {
+            if (game.slotPlayer[i] == 0 || game.slotRole[i] != PHGame.ROLE_HUNTER) continue;
+            PHSlot s = game.slots[i];
+            r += "\n" + Name(game.slotPlayer[i]) + " (hunter): " + s.hits + " hits, " + s.catches + " catches, " + s.wrongProps + " wrong props, " + s.hunterHealth + " health" + (s.hunterOut ? " (out)" : "");
+        }
+        // survival share (05 section 8.1)
+        if (n > 0) r += "\nSurvival share: " + Mathf.RoundToInt(100f * sum / (n * huntMs)) + "%";
+        return r;
+    }
 
     public void Reseat() { PHSlot s = Me(); if (s != null) s.Reseat(); }
 
@@ -169,7 +227,7 @@ public class PHLocal : UdonSharpBehaviour
         int oldMax = s.maxHealth;
         s.maxHealth = hiderHealth[cls];
         s.health = oldMax > 0 ? Mathf.Max(1, Mathf.RoundToInt((float)s.health / oldMax * s.maxHealth)) : s.maxHealth;
-        s.def = d;
+        s.def = d; s.lastDef = d;
         s.propPos = Networking.LocalPlayer.GetPosition();
         s.propYaw = Mathf.Round(Networking.LocalPlayer.GetRotation().eulerAngles.y / 15f) * 15f;
         s.Send();
@@ -292,7 +350,7 @@ public class PHLocal : UdonSharpBehaviour
         }
         lastChange = Time.time;
         SetDisguise(d);
-        Say("You are a " + game.gen.defId[d], 2f);
+        Say("You are a " + DefName(d).ToLower(), 2f);
     }
 
     void Fire()
@@ -331,7 +389,7 @@ public class PHLocal : UdonSharpBehaviour
         s.wrongProps++;
         s.hunterHealth -= penalty;
         if (s.hunterHealth <= 0) { s.hunterHealth = 0; s.hunterOut = true; Say("Out of health: you are out for the round.", 4f); SetFrozen(true); }
-        else Say("Just a " + game.gen.defId[game.gen.emitDef[e]] + ". -" + penalty + " health", 2f);
+        else Say("Just a " + DefName(game.gen.emitDef[e]).ToLower() + ". -" + penalty + " health", 2f);
         s.Send();
         sound.Play("error_006", 0.6f);
     }
@@ -403,6 +461,7 @@ public class PHLocal : UdonSharpBehaviour
             if (s != null && role == PHGame.ROLE_HIDER) t += "\nHealth " + s.health + "/" + s.maxHealth + (s.caught ? " (caught)" : "") + "  changes " + changesLeft;
             if (s != null && role == PHGame.ROLE_HUNTER) t += "\nHealth " + s.hunterHealth + "  hits " + s.hits + "  wrong " + s.wrongProps + (s.hunterOut ? " (out)" : "");
         }
+        if (phase == PHGame.PH_END && resultsText != null) t += "\n" + resultsText.text;
         if (Time.time < noticeUntil) t += "\n" + notice;
         hud.text = t;
     }
