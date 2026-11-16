@@ -368,7 +368,7 @@ public partial class MapGen
         int room = pRoom;
         GenRng r = SR(1);
         StonePaths(40, ref r);
-        Mailbox(9);
+        FrontMarkers(30);
         DoorSides(50);
         int trees = TreeCount(room, ref r);
         if (trees < 1 && AreaM2(room) >= 30) trees = 1;
@@ -378,7 +378,7 @@ public partial class MapGen
         if (r3.Chance(350) && Fit(1))
         {
             int first = nEmit;
-            if (WallPlace(Pick(ref r3, "n_sign", 5, "n_logStack", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(first, false);
+            if (WallPlace(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(first, false);
         }
         // planted borders along the fences fill the rest of the budget: no lawn is left bare (G29)
         ClearBans();
@@ -501,6 +501,7 @@ public partial class MapGen
     void PlanPatio()
     {
         int room = pRoom;
+        FrontMarkers(30);
         GenRng r = SR(1);
         // (a) the paving: 4 x 4 m in front of the first door, or against an edge, or in the middle
         int px0, pz0, px1, pz1;
@@ -578,28 +579,55 @@ public partial class MapGen
         for (int j = 0; j < 2 && Fit(1); j++) if (!Island(ref r6)) break;
     }
 
-    // A front garden's mailbox at its gate (G32): against the lane fence beside the end of the front path.
-    void Mailbox(int k)
+    // Markers at a plot's front (G42: a sign stands where it has a reason to, facing the people it is for). Seen
+    // from the lane: a house's mailbox beside its garden gate (or beside its front door when the door opens onto the
+    // lane), against the fence or the wall, facing the lane; a shop's name board beside its customer door when that
+    // door opens onto the lane. Seen from a shop's forecourt: the name board beside the customer door against the
+    // front wall, facing the forecourt and the lane. Nothing else places signs or mailboxes; they are never
+    // wrong-category spawns (GenData.NoLeak).
+    void FrontMarkers(int k0)
     {
-        int room = pRoom, gate = -1, far = -1;
+        int room = pRoom, type = roomType[room];
+        bool lane = type == GenData.R_LANE;
+        if (!lane && roomPlace[room] != PL_FRONT) return;
+        int n = 0;
+        // doorways of this room into a building: a shop's customer door, or (from the lane) a house's front door
         for (int q = 0; q < roomDoorCount[room]; q++)
         {
             int i = roomDoorStart[room] + q, cell = roomDoors[i], d = roomDoorDir[i];
             int ox = cell % IW + DX[d], oz = cell / IW + DZ[d];
             if (ox < 0 || oz < 0 || ox >= IW || oz >= IH || !IsFrontDoor(oz * IW + ox, (d + 2) & 3)) continue;
-            // the path cell of this room farthest from the door is where it meets the gate
-            for (int c = roomCellStart[room]; c < roomCellStart[room] + roomCellCount[room]; c++)
+            int zone = roomZone[innerRoom[oz * IW + ox]];
+            if (zone == GenData.Z_HOUSE && !lane) continue;
+            Marker(zone == GenData.Z_HOUSE ? "gen_mailbox" : "n_sign", cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, k0 + n++);
+        }
+        if (!lane) return;
+        // a house's garden opens onto the lane through a gap in the fence: the mailbox beside it
+        for (int c = 0; c < W * H; c++)
+        {
+            if (cellRoom[c] != room) continue;
+            int cx = c % W, cz = c / W;
+            for (int d = 0; d < 4; d++)
             {
-                int j = roomCells[c];
-                if ((tags[j] & GenData.T_PATH) == 0) continue;
-                int dd = Abs(j % IW - cell % IW) + Abs(j / IW - cell / IW);
-                if (dd > far) { far = dd; gate = j; }
+                int nx = cx + DX[d], nz = cz + DZ[d];
+                if (!InGrid(nx, nz) || EdgeType(cx, cz, d) != GenData.E_NONE) continue;
+                int nc = nz * W + nx, pl = cellPlot[nc];
+                if (cellZone[nc] != GenData.Z_LAWN || pl < 0 || plotZone[pl] != GenData.Z_HOUSE || roomPlace[cellRoom[nc]] != PL_FRONT) continue;
+                // the middle of the opening, half a metre into the lane
+                int px = cx * GenData.CELL_MM + GenData.CELL_MM / 2 + DX[d] * (GenData.CELL_MM / 2 - 500);
+                int pz = cz * GenData.CELL_MM + GenData.CELL_MM / 2 + DZ[d] * (GenData.CELL_MM / 2 - 500);
+                Marker("gen_mailbox", px, pz, k0 + n++);
             }
         }
-        if (gate < 0 || !Fit(1)) return;
+    }
+
+    // a marker against the wall or fence nearest (px, pz), its back to it
+    void Marker(string id, int px, int pz, int k)
+    {
+        if (!Fit(1)) return;
         GenRng r = SR(k);
         int first = nEmit;
-        if (WallPlace(Dn("gen_mailbox"), WM_NEAR, gate % IW * GenData.INNER_MM + 250, gate / IW * GenData.INNER_MM + 250, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
+        if (WallPlace(Dn(id), WM_NEAR, px, pz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
     }
 
     // ============================================================================================ LANE
@@ -616,6 +644,7 @@ public partial class MapGen
             int first = nEmit;
             if (WallPlace(Dn("n_sign"), WM_NEAR, rx, rz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
         }
+        FrontMarkers(30);
         BenchAtEdge(2);
         if (AreaM2(room) >= 100) BenchAtEdge(3);
         GenRng r4 = SR(4);
@@ -635,6 +664,7 @@ public partial class MapGen
     void PlanYard()
     {
         int room = pRoom, dx, dz;
+        FrontMarkers(30);
         MainDoor(room, out dx, out dz);
         bool diner = false;
         for (int k = 0; k < roomDoorCount[room]; k++) if (DoorZone(room, k) == GenData.Z_DINER) diner = true;
@@ -1039,12 +1069,7 @@ public partial class MapGen
             if (GroupAt(FlowerGroup(ref r10), GenData.A_SOFT, r10.Between(3, Fit(5) ? 5 : 3), WM_NEAR, hubX, hubZ, 0, ref r10)) Keep(first, false);
         }
         GenRng r11 = SR(11);
-        if (nGate > 0 && r11.Chance(400) && Fit(1))
-        {
-            int first = nEmit;
-            FSet(Dn("s_signpost"));
-            if (FormAt(GenData.GL_ROW, 0, GenData.A_SOFT, WM_NEAR, gateCell[0] % IW * GenData.INNER_MM + 250, gateCell[0] / IW * GenData.INNER_MM + 250, 0, ref r11) >= 0) Keep(first, false);
-        }
+        if (nGate > 0 && r11.Chance(400) && Fit(1)) Signpost(gateCell[0], ref r11);
         // fill up to the area's budget: more undergrowth at the fence, rocks and stumps on open ground (G29)
         GenRng r12 = SR(12);
         for (int k = 0; k < 10 && Fit(1); k++)
@@ -1091,6 +1116,35 @@ public partial class MapGen
         }
         return -1;
     }
+
+    // A signpost where the wood's path starts (G42): on the forest floor right beside the path, within 2 m of the
+    // entrance, turned to face the path, so whoever comes in along it reads it. None if no such spot is free.
+    void Signpost(int gate, ref GenRng rng)
+    {
+        int room = pRoom, def = Dn("s_signpost");
+        int gx = gate % IW, gz = gate / IW, a0 = rng.Range(4);
+        for (int dist = 1; dist <= 4; dist++)
+            for (int dz = -dist; dz <= dist; dz++)
+                for (int dx = -dist; dx <= dist; dx++)
+                {
+                    if (Abs(dx) != dist && Abs(dz) != dist) continue;
+                    int x = gx + dx, z = gz + dz;
+                    if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
+                    int c = z * IW + x;
+                    if (innerRoom[c] != room || (tags[c] & GenData.T_PATH) != 0) continue;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int d = (a0 + k) & 3, px = x + DX[d], pz = z + DZ[d];
+                        if (px < 0 || pz < 0 || px >= IW || pz >= IH || (tags[pz * IW + px] & GenData.T_PATH) == 0 || !CanStep(x, z, d)) continue;
+                        int first = nEmit;
+                        int e = StampAt(def, room, x * GenData.INNER_MM + 250, z * GenData.INNER_MM + 250, DirYaw(d), 0, -1, H_GROUND, false);
+                        if (e >= 0 && KeepIfWalkable(room, first, false)) return;
+                    }
+                }
+    }
+
+    // the yaw (degrees) whose front looks along direction d (0 north +z, 1 east +x, 2 south, 3 west)
+    static int DirYaw(int d) { return d == 0 ? 0 : (d == 1 ? 90 : (d == 2 ? 180 : 270)); }
 
     // a fallen log with a stump beside it and mushrooms at the stump (report 15, F-log and fungi, F-felled spot)
     void DeadWood(ref GenRng rng)

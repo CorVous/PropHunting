@@ -25,6 +25,20 @@ public class Game : MonoBehaviour
     public int size = 0;
     public int density = 0;             // GenData.DensityName index: scales the prop ranges (G24), part of the seed code
     public int mode = MODE_RANDOM;
+    // the host's settings (G14, G44): set on the lobby's host panel, used by every round started from the lobby
+    public bool sizeAuto = true;                      // size from the players in the zone, else `size` overrides
+    public int roundLength = 1;                       // Balance.RoundLengthName index
+    public int tauntInterval = (int)Balance.ForcedTaunt;
+    public int wrongPenalty = Balance.WrongPropPenalty;
+    public int runCap = Balance.RunCapDefault;        // shown, not active: the prototype has no map rotation
+    // The next map (G9, G44): back in the lobby START makes a new random map, unless the host keeps the seed (the
+    // host panel's "Keep this seed", or a seed typed into its field). A seed from the page address (?seed=) pins
+    // the map until the player goes back to the lobby, which drops it.
+    public bool keepSeed;
+    public bool seedFromUrl;
+    public string lastPlayed = "";
+
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern void PH_ClearQuery();
     public int participants = 1 + Balance.LobbyBotsInZone[0];   // players taking part in the next round (the lobby's zone)
     public string panelMessage = "";
     public bool remixOffered;
@@ -119,8 +133,6 @@ public class Game : MonoBehaviour
     {
         size = newSize;
         Recode();
-        if (Lobby.I != null) Lobby.I.ArrangeBots();   // as many in the zone as the size is for
-        participants = 1 + Balance.LobbyBotsInZone[size];
     }
 
     public void SetDensity(int newDensity)
@@ -172,7 +184,7 @@ public class Game : MonoBehaviour
     public void Generate(bool acceptOlder)
     {
         if (!ParseSeed(acceptOlder)) { AudioHub.I.Play("error_004", 0.6f); return; }
-        seedText = seedCode;
+        seedText = seedCode; lastPlayed = seedCode;
         panelMessage = "";
         round.Stop();
         player.Deactivate();
@@ -194,6 +206,14 @@ public class Game : MonoBehaviour
         if (topCam != null) topCam.enabled = false;
         cam.enabled = true;
         Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
+        if (seedFromUrl)
+        {
+            seedFromUrl = false; keepSeed = false;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            PH_ClearQuery();
+#endif
+        }
+        if (!keepSeed) NewRandomSeed();
         Lobby.I.Enter();
     }
 
@@ -301,7 +321,7 @@ public class Game : MonoBehaviour
         if (opts.TryGetValue("size", out v))
         {
             string s = v.ToUpperInvariant();
-            for (int i = 0; i < 4; i++) if (GenData.SizeName[i] == s) SetSize(i);
+            for (int i = 0; i < 4; i++) if (GenData.SizeName[i] == s) { SetSize(i); sizeAuto = false; participants = 1 + Balance.LobbyBotsInZone[i]; }
         }
         if (opts.TryGetValue("density", out v)) SetDensityByName(v);
         if (opts.TryGetValue("mode", out v))
@@ -315,7 +335,7 @@ public class Game : MonoBehaviour
         if (opts.TryGetValue("seed", out v) && v.Length > 0)
         {
             // ?seed=...&size=... skips the lobby and the start panel; the players taking part are the size's lobby zone
-            seedText = v;
+            seedText = v; seedFromUrl = true;
             Generate(true);
         }
     }
@@ -354,6 +374,8 @@ public class Game : MonoBehaviour
                 case "debug": debugOpen = a.Length < 2 || a[1] != "0"; break;
                 case "start": case "lobby": BackToStart(); break;
                 case "panel": if (state == State.Lobby) { if (a.Length > 1 && a[1] == "0") Lobby.I.ClosePanel(); else Lobby.I.OpenPanel(); } break;
+                case "zcheck": r = map.ZCheck() + " | lobby " + (Lobby.I.roomMesh != null ? MeshBuf.Coplanar(Lobby.I.roomMesh) : "not built"); break;
+                case "host": r = "sizeAuto " + sizeAuto + " size " + GenData.SizeName[size] + " roundSize " + GenData.SizeName[Lobby.I.RoundSize] + " players " + Lobby.I.Participants + " roundLength " + Balance.RoundLengthName[roundLength] + " taunt " + tauntInterval + " penalty " + wrongPenalty + " runCap " + runCap + " density " + GenData.DensityName[density] + " keepSeed " + keepSeed + " seed " + seedText + " last " + lastPlayed + " fromUrl " + seedFromUrl + " panel " + Lobby.I.panelOpen; break;
                 case "zone": r = "in zone " + Lobby.I.PlayerInZone + " participants " + Lobby.I.Participants + " hunters " + Balance.Hunters(Lobby.I.Participants); break;
                 case "lobbygenerate": Lobby.I.TryGenerate(true); r = "state " + state + " " + Lobby.I.Hint; break;
                 case "players": participants = int.Parse(a[1]); break;

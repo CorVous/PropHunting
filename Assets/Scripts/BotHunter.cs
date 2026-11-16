@@ -18,7 +18,6 @@ public class BotHunter : MonoBehaviour
     Vector3 noisePos;
     int guessesLeft;
     float nextGuess, nextLook, nextShot, pauseUntil;
-    float stepAccum;
     static readonly Collider[] near = new Collider[48];
 
     public Vector3 Eye { get { return transform.position + Vector3.up * Balance.HunterEye; } }
@@ -41,7 +40,7 @@ public class BotHunter : MonoBehaviour
     {
         var map = Game.I.map;
         int from = map.CellAt(transform.position), to = NearestWalkable(pos);
-        path = map.FindPath(from, to, false);
+        path = map.FindPath(from, to, false, true);
         pathIndex = 1;
     }
 
@@ -84,8 +83,7 @@ public class BotHunter : MonoBehaviour
             Vector3 np = Vector3.MoveTowards(p, target, 3.2f * dt);
             Vector3 dir = target - p; dir.y = 0f;
             if (dir.sqrMagnitude > 1e-4f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(dir), 420f * dt);
-            stepAccum += (np - p).magnitude;
-            if (stepAccum > 1.9f) { stepAccum = 0f; AudioHub.I.PlayAt("footstep_wood_00" + Random.Range(0, 3), np, 14f, 0.7f); }
+            // no footsteps (G41)
             transform.position = np;
             if ((np - target).sqrMagnitude < 0.0004f) pathIndex++;
             if (state == INVESTIGATE && Vector3.Distance(np, noisePos) < 2.5f) path = null;
@@ -102,7 +100,7 @@ public class BotHunter : MonoBehaviour
             {
                 int i = Random.Range(0, g.IW * g.IH);
                 if (g.walk[i] != 1 || g.reach[i] == 0) continue;
-                path = Game.I.map.FindPath(Game.I.map.CellAt(transform.position), i, false);
+                path = Game.I.map.FindPath(Game.I.map.CellAt(transform.position), i, false, true);
                 pathIndex = 1;
                 break;
             }

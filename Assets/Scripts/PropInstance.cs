@@ -22,7 +22,7 @@ public class PropInstance : MonoBehaviour
 
     public static readonly List<PropInstance> simulating = new List<PropInstance>();
 
-    public bool Heavy { get { return (GenData.defFlags[def] & (GenData.FL_HEAVY | GenData.FL_FIXTURE)) != 0; } }
+    public bool Heavy { get { return (GenData.defFlags[def] & (GenData.FL_HEAVY | GenData.FL_FIXTURE | GenData.FL_SCENERY)) != 0; } }
     public bool Light { get { return (GenData.defFlags[def] & GenData.FL_LIGHT) != 0; } }
     public bool Tumbling { get { return tumbling; } }
 

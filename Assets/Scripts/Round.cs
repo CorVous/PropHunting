@@ -28,6 +28,14 @@ public partial class Round : MonoBehaviour
     public bool playerCaught;
     public float playerSurvived;
     public float nextForced;
+    public Vector3 playerCheckPos;   // where the player stood at the last forced-taunt check, or when the hunt began (G47)
+
+    // G47: at each forced-taunt check a hider taunts only if they have moved less than 4 m, in a straight line, since
+    // the previous check (wiggling on the spot does not count), whether that check fired a taunt or skipped it. The
+    // clock restarts at every check; a taunt the hider chooses does not touch it. The first checks are staggered.
+    public float PlayerMoved { get { Vector3 d = P.body.pos - playerCheckPos; d.y = 0f; return d.magnitude; } }
+    public bool PlayerTauntSkips { get { return PlayerMoved >= Balance.ForcedTauntMoved; } }
+    static float Moved(BotHider h) { Vector3 d = h.transform.position - h.lastCheckPos; d.y = 0f; return d.magnitude; }
     bool warned;
     Vector3 playerCaughtPos;
     int playerCaughtDef;
@@ -140,8 +148,9 @@ public partial class Round : MonoBehaviour
         Map.ResetProps();
         ResetSockets();
         int size = Map.gen.size;
-        huntLength = Balance.HuntPhase[size];
+        huntLength = Mathf.Round(Balance.HuntPhase[size] * Balance.RoundLengthFactor[Game.I.roundLength]);
         huntElapsed = 0f; endgame = false; playerCaught = false; playerSurvived = 0f; warned = false;
+        statSkipped = 0;
         resultLines.Clear(); endReason = "";
 
         // who takes part, how many hunt (1 in 4, at least 1), and the player's side: drawn for every round
@@ -161,8 +170,10 @@ public partial class Round : MonoBehaviour
         }
         else SpawnPlayerHider();
         bool small = totalPlayers < Balance.SmallGroup;
-        basePenalty = small ? (Balance.WrongPropPenalty + 1) / 2 : Balance.WrongPropPenalty;
-        forcedInterval = small ? Balance.ForcedTauntSmallGroup : Balance.ForcedTaunt;
+        // the host's wrong-prop penalty and forced-taunt interval (G44); a small group gets half the penalty and
+        // three quarters of the interval, the endgame half the interval (the defaults 10, 40 s: 5, 30 s, 20 s)
+        basePenalty = small ? (Game.I.wrongPenalty + 1) / 2 : Game.I.wrongPenalty;
+        forcedInterval = small ? Game.I.tauntInterval * 0.75f : Game.I.tauntInterval;
         phase = PH_BRIEF; left = Balance.Brief;
         AudioHub.I.Play("ready", 0.8f);
     }
@@ -234,8 +245,9 @@ public partial class Round : MonoBehaviour
         AudioHub.I.Play("jingles_PIZZI07", 0.5f);
         // every hider has their own forced-taunt clock, started when the hunters are released (6.4);
         // the bots' clocks are staggered so the taunts come one at a time
-        foreach (var h in hiders) h.nextTaunt = Time.time + forcedInterval * Random.Range(0.35f, 1f);
-        nextForced = Time.time + forcedInterval;
+        foreach (var h in hiders) { h.nextTaunt = Time.time + forcedInterval * Random.Range(0.35f, 1f); h.lastCheckPos = h.transform.position; }
+        nextForced = Time.time + forcedInterval * Random.Range(0.35f, 1f);
+        playerCheckPos = P.body.pos;
         foreach (var h in hunters) h.Release();
         Say(mode == Game.MODE_HUNT ? "Hunt! Find the props that are hiders." : "The hunters are released!", 3f);
     }
@@ -255,17 +267,20 @@ public partial class Round : MonoBehaviour
                 Say(why + " Taunts come faster and a wrong prop costs less.", 4f);
                 AudioHub.I.Play("jingles_HIT03", 0.6f);
                 AudioHub.I.Play("hurry_up", 0.8f);
-                float iv = Balance.ForcedTauntEndgame;
+                float iv = Game.I.tauntInterval * 0.5f;
                 foreach (var h in hiders) if (h.nextTaunt > Time.time + iv) h.nextTaunt = Time.time + iv * Random.Range(0.4f, 1f);
                 if (nextForced > Time.time + iv) nextForced = Time.time + iv;
             }
         }
-        float interval = endgame ? Balance.ForcedTauntEndgame : forcedInterval;
+        float interval = endgame ? Game.I.tauntInterval * 0.5f : forcedInterval;
         // forced taunts of the bots
         foreach (var h in hiders)
         {
             if (!h.alive || Time.time < h.nextTaunt) continue;
             h.nextTaunt = Time.time + interval;
+            bool moved = Moved(h) >= Balance.ForcedTauntMoved;
+            h.lastCheckPos = h.transform.position;
+            if (moved) { statSkipped++; continue; }   // it has moved: no forced taunt (G47)
             AudioHub.I.PlayAt(AudioHub.Pick(AudioHub.Taunts), h.Centre, Balance.TauntRange, 1f, Random.Range(0.8f, 1.25f));
             NoiseAt(h.transform.position, Balance.TauntRange, h);
             if (!h.moving && Random.value < Balance.BotHiderMoveChance) RelocateBot(h, false);
@@ -274,8 +289,16 @@ public partial class Round : MonoBehaviour
         if (mode == Game.MODE_HIDE && !playerCaught)
         {
             float t = nextForced - Time.time;
-            if (t <= Balance.ForcedTauntWarning && !warned) { warned = true; AudioHub.I.Play("tick_001", 0.8f); P.Say("Forced taunt in 3 s: move, or taunt now with T", 3f); }
-            if (t <= 0f) P.Taunt(true);
+            bool skip = PlayerTauntSkips;
+            if (t <= Balance.ForcedTauntWarning && !warned && !skip) { warned = true; AudioHub.I.Play("tick_001", 0.8f); P.Say("Forced taunt in 3 s: move 4 m, or taunt now (wrist panel)", 3f); }
+            if (t <= 0f)
+            {
+                playerCheckPos = P.body.pos;
+                nextForced = Time.time + (endgame ? Game.I.tauntInterval * 0.5f : forcedInterval);
+                warned = false;
+                if (skip) { statSkipped++; P.Say("You moved: no forced taunt", 2f); }
+                else P.Taunt(true);
+            }
         }
         // the end of the round
         if (HidersAlive == 0) EndRound("Every hider was caught");
@@ -283,11 +306,12 @@ public partial class Round : MonoBehaviour
         else if (left <= 0f) EndRound("Time is up");
     }
 
+    public int statSkipped;          // forced taunts skipped this round because the hider had moved (G47)
+
     public void PlayerTaunted(bool forced)
     {
-        // a taunt restarts that hider's forced-taunt clock (6.3)
-        nextForced = Time.time + (endgame ? Balance.ForcedTauntEndgame : forcedInterval);
-        warned = false;
+        // G47: a taunt the hider chooses no longer restarts the forced-taunt clock (it did under 05 section 6.3); the
+        // check itself restarts it
     }
 
     // a sound that hunters within earshot walk to
@@ -500,7 +524,7 @@ public partial class Round : MonoBehaviour
     public string StatusLine()
     {
         string s = "round phase " + phase + " left " + left.ToString("0") + " hiders " + HidersAlive + "/" + startHiders + " hunters " + HuntersAlive + "/" + startHunters
-            + " endgame " + endgame + " penalty " + Penalty + " share " + survivalShare + " banner '" + Banner + "'";
+            + " endgame " + endgame + " penalty " + Penalty + " tauntsSkipped " + statSkipped + (P.role == Player.ROLE_HIDER ? " moved " + PlayerMoved.ToString("0.0") : "") + " huntLength " + huntLength.ToString("0") + " tauntEvery " + forcedInterval.ToString("0") + " share " + survivalShare + " banner '" + Banner + "'";
         for (int i = 0; i < hiders.Count; i++)
         {
             var h = hiders[i];

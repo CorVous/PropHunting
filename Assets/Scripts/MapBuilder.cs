@@ -279,33 +279,85 @@ public class MapBuilder
     }
 
     // one straight piece of wall between a0 and a1 metres along the edge, from y0 to y1.
-    // Side A is the low side (south or west of the edge), side B the high side; each has its own colour.
+    // Side A is the low side (south or west of the edge), side B the high side; each has its own colour. The end
+    // faces are drawn with their own colours (capLo, capHi: one per side; a cap's alpha 0 = not drawn, where the
+    // end meets another piece and could never be seen).
     void WallPiece(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, Color32 colA, Color32 colB, bool collider)
     {
+        WallPiece(horizontal, ex, ez, a0, a1, y0, y1, colA, colB, collider, colA, colB, colA, colB);
+    }
+
+    void WallPiece(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, Color32 colA, Color32 colB, bool collider,
+                   Color32 loA, Color32 loB, Color32 hiA, Color32 hiB)
+    {
         Vector3 mnA, mxA, mnB, mxB;
+        int lo, hi;
         if (horizontal)
         {
             mnA = new Vector3(ex + a0, y0, ez - WALL_HALF); mxA = new Vector3(ex + a1, y1, ez);
             mnB = new Vector3(ex + a0, y0, ez); mxB = new Vector3(ex + a1, y1, ez + WALL_HALF);
-            walls.Box(mnA, mxA, colA, MeshBuf.FACE_ALL & ~MeshBuf.FACE_ZP);
-            walls.Box(mnB, mxB, colB, MeshBuf.FACE_ALL & ~MeshBuf.FACE_ZN);
+            walls.Box(mnA, mxA, colA, MeshBuf.FACE_ALL & ~(MeshBuf.FACE_ZP | MeshBuf.FACE_XN | MeshBuf.FACE_XP));
+            walls.Box(mnB, mxB, colB, MeshBuf.FACE_ALL & ~(MeshBuf.FACE_ZN | MeshBuf.FACE_XN | MeshBuf.FACE_XP));
+            lo = MeshBuf.FACE_XN; hi = MeshBuf.FACE_XP;
         }
         else
         {
             mnA = new Vector3(ex - WALL_HALF, y0, ez + a0); mxA = new Vector3(ex, y1, ez + a1);
             mnB = new Vector3(ex, y0, ez + a0); mxB = new Vector3(ex + WALL_HALF, y1, ez + a1);
-            walls.Box(mnA, mxA, colA, MeshBuf.FACE_ALL & ~MeshBuf.FACE_XP);
-            walls.Box(mnB, mxB, colB, MeshBuf.FACE_ALL & ~MeshBuf.FACE_XN);
+            walls.Box(mnA, mxA, colA, MeshBuf.FACE_ALL & ~(MeshBuf.FACE_XP | MeshBuf.FACE_ZN | MeshBuf.FACE_ZP));
+            walls.Box(mnB, mxB, colB, MeshBuf.FACE_ALL & ~(MeshBuf.FACE_XN | MeshBuf.FACE_ZN | MeshBuf.FACE_ZP));
+            lo = MeshBuf.FACE_ZN; hi = MeshBuf.FACE_ZP;
         }
+        if (loA.a != 0) walls.Box(mnA, mxA, loA, lo);
+        if (loB.a != 0) walls.Box(mnB, mxB, loB, lo);
+        if (hiA.a != 0) walls.Box(mnA, mxA, hiA, hi);
+        if (hiB.a != 0) walls.Box(mnB, mxB, hiB, hi);
         if (collider) Collider(mnA, mxB, "Wall");
+    }
+
+    // ---- corners (G40). Every edge's wall used to run 10 cm past both cell corners, so where walls met the end
+    // of one lay in the plane of the other's face, in two colours: they flickered. Now each corner's 20 x 20 cm
+    // square of wall belongs to exactly one wall: the horizontal (east-west) wall that starts there, else the one
+    // that ends there, else the vertical wall that starts there, else the one that ends there. Every other wall at
+    // the corner stops at the square's edge, and the walls of a straight run meet end to end without overlap.
+    static bool IsWallType(int t) { return t == GenData.E_WALL || t == GenData.E_DOOR || t == GenData.E_WINDOW; }
+
+    // a wall on the east-west edge from grid corner (vx, vz) to (vx + 1, vz)?
+    bool WallH(int vx, int vz)
+    {
+        if (gen.InGrid(vx, vz) && gen.cellZone[vz * gen.W + vx] != GenData.Z_NONE) return IsWallType(gen.EdgeType(vx, vz, 2));
+        if (gen.InGrid(vx, vz - 1) && gen.cellZone[(vz - 1) * gen.W + vx] != GenData.Z_NONE) return IsWallType(gen.EdgeType(vx, vz - 1, 0));
+        return false;
+    }
+
+    // a wall on the north-south edge from grid corner (vx, vz) to (vx, vz + 1)?
+    bool WallV(int vx, int vz)
+    {
+        if (gen.InGrid(vx, vz) && gen.cellZone[vz * gen.W + vx] != GenData.Z_NONE) return IsWallType(gen.EdgeType(vx, vz, 3));
+        if (gen.InGrid(vx - 1, vz) && gen.cellZone[vz * gen.W + vx - 1] != GenData.Z_NONE) return IsWallType(gen.EdgeType(vx - 1, vz, 1));
+        return false;
+    }
+
+    // the colour of a wall's end face that looks into cell (cx, cz): that room's wall colour, or the building's
+    // outside colour when the cell is outdoors
+    Color32 CapColour(int cx, int cz, int buildingZone)
+    {
+        if (gen.InGrid(cx, cz))
+        {
+            int c = cz * gen.W + cx;
+            if (GenData.IsBuilding(gen.cellZone[c])) return WallColour(gen.roomType[gen.cellRoom[c]]);
+        }
+        return ExteriorColour(buildingZone);
     }
 
     // trim around an opening: sticks out 2 cm on both faces
     void Trim(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, Color32 col)
     {
+        // a jamb that stands on the floor has no bottom face (it would lie in the plane of the wall's)
+        int faces = y0 <= 0f ? MeshBuf.FACE_ALL & ~MeshBuf.FACE_YN : MeshBuf.FACE_ALL;
         float t = WALL_HALF + 0.02f;
-        if (horizontal) walls.Box(new Vector3(ex + a0, y0, ez - t), new Vector3(ex + a1, y1, ez + t), col);
-        else walls.Box(new Vector3(ex - t, y0, ez + a0), new Vector3(ex + t, y1, ez + a1), col);
+        if (horizontal) walls.Box(new Vector3(ex + a0, y0, ez - t), new Vector3(ex + a1, y1, ez + t), col, faces);
+        else walls.Box(new Vector3(ex - t, y0, ez + a0), new Vector3(ex + t, y1, ez + a1), col, faces);
     }
 
     void Edge(bool horizontal, int cx, int cz, int type, int off, int cellA, int cellB)
@@ -322,35 +374,58 @@ public class MapBuilder
         float h = Mathf.Max(hA, hB);
         Color32 colA = GenData.IsBuilding(zoneA) ? WallColour(gen.roomType[gen.cellRoom[cellA]]) : ExteriorColour(zoneB);
         Color32 colB = GenData.IsBuilding(zoneB) ? WallColour(gen.roomType[gen.cellRoom[cellB]]) : ExteriorColour(zoneA);
-        float lo = -WALL_HALF, hi = CELL + WALL_HALF;   // walls run 10 cm past the cell corners so corners close
+        // the ends: how far past the cell corners this wall runs (it owns the corner square or stops at its edge),
+        // and the colours of the end faces that can be seen (alpha 0: none)
+        int vx = cx, vz = cz, bz = GenData.IsBuilding(zoneA) ? zoneA : zoneB;
+        float lo, hi;
+        Color32 none = new Color32(0, 0, 0, 0), loA = none, loB = none, hiA = none, hiB = none;
+        if (horizontal)
+        {
+            lo = -WALL_HALF;
+            if (!WallH(vx - 1, vz)) { loA = CapColour(vx - 1, vz - 1, bz); loB = CapColour(vx - 1, vz, bz); }
+            bool next = WallH(vx + 1, vz);
+            hi = next ? CELL - WALL_HALF : CELL + WALL_HALF;
+            if (!next) { hiA = CapColour(vx + 1, vz - 1, bz); hiB = CapColour(vx + 1, vz, bz); }
+        }
+        else
+        {
+            bool h0 = WallH(vx, vz) || WallH(vx - 1, vz), h1 = WallH(vx, vz + 1) || WallH(vx - 1, vz + 1);
+            bool south = WallV(vx, vz - 1), north = WallV(vx, vz + 1);
+            lo = h0 ? WALL_HALF : -WALL_HALF;
+            if (!h0 && !south) { loA = CapColour(vx - 1, vz - 1, bz); loB = CapColour(vx, vz - 1, bz); }
+            hi = (h1 || north) ? CELL - WALL_HALF : CELL + WALL_HALF;
+            if (!h1 && !north) { hiA = CapColour(vx - 1, vz + 1, bz); hiB = CapColour(vx, vz + 1, bz); }
+        }
         if (type == GenData.E_WALL)
         {
-            WallPiece(horizontal, ex, ez, lo, hi, 0f, h, colA, colB, true);
+            WallPiece(horizontal, ex, ez, lo, hi, 0f, h, colA, colB, true, loA, loB, hiA, hiB);
         }
         else if (type == GenData.E_DOOR)
         {
             float d0 = off * INNER, d1 = (off + GenData.DOOR_CELLS) * INNER, dh = GenData.DOOR_HEIGHT_MM / 1000f;
-            WallPiece(horizontal, ex, ez, lo, d0, 0f, h, colA, colB, true);
-            WallPiece(horizontal, ex, ez, d1, hi, 0f, h, colA, colB, true);
-            WallPiece(horizontal, ex, ez, d0, d1, dh, h, colA, colB, true);
-            float e = 0.004f;   // trims stand a little proud of the wall pieces they frame
-            Trim(horizontal, ex, ez, d0 - 0.06f, d0 + e, 0f, dh, Frame);
-            Trim(horizontal, ex, ez, d1 - e, d1 + 0.06f, 0f, dh, Frame);
+            WallPiece(horizontal, ex, ez, lo, d0, 0f, h, colA, colB, true, loA, loB, colA, colB);
+            WallPiece(horizontal, ex, ez, d1, hi, 0f, h, colA, colB, true, colA, colB, hiA, hiB);
+            WallPiece(horizontal, ex, ez, d0, d1, dh, h, colA, colB, true, none, none, none, none);
+            // trims stand a little proud of the wall pieces they frame; the jambs stop where the head begins, so no
+            // two trims share a face
+            float e = 0.004f;
+            Trim(horizontal, ex, ez, d0 - 0.06f, d0 + e, 0f, dh - e, Frame);
+            Trim(horizontal, ex, ez, d1 - e, d1 + 0.06f, 0f, dh - e, Frame);
             Trim(horizontal, ex, ez, d0 - 0.06f, d1 + 0.06f, dh - e, dh + 0.06f, Frame);
         }
         else if (type == GenData.E_WINDOW)
         {
             float w0 = 1.0f, w1 = 3.0f, sill = 0.9f, head = 2.05f;
-            WallPiece(horizontal, ex, ez, lo, w0, 0f, h, colA, colB, false);
-            WallPiece(horizontal, ex, ez, w1, hi, 0f, h, colA, colB, false);
-            WallPiece(horizontal, ex, ez, w0, w1, 0f, sill, colA, colB, false);
-            WallPiece(horizontal, ex, ez, w0, w1, head, h, colA, colB, false);
+            WallPiece(horizontal, ex, ez, lo, w0, 0f, h, colA, colB, false, loA, loB, colA, colB);
+            WallPiece(horizontal, ex, ez, w1, hi, 0f, h, colA, colB, false, colA, colB, hiA, hiB);
+            WallPiece(horizontal, ex, ez, w0, w1, 0f, sill, colA, colB, false, none, none, none, none);
+            WallPiece(horizontal, ex, ez, w0, w1, head, h, colA, colB, false, none, none, none, none);
             float e = 0.004f;
             Trim(horizontal, ex, ez, w0 - 0.05f, w1 + 0.05f, sill - 0.05f, sill + e, WindowFrame);
             Trim(horizontal, ex, ez, w0 - 0.05f, w1 + 0.05f, head - e, head + 0.05f, WindowFrame);
-            Trim(horizontal, ex, ez, w0 - 0.05f, w0 + e, sill, head, WindowFrame);
-            Trim(horizontal, ex, ez, w1 - e, w1 + 0.05f, sill, head, WindowFrame);
-            Trim(horizontal, ex, ez, (w0 + w1) / 2 - 0.02f, (w0 + w1) / 2 + 0.02f, sill, head, WindowFrame);
+            Trim(horizontal, ex, ez, w0 - 0.05f, w0 + e, sill + e, head - e, WindowFrame);
+            Trim(horizontal, ex, ez, w1 - e, w1 + 0.05f, sill + e, head - e, WindowFrame);
+            Trim(horizontal, ex, ez, (w0 + w1) / 2 - 0.02f, (w0 + w1) / 2 + 0.02f, sill + e, head - e, WindowFrame);
             // a window is a wall for movement and for darts (04 section 4.1.1): one collider for the whole edge
             if (horizontal) Collider(new Vector3(ex + lo, 0, ez - WALL_HALF), new Vector3(ex + hi, h, ez + WALL_HALF), "WindowWall");
             else Collider(new Vector3(ex - WALL_HALF, 0, ez + lo), new Vector3(ex + WALL_HALF, h, ez + hi), "WindowWall");
@@ -401,10 +476,25 @@ public class MapBuilder
         }
         if (GenData.IsBuilding(zone))
         {
-            // flat roof with a ceiling colour underneath
-            float h = GenData.ZoneWallMm[zone] / 1000f;
-            Vector3 mn = new Vector3(x * CELL - WALL_HALF, h, z * CELL - WALL_HALF), mx = new Vector3((x + 1) * CELL + WALL_HALF, h + 0.14f, (z + 1) * CELL + WALL_HALF);
-            roofs.Box(mn, mx, RoofColour(zone), RoofColour(zone), Ceiling);
+            // flat roof with a ceiling colour underneath. The roof of each cell meets its building neighbours' at the
+            // cell line and reaches 10 cm out over an outside wall; no two pieces overlap (G40): the cell's own piece
+            // takes the east and west overhangs, a strip takes the north or south overhang, and a strip stops 10 cm
+            // short where the diagonal cell's piece already covers the corner (an inside corner of an L)
+            float h = GenData.ZoneWallMm[zone] / 1000f, t = h + 0.14f;
+            bool bw = Bld(x - 1, z), be = Bld(x + 1, z), bs = Bld(x, z - 1), bn = Bld(x, z + 1);
+            float x0 = x * CELL - (bw ? 0f : WALL_HALF), x1 = (x + 1) * CELL + (be ? 0f : WALL_HALF);
+            Color32 rc = RoofColour(zone);
+            roofs.Box(new Vector3(x0, h, z * CELL), new Vector3(x1, t, (z + 1) * CELL), rc, rc, Ceiling);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                if (side < 0 ? bs : bn) continue;
+                int dz = side < 0 ? z - 1 : z + 1;
+                float s0 = bw ? (Bld(x - 1, dz) ? x * CELL + WALL_HALF : x * CELL) : x * CELL - WALL_HALF;
+                float s1 = be ? (Bld(x + 1, dz) ? (x + 1) * CELL - WALL_HALF : (x + 1) * CELL) : (x + 1) * CELL + WALL_HALF;
+                float zz0 = side < 0 ? z * CELL - WALL_HALF : (z + 1) * CELL, zz1 = side < 0 ? z * CELL : (z + 1) * CELL + WALL_HALF;
+                roofs.Box(new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, Ceiling);
+            }
+            Vector3 mn = new Vector3(x * CELL - WALL_HALF, h, z * CELL - WALL_HALF), mx = new Vector3((x + 1) * CELL + WALL_HALF, t, (z + 1) * CELL + WALL_HALF);
             var go = new GameObject("Roof");
             go.transform.SetParent(roofRoot, false);
             go.layer = Layers.Arch;
@@ -412,6 +502,15 @@ public class MapBuilder
             bc.center = (mn + mx) * 0.5f; bc.size = mx - mn;
             colliderCount++;
         }
+    }
+
+    bool Bld(int x, int z) { return gen.InGrid(x, z) && GenData.IsBuilding(gen.cellZone[z * gen.W + x]); }
+
+    // G40 check: coplanar faces of the walls, the roofs and the ground that overlap (see MeshBuf.Coplanar)
+    public string ZCheck()
+    {
+        if (walls == null) return "no map";
+        return "walls " + MeshBuf.Coplanar(walls) + " | roofs " + MeshBuf.Coplanar(roofs) + " | ground " + MeshBuf.Coplanar(ground);
     }
 
     // ------------------------------------------------------------------ props
@@ -433,7 +532,8 @@ public class MapBuilder
         go.layer = PropColliders.LayerFor(def);
         PropColliders.Build(go, def);
         colliderCount += go.GetComponents<BoxCollider>().Length;
-        if ((fl & (GenData.FL_DECOR | GenData.FL_SCENERY)) != 0) return;
+        // ground cover cannot be pointed at (no collider, no PropInstance); everything else can, and is a disguise (G46)
+        if ((fl & GenData.FL_DECOR) != 0) return;
         var pi = go.AddComponent<PropInstance>();
         pi.Init(e, def);
         props[e] = pi;
@@ -519,7 +619,10 @@ public class MapBuilder
     int[] pathPrev;
     int[] pathQueue;
 
-    public List<int> FindPath(int from, int to, bool throughSolid)
+    public List<int> FindPath(int from, int to, bool throughSolid) { return FindPath(from, to, throughSolid, false); }
+
+    // throughProps: a hunter's path (G45) crosses cells taken by props, trees included
+    public List<int> FindPath(int from, int to, bool throughSolid, bool throughProps)
     {
         if (from < 0 || to < 0) return null;
         int n = gen.IW * gen.IH;
@@ -537,7 +640,7 @@ public class MapBuilder
                 if (!gen.CanStep(ix, iz, d)) continue;
                 int j = (iz + MapGen.DZ[d]) * gen.IW + ix + MapGen.DX[d];
                 if (pathPrev[j] != -2) continue;
-                if (!throughSolid && gen.walk[j] != 1 && j != to) continue;
+                if (!throughSolid && gen.walk[j] != 1 && j != to && !(throughProps && gen.walk[j] == 2)) continue;
                 pathPrev[j] = i; pathQueue[qt++] = j;
             }
         }

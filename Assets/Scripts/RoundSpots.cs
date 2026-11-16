@@ -270,6 +270,9 @@ public partial class Round
         var g = Map.gen;
         if (!g.menu[d]) return 0f;
         int cls = GenData.defDisguise[d];
+        // bots keep to tiny, medium and large (G46): their spot finder works on furniture slots and floor cells and
+        // cannot check a tree's 6 m box; huge disguises are the players'
+        if (cls == 4) return 0f;
         float w = cls == 1 ? 3f : (cls == 2 ? 5f : 1.2f);
         return w * Mathf.Min(g.defCopies[d], 10);
     }

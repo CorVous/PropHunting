@@ -121,7 +121,7 @@ public partial class Player
         int cls = GenData.defDisguise[d];
         if (cls == 0) return GameUI.DefName(d) + " · not a disguise";
         bool onMenu = Game.I.map.gen.menu[d];
-        string cn = cls == 1 ? "tiny" : (cls == 2 ? "medium" : "large");
+        string cn = Balance.ClassName[cls - 1];
         string t = GameUI.DefName(d) + " · " + cn + " · " + Balance.HiderHealth[cls - 1] + " HP";
         if (!onMenu && role == ROLE_HIDER) return t + " · not a disguise this round";
         return t + " · click: disguise";

@@ -18,7 +18,8 @@ public static class PropColliders
     public static int LayerFor(int def)
     {
         int fl = GenData.defFlags[def];
-        if ((fl & GenData.FL_SCENERY) != 0) return Layers.Arch;
+        // trees are props like any other (G45: walking bodies pass their trunks; G46: they are disguises)
+        if ((fl & GenData.FL_SCENERY) != 0) return Layers.Solid;
         return (fl & GenData.FL_SOLID) != 0 ? Layers.Solid : Layers.Prop;
     }
 

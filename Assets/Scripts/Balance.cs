@@ -7,6 +7,13 @@ public static class Balance
     // ---- phases, by map size S, M, L, XL (9.1) ----
     public static readonly float[] HidePhase = { 35f, 40f, 45f, 50f };
     public static readonly float[] HuntPhase = { 180f, 210f, 240f, 270f };
+    // the host's round length preset (G14, G44): the hunt phase above times the factor; the hide phase is unchanged
+    public static readonly string[] RoundLengthName = { "Short", "Normal", "Long" };
+    public static readonly float[] RoundLengthFactor = { 0.75f, 1f, 1.5f };
+    public const int RunCapDefault = 10;             // runs per map before it leaves the rotation (Q4, C1); not active here
+    public const int MaxPlayers = 32;
+    // Auto size (G44, D5): S up to 8 players, M up to 16, L up to 24, XL up to 32
+    public static int SizeFor(int players) { return players <= 8 ? 0 : (players <= 16 ? 1 : (players <= 24 ? 2 : 3)); }
     public const float Brief = 8f;
     public const float RoundEnd = 12f;
     public const float EndgameAt = 45f;              // endgame: one hider left, one hunter left, or 45 s left (6.6)
@@ -20,7 +27,8 @@ public static class Balance
 
     // ---- hunter (5.5) ----
     public const int HunterHealth = 100;
-    public const int WrongPropPenalty = 10;          // host setting 5 / 10 / 15 (G14, G17)
+    public const int WrongPropPenalty = 10;          // the host's default; the host panel sets 5 / 10 / 15 (G14, G17, G44)
+    public static readonly int[] WrongPropChoices = { 5, 10, 15 };
     public const float WrongPropSameWindow = 5f;     // the same real prop again within 5 s costs nothing
     public const int HitReward = 5;
     public const float HunterWalk = 2.0f;            // VRChat's default walk speed (prototype: Shift runs)
@@ -31,9 +39,11 @@ public static class Balance
     public const float WalkStep = 0.35f;
 
     // ---- hider, by disguise class tiny, medium, large (6.1, 3.6.2) ----
-    public static readonly int[] HiderHealth = { 50, 100, 150 };
-    public static readonly float[] HiderRun = { 3.2f, 3.6f, 2.8f };
-    public static readonly float[] HopHeight = { 1.0f, 0.8f, 0f };
+    // tiny, medium, large, and huge (G46: over 2.5 m, trees): huge is slow, cannot hop and takes the most darts
+    public static readonly int[] HiderHealth = { 50, 100, 150, 200 };
+    public static readonly float[] HiderRun = { 3.2f, 3.6f, 2.8f, 2.2f };
+    public static readonly float[] HopHeight = { 1.0f, 0.8f, 0f, 0f };
+    public static readonly string[] ClassName = { "tiny", "medium", "large", "huge" };
     public const float DesktopWalkFactor = 0.55f;    // desktop walks at 55% without Shift
     public const float LedgeAssist = 0.35f;
     public const float LedgeLiftTime = 0.15f;
@@ -47,7 +57,9 @@ public static class Balance
     public static float StepHeight(float boxHeight) { return Mathf.Clamp(0.4f * boxHeight, 0.04f, 0.30f); }
 
     // eye height: 0.9 x the prop's top height, 0.25 m to 2.0 m, in 0.05 m steps (3.6.4)
-    public static float EyeHeight(float propHeight) { return Mathf.Clamp(Mathf.Round(0.9f * propHeight / 0.05f) * 0.05f, 0.25f, 2.0f); }
+    // 0.9 of the prop's height (G5), 0.25 to 2.0 m; a prop taller than 2.5 m (a tree, G46) puts the eye at a standing
+    // person's 1.6 m, under its crown, where the view is clear and a VR player stands as they are
+    public static float EyeHeight(float propHeight) { return propHeight > 2.5f ? HunterEye : Mathf.Clamp(Mathf.Round(0.9f * propHeight / 0.05f) * 0.05f, 0.25f, 2.0f); }
 
     // ---- disguise (3.8) ----
     public const float TakeRange = 4f;
@@ -63,10 +75,11 @@ public static class Balance
     // ---- taunts (6.3, 6.4) ----
     public const float TauntCooldown = 8f;
     public const float TauntRange = 20f;
-    public const float ForcedTaunt = 40f;
-    public const float ForcedTauntSmallGroup = 30f;  // fewer than 6 players (9.4)
-    public const float ForcedTauntEndgame = 20f;
+    public const float ForcedTaunt = 40f;            // the host's default; the host panel sets 30 / 40 / 60 s (G14, G44)
+    public static readonly int[] ForcedTauntChoices = { 30, 40, 60 };
+    // fewer than 6 players (9.4): three quarters of the host's interval; the endgame: half of it (Round.cs)
     public const float ForcedTauntWarning = 3f;
+    public const float ForcedTauntMoved = 4f;        // G47: a hider this far (straight line) from where they last taunted skips the forced taunt
     public const int SmallGroup = 6;
 
     // ---- knocks (04 section 4.8; values are the prototype's) ----

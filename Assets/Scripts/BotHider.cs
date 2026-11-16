@@ -14,6 +14,7 @@ public class BotHider : MonoBehaviour
     public string label = "";
     public string spotNote = "";
     public float nextTaunt;
+    public Vector3 lastCheckPos;     // where it stood at its last forced-taunt check (G47)
     public bool moving;
     public Vector3 lastSeenPos;
     public PropInstance support;        // the furniture this hider stands on or in, if any
@@ -31,7 +32,7 @@ public class BotHider : MonoBehaviour
     public void Init(int defIndex, Vector3 pos, float yaw, string name, string note)
     {
         def = defIndex; label = name; spotNote = note;
-        disguiseClass = Mathf.Clamp(GenData.defDisguise[def] - 1, 0, 2);
+        disguiseClass = Mathf.Clamp(GenData.defDisguise[def] - 1, 0, 3);
         maxHealth = Balance.HiderHealth[disguiseClass]; health = maxHealth;
         float sc = GenData.defScale[def] / 1000f;
         transform.position = pos;

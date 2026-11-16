@@ -17,7 +17,7 @@ public partial class Player : MonoBehaviour
     float thirdDist = 3.2f;
 
     public int def = -1;                // disguise def, -1 = walking body
-    public int disguiseClass;           // 0 tiny, 1 medium, 2 large
+    public int disguiseClass;           // 0 tiny, 1 medium, 2 large, 3 huge (G46)
     public float eye = Balance.HunterEye;
     public bool locked, settled;
     float stillTime;
@@ -32,8 +32,6 @@ public partial class Player : MonoBehaviour
     GameObject visual, figure;
     MeshFilter visualMesh;
     MeshRenderer visualRend;
-    float stepAccum;
-    float shuffleTimer;
     int captureClickFrame = -1;
 
     // simulated input for the build checks (Game.Cmd)
@@ -118,7 +116,7 @@ public partial class Player : MonoBehaviour
         }
         int oldMax = maxHealth;
         def = d;
-        disguiseClass = Mathf.Clamp(GenData.defDisguise[d] - 1, 0, 2);
+        disguiseClass = Mathf.Clamp(GenData.defDisguise[d] - 1, 0, 3);
         body.stepHeight = Balance.StepHeight(size.y);
         body.hopHeight = Balance.HopHeight[disguiseClass];
         body.jumpSpeed = 0f;
@@ -192,6 +190,7 @@ public partial class Player : MonoBehaviour
         if (def >= 0 && !settled && !locked) body.TryYaw(camYaw);
 
         // sub-steps keep sweeps short on slow frames
+        UpdateMask();
         float left = dt;
         while (left > 1e-5f)
         {
@@ -204,12 +203,21 @@ public partial class Player : MonoBehaviour
 
         if ((body.pos - lastPos).sqrMagnitude > 2.5e-5f) lastMoveTime = Time.time;
         UpdatePin(moveInput, dt);
-        Footsteps(wish, run, dt);
+        // no movement sounds (G41): no footsteps, no shuffle of a running prop. What a moving prop should sound like
+        // to hunters is an open design question (README, revision 6).
         UpdateVisual();
         UpdateCamera();
         if (!paused && !lobby) UpdateActions(dt);   // in the lobby a click is for the start stand
         else ClearAim();
         lastPos = body.pos;
+    }
+
+    // What the body collides with (G45): a walking body (hunter, the dead, explore, the lobby) passes through props
+    // and stops only at the architecture; a prop body (a disguised hider) and a hider still on foot collide with
+    // every prop (G26), and step onto low ones.
+    void UpdateMask()
+    {
+        body.mask = (def >= 0 || role == ROLE_HIDER) ? Layers.MoveMask : Layers.WalkerMask;
     }
 
     void Look()
@@ -239,41 +247,6 @@ public partial class Player : MonoBehaviour
     {
         locked = false; settled = false; stillTime = 0f;
         noSettleUntil = Time.time + noSettleFor;
-    }
-
-    void Footsteps(Vector3 wish, bool run, float dt)
-    {
-        float moved = new Vector2(body.pos.x - lastPos.x, body.pos.z - lastPos.z).magnitude;
-        if (!body.grounded || moved < 1e-4f) return;
-        if (def < 0)
-        {
-            stepAccum += moved;
-            if (stepAccum < 1.9f) return;
-            stepAccum = 0f;
-            int cell = Game.I.map.CellAt(body.pos);
-            string s = "footstep_concrete_00";
-            if (cell >= 0 && Game.I.map.gen.innerRoom[cell] >= 0)
-            {
-                var g = Game.I.map.gen;
-                int rt = g.roomType[g.innerRoom[cell]];
-                if ((g.tags[cell] & GenData.T_OUTDOOR) != 0) s = "footstep_grass_00";
-                else if (rt == GenData.R_STORAGE || rt == GenData.R_LOADING || rt == GenData.R_DINER_STORE || rt == GenData.R_KITCHEN || rt == GenData.R_BATH || rt == GenData.R_DINER_KITCHEN) s = "footstep_concrete_00";
-                else s = "footstep_wood_00";
-            }
-            // the dead make no sound for anyone else; the local player still hears their own steps
-            AudioHub.I.Play(s + Random.Range(0, 3), role == ROLE_DEAD ? 0.15f : 0.35f, Random.Range(0.92f, 1.08f));
-        }
-        else if (run)
-        {
-            // a running prop shuffles, heard to 6 m (05 section 6.5); walking and standing are silent
-            shuffleTimer -= dt;
-            if (shuffleTimer <= 0f)
-            {
-                shuffleTimer = 0.45f;
-                AudioHub.I.PlayAt("cloth1", body.pos, 6f, 0.5f, Random.Range(0.9f, 1.2f));
-                Game.I.round.NoiseAt(body.pos, 6f, this);
-            }
-        }
     }
 
     void UpdateVisual()

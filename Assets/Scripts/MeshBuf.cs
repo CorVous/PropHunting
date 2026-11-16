@@ -49,6 +49,49 @@ public class MeshBuf
         if ((faces & FACE_XN) != 0) Quad(new Vector3(x0, y0, z0), new Vector3(x0, y0, z1), new Vector3(x0, y1, z1), new Vector3(x0, y1, z0), Vector3.left, side);
     }
 
+    // G40: faces that lie in one plane, look the same way and overlap (by more than 1 mm each way) fight for the
+    // same pixels. Counts such pairs among the axis-aligned quads, and how many of them differ in colour (those
+    // flicker visibly). "pairs N, in two colours M".
+    public static string Coplanar(MeshBuf b)
+    {
+        var groups = new Dictionary<long, List<float[]>>();
+        for (int q = 0; q + 3 < b.verts.Count; q += 4)
+        {
+            Vector3 n = b.norms[q];
+            int axis = Mathf.Abs(n.x) > 0.9f ? 0 : (Mathf.Abs(n.y) > 0.9f ? 1 : (Mathf.Abs(n.z) > 0.9f ? 2 : -1));
+            if (axis < 0) continue;
+            int u = axis == 0 ? 1 : 0, v = axis == 2 ? 1 : 2;
+            float u0 = float.MaxValue, u1 = float.MinValue, v0 = float.MaxValue, v1 = float.MinValue;
+            for (int k = 0; k < 4; k++)
+            {
+                Vector3 p = b.verts[q + k];
+                u0 = Mathf.Min(u0, p[u]); u1 = Mathf.Max(u1, p[u]); v0 = Mathf.Min(v0, p[v]); v1 = Mathf.Max(v1, p[v]);
+            }
+            float sgn = n[axis] > 0 ? 1f : 0f;
+            long key = ((long)Mathf.RoundToInt(b.verts[q][axis] * 1000f) << 3) | (long)(axis * 2 + (int)sgn);
+            Color32 c = b.cols[q];
+            List<float[]> list;
+            if (!groups.TryGetValue(key, out list)) { list = new List<float[]>(); groups[key] = list; }
+            list.Add(new float[] { u0, u1, v0, v1, c.r * 65536 + c.g * 256 + c.b });
+        }
+        int pairs = 0, coloured = 0;
+        const float eps = 0.001f;
+        foreach (var list in groups.Values)
+        {
+            list.Sort((p, q) => p[0].CompareTo(q[0]));
+            for (int i = 0; i < list.Count; i++)
+                for (int j = i + 1; j < list.Count && list[j][0] < list[i][1] - eps; j++)
+                {
+                    float ou = Mathf.Min(list[i][1], list[j][1]) - Mathf.Max(list[i][0], list[j][0]);
+                    float ov = Mathf.Min(list[i][3], list[j][3]) - Mathf.Max(list[i][2], list[j][2]);
+                    if (ou <= eps || ov <= eps) continue;
+                    pairs++;
+                    if (list[i][4] != list[j][4]) coloured++;
+                }
+        }
+        return "pairs " + pairs + ", in two colours " + coloured;
+    }
+
     public Mesh ToMesh(string name)
     {
         var m = new Mesh();
