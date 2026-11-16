@@ -318,7 +318,7 @@ public class GameUI : MonoBehaviour
             if (rd.requested == Game.MODE_RANDOM) who = "Drawn this round: " + who;
             GUI.Label(new Rect(0, H / 2 - 80, W, 40), who, bigCentre);
             string what = rd.mode == Game.MODE_HUNT
-                ? "Hitting a real prop costs " + rd.basePenalty + " of your 100 health; at 0 you are out. A hit on a hider gives 5 back."
+                ? "Hitting a real prop costs " + rd.basePenalty + " of your 100 health; at 0 you are out. A hit on a hider gives 5 back. In the last 45 s wrong props and hits count double."
                 : "Look at a prop and click to become it, find a place, stand still; lock and taunt are on the wrist panel (Esc). You will be forced to taunt now and then.";
             GUI.Label(new Rect(W / 2 - 430, H / 2 - 34, 860, 50), what, centre);
             GUI.Label(new Rect(0, H / 2 + 20, W, 30), "Starting in " + Mathf.CeilToInt(rd.left) + " s", centre);
@@ -591,7 +591,7 @@ public class GameUI : MonoBehaviour
         if (rd.phase == Round.PH_END)
         {
             Fill(new Rect(W / 2 - 330, H - 70, 660, 34), new Color(0.04f, 0.05f, 0.07f, 0.8f));
-            GUI.Label(new Rect(W / 2 - 330, H - 68, 660, 30), rd.endReason + ". This is where the hiders were. (Click: results)", centre);
+            GUI.Label(new Rect(W / 2 - 330, H - 68, 660, 30), rd.Winner + ": " + rd.endReason.ToLowerInvariant() + ". This is where the hiders were. (Click: results)", centre);
         }
     }
 
@@ -599,13 +599,13 @@ public class GameUI : MonoBehaviour
     {
         var g = Game.I;
         var rd = g.round;
-        float pw = 620f, ph = 150f + rd.resultLines.Count * 24f + 150f;
+        float pw = 620f, ph = 210f + rd.resultLines.Count * 24f + 150f;
         Rect r = new Rect(W - pw - 16, 70, pw, ph);
         GUI.Box(r, GUIContent.none, box);
         GUILayout.BeginArea(new Rect(r.x + 20, r.y + 12, pw - 40, ph - 20));
-        GUILayout.Label("Round over: " + rd.endReason.ToLowerInvariant(), heading);
-        GUILayout.Label("Hiders' survival share: <b>" + rd.survivalShare + "%</b>", bigCentre, GUILayout.Height(40));
-        GUILayout.Label("A run is this one round: about 1 in 4 players hunted, drawn at random, and everyone else hid. It has no winner: the hiders are scored by how long they survived.", small);
+        GUILayout.Label("<b>" + rd.Winner.ToUpperInvariant() + "</b>", title, GUILayout.Height(44));
+        GUILayout.Label("Round over: " + rd.endReason.ToLowerInvariant() + (rd.hidersWin && rd.HuntersAlive > 0 ? ", with a hider uncaught" : "") + ".", heading);
+        GUILayout.Label("A run is this one round: about 1 in 4 players hunted, drawn at random, and everyone else hid. Any hider uncaught at the end, or every hunter out: the hiders win; every hider caught: the hunters win (G54). Below, personal figures: how long each hider survived (hiders' survival share " + rd.survivalShare + "%).", small);
         GUILayout.Space(6);
         foreach (string line in rd.resultLines) GUILayout.Label(line, label, GUILayout.Height(22));
         GUILayout.Space(8);

@@ -16,7 +16,7 @@ public static class Balance
     public static int SizeFor(int players) { return players <= 8 ? 0 : (players <= 16 ? 1 : (players <= 24 ? 2 : 3)); }
     public const float Brief = 8f;
     public const float RoundEnd = 12f;
-    public const float EndgameAt = 45f;              // endgame: one hider left, one hunter left, or 45 s left (6.6)
+    public const float EndgameAt = 45f;              // the endgame is the last 45 s of the hunt (G53): taunts twice as often, wrong props and hits doubled
 
     // ---- tagger (5.2) ----
     public const float DartInterval = 0.5f;

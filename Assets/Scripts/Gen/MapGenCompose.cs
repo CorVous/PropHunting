@@ -419,11 +419,17 @@ public partial class MapGen
     // One object with its back against a wall, facing the room. Returns the emit index or -1.
     int WallPlace(int def, int mode, int tx, int tz, int win, int flags, ref GenRng rng)
     {
+        return WallPlace(def, 0, mode, tx, tz, win, flags, ref rng);
+    }
+
+    // gapMm: how far its back stands off the wall or fence (signs, G42: clear of the fence, not touching it)
+    int WallPlace(int def, int gapMm, int mode, int tx, int tz, int win, int flags, ref GenRng rng)
+    {
         int sx = GenData.defSx[def], sz = GenData.defSz[def];
         if (GenData.defSy[def] >= 1200 && win != WIN_ANY) win = WIN_NEVER;   // nothing tall in front of a window (K10)
-        if (!FindWallRun(pRoom, sx, sz, GenData.defClear[def], mode, tx, tz, win, ref rng)) return -1;
+        if (!FindWallRun(pRoom, sx, sz + gapMm, GenData.defClear[def], mode, tx, tz, win, ref rng)) return -1;
         int px, pz, rot;
-        WallPos(wrDir, wrBack, wrCentre, sz, out px, out pz, out rot);
+        WallPos(wrDir, wrBack, wrCentre, sz + 2 * gapMm, out px, out pz, out rot);
         return StampAt(def, pRoom, px, pz, rot * 90, flags, -1, H_WALL, true);   // parallel to its wall
     }
 

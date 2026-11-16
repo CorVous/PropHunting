@@ -5,7 +5,7 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 7;
+    public const int GEN_VERSION = 8;
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -732,7 +732,7 @@ public static class GenData
         D("s_chest", "chest", 2500, I_TOY, A_WALL, BOTH, 2); Jit(4, 20); Loose(); Beside(K_TENT | K_BED); Cap(1);
         D("s_bedroll", "bedroll", 2600, I_BEDROLL, A_BESIDE, FL_LIGHT | BOTH, 1); Loose(); Beside(K_TENT | K_FIRE); Cap(1);
         D("s_axe", "tool-axe", 2500, I_TOOL | I_CHOP, A_WALL, BOTH, 1); Loose(); Beside(K_WORK | K_TENT | K_STUMP);
-        D("s_signpost", "signpost", 3000, 0, A_OUT_EDGE, BOTH, 1); NoLeak();
+        D("s_signpost", "signpost", 3000, 0, A_OUT_EDGE, BOTH, 1); NoLeak(); Jit(2, 3);
         D("s_workbench", "workbench", 2800, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 1); Clear(1); SlotsTop(3, I_TOOL | I_STORE, SZ_M, 600); Kind(K_WORK);
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ADJACENT, 0, 0, defSz[cur] / 2 + 330, 180, SZ_XL, I_STOOL, 650); Hiding(); }
         D("s_treeLog", "tree-log", 2000, I_SEAT_OUT, A_SOFT, FL_SOLID | FL_HEAVY | OUT, 0); Kind(K_STUMP); Cap(1);
@@ -789,7 +789,7 @@ public static class GenData
         { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_INSIDE, 0, 40, -150, 0, SZ_XL, I_BEDROLL, 800); Hiding(); }
         D("n_tentClosed", "tent_smallClosed", 3000, 0, A_SOFT, FL_SOLID | FL_HEAVY | BOTH, 2); Jit(5, 30); Kind(K_TENT);
         D("n_fence", "fence_planks", 2000, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | OUT, 0); Jit(2, 2);
-        D("n_sign", "sign", 2500, 0, A_OUT_EDGE, BOTH, 1); NoLeak();
+        D("n_sign", "sign", 2500, 0, A_OUT_EDGE, BOTH, 1); NoLeak(); Jit(2, 3);   // square to its fence, not turned 12 degrees into it
         D("n_planter", "pot_large", 2000, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 0); Kind(K_PLANT);
         D("n_canoe", "canoe", 2000, 0, A_OUT_EDGE, FL_HEAVY | BOTH, 2);
         D("n_sleepingMat", "bed_floor", 2500, I_BEDROLL, A_SLOT_ONLY, FL_LIGHT | BOTH, 1);

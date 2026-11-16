@@ -67,10 +67,18 @@ public partial class Round : MonoBehaviour
     {
         get
         {
-            // halved, rounded up, in the endgame (6.6); the small-group halving (9.4) is already in basePenalty
-            return endgame ? (basePenalty + 1) / 2 : basePenalty;
+            // doubled in the endgame (G53), on top of the round's base (the small-group halving, 9.4, is in basePenalty)
+            return endgame ? basePenalty * 2 : basePenalty;
         }
     }
+
+    // what a hunter's dart does to a hider: doubled in the endgame (G53)
+    public int HitDamage { get { return endgame ? Balance.DartDamage * 2 : Balance.DartDamage; } }
+
+    // G54: a round has a winner. Any hider uncaught when the clock ends, or every hunter out: the hiders win; every
+    // hider caught: the hunters win. Survival times stay as personal figures.
+    public bool hidersWin;
+    public string Winner { get { return hidersWin ? "Hiders win" : "Hunters win"; } }
 
     public int HidersAlive
     {
@@ -254,17 +262,13 @@ public partial class Round : MonoBehaviour
 
     void UpdateHunt()
     {
-        // endgame: one hider left, one hunter left, or 45 s left (6.6)
+        // endgame: the last 45 s of the hunt, and nothing else (G53: no longer the last hider or the last hunter)
         if (!endgame)
         {
-            string why = null;
-            if (left <= Balance.EndgameAt) why = "45 seconds!";
-            else if (startHiders > 1 && HidersAlive == 1) why = "Last hider!";
-            else if (startHunters > 1 && HuntersAlive == 1) why = "Last hunter!";
-            if (why != null)
+            if (left <= Balance.EndgameAt)
             {
                 endgame = true;
-                Say(why + " Taunts come faster and a wrong prop costs less.", 4f);
+                Say("45 seconds! Taunts come twice as often; wrong props and hits count double.", 4f);
                 AudioHub.I.Play("jingles_HIT03", 0.6f);
                 AudioHub.I.Play("hurry_up", 0.8f);
                 float iv = Game.I.tauntInterval * 0.5f;
@@ -357,7 +361,7 @@ public partial class Round : MonoBehaviour
         {
             var bh = hit.collider.GetComponentInParent<BotHider>();
             if (bh == null || !bh.alive) return;
-            bool caught = bh.TakeHit(Balance.DartDamage, dir);
+            bool caught = bh.TakeHit(HitDamage, dir);
             p.hitsLanded++;
             p.hunterHealth = Mathf.Min(Balance.HunterHealth, p.hunterHealth + Balance.HitReward);
             p.hitMarkUntil = Time.time + 0.35f;
@@ -372,7 +376,7 @@ public partial class Round : MonoBehaviour
             }
             else
             {
-                p.Say("Hit! +" + Balance.HitReward + " health. It runs...", 2f);
+                p.Say("Hit! -" + HitDamage + " to it, +" + Balance.HitReward + " health for you. It runs...", 2f);
                 RelocateBot(bh, true);   // found: run or take the next dart
             }
             return;
@@ -417,12 +421,12 @@ public partial class Round : MonoBehaviour
             var bh = hit.collider.GetComponentInParent<BotHider>();
             if (bh != null)
             {
-                if (bh.TakeHit(Balance.DartDamage, dir)) { bh.survived = huntElapsed; Say(b.label + " caught " + bh.label + ".", 3f); }
+                if (bh.TakeHit(HitDamage, dir)) { bh.survived = huntElapsed; Say(b.label + " caught " + bh.label + ".", 3f); }
                 else RelocateBot(bh, true);
                 return;
             }
             // the player was hit: damage, a 0.3 m slide, unpinned for 1.5 s (05 section 3.9)
-            P.health -= Balance.DartDamage;
+            P.health -= HitDamage;
             P.hurtUntil = Time.time + 0.4f;
             P.Unpin(Balance.HitNoSettle);
             Vector3 slide = new Vector3(dir.x, 0f, dir.z).normalized * Balance.HitSlide;
@@ -459,6 +463,7 @@ public partial class Round : MonoBehaviour
     void EndRound(string reason)
     {
         endReason = reason;
+        hidersWin = HidersAlive > 0;   // at the clock's end, or with every hunter out (G54)
         phase = PH_END; left = Balance.RoundEnd;
         AudioHub.I.Play("time_over", 0.8f);
         AudioHub.I.Play("jingles_STEEL10", 0.5f);
@@ -524,7 +529,7 @@ public partial class Round : MonoBehaviour
     public string StatusLine()
     {
         string s = "round phase " + phase + " left " + left.ToString("0") + " hiders " + HidersAlive + "/" + startHiders + " hunters " + HuntersAlive + "/" + startHunters
-            + " endgame " + endgame + " penalty " + Penalty + " tauntsSkipped " + statSkipped + (P.role == Player.ROLE_HIDER ? " moved " + PlayerMoved.ToString("0.0") : "") + " huntLength " + huntLength.ToString("0") + " tauntEvery " + forcedInterval.ToString("0") + " share " + survivalShare + " banner '" + Banner + "'";
+            + " endgame " + endgame + " penalty " + Penalty + " hitDamage " + HitDamage + (phase == PH_END ? " winner '" + Winner + "'" : "") + " tauntsSkipped " + statSkipped + (P.role == Player.ROLE_HIDER ? " moved " + PlayerMoved.ToString("0.0") : "") + " huntLength " + huntLength.ToString("0") + " tauntEvery " + forcedInterval.ToString("0") + " share " + survivalShare + " banner '" + Banner + "'";
         for (int i = 0; i < hiders.Count; i++)
         {
             var h = hiders[i];
@@ -536,18 +541,21 @@ public partial class Round : MonoBehaviour
         return s;
     }
 
-    // commands for the build checks: round skip | round end | round goto <i> | round restart
+    // commands for the build checks: round skip | round left <s> | round catchall | round end | round goto <i> | round restart
     public string RoundCommand(string[] a)
     {
         if (a.Length < 2) return "?";
         if (a[1] == "skip") { left = Mathf.Min(left, 0.2f); return "skipped"; }
+        if (a[1] == "left" && a.Length > 2) { left = float.Parse(a[2], System.Globalization.CultureInfo.InvariantCulture); return "left " + left.ToString("0"); }
+        if (a[1] == "catchall") { foreach (var h in hiders) if (h.alive) { h.TakeHit(10000, Vector3.forward); h.survived = huntElapsed; } return "hiders alive " + HidersAlive; }
         if (a[1] == "hunt") { if (phase == PH_BRIEF || phase == PH_HIDE) StartHunt(); return "phase " + phase; }
         if (a[1] == "end" && phase == PH_HUNT) { EndRound("Ended by a test command"); return "ended"; }
         if (a[1] == "restart") { StartRound(); return "restarted"; }
         if (a[1] == "goto" && a.Length > 2)
         {
-            // stand 2.5 m from bot hider i, looking at it
+            // stand 2.5 m from bot hider i, looking at it; a caught one: look at the sky (a dart there costs nothing)
             var h = hiders[int.Parse(a[2])];
+            if (!h.alive) { P.SetLook(P.camYaw, -80f); return "caught already"; }
             Vector3 c = h.Centre;
             var g = Map.gen;
             int cell = Map.CellAt(c);

@@ -621,13 +621,15 @@ public partial class MapGen
         }
     }
 
-    // a marker against the wall or fence nearest (px, pz), its back to it
+    // a marker by the wall or fence nearest (px, pz), its back to it and its face to the people coming (the models'
+    // readable face is +z: convert_models.py turns the sign board, whose face was its back), SignGap clear of it
+    const int SignGap = 150;
     void Marker(string id, int px, int pz, int k)
     {
         if (!Fit(1)) return;
         GenRng r = SR(k);
         int first = nEmit;
-        if (WallPlace(Dn(id), WM_NEAR, px, pz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
+        if (WallPlace(Dn(id), SignGap, WM_NEAR, px, pz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
     }
 
     // ============================================================================================ LANE
@@ -642,7 +644,7 @@ public partial class MapGen
         if (Fit(1))
         {
             int first = nEmit;
-            if (WallPlace(Dn("n_sign"), WM_NEAR, rx, rz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
+            if (WallPlace(Dn("n_sign"), SignGap, WM_NEAR, rx, rz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
         }
         FrontMarkers(30);
         BenchAtEdge(2);
