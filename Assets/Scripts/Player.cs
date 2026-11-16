@@ -124,6 +124,9 @@ public partial class Player : MonoBehaviour
         body.jumpSpeed = 0f;
         body.ledge = disguiseClass < 2 ? Balance.LedgeAssist : 0f;
         eye = Balance.EyeHeight(size.y);
+        // the first-person shell keeps clear of the eye by the prop's half diagonal, except low down (PropGhost.shader)
+        ModelLibrary.ghost.SetFloat("_Clear", 0.5f * Mathf.Sqrt(size.x * size.x + size.z * size.z));
+        ModelLibrary.ghost.SetFloat("_Below", size.y / 3f);
         // changing disguise keeps the same fraction of health (05 section 6.1)
         maxHealth = Balance.HiderHealth[disguiseClass];
         health = oldMax > 0 ? Mathf.Max(1, Mathf.RoundToInt((float)health / oldMax * maxHealth)) : maxHealth;
@@ -204,7 +207,7 @@ public partial class Player : MonoBehaviour
         Footsteps(wish, run, dt);
         UpdateVisual();
         UpdateCamera();
-        if (!paused && !lobby) UpdateActions(dt);   // in the lobby E is for the board
+        if (!paused && !lobby) UpdateActions(dt);   // in the lobby a click is for the start stand
         else ClearAim();
         lastPos = body.pos;
     }

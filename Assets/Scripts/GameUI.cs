@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// All screens, drawn with Unity's immediate-mode GUI: the lobby (its hints, and the start panel on its board:
+// All screens, drawn with Unity's immediate-mode GUI: the lobby (its hints, and the start panel on its stand:
 // seed, size, density, role, Generate), the progress bar, the in-round display, the help panel, the Esc menu, the
 // debug overlay and the round result.
 public class GameUI : MonoBehaviour
@@ -123,19 +123,27 @@ public class GameUI : MonoBehaviour
     {
         var g = Game.I;
         var lb = Lobby.I;
-        if (lb.panelOpen) { StartPanel(); return; }
+        if (lb.panelOpen)
+        {
+            // the click on the stand's screen that opened the panel is not a click on the panel: under pointer lock its
+            // position is stale and could land on Generate
+            var ev = Event.current;
+            if (Time.unscaledTime < lb.panelOpenedAt + 0.3f && (ev.type == EventType.MouseDown || ev.type == EventType.MouseUp)) ev.Use();
+            StartPanel();
+            return;
+        }
         int n = lb.Participants, hunters = Balance.Hunters(n);
         bool inZone = lb.PlayerInZone;
         Rect r = new Rect(12, 12, 560, 128);
         GUI.Box(r, GUIContent.none, box);
         GUILayout.BeginArea(new Rect(r.x + 14, r.y + 8, r.width - 28, r.height - 12));
         GUILayout.Label("Lobby", heading);
-        GUILayout.Label("The board on the wall (walk up to it, look at it, click) holds the map: seed, size, density, your role, Generate. "
-            + "Whoever stands in the green zone takes part in the next round.", small);
+        GUILayout.Label("Whoever stands in the green zone takes part in the next round. The stand at the zone's edge starts it: "
+            + "point at START and click; click its screen to change the seed, size, density or your role.", small);
         GUILayout.Label("In the zone: " + (inZone ? "<b>you</b> and " : "") + lb.botsInZone + " bots" + (inZone ? "" : " (step in to play)")
             + ". A round of " + n + " players has " + hunters + " hunter" + (hunters == 1 ? "" : "s") + " (1 in 4, drawn at random).", label);
         GUILayout.EndArea();
-        string tip = lb.Hint.Length > 0 ? lb.Hint : (Cursor.lockState != CursorLockMode.Locked ? "Click to capture the mouse, then W A S D to walk" : (lb.NearBoard ? "Click the board to open it" : ""));
+        string tip = lb.Hint.Length > 0 ? lb.Hint : (Cursor.lockState != CursorLockMode.Locked ? "Click to capture the mouse, then W A S D to walk" : (lb.StandAim() == 1 ? "Click START to begin a round" : (lb.StandAim() == 2 ? "Click the screen to change the map or your role" : (lb.NearStand ? "Point at START on the stand and click" : ""))));
         if (tip.Length > 0)
         {
             Fill(new Rect(W / 2 - 320, H - 120, 640, 34), new Color(0.04f, 0.05f, 0.07f, 0.8f));
@@ -148,7 +156,7 @@ public class GameUI : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------------- start panel (on the lobby's board)
+    // ---------------------------------------------------------------- start panel (on the lobby's start stand)
     void StartPanel()
     {
         var g = Game.I;
@@ -212,7 +220,7 @@ public class GameUI : MonoBehaviour
         }
         else GUILayout.Label("Nothing is generated until you press Generate; every new map needs a new press. "
             + (lobby ? Lobby.I.Participants + " players in the zone take part." : ""), small);
-        if (lobby && GUILayout.Button("Close the board (Esc)", button, GUILayout.Height(30))) Lobby.I.ClosePanel();
+        if (lobby && GUILayout.Button("Close (Esc)", button, GUILayout.Height(30))) Lobby.I.ClosePanel();
         GUILayout.Space(8);
 
         Sliders();
@@ -594,7 +602,7 @@ public class GameUI : MonoBehaviour
         if (GUILayout.Button(g.topView ? "Map from above: on" : "Map from above: off (debug)", button, GUILayout.Height(32))) g.SetTopView(!g.topView);
         GUILayout.Space(6);
         if (GUILayout.Button("Back to the lobby", button, GUILayout.Height(36))) { AudioHub.I.Play("back_001", 0.5f); g.BackToStart(); }
-        GUILayout.Label("Returning keeps nothing: a new map is generated only when you press Generate on the lobby's board.", small);
+        GUILayout.Label("Returning keeps nothing: a new map is generated only when you press START on the lobby's stand (or Generate on its screen).", small);
         GUILayout.EndArea();
     }
 }

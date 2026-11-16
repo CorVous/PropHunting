@@ -5,12 +5,13 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 5;
+    public const int GEN_VERSION = 6;
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
     // Layout 2 (generator 5): plots along a lane, buildings from the plan library, a wood (MapGenSite.cs, G32).
-    public const int LAYOUT_VERSION = 2;
+    // Layout 3 (generator 6): the same, at the smaller sizes of G36 "B" (no front garden at S, fewer and smaller plots).
+    public const int LAYOUT_VERSION = 3;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell
@@ -25,10 +26,29 @@ public static class GenData
     // sizes give the plots, the ground cells the wood tops the map up to, and the wood's own minimum. Layout 1 (the
     // zone pieces) filled a fixed square of SizeGrid cells to 28, 52, 85 and 108 ground cells.
     public static readonly int[] SizeGrid = { 7, 9, 12, 14 };            // layout 1: bounding box, outer cells per side
-    public static readonly int[] SizeGroundCells = { 46, 80, 124, 164 }; // ground cells the wood tops the map up to (layout 1: 28, 52, 85, 108)
-    public static readonly int[] SizeWoodMin = { 6, 10, 16, 22 };        // the wood is never smaller than this
+    public static readonly int[] SizeGroundCells = { 36, 70, 115, 150 }; // ground cells the wood tops the map up to (layout 1: 28, 52, 85, 108; layout 2: 46, 80, 124, 164)
+    public static readonly int[] SizeWoodMin = { 6, 8, 16, 20 };        // the wood is never smaller than this (layout 2: 6, 10, 16, 22)
     public static readonly string[] SizePlots = { "H+", "HH+", "HHDW", "HHHDW" };   // plots: H house, D diner, W warehouse, + a diner or a warehouse (or a house at S)
-    public static readonly int[] SizeExtraHouse = { 0, 300, 400, 500 };  // chance (per mille) of one more house plot
+    public static readonly int[] SizeExtraHouse = { 0, 0, 0, 0 };        // chance (per mille) of one more house plot (layout 2: 0, 300, 400, 500)
+    // the plans a plot may take, by their cells: houses, warehouses, diners (the least and the most)
+    public static readonly int[] SizeHouseCellsMin = { 5, 5, 5, 6 };
+    public static readonly int[] SizeHouseCellsMax = { 6, 8, 9, 10 };
+    public static readonly int[] SizeWarehouseCellsMin = { 6, 6, 8, 8 };
+    public static readonly int[] SizeWarehouseCellsMax = { 6, 6, 12, 10 };
+    public static readonly int[] SizeDinerCellsMax = { 6, 6, 8, 8 };
+    // a house plot's gardens in cells: the front garden (and the chance of one more row), the back garden (and the
+    // chance of one more row); a warehouse's forecourt and its chance of a yard two deep at the back; the chance of
+    // a side yard. G36 "B" brought the maps down to about 40 to 60% above layout 1: at S the house's front door and
+    // the warehouse's office door open straight onto the lane (report 16, 4.1: "S: 0 allowed"), no extra house plot,
+    // smaller commercial plans at M and XL, a back garden one row deeper less often. Layout 2: front { 1, 1, 1, 1 }
+    // and one more row 25% at L and XL, back extra { 300, 300, 350, 350 }, warehouse front 1 at every size.
+    public static readonly int[] SizeHouseFront = { 0, 1, 1, 1 };
+    public static readonly int[] SizeHouseFront2 = { 0, 0, 0, 0 };
+    public static readonly int[] SizeHouseBack = { 1, 1, 2, 2 };
+    public static readonly int[] SizeHouseBackExtra = { 0, 0, 200, 200 };
+    public static readonly int[] SizeWarehouseFront = { 0, 1, 1, 1 };
+    public static readonly int[] SizeWarehouseBack2 = { 0, 0, 500, 500 };
+    public static readonly int[] SizeSideYard = { 250, 250, 250, 250 };
     public static readonly int[] SizeLeaks = { 8, 11, 15, 18 };          // wrong-category spawns (04 section 4.3.5)
     public static readonly int[] SizePlayers = { 8, 16, 24, 32 };
     public const int LEAK_COMEDIC_PERMILLE = 300;                        // D10
@@ -936,7 +956,7 @@ public static class GenData
         Range(R_BATH,              25,   40,       10,             50);
         Range(R_OFFICE,            34,   50,       34,             50);
         Range(R_KIDS,              36,   50,       26,             55);
-        Range(R_HALL,              19,   31,       12,             40);
+        Range(R_HALL,              25,   38,       12,             40);   // generator 5: 19 to 31 (38% of halls held 3 or fewer)
         Range(R_STORAGE,           38,   54,       40,             50);
         Range(R_LOADING,           34,   50,       16,             50);
         Range(R_WH_OFFICE,         32,   46,       30,             50);

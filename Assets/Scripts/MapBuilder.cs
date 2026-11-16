@@ -187,6 +187,8 @@ public class MapBuilder
     // Where two kinds meet they blend (G30), in two ways that work together: the generator frays the border (cells
     // within two of it take the other kind by a seeded hash), and here the corners of the cells along a border
     // take the mean colour of the cells around them, so the colour runs over half a metre instead of stepping.
+    // Paving takes no part (the G30 amendment): its cells keep their own colour to the corner and the natural
+    // ground beside it averages only with natural ground, so a patio, forecourt or yard ends in a clean edge.
     // Indoor floors keep their hard edges at the walls.
     Color32[] cellColour;
 
@@ -206,7 +208,7 @@ public class MapBuilder
     bool Blends(int i)
     {
         int g = gen.ground[i];
-        return g >= MapGen.GR_LAWN && g != MapGen.GR_RELEASE;
+        return g >= MapGen.GR_LAWN && g != MapGen.GR_RELEASE && g != MapGen.GR_PAVING;
     }
 
     // the colour of the grid corner at (cx, cz) for the cell `self`: the mean of the outdoor cells around the

@@ -204,6 +204,22 @@ public partial class MapGen
             int first = nEmit;
             if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r8) >= 0) Keep(first, false);
         }
+        // goods still waiting: while the dock is under its range, another row at a wall or a pallet against it (a
+        // dock whose first rows found no room otherwise ends with its staging lane alone)
+        GenRng r10 = SR(10);
+        for (int k = 0; k < 6 && Fit(2); k++)
+        {
+            int first = nEmit;
+            if (k % 2 == 0)
+            {
+                if (PlaceGroup(GenData.FindGrp(rows[r10.Range(rows.Length)]), room, GenData.A_WALL, r10.Between(2, 3), 0, ref r10)) Keep(first, false);
+            }
+            else
+            {
+                int def = Pick(ref r10, "w_palletLoaded", 5, "w_pallet", 3, "s_boxLarge", 3);
+                if (CountInRoom(def, room) < ScaledCap(GenData.defRoomCap[def], room) && WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, ref r10) >= 0) Keep(first, false);
+            }
+        }
         GenRng r9 = SR(9);
         if (r9.Chance(300) && LooseFit(2))
         {

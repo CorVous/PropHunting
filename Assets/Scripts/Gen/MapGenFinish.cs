@@ -494,10 +494,12 @@ public partial class MapGen
         return GR_LAWN;
     }
 
-    // The kind of every cell, then the borders between two outdoor kinds are frayed: a cell next to another kind
-    // takes that kind with a chance of 38%, a cell two away with 14%. The chance comes from a hash of the seed
-    // and the cell, so it is the same on every machine and needs no state. Paving keeps a straight edge against
-    // the building it lies at (walls are not borders); a walkway that must stay clear keeps its kind.
+    // The kind of every cell, then the borders between two kinds of natural ground (lawn, forest floor, soil, the
+    // trodden track) are frayed: a cell next to another kind takes that kind with a chance of 38%, a cell two away
+    // with 14%. The chance comes from a hash of the seed and the cell, so it is the same on every machine and needs
+    // no state. Paving (a patio, a forecourt, a yard) never blends (the G30 amendment: "outside tile areas don't
+    // necessarily need blending"): its edge stays where its area ends, and the natural ground beside it frays only
+    // with other natural ground. Walls and fences are not borders.
     void BuildGround()
     {
         int n = IW * IH;
@@ -506,7 +508,7 @@ public partial class MapGen
         for (int i = 0; i < n; i++)
         {
             int g = dist[i];
-            if (g < GR_LAWN || g == GR_RELEASE) continue;
+            if (g < GR_LAWN || g == GR_RELEASE || g == GR_PAVING) continue;
             int ix = i % IW, iz = i / IW;
             int other = 0, away = 3;
             for (int d = 0; d < 4 && away > 1; d++)
@@ -517,12 +519,11 @@ public partial class MapGen
                     // a wall or a fence between the two cells is not a border to blend across
                     if (!CanStep(ix + DX[d] * (step - 1), iz + DZ[d] * (step - 1), d)) break;
                     int gj = dist[jz * IW + jx];
-                    if (gj < GR_LAWN || gj == GR_RELEASE) break;
+                    if (gj < GR_LAWN || gj == GR_RELEASE || gj == GR_PAVING) break;
                     if (gj != g && step < away) { away = step; other = gj; }
                     if (gj != g) break;
                 }
             if (other == 0) continue;
-            if (away == 2 && (g == GR_PAVING || other == GR_PAVING)) continue;   // paving keeps a tighter edge: no stray slabs
             uint h = GenRng.Hash32(seed, (uint)GenData.GEN_VERSION, 77, (uint)i, (uint)size) % 100u;
             if (h < (away == 1 ? 38u : 14u)) ground[i] = (byte)other;
         }

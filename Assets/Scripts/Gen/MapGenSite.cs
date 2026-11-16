@@ -65,9 +65,9 @@ public partial class MapGen
     int PickPlan(int zone, ref GenRng rng)
     {
         int lo, hi;
-        if (zone == GenData.Z_HOUSE) { lo = size == 3 ? 6 : 5; hi = size == 0 ? 6 : (size == 1 ? 8 : (size == 2 ? 9 : 10)); }
-        else if (zone == GenData.Z_WAREHOUSE) { lo = size <= 1 ? 6 : 8; hi = size == 0 ? 6 : (size == 1 ? 8 : 12); }
-        else { lo = 6; hi = size == 0 ? 6 : 8; }
+        if (zone == GenData.Z_HOUSE) { lo = GenData.SizeHouseCellsMin[size]; hi = GenData.SizeHouseCellsMax[size]; }
+        else if (zone == GenData.Z_WAREHOUSE) { lo = GenData.SizeWarehouseCellsMin[size]; hi = GenData.SizeWarehouseCellsMax[size]; }
+        else { lo = 6; hi = GenData.SizeDinerCellsMax[size]; }
         int n = 0;
         for (int p = 0; p < GenPlans.Count; p++)
         {
@@ -187,10 +187,10 @@ public partial class MapGen
             plotSide[k] = side;
             int w = PlW(p), d = PlD(p);
             // front garden 1 cell (2 now and then on L and XL), back garden 1 or 2 cells deep (2 or 3 on L and XL)
-            if (kinds[i] == GenData.Z_HOUSE) { plotSet[k] = size >= 2 && rng.Chance(250) ? 2 : 1; plotBack[k] = (size >= 2 ? 2 : 1) + (rng.Chance(size >= 2 ? 350 : 300) ? 1 : 0); }
+            if (kinds[i] == GenData.Z_HOUSE) { plotSet[k] = GenData.SizeHouseFront[size] + (GenData.SizeHouseFront2[size] > 0 && rng.Chance(GenData.SizeHouseFront2[size]) ? 1 : 0); plotBack[k] = GenData.SizeHouseBack[size] + (rng.Chance(GenData.SizeHouseBackExtra[size]) ? 1 : 0); }
             else if (kinds[i] == GenData.Z_DINER) { plotSet[k] = 1; plotBack[k] = 1; }
-            else { plotSet[k] = 1; plotBack[k] = size >= 2 && rng.Chance(500) ? 2 : 1; }
-            plotSL[k] = rng.Chance(250) ? 1 : 0; plotSR[k] = rng.Chance(250) ? 1 : 0;
+            else { plotSet[k] = GenData.SizeWarehouseFront[size]; plotBack[k] = GenData.SizeWarehouseBack2[size] > 0 && rng.Chance(GenData.SizeWarehouseBack2[size]) ? 2 : 1; }
+            plotSL[k] = rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0; plotSR[k] = rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0;
             // a back door in a side wall opens onto this plot's own side yard
             int bd = PlBack(p) & 3;
             if (bd == 1 || bd == 3) { if ((bd == 1) != (plotMir[k] != 0)) plotSR[k] = 1; else plotSL[k] = 1; }
@@ -507,9 +507,9 @@ public partial class MapGen
         int front = plotSide[k] < 0 ? 1 : 3, back = (front + 2) & 3;
         if (plotZone[k] == GenData.Z_HOUSE)
         {
-            // the garden gate where the front path meets the lane
+            // the garden gate where the front path meets the lane (none when the front door opens onto the lane)
             int fx, fy, fd;
-            if (DoorOutside(k, SD_FRONT, out fx, out fy, out fd))
+            if (DoorOutside(k, SD_FRONT, out fx, out fy, out fd) && cvPlot[fy * CV + fx] == k)
             {
                 int x = fx, y = fy;
                 while (CvZone(x + DX[front], y + DZ[front]) == GenData.Z_LAWN && cvPlot[(y + DZ[front]) * CV + x + DX[front]] == k) { x += DX[front]; y += DZ[front]; }
@@ -519,7 +519,7 @@ public partial class MapGen
         else
         {
             // a shop's front is open to the lane
-            for (int u = 0; u < plotAlong[k]; u++) { int x, y; PlotXY(k, u, 0, out x, out y); Sd(x, y, front, SD_OPEN); }
+            for (int u = 0; u < plotAlong[k]; u++) { int x, y; PlotXY(k, u, 0, out x, out y); if (cvZone[y * CV + x] == GenData.Z_LAWN) Sd(x, y, front, SD_OPEN); }
         }
         // a gate from the back garden or the yard into the wood
         if (rng.Chance(plotZone[k] == GenData.Z_HOUSE ? 500 : 650))

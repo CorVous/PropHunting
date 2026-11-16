@@ -107,7 +107,7 @@ public partial class MapGen
             kind = kind < 4 ? 0 : (kind < 8 ? 1 : 2);     // bush, drift, rocks
             if (kind == last && kind != 0) kind = 0;
             if (kind == 1 && !Fit(3)) kind = 0;
-            if (kind == 2 && !Fit(2)) kind = 0;
+            if (kind == 2 && (!Fit(2) || !RocksAllowed())) kind = Fit(3) ? 1 : 0;
             int first = nEmit;
             if (kind == 0)
             {
@@ -161,9 +161,19 @@ public partial class MapGen
         if (Fit(2))
         {
             first = nEmit;
-            if (GroupBeside(GenData.FindGrp("rocks"), bush, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
+            if (GroupBeside(RocksAllowed() ? GenData.FindGrp("rocks") : FlowerGroup(ref rng), bush, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
         }
         return true;
+    }
+
+    // Small rocks are a feature of a garden, not its filler: outside the wood an area takes at most two clumps of
+    // them (the v4 gallery's big lawns held a dozen rocks or more in five clumps). Borders, islands and trees take
+    // flowers or nothing instead.
+    bool RocksAllowed()
+    {
+        int t = roomType[pRoom];
+        if (t == GenData.R_FOREST_DENSE || t == GenData.R_FOREST_CLEARING) return true;
+        return CountInRoom(Dn("n_rockSmall"), pRoom) + CountInRoom(Dn("n_rockSmallB"), pRoom) + CountInRoom(Dn("n_rockSmallC"), pRoom) <= 3;
     }
 
     // No outdoor area is left bare (G29). An area whose plan ended below its minimum (a small one whose edges
@@ -219,8 +229,10 @@ public partial class MapGen
             }
             if (how <= 2 && roomFloor[room] + 2 <= roomFloorTarget[room])
             {
+                // rocks, or flowers once the area has its rocks
                 first = nEmit;
-                if (GroupAt(GenData.FindGrp("rocks"), forest ? GenData.A_SOFT : GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r) && Keep(first, false)) continue;
+                int g = RocksAllowed() ? GenData.FindGrp("rocks") : FlowerGroup(ref r);
+                if (GroupAt(g, forest ? GenData.A_SOFT : GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r) && Keep(first, false)) continue;
             }
             if (forest)
             {
@@ -266,7 +278,7 @@ public partial class MapGen
         int cell = OpenSpot(4, WM_ANY, 0, 0, 0, ref r);
         if (cell < 0) return -1;
         int tree = TreeAt(Pick(ref r, "n_treeFat", 6, "n_treeOak", 4), cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, ref r);
-        if (tree >= 0 && r.Chance(550) && Fit(2))
+        if (tree >= 0 && r.Chance(550) && Fit(2) && RocksAllowed())
         {
             int first = nEmit;
             if (GroupBeside(GenData.FindGrp("rocks"), tree, r.Between(2, 3), 0, ref r)) Keep(first, false);
@@ -685,7 +697,14 @@ public partial class MapGen
                 if (dd <= 14) tags[z * IW + x] |= GenData.T_EARTH;
                 if (dd <= (soft ? 36 : 14)) tags[z * IW + x] |= GenData.T_GLADE;
             }
-        // a few logs beside the fire, and the bucket of water
+        // in the wood the tent comes first (a narrow clearing has room for little else), then the gear (PlanForest)
+        if (!soft) FireGear(fire, ref rng);
+        return fire;
+    }
+
+    // a few logs beside the fire, and the bucket of water
+    void FireGear(int fire, ref GenRng rng)
+    {
         if (rng.Chance(650) && Fit(2))
         {
             int first = nEmit;
@@ -697,7 +716,6 @@ public partial class MapGen
             FSet(Pick(ref rng, "m_bucketWater", 6, "s_bucket", 3));
             if (FormBeside(GenData.GL_ROW, 0, fire, 0, ref rng) >= 0) Keep(first, false);
         }
-        return fire;
     }
 
     // Something that belongs to a fire but stands back from its ring of seats (the tent, the wood pile): at one
@@ -760,12 +778,30 @@ public partial class MapGen
         }
     }
 
+    // The ring of seats round a fire: two or three, 1.3 to 1.9 m from it, each facing it (a bench), lying across the
+    // bearing (a log) or standing (a stump); in a garden a bench is likeliest, in the wood logs and stumps.
+    void FireSeats(int fire, bool wood, int k)
+    {
+        if (fire < 0) return;
+        GenRng rng = SR(k);
+        int n = rng.Between(2, 3);
+        for (int s = 0, tries = 0; s < n && tries < 6 && Fit(1); tries++)
+        {
+            int def = wood ? Pick(ref rng, "w_logA", 5, "n_stumpRound", 3, "n_stump", 2) : Pick(ref rng, "k_bench", 4, "w_logA", 3, "n_stumpRound", 3);
+            if (CountInRoom(def, pRoom) >= ScaledCap(GenData.defRoomCap[def], pRoom)) continue;
+            int rel = def == Dn("k_bench") ? 180 : (def == Dn("w_logA") ? 90 : 0);
+            // a log is a small loose thing: it keeps within a step of the fire (G25: nothing loose alone in the open)
+            if (AroundFire(def, fire, rel, 1300, def == Dn("w_logA") ? 1600 : 1900, 0, false, false, ref rng) >= 0) s++;
+        }
+    }
+
     void PlanFirepit()
     {
         int room = pRoom;
         GenRng r = SR(1);
         StonePaths(40, ref r);
         int fire = FireRing(6, RoomMidX(room), RoomMidZ(room), false, ref r);
+        FireSeats(fire, false, 7);
         GenRng r2 = SR(2);
         if (r2.Chance(850)) WoodPile(fire, true, ref r2);
         DoorSides(50);
@@ -883,7 +919,14 @@ public partial class MapGen
             if (tent < 0) tent = WallKeep(tentDef, WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
             if (tent < 0) tent = WallKeep(Dn("n_tentClosed"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
             if (tent < 0) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2300, 3800, EF_MANDATORY, true, false, ref r2);
+            // a clearing too narrow for any tent (a strip of wood two cells long): a bedroll laid out by the fire,
+            // its foot to the fire, the gear beside it as beside a tent
+            if (tent < 0) tent = AroundFire(Dn("s_bedroll"), fire, 0, 1500, 2700, EF_MANDATORY, true, false, ref r2);
+            if (tent < 0) tent = WallKeep(Dn("s_bedroll"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
             if (tent < 0) MandFail(1);
+            FireSeats(fire, true, 8);
+            GenRng rgear = SR(9);
+            FireGear(fire, ref rgear);
         }
         // a piece of forest of one cell (4 x 4 m) is too small for a path of its own
         if (camp || roomOuterCells[room] >= 2)
