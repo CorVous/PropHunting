@@ -139,8 +139,10 @@ public class PHGame : UdonSharpBehaviour
     public string SettingsText()
     {
         return "Size: " + (sizeAuto ? "Auto (" + sizeName[RoundSize()] + ")" : sizeName[sizeChoice])
-            + "    Props: " + densityName[densityChoice]
-            + "\nRound: " + roundLengthName[roundLength] + "    Forced taunt every " + tauntInterval + " s    Wrong prop -" + wrongPenalty
+            + "\nProps: " + densityName[densityChoice]
+            + "\nRound: " + roundLengthName[roundLength]
+            + "\nForced taunt every " + tauntInterval + " s"
+            + "\nWrong prop: -" + wrongPenalty + " health"
             + "\nIn the zone: " + Participants() + " (" + Hunters(Mathf.Max(1, Participants())) + " hunt)"
             + (phase != PH_LOBBY ? "\nA round is on." : "");
     }

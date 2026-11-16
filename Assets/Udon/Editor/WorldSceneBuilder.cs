@@ -163,19 +163,18 @@ public static class WorldSceneBuilder
 
         // the host panel on the north wall, above the zone (G50, G51): every setting and START. Everyone can read
         // it; only the host's presses count (PHGame checks)
-        float wz = RoomD / 2 - 0.15f;
-        var panelMat = Mat("PanelButton", new Color(0.30f, 0.45f, 0.70f));
-        Row(lobby.transform, game, panelMat, "Size", nameof(PHGame.PanelSize), new[] { "Auto", "S", "M", "L", "XL" }, new[] { -1, 0, 1, 2, 3 }, 4.4f, wz);
-        Row(lobby.transform, game, panelMat, "Props", nameof(PHGame.PanelDensity), new[] { "Normal", "Sparse", "Dense", "V. sparse", "V. dense" }, new[] { 0, 1, 2, 3, 4 }, 3.8f, wz);
-        Row(lobby.transform, game, panelMat, "Round", nameof(PHGame.PanelRoundLength), new[] { "Short", "Normal", "Long" }, new[] { 0, 1, 2 }, 3.2f, wz);
-        Row(lobby.transform, game, panelMat, "Taunt every", nameof(PHGame.PanelTaunt), new[] { "30 s", "40 s", "60 s" }, new[] { 30, 40, 60 }, 2.6f, wz);
-        Row(lobby.transform, game, panelMat, "Wrong prop", nameof(PHGame.PanelPenalty), new[] { "-5", "-10", "-15" }, new[] { 5, 10, 15 }, 2.0f, wz);
-        Button(lobby.transform, game, buttonMat, "START", nameof(PHGame.StartRound), 0, new Vector3(-1.5f, 1.3f, wz), new Vector3(1.6f, 0.45f, 0.2f));
-        Label(lobby.transform, "Stand in the green square to play. The host sets up the round here.", new Vector3(0f, 5.0f, wz - 0.1f), 0.32f, 20f);
-        var settings = Label(lobby.transform, "", new Vector3(6.2f, 3.2f, wz - 0.1f), 0.24f, 7f);
-        settings.alignment = TextAlignmentOptions.TopLeft;
-        settings.rectTransform.sizeDelta = new Vector2(7f, 3f);
-        local.panelText = settings;
+        // a world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR
+        float wz = RoomD / 2 - 0.12f;
+        var canvas = PanelCanvas(lobby.transform, new Vector3(0f, 3.0f, wz), new Vector2(1800f, 560f));
+        PanelText(canvas, "Stand in the green square to play. The host sets up the round here.", new Vector2(0f, 245f), new Vector2(1740f, 60f), 40f, TextAlignmentOptions.Center);
+        Row(canvas, game, "Size", nameof(PHGame.PanelSize), new[] { "Auto", "S", "M", "L", "XL" }, new[] { -1, 0, 1, 2, 3 }, 160f);
+        Row(canvas, game, "Props", nameof(PHGame.PanelDensity), new[] { "Normal", "Sparse", "Dense", "V. sparse", "V. dense" }, new[] { 0, 1, 2, 3, 4 }, 90f);
+        Row(canvas, game, "Round", nameof(PHGame.PanelRoundLength), new[] { "Short", "Normal", "Long" }, new[] { 0, 1, 2 }, 20f);
+        Row(canvas, game, "Taunt every", nameof(PHGame.PanelTaunt), new[] { "30 s", "40 s", "60 s" }, new[] { 30, 40, 60 }, -50f);
+        Row(canvas, game, "Wrong prop", nameof(PHGame.PanelPenalty), new[] { "-5", "-10", "-15" }, new[] { 5, 10, 15 }, -120f);
+        UiButton(canvas, game, "START", nameof(PHGame.StartRound), 0, new Vector2(-260f, -215f), new Vector2(300f, 80f), new Color(0.85f, 0.32f, 0.22f));
+        var settings = PanelText(canvas, "", new Vector2(650f, 20f), new Vector2(440f, 380f), 30f, TextAlignmentOptions.TopLeft);
+        local.panelUiText = settings;
         // the last round's results, on the west wall
         var results = Label(lobby.transform, "No round played yet.", new Vector3(-RoomW / 2 + 0.05f, 2.8f, 0f), 0.24f, 14f);
         results.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
@@ -337,23 +336,56 @@ public static class WorldSceneBuilder
         return t;
     }
 
-    static void Row(Transform parent, PHGame game, Material m, string title, string action, string[] labels, int[] args, float y, float wz)
+    // ---- the host panel: a world-space canvas set up as VRChat's UI page asks (VRC Ui Shape, a GraphicRaycaster,
+    // a BoxCollider the size of the canvas, layer Default, buttons with Navigation None, text not a raycast
+    // target); 1 canvas unit = 2 mm. The canvas faces the room (its -z is towards the players).
+    static Transform PanelCanvas(Transform parent, Vector3 localPos, Vector2 size)
     {
-        var l = Label(parent, title, new Vector3(-5.6f, y, wz - 0.1f), 0.22f, 2.4f);
-        l.alignment = TextAlignmentOptions.Right;
-        for (int i = 0; i < labels.Length; i++)
-            Button(parent, game, m, labels[i], action, args[i], new Vector3(-3.6f + i * 1.25f, y, wz), new Vector3(1.1f, 0.4f, 0.15f));
+        var go = new GameObject("HostPanel");
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = localPos;
+        go.layer = 0;
+        var c = go.AddComponent<Canvas>(); c.renderMode = RenderMode.WorldSpace;
+        go.AddComponent<GraphicRaycaster>();
+        var rt = go.GetComponent<RectTransform>(); rt.sizeDelta = size;
+        go.transform.localScale = Vector3.one * 0.005f;
+        var col = go.AddComponent<BoxCollider>(); col.size = new Vector3(size.x, size.y, 1f);
+        go.AddComponent<VRC.SDK3.Components.VRCUiShape>();
+        var bg = go.AddComponent<Image>(); bg.color = new Color(0.12f, 0.14f, 0.18f, 0.92f); bg.raycastTarget = false;
+        return go.transform;
     }
 
-    static void Button(Transform parent, PHGame game, Material m, string label, string action, int arg, Vector3 pos, Vector3 size)
+    static TextMeshProUGUI PanelText(Transform canvas, string s, Vector2 at, Vector2 size, float fontSize, TextAlignmentOptions align)
     {
-        var b = Box(parent, "Button " + label, pos, size, m, true);
-        var btn = b.AddUdonSharpComponent<PHButton>();
+        var go = new GameObject("Text");
+        go.transform.SetParent(canvas, false);
+        var t = go.AddComponent<TextMeshProUGUI>();
+        t.text = s; t.fontSize = fontSize; t.alignment = align; t.color = Color.white; t.raycastTarget = false;
+        var rt = go.GetComponent<RectTransform>(); rt.anchoredPosition = at; rt.sizeDelta = size;
+        return t;
+    }
+
+    static void Row(Transform canvas, PHGame game, string title, string action, string[] labels, int[] args, float y)
+    {
+        PanelText(canvas, title, new Vector2(-590f, y), new Vector2(240f, 60f), 32f, TextAlignmentOptions.Right);
+        for (int i = 0; i < labels.Length; i++)
+            UiButton(canvas, game, labels[i], action, args[i], new Vector2(-380f + i * 165f, y), new Vector2(150f, 56f), new Color(0.26f, 0.42f, 0.70f));
+    }
+
+    static void UiButton(Transform canvas, PHGame game, string label, string action, int arg, Vector2 at, Vector2 size, Color colour)
+    {
+        var go = new GameObject("Button " + label);
+        go.transform.SetParent(canvas, false);
+        var img = go.AddComponent<Image>(); img.color = colour;
+        var b = go.AddComponent<Button>();
+        var nav = b.navigation; nav.mode = Navigation.Mode.None; b.navigation = nav;
+        var rt = go.GetComponent<RectTransform>(); rt.anchoredPosition = at; rt.sizeDelta = size;
+        var btn = go.AddUdonSharpComponent<PHButton>();
         btn.game = game; btn.action = action; btn.arg = arg;
-        btn.InteractionText = label;
         UdonSharpEditorUtility.CopyProxyToUdon(btn);
-        var t = Label(parent, label, pos + new Vector3(0f, 0f, -size.z / 2 - 0.01f), 0.2f, size.x);
-        t.color = Color.white;
+        var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(b.onClick, udon.SendCustomEvent, nameof(PHButton.Press));
+        PanelText(go.transform, label, Vector2.zero, size, 28f, TextAlignmentOptions.Center);
     }
 
     static PHAudio BuildAudio(Transform parent)

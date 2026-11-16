@@ -20,6 +20,7 @@ public class PHLocal : UdonSharpBehaviour
     public PHAudio sound;
     public PHHiderBody body;             // the hider's prop-shaped body (custom controller in the station)
     public TextMeshPro panelText;
+    public TextMeshProUGUI panelUiText;  // the same, on the host panel's canvas
     public TextMeshPro resultsText;      // the last round's results, on the lobby wall
     public Material beaconGreen, beaconRed;
     public string[] defNames;            // readable names of the defs ("k_chairCushion" -> "Chair cushion"), baked        // the host panel's settings, for everyone to read
@@ -285,7 +286,7 @@ public class PHLocal : UdonSharpBehaviour
         wasEndgame = eg;
         UpdateForcedTaunt();
         UpdateHud();
-        if (panelText != null && Time.time >= nextPanel) { nextPanel = Time.time + 0.5f; panelText.text = game.SettingsText(); }
+        if (Time.time >= nextPanel) { nextPanel = Time.time + 0.5f; string st = game.SettingsText(); if (panelText != null) panelText.text = st; if (panelUiText != null) panelUiText.text = st; }
     }
 
     // the host's interval; a small group (under 6) three quarters of it, the endgame half (9.4, G53)

@@ -11,6 +11,9 @@ public class PHButton : UdonSharpBehaviour
     public string action = "StartRound";
     public int arg;
 
+    // from a UI button's OnClick (the host panel)
+    public void Press() { Interact(); }
+
     public override void Interact()
     {
         if (game == null) return;
