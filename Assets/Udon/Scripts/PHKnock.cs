@@ -47,6 +47,7 @@ public class PHKnock : UdonSharpBehaviour
         body.AddTorque(Random.insideUnitSphere * mass * 0.4f, ForceMode.Impulse);
         knockedAt = Time.time;
         moving = true;
+        KnockSound(point);
         Capture();
         nextSend = Time.time + SEND_INTERVAL;
         RequestSerialization();
@@ -101,8 +102,25 @@ public class PHKnock : UdonSharpBehaviour
         g.SetPositionAndRotation(Vector3.Lerp(g.position, pos, k), Quaternion.Slerp(g.rotation, rot, k));
     }
 
+    bool wasMoving;
+    int heardEmit = -1;
+
+    // the knock's sound, where the prop was hit: wood, soft, or a thud
+    void KnockSound(Vector3 at)
+    {
+        PHAudio a = game.local != null ? game.local.sound : null;
+        if (a == null) return;
+        int d = game.gen.emitDef[emit];
+        string id = game.gen.defId[d];
+        bool soft = id.Contains("cushion") || id.Contains("pillow") || id.Contains("bed") || id.Contains("rug") || id.Contains("plush") || id.Contains("bag");
+        a.PlayAt(a.Pick(soft ? a.softKnock : a.woodKnock, Random.Range(0, 100)), at, 16f, 0.9f, Random.Range(0.9f, 1.1f));
+    }
+
     public override void OnDeserialization()
     {
+        // a knock that has just started: everyone hears it
+        if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0) KnockSound(pos);
+        wasMoving = moving; heardEmit = emit;
         // a knock of another prop took this one over: the old prop stays where it lay
         shownEmit = emit;
         if (!moving && emit >= 0 && round == game.round && game.builder.objects != null && emit < game.builder.objects.Length && game.builder.objects[emit] != null)

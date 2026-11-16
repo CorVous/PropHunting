@@ -17,9 +17,9 @@ public class PHLocal : UdonSharpBehaviour
     public PHGame game;
     public TextMeshProUGUI hud;          // head-locked text
     public Transform hudRoot;
-    public AudioSource sfx;
-    public AudioClip[] tauntClips;
-    public AudioClip hitClip, wrongClip, caughtClip, dartClip;
+    public PHAudio sound;
+    public TextMeshPro panelText;        // the host panel's settings, for everyone to read
+    float nextPanel;
 
     // ---- balance (Balance.cs)
     public const float TAKE_RANGE = 4f, DART_RANGE = 25f, DART_INTERVAL = 0.5f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 8f;
@@ -37,6 +37,13 @@ public class PHLocal : UdonSharpBehaviour
     string notice = "";
     float noticeUntil;
     int propLayer = -1;
+    bool wasEndgame;
+    // forced taunts (6.4, G47): every hider's own clock from the release of the hunters; a hider that has moved
+    // 4 m (straight line) since the last check skips it
+    float nextForced = -1f;
+    bool warned;
+    Vector3 checkPos;
+    public const float FORCED_WARNING = 3f, FORCED_MOVED = 4f;
 
     PHSlot Me() { return slotIndex >= 0 ? game.slots[slotIndex] : null; }
 
@@ -60,10 +67,12 @@ public class PHLocal : UdonSharpBehaviour
                 if (role == PHGame.ROLE_NONE && game.lobbySpawn != null && game.round > 0) me.TeleportTo(game.lobbySpawn.position, game.lobbySpawn.rotation);
                 break;
             case PHGame.PH_LOADING:
+                sound.Play("confirmation_001", 0.6f);
                 if (s != null && role != PHGame.ROLE_NONE) s.ResetFor(game.round, role);
                 Say(role == PHGame.ROLE_NONE ? "A round is starting. You are watching." : "Building the map...", 5f);
                 break;
             case PHGame.PH_BRIEF:
+                sound.Play("ready", 0.8f);
                 if (role == PHGame.ROLE_HUNTER)
                 {
                     SetPropLayer(LAYER_PROPS_WALKTHROUGH);
@@ -92,10 +101,19 @@ public class PHLocal : UdonSharpBehaviour
                 if (role == PHGame.ROLE_HIDER) SetFrozen(false);
                 break;
             case PHGame.PH_HUNT:
+                sound.Play("go", 0.8f);
+                sound.Play("jingles_PIZZI07", 0.5f);
                 if (role == PHGame.ROLE_HUNTER) { SetFrozen(false); Say("Hunt! Find the props that are hiders.", 3f); }
-                else if (role == PHGame.ROLE_HIDER) Say("The hunters are released!", 3f);
+                else if (role == PHGame.ROLE_HIDER)
+                {
+                    Say("The hunters are released!", 3f);
+                    nextForced = Time.time + ForcedInterval() * Random.Range(0.35f, 1f);
+                    checkPos = me.GetPosition(); warned = false;
+                }
                 break;
             case PHGame.PH_END:
+                sound.Play("time_over", 0.8f);
+                if (role != PHGame.ROLE_NONE) sound.Play((role == PHGame.ROLE_HIDER) == game.hidersWin ? "you_win" : "game_over", 0.8f);
                 SetFrozen(true);
                 Say((game.hidersWin ? "Hiders win. " : "Hunters win. ") + game.endReason, 10f);
                 break;
@@ -185,7 +203,47 @@ public class PHLocal : UdonSharpBehaviour
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.T)) Taunt();
+        bool eg = game.Endgame;
+        if (eg && !wasEndgame && role != PHGame.ROLE_NONE)
+        {
+            sound.Play("hurry_up", 0.8f); sound.Play("jingles_HIT03", 0.6f);
+            Say("45 seconds! Taunts come twice as often; wrong props and hits count double.", 4f);
+            float iv = game.tauntInterval * 0.5f;
+            if (nextForced > Time.time + iv) nextForced = Time.time + iv;
+        }
+        wasEndgame = eg;
+        UpdateForcedTaunt();
         UpdateHud();
+        if (panelText != null && Time.time >= nextPanel) { nextPanel = Time.time + 0.5f; panelText.text = game.SettingsText(); }
+    }
+
+    // the host's interval; a small group (under 6) three quarters of it, the endgame half (9.4, G53)
+    float ForcedInterval()
+    {
+        if (game.Endgame) return game.tauntInterval * 0.5f;
+        return game.Participants() < 6 ? game.tauntInterval * 0.75f : game.tauntInterval;
+    }
+
+    void UpdateForcedTaunt()
+    {
+        PHSlot s = Me();
+        if (role != PHGame.ROLE_HIDER || game.phase != PHGame.PH_HUNT || s == null || s.caught || nextForced < 0f) return;
+        Vector3 d = Networking.LocalPlayer.GetPosition() - checkPos; d.y = 0f;
+        bool skip = d.magnitude >= FORCED_MOVED;
+        float t = nextForced - Time.time;
+        if (t <= FORCED_WARNING && !warned && !skip)
+        {
+            warned = true;
+            sound.Play("tick_001", 0.8f);
+            Say("Forced taunt in 3 s: move 4 m, or taunt now (T)", 3f);
+        }
+        if (t > 0f) return;
+        checkPos = Networking.LocalPlayer.GetPosition();
+        nextForced = Time.time + ForcedInterval();
+        warned = false;
+        if (skip) { Say("You moved: no forced taunt", 2f); return; }
+        lastTaunt = -99f;
+        Taunt();
     }
 
     bool Aim(out RaycastHit hit, float range)
@@ -242,7 +300,7 @@ public class PHLocal : UdonSharpBehaviour
         PHSlot s = Me();
         if (s == null || s.hunterOut || Time.time < nextDart) return;
         nextDart = Time.time + DART_INTERVAL;
-        if (sfx != null && dartClip != null) sfx.PlayOneShot(dartClip, 0.6f);
+        sound.Play("switch_002", 0.5f);
         RaycastHit hit;
         if (!Aim(out hit, DART_RANGE)) return;
         int damage = game.Endgame ? DART_DAMAGE * 2 : DART_DAMAGE;
@@ -256,7 +314,8 @@ public class PHLocal : UdonSharpBehaviour
             s.hunterHealth = Mathf.Min(HUNTER_HEALTH, s.hunterHealth + HIT_REWARD);
             if (target.health - damage <= 0) s.catches++;
             s.Send();
-            if (sfx != null && hitClip != null) sfx.PlayOneShot(hitClip, 0.8f);
+            sound.Play("confirmation_002", 0.8f);
+            sound.PlayAt("impactPunch_medium_000", hit.point, 14f, 0.8f, 1f);
             Say("Hit!", 1.5f);
             return;
         }
@@ -274,7 +333,7 @@ public class PHLocal : UdonSharpBehaviour
         if (s.hunterHealth <= 0) { s.hunterHealth = 0; s.hunterOut = true; Say("Out of health: you are out for the round.", 4f); SetFrozen(true); }
         else Say("Just a " + game.gen.defId[game.gen.emitDef[e]] + ". -" + penalty + " health", 2f);
         s.Send();
-        if (sfx != null && wrongClip != null) sfx.PlayOneShot(wrongClip, 0.7f);
+        sound.Play("error_006", 0.6f);
     }
 
     Vector3 Aim0()
@@ -318,7 +377,7 @@ public class PHLocal : UdonSharpBehaviour
         if (nowCaught)
         {
             Say("You were caught! You stay hidden as a ghost until the round ends.", 5f);
-            if (sfx != null && caughtClip != null) sfx.PlayOneShot(caughtClip, 0.8f);
+            sound.Play("you_lose", 0.8f);
             s.def = -1; s.Send();
             RestoreEye();
         }

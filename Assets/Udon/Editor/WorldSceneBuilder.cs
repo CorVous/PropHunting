@@ -93,8 +93,7 @@ public static class WorldSceneBuilder
         localGo.transform.SetParent(gameGo.transform, false);
         var local = localGo.AddUdonSharpComponent<PHLocal>();
         local.game = game;
-        local.sfx = localGo.AddComponent<AudioSource>();
-        local.sfx.spatialBlend = 0f; local.sfx.playOnAwake = false;
+        local.sound = BuildAudio(gameGo.transform);
         BuildHud(localGo.transform, local);
         game.local = local;
 
@@ -140,13 +139,21 @@ public static class WorldSceneBuilder
         }
         game.knocks = knocks;
 
-        // START, on the north wall above the zone (host only; the game checks)
-        var start = Box(lobby.transform, "StartButton", new Vector3(0f, 1.4f, RoomD / 2 - 0.15f), new Vector3(1.2f, 0.5f, 0.2f), buttonMat, true);
-        var btn = start.AddUdonSharpComponent<PHButton>();
-        btn.game = game; btn.action = nameof(PHGame.StartRound);
-        UdonSharpEditorUtility.CopyProxyToUdon(btn);
-        Label(lobby.transform, "START (host)", new Vector3(0f, 1.9f, RoomD / 2 - 0.25f), 0.35f);
-        Label(lobby.transform, "Stand in the green square to play", new Vector3(0f, 3.4f, RoomD / 2 - 0.25f), 0.45f);
+        // the host panel on the north wall, above the zone (G50, G51): every setting and START. Everyone can read
+        // it; only the host's presses count (PHGame checks)
+        float wz = RoomD / 2 - 0.15f;
+        var panelMat = Mat("PanelButton", new Color(0.30f, 0.45f, 0.70f));
+        Row(lobby.transform, game, panelMat, "Size", nameof(PHGame.PanelSize), new[] { "Auto", "S", "M", "L", "XL" }, new[] { -1, 0, 1, 2, 3 }, 4.4f, wz);
+        Row(lobby.transform, game, panelMat, "Props", nameof(PHGame.PanelDensity), new[] { "Normal", "Sparse", "Dense", "V. sparse", "V. dense" }, new[] { 0, 1, 2, 3, 4 }, 3.8f, wz);
+        Row(lobby.transform, game, panelMat, "Round", nameof(PHGame.PanelRoundLength), new[] { "Short", "Normal", "Long" }, new[] { 0, 1, 2 }, 3.2f, wz);
+        Row(lobby.transform, game, panelMat, "Taunt every", nameof(PHGame.PanelTaunt), new[] { "30 s", "40 s", "60 s" }, new[] { 30, 40, 60 }, 2.6f, wz);
+        Row(lobby.transform, game, panelMat, "Wrong prop", nameof(PHGame.PanelPenalty), new[] { "-5", "-10", "-15" }, new[] { 5, 10, 15 }, 2.0f, wz);
+        Button(lobby.transform, game, buttonMat, "START", nameof(PHGame.StartRound), 0, new Vector3(-1.5f, 1.3f, wz), new Vector3(1.6f, 0.45f, 0.2f));
+        Label(lobby.transform, "Stand in the green square to play. The host sets up the round here.", new Vector3(0f, 5.0f, wz - 0.1f), 0.32f, 20f);
+        var settings = Label(lobby.transform, "", new Vector3(6.2f, 3.2f, wz - 0.1f), 0.24f, 7f);
+        settings.alignment = TextAlignmentOptions.TopLeft;
+        settings.rectTransform.sizeDelta = new Vector2(7f, 3f);
+        local.panelText = settings;
 
         UdonSharpEditorUtility.CopyProxyToUdon(local);
         UdonSharpEditorUtility.CopyProxyToUdon(game);
@@ -176,14 +183,62 @@ public static class WorldSceneBuilder
         local.hud = text; local.hudRoot = root.transform;
     }
 
-    static void Label(Transform parent, string s, Vector3 localPos, float height)
+    static TextMeshPro Label(Transform parent, string s, Vector3 localPos, float height, float width)
     {
         var go = new GameObject("Label");
         go.transform.SetParent(parent, false);
         go.transform.localPosition = localPos;
         var t = go.AddComponent<TextMeshPro>();
         t.text = s; t.fontSize = height * 10f; t.alignment = TextAlignmentOptions.Center; t.color = new Color(0.15f, 0.15f, 0.15f);
-        t.rectTransform.sizeDelta = new Vector2(20f, 2f);
+        t.rectTransform.sizeDelta = new Vector2(width, height * 2f);
+        return t;
+    }
+
+    static void Row(Transform parent, PHGame game, Material m, string title, string action, string[] labels, int[] args, float y, float wz)
+    {
+        var l = Label(parent, title, new Vector3(-5.6f, y, wz - 0.1f), 0.22f, 2.4f);
+        l.alignment = TextAlignmentOptions.Right;
+        for (int i = 0; i < labels.Length; i++)
+            Button(parent, game, m, labels[i], action, args[i], new Vector3(-3.6f + i * 1.25f, y, wz), new Vector3(1.1f, 0.4f, 0.15f));
+    }
+
+    static void Button(Transform parent, PHGame game, Material m, string label, string action, int arg, Vector3 pos, Vector3 size)
+    {
+        var b = Box(parent, "Button " + label, pos, size, m, true);
+        var btn = b.AddUdonSharpComponent<PHButton>();
+        btn.game = game; btn.action = action; btn.arg = arg;
+        btn.InteractionText = label;
+        UdonSharpEditorUtility.CopyProxyToUdon(btn);
+        var t = Label(parent, label, pos + new Vector3(0f, 0f, -size.z / 2 - 0.01f), 0.2f, size.x);
+        t.color = Color.white;
+    }
+
+    static PHAudio BuildAudio(Transform parent)
+    {
+        var go = new GameObject("Audio");
+        go.transform.SetParent(parent, false);
+        var a = go.AddUdonSharpComponent<PHAudio>();
+        var guids = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Udon/Audio" });
+        a.names = new string[guids.Length];
+        a.clips = new AudioClip[guids.Length];
+        for (int i = 0; i < guids.Length; i++)
+        {
+            var c = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guids[i]));
+            a.clips[i] = c; a.names[i] = c.name;
+        }
+        a.ui = go.AddComponent<AudioSource>();
+        a.ui.spatialBlend = 0f; a.ui.playOnAwake = false;
+        a.pool = new AudioSource[8];
+        for (int i = 0; i < a.pool.Length; i++)
+        {
+            var s = new GameObject("Source" + i);
+            s.transform.SetParent(go.transform, false);
+            var src = s.AddComponent<AudioSource>();
+            src.spatialBlend = 1f; src.rolloffMode = AudioRolloffMode.Linear; src.minDistance = 1f; src.maxDistance = 16f; src.playOnAwake = false;
+            a.pool[i] = src;
+        }
+        UdonSharpEditorUtility.CopyProxyToUdon(a);
+        return a;
     }
 
     static GameObject Box(Transform parent, string name, Vector3 localPos, Vector3 size, Material m, bool collider)

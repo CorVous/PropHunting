@@ -117,8 +117,10 @@ public class PHSlot : UdonSharpBehaviour
     [NetworkCallable]
     public void PlayTaunt(int pick)
     {
-        if (voice == null || game.local == null || game.local.tauntClips == null || game.local.tauntClips.Length == 0) return;
-        AudioClip c = game.local.tauntClips[pick % game.local.tauntClips.Length];
+        if (voice == null || game.local == null || game.local.sound == null) return;
+        PHAudio a = game.local.sound;
+        AudioClip c = a.Clip(a.Pick(a.taunts, pick));
+        if (c == null) return;
         voice.transform.position = proxy != null ? proxy.transform.position : propPos;
         voice.PlayOneShot(c, 1f);
     }

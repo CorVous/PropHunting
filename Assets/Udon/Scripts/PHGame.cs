@@ -124,6 +124,27 @@ public class PHGame : UdonSharpBehaviour
     }
 
     // ------------------------------------------------------------------ the host's settings
+    // the host panel's buttons (PHButton sets panelArg first)
+    [HideInInspector] public int panelArg;
+    public void PanelSize() { if (panelArg < 0) SetSizeAuto(true); else SetSize(panelArg); }
+    public void PanelDensity() { SetDensity(panelArg); }
+    public void PanelRoundLength() { SetRoundLength(panelArg); }
+    public void PanelTaunt() { SetTauntInterval(panelArg); }
+    public void PanelPenalty() { SetWrongPenalty(panelArg); }
+
+    public readonly string[] sizeName = { "S", "M", "L", "XL" };
+    public readonly string[] densityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense" };
+    public readonly string[] roundLengthName = { "Short", "Normal", "Long" };
+
+    public string SettingsText()
+    {
+        return "Size: " + (sizeAuto ? "Auto (" + sizeName[RoundSize()] + ")" : sizeName[sizeChoice])
+            + "    Props: " + densityName[densityChoice]
+            + "\nRound: " + roundLengthName[roundLength] + "    Forced taunt every " + tauntInterval + " s    Wrong prop -" + wrongPenalty
+            + "\nIn the zone: " + Participants() + " (" + Hunters(Mathf.Max(1, Participants())) + " hunt)"
+            + (phase != PH_LOBBY ? "\nA round is on." : "");
+    }
+
     public void SetSizeAuto(bool v) { if (!IsHost || phase != PH_LOBBY) return; sizeAuto = v; RequestSerialization(); }
     public void SetSize(int v) { if (!IsHost || phase != PH_LOBBY) return; sizeChoice = Mathf.Clamp(v, 0, 3); sizeAuto = false; RequestSerialization(); }
     public void SetDensity(int v) { if (!IsHost || phase != PH_LOBBY) return; densityChoice = Mathf.Clamp(v, 0, 4); RequestSerialization(); }
