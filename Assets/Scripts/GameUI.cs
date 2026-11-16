@@ -1,7 +1,7 @@
 using UnityEngine;
 
-// All screens, drawn with Unity's immediate-mode GUI: the lobby (its hints, and the host panel on its wall: map,
-// size, density, rules, run cap, G44), the progress bar, the in-round display, the help panel, the Esc menu, the
+// All screens, drawn with Unity's immediate-mode GUI: the lobby (its hints and the prototype's aids; the host's
+// settings are on its wall, HostWall.cs), the progress bar, the in-round display, the help panel, the Esc menu, the
 // debug overlay and the round result.
 public class GameUI : MonoBehaviour
 {
@@ -123,26 +123,18 @@ public class GameUI : MonoBehaviour
     {
         var g = Game.I;
         var lb = Lobby.I;
-        if (lb.panelOpen)
-        {
-            // the click on the wall that opened the panel is not a click on the panel
-            var ev = Event.current;
-            if (Time.unscaledTime < lb.panelOpenedAt + 0.3f && (ev.type == EventType.MouseDown || ev.type == EventType.MouseUp)) ev.Use();
-            HostPanel();
-            return;
-        }
         int n = lb.Participants, hunters = Balance.Hunters(n);
         bool inZone = lb.PlayerInZone;
         Rect r = new Rect(12, 12, 560, 128);
         GUI.Box(r, GUIContent.none, box);
         GUILayout.BeginArea(new Rect(r.x + 14, r.y + 8, r.width - 28, r.height - 12));
         GUILayout.Label("Lobby", heading);
-        GUILayout.Label("Whoever stands in the green zone takes part in the next round. The stand in the middle of the zone starts it: "
-            + "point at START and click. The host panel on the north wall holds the settings: point at it and click.", small);
+        GUILayout.Label("Whoever stands in the green zone takes part in the next round. The panel on the wall above the zone holds the settings "
+            + "and START; the host points at a button and clicks. Esc: the prototype's aids.", small);
         GUILayout.Label("In the zone: " + (inZone ? "<b>you</b> and " : "") + lb.botsInZone + " bots" + (inZone ? "" : " (step in to play)")
             + ". A round of " + n + " players has " + hunters + " hunter" + (hunters == 1 ? "" : "s") + " (1 in 4, drawn at random).", label);
         GUILayout.EndArea();
-        string tip = lb.Hint.Length > 0 ? lb.Hint : (Cursor.lockState != CursorLockMode.Locked ? "Click to capture the mouse, then W A S D to walk" : (lb.Aim() == 1 ? "Click START to begin a round" : (lb.Aim() == 2 ? "Click the host panel to change the settings" : (lb.NearStand ? "Point at START on the stand and click" : ""))));
+        string tip = lb.Hint.Length > 0 ? lb.Hint : (Cursor.lockState != CursorLockMode.Locked ? "Click to capture the mouse, then W A S D to walk" : (lb.Aim() == 2 ? (g.isHost ? "Click to press this button" : "Only the host can change these") : ""));
         if (tip.Length > 0)
         {
             Fill(new Rect(W / 2 - 320, H - 120, 640, 34), new Color(0.04f, 0.05f, 0.07f, 0.8f));
@@ -153,124 +145,51 @@ public class GameUI : MonoBehaviour
             Fill(new Rect(W / 2 - 200, 20, 400, 34), new Color(0.15f, 0.45f, 0.20f, 0.85f));
             GUI.Label(new Rect(W / 2 - 200, 22, 400, 30), "You are in the zone: you take part", centre);
         }
+        LobbyAids();
     }
 
-    // ---------------------------------------------------------------- the host panel (G44), on the lobby's north wall
-    // Two columns: the map on the left, the rules, the run cap and the prototype's own aids on the right. Every
-    // setting is used by the next round started with START; the run cap is shown but has nothing to drive yet.
-    void HostPanel()
+    // ---------------------------------------------------------------- the lobby's prototype aids (G50)
+    // The host's settings are on the lobby wall (HostWall.cs). What is only the prototype's (your role, the number of
+    // bot players in the zone, typing a seed code, volume, mouse speed) sits here, on the screen, while the mouse is
+    // free (Esc); a click outside it captures the mouse again.
+    public Rect LobbyAidsRect { get { return Cursor.lockState == CursorLockMode.Locked ? new Rect(0, 0, 0, 0) : new Rect(12, 150, 470, 362); } }
+
+    void LobbyAids()
     {
         var g = Game.I;
         var lb = Lobby.I;
-        Fill(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.35f));
-        float pw = Mathf.Min(1180f, W - 16f), ph = Mathf.Min(800f, H - 16f);
-        Rect r = new Rect((W - pw) / 2, (H - ph) / 2, pw, ph);
-        Fill(r, new Color(0.10f, 0.12f, 0.15f, 1f));   // opaque: the lobby's 3D labels must not show through
+        Rect r = LobbyAidsRect;
+        if (r.width <= 0f) return;
         GUI.Box(r, GUIContent.none, box);
-        float cw = (pw - 78f) / 2;
-        GUILayout.BeginArea(new Rect(r.x + 26, r.y + 14, pw - 52, 70));
-        GUILayout.Label("HOST PANEL", title, GUILayout.Height(40));
-        GUILayout.Label("Host: <b>you</b>. In the game the host is the player who opened the instance (C5); only the host can change these. Everyone sees them on the stand.", small);
-        GUILayout.EndArea();
-
-        // ---- left: the map
-        GUILayout.BeginArea(new Rect(r.x + 26, r.y + 90, cw, ph - 100));
-        GUILayout.Label("The next map", heading);
-        if (GUILayout.Button("New map (a new random seed)", bigButton, GUILayout.Height(40))) { g.NewRandomSeed(); g.keepSeed = false; AudioHub.I.Play("click_001", 0.5f); }
+        GUILayout.BeginArea(new Rect(r.x + 14, r.y + 8, r.width - 28, r.height - 12));
+        GUILayout.Label("Prototype aids (not part of the game)", heading);
+        if (GUILayout.Button(g.isHost ? "You are the host: yes (click: see the panel as a guest)" : "You are the host: no (click: be the host)", g.isHost ? toggleOn : button, GUILayout.Height(26))) { g.isHost = !g.isHost; AudioHub.I.Play("select_001", 0.5f); }
+        GUILayout.Label("Your role", small);
         GUILayout.BeginHorizontal();
-        GUILayout.Label("Seed", label, GUILayout.Width(44));
+        foreach (int i in ModeOrder)
+            if (GUILayout.Button(ModeName[i], g.mode == i ? toggleOn : button, GUILayout.Height(28))) { g.mode = i; AudioHub.I.Play("select_001", 0.5f); }
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Players in the zone", small, GUILayout.Width(130));
+        if (GUILayout.Button("-", button, GUILayout.Width(40), GUILayout.Height(26))) lb.SetBots(lb.botsInZone - 1);
+        GUILayout.Label("<b>" + lb.Participants + "</b> (you and " + lb.botsInZone + " bots)", small, GUILayout.Width(150));
+        if (GUILayout.Button("+", button, GUILayout.Width(40), GUILayout.Height(26))) lb.SetBots(lb.botsInZone + 1);
+        GUILayout.EndHorizontal();
+        GUILayout.Label("Type a seed code (in VR the system keyboard); the host wall's New map makes a random one", small);
         GUI.SetNextControlName("seed");
-        string typed = GUILayout.TextField(g.seedText, 24, field, GUILayout.Height(34), GUILayout.Width(cw * 0.5f));
+        string typed = GUILayout.TextField(g.seedText, 24, field, GUILayout.Height(30));
         if (typed != g.seedText) { g.seedText = typed; g.keepSeed = true; }   // a seed typed in is kept
-        if (GUILayout.Button(g.keepSeed ? "Keep this seed: on" : "Keep this seed: off", g.keepSeed ? toggleOn : button, GUILayout.Height(34))) { g.keepSeed = !g.keepSeed; AudioHub.I.Play("select_001", 0.5f); }
-        GUILayout.EndHorizontal();
-        GUILayout.Label((g.seedText.Trim() == g.lastPlayed && g.lastPlayed.Length > 0 ? "<color=#ffb060>The same map as the last round.</color> " : "")
-            + (g.keepSeed ? "Kept: every START replays this seed until you press New map." : "Back from a round the lobby picks a new random seed.")
-            + " Share a code to replay a map. Generator v" + GenData.GEN_VERSION + "; START gives the code the size below.", small);
-        GUILayout.Space(8);
-        GUILayout.Label("Map size", heading);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Auto", g.sizeAuto ? toggleOn : button, GUILayout.Height(32))) { g.sizeAuto = true; AudioHub.I.Play("select_001", 0.5f); }
-        for (int i = 0; i < 4; i++)
-            if (GUILayout.Button(GenData.SizeName[i], !g.sizeAuto && g.size == i ? toggleOn : button, GUILayout.Height(32))) { g.sizeAuto = false; g.SetSize(i); AudioHub.I.Play("select_001", 0.5f); }
-        GUILayout.EndHorizontal();
-        int rs = lb.RoundSize;
-        GUILayout.Label("Size of the next map: <b>" + GenData.SizeName[rs] + "</b>" + (g.sizeAuto ? " (Auto: " + lb.Participants + " players in the zone)" : " (set by the host; Auto would give " + GenData.SizeName[Balance.SizeFor(lb.Participants)] + ")"), label);
-        GUILayout.Label(SizeNote[rs], small);
-        GUILayout.Space(8);
-        GUILayout.Label("Prop density (prototype tuning aid)", heading);
-        GUILayout.BeginHorizontal();
-        for (int k = 0; k < GenData.DensityOrder.Length; k++)
-        {
-            int d = GenData.DensityOrder[k];
-            if (GUILayout.Button(GenData.DensityName[d], g.density == d ? toggleOn : button, GUILayout.Height(32))) { g.SetDensity(d); AudioHub.I.Play("select_001", 0.5f); }
-        }
-        GUILayout.EndHorizontal();
-        GUILayout.Label(GenData.DensityName[g.density] + ": every room type's prop range at " + GenData.DensityPercent[g.density] + "%. Same seed, same buildings.", small);
-        if (lb.Hint.Length > 0) GUILayout.Label("<color=#ffb060>" + lb.Hint + "</color>", label);
         if (g.panelMessage.Length > 0)
         {
-            GUILayout.Label("<color=#ffb060>" + g.panelMessage + "</color>", label);
-            if (g.remixOffered && GUILayout.Button("Use it as a remix on generator v" + GenData.GEN_VERSION + " (then press START)", button, GUILayout.Height(30)))
+            GUILayout.Label("<color=#ffb060>" + g.panelMessage + "</color>", small);
+            if (g.remixOffered && GUILayout.Button("Use it as a remix on generator v" + GenData.GEN_VERSION, button, GUILayout.Height(26)))
             {
                 int v, sz; uint sd;
                 SeedCode.Decode(g.seedText, GenData.GEN_VERSION, out v, out sz, out sd);
                 g.seedText = SeedCode.Encode(GenData.GEN_VERSION, sz, sd, g.density); g.panelMessage = ""; g.remixOffered = false;
             }
         }
-        GUILayout.Space(10);
         Sliders();
-        GUILayout.Space(4);
-        GUILayout.Label("Controls stand in for VR (G38): pointing and the trigger are a click. Models, sounds and fonts: Kenney and KayKit, CC0.", small);
-        GUILayout.EndArea();
-
-        // ---- right: the rules, the run cap, the prototype's aids
-        GUILayout.BeginArea(new Rect(r.x + 52 + cw, r.y + 90, cw, ph - 100));
-        GUILayout.Label("Round length", heading);
-        GUILayout.BeginHorizontal();
-        for (int i = 0; i < Balance.RoundLengthName.Length; i++)
-            if (GUILayout.Button(Balance.RoundLengthName[i], g.roundLength == i ? toggleOn : button, GUILayout.Height(32))) { g.roundLength = i; AudioHub.I.Play("select_001", 0.5f); }
-        GUILayout.EndHorizontal();
-        float hunt = Mathf.Round(Balance.HuntPhase[rs] * Balance.RoundLengthFactor[g.roundLength]);
-        GUILayout.Label("At size " + GenData.SizeName[rs] + ": hide " + Balance.HidePhase[rs].ToString("0") + " s, hunt " + Mathf.FloorToInt(hunt / 60f) + ":" + ((int)hunt % 60).ToString("00") + ".", small);
-        GUILayout.Space(6);
-        GUILayout.Label("Forced taunt every", heading);
-        GUILayout.BeginHorizontal();
-        foreach (int t in Balance.ForcedTauntChoices)
-            if (GUILayout.Button(t + " s", g.tauntInterval == t ? toggleOn : button, GUILayout.Height(32))) { g.tauntInterval = t; AudioHub.I.Play("select_001", 0.5f); }
-        GUILayout.EndHorizontal();
-        GUILayout.Label("A hider who has not taunted in this time taunts by itself. Fewer than 6 players: three quarters of it; the endgame: half.", small);
-        GUILayout.Space(6);
-        GUILayout.Label("Wrong-prop penalty", heading);
-        GUILayout.BeginHorizontal();
-        foreach (int pn in Balance.WrongPropChoices)
-            if (GUILayout.Button(pn + " health", g.wrongPenalty == pn ? toggleOn : button, GUILayout.Height(32))) { g.wrongPenalty = pn; AudioHub.I.Play("select_001", 0.5f); }
-        GUILayout.EndHorizontal();
-        GUILayout.Label("What a hunter's dart into a real prop costs of 100 health (halved for fewer than 6 players and in the endgame).", small);
-        GUILayout.Space(6);
-        GUILayout.Label("Run cap", heading);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("-", button, GUILayout.Width(44), GUILayout.Height(30))) g.runCap = Mathf.Max(1, g.runCap - 1);
-        GUILayout.Label("<b>" + g.runCap + "</b> runs per map", label, GUILayout.Width(150));
-        if (GUILayout.Button("+", button, GUILayout.Width(44), GUILayout.Height(30))) g.runCap = Mathf.Min(50, g.runCap + 1);
-        GUILayout.EndHorizontal();
-        GUILayout.Label("<color=#ffb060>Not active yet:</color> the prototype has no map rotation, so nothing counts runs (Q4, C1).", small);
-        GUILayout.Space(8);
-        GUILayout.Label("Prototype aids (not host settings)", heading);
-        GUILayout.Label("Your role", label);
-        GUILayout.BeginHorizontal();
-        foreach (int i in ModeOrder)
-            if (GUILayout.Button(ModeName[i], g.mode == i ? toggleOn : button, GUILayout.Height(30))) { g.mode = i; AudioHub.I.Play("select_001", 0.5f); }
-        GUILayout.EndHorizontal();
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Players in the zone", label, GUILayout.Width(150));
-        if (GUILayout.Button("-", button, GUILayout.Width(44), GUILayout.Height(30))) lb.SetBots(lb.botsInZone - 1);
-        GUILayout.Label("<b>" + lb.Participants + "</b> (you and " + lb.botsInZone + " bots)", label, GUILayout.Width(170));
-        if (GUILayout.Button("+", button, GUILayout.Width(44), GUILayout.Height(30))) lb.SetBots(lb.botsInZone + 1);
-        GUILayout.EndHorizontal();
-        GUILayout.Space(10);
-        if (GUILayout.Button("Close (Esc)", bigButton, GUILayout.Height(42))) lb.ClosePanel();
-        GUILayout.Label("Then press START on the stand in the zone.", small);
         GUILayout.EndArea();
     }
 
@@ -338,7 +257,6 @@ public class GameUI : MonoBehaviour
         }
         else GUILayout.Label("Nothing is generated until you press Generate; every new map needs a new press. "
             + (lobby ? Lobby.I.Participants + " players in the zone take part." : ""), small);
-        if (lobby && GUILayout.Button("Close (Esc)", button, GUILayout.Height(30))) Lobby.I.ClosePanel();
         GUILayout.Space(8);
 
         Sliders();

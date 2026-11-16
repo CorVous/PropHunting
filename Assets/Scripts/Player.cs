@@ -142,14 +142,14 @@ public partial class Player : MonoBehaviour
     {
         bool lobby = Game.I.state == Game.State.Lobby;
         if (!active || (Game.I.state != Game.State.Playing && !lobby)) return;
-        bool paused = Game.I.menuOpen || Game.I.round.InputBlocked || (lobby && Lobby.I.panelOpen);
+        bool paused = Game.I.menuOpen || Game.I.round.InputBlocked;
         float dt = Mathf.Min(Time.deltaTime, 0.1f);
 
         if (!paused)
         {
             // a click captures the mouse, unless it is on the wrist panel or on the third-person screen (dragging it)
             Vector2 gp = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-            bool onPanel = (GameUI.I.wristOpen && GameUI.I.WristRect.Contains(gp)) || PipScreen.I.Contains(gp);
+            bool onPanel = (GameUI.I.wristOpen && GameUI.I.WristRect.Contains(gp)) || PipScreen.I.Contains(gp) || (lobby && GameUI.I.LobbyAidsRect.Contains(gp));
             if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked && !onPanel)
             {
                 GameUI.I.wristOpen = false;
