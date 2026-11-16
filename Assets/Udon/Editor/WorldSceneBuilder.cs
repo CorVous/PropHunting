@@ -1,4 +1,6 @@
 using TMPro;
+using UnityEngine.UI;
+using VRC.SDK3.Components;
 using UdonSharpEditor;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -94,8 +96,9 @@ public static class WorldSceneBuilder
         var local = localGo.AddUdonSharpComponent<PHLocal>();
         local.game = game;
         local.sound = BuildAudio(gameGo.transform);
-        BuildHud(localGo.transform, local);
+        local.hud = null; local.hudRoot = null;   // no head-locked text (Cor): PHView shows the little there is
         game.local = local;
+        BuildView(gameGo.transform, game, local);
         var body = localGo.AddUdonSharpComponent<PHHiderBody>();
         body.game = game; body.local = local;
         UdonSharpEditorUtility.CopyProxyToUdon(body);
@@ -200,6 +203,105 @@ public static class WorldSceneBuilder
             sb.Append(i == 0 ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c));
         }
         return sb.ToString();
+    }
+
+    // PHView: the hider's health (desktop low on the screen, VR on the left wrist) and the third-person view
+    // (desktop lower right corner, VR a grabbable panel)
+    static void BuildView(Transform parent, PHGame game, PHLocal local)
+    {
+        var viewGo = new GameObject("View");
+        viewGo.transform.SetParent(parent, false);
+        var view = viewGo.AddUdonSharpComponent<PHView>();
+        view.game = game; view.local = local;
+
+        var rt = AssetDatabase.LoadAssetAtPath<RenderTexture>("Assets/Udon/Generated/Pip.renderTexture");
+        if (rt == null)
+        {
+            rt = new RenderTexture(384, 256, 16) { name = "Pip" };
+            AssetDatabase.CreateAsset(rt, "Assets/Udon/Generated/Pip.renderTexture");
+        }
+        var camGo = new GameObject("PipCamera");
+        camGo.transform.SetParent(viewGo.transform, false);
+        var cam = camGo.AddComponent<Camera>();
+        cam.targetTexture = rt; cam.fieldOfView = 60f; cam.nearClipPlane = 0.05f; cam.farClipPlane = 120f;
+        cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.56f, 0.76f, 0.93f);
+        cam.cullingMask = ~((1 << 5) | (1 << 10) | (1 << 12) | (1 << 19) | (1 << 9));
+        cam.enabled = false;
+        view.pipCam = cam;
+        var pipMat = Mat2("PipDisplay", Shader.Find("Unlit/Texture"));
+        pipMat.mainTexture = rt;
+        var sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+
+        // desktop: head-locked, 0.5 m ahead
+        var desk = new GameObject("Desktop");
+        desk.transform.SetParent(viewGo.transform, false);
+        desk.layer = 5;
+        var dc = desk.AddComponent<Canvas>(); dc.renderMode = RenderMode.WorldSpace;
+        var drt = desk.GetComponent<RectTransform>(); drt.sizeDelta = new Vector2(1600, 900);
+        desk.transform.localScale = Vector3.one * 0.0004f;
+        GameObject bar; Image fill;
+        HealthBar(desk.transform, sprite, new Vector2(0f, -360f), new Vector2(420f, 26f), out bar, out fill);
+        view.desktopHealthBar = bar; view.desktopHealth = fill;
+        var pip = new GameObject("Pip");
+        pip.transform.SetParent(desk.transform, false);
+        pip.layer = 5;
+        var raw = pip.AddComponent<RawImage>(); raw.texture = rt; raw.raycastTarget = false;
+        var prt = pip.GetComponent<RectTransform>(); prt.anchoredPosition = new Vector2(560f, -300f); prt.sizeDelta = new Vector2(360f, 240f);
+        view.desktopPip = pip;
+        view.desktopRoot = desk.transform;
+
+        // VR: the left wrist
+        var wrist = new GameObject("Wrist");
+        wrist.transform.SetParent(viewGo.transform, false);
+        wrist.layer = 5;
+        var wc = wrist.AddComponent<Canvas>(); wc.renderMode = RenderMode.WorldSpace;
+        wrist.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 40);
+        wrist.transform.localScale = Vector3.one * 0.0004f;
+        HealthBar(wrist.transform, sprite, Vector2.zero, new Vector2(180f, 26f), out bar, out fill);
+        view.wristHealthBar = bar; view.wristHealth = fill;
+        view.wristRoot = wrist.transform;
+
+        // VR: the third-person panel, grabbable
+        var panel = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        panel.name = "PipPanel";
+        panel.transform.SetParent(viewGo.transform, false);
+        panel.transform.localScale = new Vector3(0.36f, 0.24f, 1f);
+        panel.layer = 13;   // Pickup
+        Object.DestroyImmediate(panel.GetComponent<MeshCollider>());
+        var bc = panel.AddComponent<BoxCollider>(); bc.size = new Vector3(1f, 1f, 0.05f);
+        panel.GetComponent<MeshRenderer>().sharedMaterial = pipMat;
+        var rb = panel.AddComponent<Rigidbody>(); rb.isKinematic = true; rb.useGravity = false;
+        var pickup = panel.AddComponent<VRCPickup>();
+        pickup.AutoHold = VRC.SDKBase.VRC_Pickup.AutoHoldMode.No;
+        pickup.InteractionText = "Third-person view";
+        view.vrPanel = panel.transform; view.vrPanelPickup = pickup;
+
+        UdonSharpEditorUtility.CopyProxyToUdon(view);
+    }
+
+    static void HealthBar(Transform parent, Sprite sprite, Vector2 at, Vector2 size, out GameObject bar, out Image fill)
+    {
+        bar = new GameObject("HealthBar");
+        bar.transform.SetParent(parent, false);
+        bar.layer = 5;
+        var bg = bar.AddComponent<Image>(); bg.sprite = sprite; bg.color = new Color(0f, 0f, 0f, 0.55f); bg.raycastTarget = false;
+        var brt = bar.GetComponent<RectTransform>(); brt.anchoredPosition = at; brt.sizeDelta = size;
+        var f = new GameObject("Fill");
+        f.transform.SetParent(bar.transform, false);
+        f.layer = 5;
+        fill = f.AddComponent<Image>(); fill.sprite = sprite; fill.color = new Color(0.35f, 0.85f, 0.4f, 0.9f); fill.raycastTarget = false;
+        fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 1f;
+        var frt = f.GetComponent<RectTransform>(); frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one; frt.offsetMin = new Vector2(3, 3); frt.offsetMax = new Vector2(-3, -3);
+    }
+
+    static Material Mat2(string name, Shader shader)
+    {
+        string path = "Assets/Udon/Generated/" + name + ".mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (m == null) { m = new Material(shader); AssetDatabase.CreateAsset(m, path); }
+        m.shader = shader;
+        EditorUtility.SetDirty(m);
+        return m;
     }
 
     static void BuildHud(Transform parent, PHLocal local)
