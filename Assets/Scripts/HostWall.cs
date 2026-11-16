@@ -35,10 +35,10 @@ public class HostWall
     Transform root;
     Button hovered;
 
-    public const float HalfW = 6.5f, Y0 = 1.5f, Y1 = 4.75f, Reach = 20f;
+    public const float HalfW = 6.5f, Y0 = 2.0f, Y1 = 5.35f, Reach = 20f;
     static readonly Color32 Off = new Color32(58, 72, 92, 255), On = new Color32(70, 150, 88, 255), StartCol = new Color32(46, 140, 70, 255);
     static readonly Color Info = new Color(0.85f, 0.9f, 1f);
-    const float LabelSize = 0.06f, SmallSize = 0.04f;
+    const float LabelSize = 0.06f, SmallSize = 0.055f;
 
     // wallCentre: world point on the wall's face (z) at x = 0, y = 0; the wall looks towards -z. Two columns of
     // settings over a full-width START row, all above head height (the zone lies right in front of the wall, so the
@@ -47,13 +47,14 @@ public class HostWall
     {
         root = parent; origin = wallCentre; faceZ = wallCentre.z - 0.04f;
         var g = Game.I;
-        Dynamic(0f, 4.57f, 0.08f, () => g.isHost ? "HOST PANEL   ·   HOST: YOU" : "HOST PANEL   ·   HOST: PLAYER 1, NOT YOU", new Color(1f, 0.85f, 0.4f));
+        Dynamic(0f, 5.08f, 0.07f, () => g.isHost ? "HOST: YOU" : "HOST: PLAYER 1 (NOT YOU)", new Color(1f, 0.85f, 0.4f));
 
-        float r1 = 4.1f, r2 = 3.68f, r3 = 3.26f, r4 = 2.84f, r5 = 2.42f, r6 = 1.92f;
+        // START on top, under the host's name, where the players standing at the front do not hide it
+        float r6 = 4.55f, r1 = 3.98f, r2 = 3.56f, r3 = 3.14f, r4 = 2.72f, r5 = 2.3f;
         Label("NEXT MAP", -5.4f, r1, LabelSize, Color.white);
         Add("new map", -3.3f, r1, 1.9f, () => false, () => { g.NewRandomSeed(); g.keepSeed = false; }, "NEW MAP");
         Add("keep seed", -1.15f, r1, 2.2f, () => g.keepSeed, () => g.keepSeed = !g.keepSeed, "KEEP SEED");
-        Dynamic(3.2f, r1, SmallSize, () => g.seedText.Trim() + "\n" + (g.seedText.Trim() == g.lastPlayed && g.lastPlayed.Length > 0 ? "the last map again" : (g.keepSeed ? "kept for every START" : "new")), Info);
+        Dynamic(3.4f, r1, SmallSize, () => g.seedText.Trim() + " " + (g.seedText.Trim() == g.lastPlayed && g.lastPlayed.Length > 0 ? "(AGAIN)" : (g.keepSeed ? "(KEPT)" : "(NEW)")), Info);
 
         Label("SIZE", -5.4f, r2, LabelSize, Color.white);
         Add("size auto", -3.65f, r2, 1.1f, () => g.sizeAuto, () => g.sizeAuto = true, "AUTO");
@@ -62,7 +63,7 @@ public class HostWall
             int k = i;
             Add("size " + GenData.SizeName[k], -2.75f + k * 0.7f, r2, 0.6f + (k == 3 ? 0.1f : 0f), () => !g.sizeAuto && g.size == k, () => { g.sizeAuto = false; g.SetSize(k); }, GenData.SizeName[k]);
         }
-        Dynamic(3.2f, r2, SmallSize, () => "next map: " + GenData.SizeName[Lobby.I.RoundSize] + (g.sizeAuto ? "\n(auto: " + Lobby.I.Participants + " players in the zone)" : "\n(set by the host)"), Info);
+        Dynamic(3.4f, r2, SmallSize, () => "NEXT: " + GenData.SizeName[Lobby.I.RoundSize] + (g.sizeAuto ? " (" + Lobby.I.Participants + " PLAYERS)" : ""), Info);
 
         Label("ROUND", -5.4f, r3, LabelSize, Color.white);
         float[] rx = { -3.55f, -2.0f, -0.6f }, rw = { 1.35f, 1.55f, 1.1f };
@@ -88,7 +89,7 @@ public class HostWall
         Add("run cap -", 2.75f, r4, 0.55f, () => false, () => g.runCap = Mathf.Max(1, g.runCap - 1), "-");
         Dynamic(3.45f, r4, LabelSize, () => g.runCap.ToString(), Color.white);
         Add("run cap +", 4.15f, r4, 0.55f, () => false, () => g.runCap = Mathf.Min(50, g.runCap + 1), "+");
-        Dynamic(5.55f, r4, SmallSize, () => "not active\nyet", Info);
+        Dynamic(5.45f, r4, SmallSize, () => "(OFF)", Info);
 
         Label("DENSITY", -5.4f, r5, LabelSize, Color.white);
         string[] shortName = { "NORMAL", "SPARSE", "DENSE", "V.SPARSE", "V.DENSE" };
@@ -97,10 +98,10 @@ public class HostWall
             int d = GenData.DensityOrder[k];
             Add("density " + GenData.DensityName[d].ToLowerInvariant(), -3.6f + k * 1.36f, r5, 1.3f, () => g.density == d, () => g.SetDensity(d), shortName[d], 0.045f);
         }
-        Dynamic(4.3f, r5, SmallSize, () => "prototype\ntuning aid", Info);
+        Dynamic(4.3f, r5, SmallSize, () => "(TEST AID)", Info);
 
-        Add("start", -0.5f, r6, 5f, () => false, () => Lobby.I.TryGenerate(false), "START", 0.11f, 0.56f, StartCol);
-        Dynamic(4.6f, r6, SmallSize, () => g.isHost ? "the host starts the round\nfor everyone in the zone" : "only the host can press\nthese; you can read them", Info);
+        Add("start", 0f, r6, 5f, () => false, () => Lobby.I.TryGenerate(false), "START", 0.11f, 0.56f, StartCol);
+        Dynamic(4.6f, r6, SmallSize, () => g.isHost ? "" : "HOST ONLY", Info);
     }
 
     void Add(string name, float x, float y, float w, Func<bool> on, Action act, string label, float size = LabelSize, float h = 0.36f, Color32 off = default(Color32))

@@ -17,7 +17,7 @@ public class Lobby : MonoBehaviour
 
     // the lobby stands well away from the maps, which are built from the origin towards +x and +z
     public static readonly Vector3 Origin = new Vector3(-120f, 0f, -120f);
-    const float RoomW = 24f, RoomD = 22f, WallH = 4.8f;
+    const float RoomW = 24f, RoomD = 22f, WallH = 5.5f;
     // the zone: a square on the floor in the middle of the room
     const float ZoneHalf = 5.5f;
     static readonly Vector3 ZoneCentre = new Vector3(0f, 0f, RoomD / 2 - 0.15f - ZoneHalf);   // its edge strip meets the wall
