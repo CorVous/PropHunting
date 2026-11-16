@@ -38,10 +38,12 @@ public class MapGenBench : UdonSharpBehaviour
         while (sw.Elapsed.TotalMilliseconds < budgetMs)
         {
             double before = sw.Elapsed.TotalMilliseconds;
+            int st = gen.CurrentStage(), cu = gen.CurrentCursor();
             finished = gen.Step();
             steps++;
             double one = sw.Elapsed.TotalMilliseconds - before;
             if (one > maxStepMs) maxStepMs = one;
+            if (one > 50) Debug.Log("[MapGenBench] slow step: stage " + st + " cursor " + cu + " took " + one.ToString("0") + " ms");
             if (finished) break;
         }
         sw.Stop();

@@ -8,6 +8,10 @@ public partial class MapGenUdon
     [UnityEngine.HideInInspector] public int[] tableRoom;
     [UnityEngine.HideInInspector] public string[] defId;
 
+    // for the bench and the progress display
+    public int CurrentStage() { return stage; }
+    public int CurrentCursor() { return cursor; }
+
     bool IsBuilding(int zone) { return zone == GenData.Z_HOUSE || zone == GenData.Z_WAREHOUSE || zone == GenData.Z_DINER; }
 
     string RoomName(int r) { return "room type " + r; }
