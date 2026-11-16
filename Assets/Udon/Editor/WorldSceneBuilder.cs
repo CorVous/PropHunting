@@ -238,7 +238,9 @@ public static class WorldSceneBuilder
         cam.cullingMask = ~((1 << 5) | (1 << 9) | (1 << 10) | (1 << 12) | (1 << 18) | (1 << 19));
         cam.enabled = false;
         view.pipCam = cam;
-        var pipMat = Mat2("PipDisplay", Shader.Find("Unlit/Texture"));
+        // drawn over everything (no depth test): walls and props never cover the view or the health bar
+        var pipMat = Mat2("PipDisplay", Shader.Find("PropHunt/Overlay"));
+        hudMat = Mat2("HudOverlay", Shader.Find("PropHunt/Overlay"));
         pipMat.mainTexture = rt;
         var sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
 
@@ -255,7 +257,7 @@ public static class WorldSceneBuilder
         var pip = new GameObject("Pip");
         pip.transform.SetParent(desk.transform, false);
         pip.layer = 5;
-        var raw = pip.AddComponent<RawImage>(); raw.texture = rt; raw.raycastTarget = false;
+        var raw = pip.AddComponent<RawImage>(); raw.texture = rt; raw.raycastTarget = false; raw.material = hudMat;
         var prt = pip.GetComponent<RectTransform>(); prt.anchoredPosition = new Vector2(560f, -300f); prt.sizeDelta = new Vector2(360f, 240f);
         view.desktopPip = pip;
         view.desktopRoot = desk.transform;
@@ -289,17 +291,19 @@ public static class WorldSceneBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(view);
     }
 
+    static Material hudMat;
+
     static void HealthBar(Transform parent, Sprite sprite, Vector2 at, Vector2 size, out GameObject bar, out Image fill)
     {
         bar = new GameObject("HealthBar");
         bar.transform.SetParent(parent, false);
         bar.layer = 5;
-        var bg = bar.AddComponent<Image>(); bg.sprite = sprite; bg.color = new Color(0f, 0f, 0f, 0.55f); bg.raycastTarget = false;
+        var bg = bar.AddComponent<Image>(); bg.sprite = sprite; bg.color = new Color(0f, 0f, 0f, 0.55f); bg.raycastTarget = false; bg.material = hudMat;
         var brt = bar.GetComponent<RectTransform>(); brt.anchoredPosition = at; brt.sizeDelta = size;
         var f = new GameObject("Fill");
         f.transform.SetParent(bar.transform, false);
         f.layer = 5;
-        fill = f.AddComponent<Image>(); fill.sprite = sprite; fill.color = new Color(0.35f, 0.85f, 0.4f, 0.9f); fill.raycastTarget = false;
+        fill = f.AddComponent<Image>(); fill.sprite = sprite; fill.color = new Color(0.35f, 0.85f, 0.4f, 0.9f); fill.raycastTarget = false; fill.material = hudMat;
         fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 1f;
         var frt = f.GetComponent<RectTransform>(); frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one; frt.offsetMin = new Vector2(3, 3); frt.offsetMax = new Vector2(-3, -3);
     }
