@@ -208,11 +208,18 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
                 if (!Layout()) { Retry("layout"); break; }
                 stage = 1; progressPermille = 80;
                 break;
+            // stage 1 in three steps, and Finish in three (Cor: build freezes): the same work in the same order
             case 1:
                 BuildRooms();
                 BuildEdgesSite();
+                stage = 11; progressPermille = 100;
+                break;
+            case 11:
                 if (!PlaceStairs()) { Retry("stairs"); break; }
                 if (!ValidateSite()) { Retry("layout tests"); break; }
+                stage = 12; progressPermille = 120;
+                break;
+            case 12:
                 BuildTags();
                 ResetExits();
                 stage = 2; cursor = 0; progressPermille = 150;
@@ -236,6 +243,14 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
                 break;
             case 6:
                 Finish();
+                stage = 7; progressPermille = 960;
+                break;
+            case 7:
+                Finish2();
+                stage = 8; progressPermille = 980;
+                break;
+            case 8:
+                Finish3();
                 progressPermille = 1000;
                 done = true;
                 break;

@@ -36,12 +36,25 @@ public partial class MapGenUdon
         while (qh < qt)
         {
             int i = queue[qh++];
-            int ix = i % IW, iz = i / IW;
+            int ix = i % IW, iz = i / IW, cx = ix >> 3, cz = iz >> 3;
             for (int d = 0; d < 4; d++)
             {
-                if (!CanStep(ix, iz, d)) continue;
-                int j = (iz + DZ[d]) * IW + ix + DX[d];
-                if (reach[j] != 0 || SolidAt(j)) continue;
+                // CanStep written out (in Udon every call costs: Cor, build freezes)
+                int jx = ix + DX[d], jz = iz + DZ[d];
+                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
+                int j = jz * IW + jx;
+                if ((tags[j] & GenData.T_FLOOR) == 0 || reach[j] != 0 || solid[j] > 0) continue;
+                if ((jx >> 3) != cx || (jz >> 3) != cz)
+                {
+                    int et = EdgeType(cx, cz, d);
+                    if (et != GenData.E_NONE)
+                    {
+                        if (et != GenData.E_DOOR) continue;
+                        int along = (d == 0 || d == 2) ? (ix & 7) : (iz & 7);
+                        int off = EdgeOff(cx, cz, d);
+                        if (along < off || along >= off + GenData.DOOR_CELLS) continue;
+                    }
+                }
                 reach[j] = 1; queue[qt++] = j;
             }
             int l = link[i];   // up or down a stair
@@ -205,8 +218,14 @@ public partial class MapGenUdon
             menu[d] = defDisguise[d] > 0 && defCopies[d] > 0;
             if (menu[d]) menuCount++;
         }
-        BuildGround();
+    }
 
+    // Finish in three steps (Cor: build freezes), so no one frame holds all of it
+    void Finish2() { BuildGround(); }
+
+    void Finish3()
+    {
+        int n = IW * IH;
         Flood();
         for (int i = 0; i < n; i++)
             walk[i] = (byte)((tags[i] & GenData.T_FLOOR) == 0 ? 0 : (SolidAt(i) ? 2 : 1));

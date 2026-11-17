@@ -425,21 +425,26 @@ public class MapBuilderUdon : UdonSharpBehaviour
         Material skyMat = RenderSettings.skybox;
         if (skyMat != null)
         {
-            Color skyTint = new Color(0.5f, 0.5f, 0.5f), skyGround = fog * 0.92f;   // below the horizon: the haze, so the land's far edge melts into it
-            float exposure = 1.2f, thickness = 1f;
-            if (moodTime == 0) { skyTint = new Color(0.60f, 0.50f, 0.54f); thickness = 1.15f; exposure = 1.1f; }   // dawn: pinker, a softer band at the horizon
-            else if (moodTime == 3) { skyTint = new Color(0.62f, 0.42f, 0.38f); thickness = 1.6f; exposure = 1.0f; }   // dusk
-            else if (moodTime == 4) { skyTint = new Color(0.50f, 0.50f, 0.52f); thickness = 1.0f; exposure = 0.85f; }   // overcast: grey (a thick atmosphere turned its horizon orange: review 4)
-            else if (moodTime == 5) { skyTint = new Color(0.25f, 0.30f, 0.50f); thickness = 0.6f; exposure = 0.12f; }   // night
-            if (gen.mapTheme == GenData.THEME_SPACE) { skyTint = Color.Lerp(skyTint, new Color(0.70f, 0.38f, 0.30f), 0.6f); thickness *= 0.5f; exposure *= 0.75f; }
-            skyMat.SetColor("_SkyTint", skyTint);
+            // the gradient sky (PropHunt/SkyGradient, profiling: the procedural sky cost a third of the GPU frame): a
+            // zenith by mood, the haze at the horizon so the land's far edge melts into it, the sun's own colour
+            Color skyGround = fog * 0.92f, horizon = Color.Lerp(fog, Color.white, 0.12f);
+            Color zen = new Color(0.36f, 0.54f, 0.84f);
+            float sunSize = 0.035f;
+            if (moodTime == 0) { zen = new Color(0.48f, 0.56f, 0.80f); horizon = Color.Lerp(fog, new Color(0.98f, 0.82f, 0.70f), 0.5f); sunSize = 0.05f; }   // dawn
+            else if (moodTime == 1) zen = new Color(0.30f, 0.50f, 0.86f);
+            else if (moodTime == 3) { zen = new Color(0.32f, 0.36f, 0.60f); horizon = Color.Lerp(fog, new Color(1f, 0.66f, 0.46f), 0.55f); sunSize = 0.06f; }   // dusk
+            else if (moodTime == 4) { zen = new Color(0.58f, 0.60f, 0.64f); sunSize = 0f; }   // overcast: grey, no sun disc
+            else if (moodTime == 5) { zen = new Color(0.02f, 0.03f, 0.08f); horizon = fog * 1.3f; sunSize = 0f; }   // night: the moon is its own object
+            if (gen.mapTheme == GenData.THEME_SPACE && moodTime != 5) { zen = Color.Lerp(zen, new Color(0.26f, 0.18f, 0.34f), 0.7f); horizon = Color.Lerp(horizon, new Color(0.70f, 0.42f, 0.36f), 0.5f); }
+            skyMat.SetColor("_Zenith", zen);
+            skyMat.SetColor("_Horizon", horizon);
             skyMat.SetColor("_GroundColor", skyGround);
-            skyMat.SetFloat("_Exposure", exposure);
-            skyMat.SetFloat("_AtmosphereThickness", thickness);
-            // the shadows take the sky's colour (Cor): the ambient from above takes the hue of the sky's zenith (its tint,
-            // bluer as a clear sky is) and the ambient from the sides the hue of the horizon haze; each keeps the
-            // brightness the mood set, so only the colour follows the sky
-            Color zenith = new Color(skyTint.r * 0.75f, skyTint.g * 0.9f, skyTint.b * 1.25f);
+            skyMat.SetColor("_SunColor", sunCol * 1.2f);
+            skyMat.SetFloat("_SunSize", sunSize);
+            skyMat.SetFloat("_Exposure", 1f);
+            // the shadows take the sky's colour (Cor): the ambient from above takes the hue of the sky's zenith and the
+            // ambient from the sides the hue of the horizon haze; each keeps the brightness the mood set
+            Color zenith = zen;
             sky = HueOf(zenith, sky);
             eq = HueOf(Color.Lerp(fog, zenith, 0.3f), eq);
             // winter: snow under a blue sky light read as an ice planet (review 4): the shade nearly neutral
@@ -666,7 +671,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         BufInit(B_WALLS, W * H * 40 + 64);
         BufInit(B_ROOFS, W * H * 20 + 64);
         BufInit(B_COLL, W * H * 24 + 64);
-        stage = 1; cursor = 0; built = false; failed = false; busy = true; progress = 0f; buildMs = 0;
+        stage = 6; cursor = 0; built = false; failed = false; busy = true; progress = 0f; buildMs = 0;
+        cellColour = new Color32[IW * IH];
         phase = "Laying floors";
     }
 
@@ -684,6 +690,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (wallsFilter != null) wallsFilter.sharedMesh = null;
         if (roofsFilter != null) roofsFilter.sharedMesh = null;
         if (sceneryFilter != null) sceneryFilter.sharedMesh = null;
+        if (tiles != null) for (int i = 1; i < tiles.Length; i++) if (tiles[i] != null) { Destroy(tiles[i]); tiles[i] = null; }
+        nTiles = 0;
         if (collisionCollider != null) collisionCollider.sharedMesh = null;
         built = false; busy = false; stage = 0;
     }
@@ -705,7 +713,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
         bool finished = false;
         while (watch.Elapsed.TotalMilliseconds < budgetMs)
         {
+            double s0 = watch.Elapsed.TotalMilliseconds;
+            int st = stage, cu = cursor;
             if (StepOne()) { finished = true; break; }
+            double one = watch.Elapsed.TotalMilliseconds - s0;
+            if (one > 20.0) Debug.Log("[MapBuilder] slow step: stage " + st + " cursor " + cu + " " + one.ToString("0") + " ms");
         }
         watch.Stop();
         buildMs += watch.Elapsed.TotalMilliseconds;
@@ -720,32 +732,44 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         switch (stage)
         {
+            case 6:
+                // the floor colours, a row at a time (all at once took a frame of 160 ms: Cor, build freezes)
+                if (cursor < IH)
+                {
+                    for (int ix = 0; ix < IW; ix++)
+                    {
+                        int i = cursor * IW + ix;
+                        if ((tags[i] & GenData.T_FLOOR) != 0) cellColour[i] = CellColour(i, ix, cursor);
+                    }
+                    cursor++;
+                }
+                else { stage = 1; cursor = 0; }
+                break;
             case 1:
                 if (cursor < IH) { GroundRow(cursor); cursor++; progress = 0.2f * cursor / IH; }
                 else { FinishGround(); stage = 2; cursor = 0; phase = "Raising walls"; }
                 break;
             case 2:
                 if (cursor < W * H) { CellWalls(cursor); cursor++; progress = 0.2f + 0.2f * cursor / (W * H); }
-                else
-                {
-                    Fixtures();
-                    Stairs();
-                    Landmark();
-                    wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls");
-                    Canopies();
-                    PitchedRoofs();
-                    Dressing();
-                    roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs");
-                    collisionCollider.sharedMesh = ToMesh(B_COLL, "ArchCollision");
-                    stage = 3; cursor = 0; phase = "Placing props";
-                }
+                else { stage = 20; cursor = 0; }
+                break;
+            // the rest of the architecture, a piece a step (Cor: build freezes)
+            case 20: Fixtures(); stage = 21; break;
+            case 21: Stairs(); Landmark(); stage = 22; break;
+            case 22: wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls"); stage = 23; break;
+            case 23: Canopies(); PitchedRoofs(); stage = 24; break;
+            case 24: Dressing(); stage = 25; break;
+            case 25: roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs"); stage = 26; break;
+            case 26:
+                collisionCollider.sharedMesh = ToMesh(B_COLL, "ArchCollision");
+                stage = 3; cursor = 0; phase = "Placing props";
                 break;
             case 3:
                 if (cursor < objects.Length) { MakeProp(cursor); cursor++; progress = 0.4f + 0.55f * cursor / objects.Length; }
                 else { stage = 5; cursor = 0; MergeBegin(); phase = "Merging scenery"; }
                 break;
             case 5:
-                if (mergeList != null && cursor < mergeList.Length) { MergeOne(mergeList[cursor]); cursor++; progress = 0.95f + 0.05f * cursor / mergeList.Length; }
+                if (mergeList != null && cursor < mergeList.Length) { MergeOne(cursor); cursor++; progress = 0.95f + 0.05f * cursor / mergeList.Length; }
                 else { MergeEnd(); stage = 4; }
                 break;
             case 4:
@@ -837,12 +861,6 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void GroundRow(int iz)
     {
-        if (iz == 0)
-        {
-            cellColour = new Color32[IW * IH];
-            for (int i = 0; i < cellColour.Length; i++)
-                if ((tags[i] & GenData.T_FLOOR) != 0) cellColour[i] = CellColour(i, i % IW, i / IW);
-        }
         for (int ix = 0; ix < IW; ix++)
         {
             int i = iz * IW + ix;
@@ -2399,20 +2417,45 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // light fixtures, fences, hedges) is drawn by one merged mesh instead of one renderer each: its renderers are
     // switched off (their colliders and light points stay). Clouds drift and the sky's own objects (stars, the moon, the
     // planet) have their own shader, so they stay as they are. One renderer per step, so the build stays time-sliced.
-    public bool mergeScenery = false;  // measured mixed (one mesh is never culled): off until it is split into tiles
+    public bool mergeScenery = true;   // the static scenery merged in tiles (profiling)
     MeshRenderer[] mergeList;
+    int[] mergeKey;
+    int mergeCur, nTiles;
+    GameObject[] tiles;
     Material mergeMat;
     MaterialPropertyBlock mergeBlock;
 
+    // The scenery is merged in tiles 24 m square (one mesh for all of it was never culled: profiling), and everything
+    // far out (the hill rings, mountains) in one more, which is on screen whenever the horizon is
+    int TileKey(Vector3 p)
+    {
+        float far = Mathf.Max(siteW, siteH) * CELL * 0.5f + 35f;
+        if ((p - new Vector3(siteW * CELL * 0.5f, 0f, siteH * CELL * 0.5f)).magnitude > far) return 0;
+        int tx = Mathf.FloorToInt((p.x + 64f) / 24f), tz = Mathf.FloorToInt((p.z + 64f) / 24f);
+        return 1 + Mathf.Clamp(tx, 0, 63) + 64 * Mathf.Clamp(tz, 0, 63);
+    }
+
     void MergeBegin()
     {
-        mergeList = null;
+        mergeList = null; nTiles = 0;
         if (!mergeScenery || sceneryFilter == null || fixtureRoot == null || fenceRoot == null) return;
         mergeMat = wallsFilter.GetComponent<MeshRenderer>().sharedMaterial;
         MeshRenderer[] a = fixtureRoot.GetComponentsInChildren<MeshRenderer>(), b = fenceRoot.GetComponentsInChildren<MeshRenderer>();
-        mergeList = new MeshRenderer[a.Length + b.Length];
+        int n = a.Length + b.Length;
+        mergeList = new MeshRenderer[n];
         System.Array.Copy(a, mergeList, a.Length);
         System.Array.Copy(b, 0, mergeList, a.Length, b.Length);
+        mergeKey = new int[n];
+        for (int i = 0; i < n; i++) mergeKey[i] = mergeList[i] != null ? TileKey(mergeList[i].bounds.center) : 0;
+        // by tile (insertion sort: a few hundred renderers)
+        for (int i = 1; i < n; i++)
+        {
+            int k = mergeKey[i]; MeshRenderer r = mergeList[i]; int j = i - 1;
+            while (j >= 0 && mergeKey[j] > k) { mergeKey[j + 1] = mergeKey[j]; mergeList[j + 1] = mergeList[j]; j--; }
+            mergeKey[j + 1] = k; mergeList[j + 1] = r;
+        }
+        if (tiles == null) tiles = new GameObject[96];
+        mergeCur = n > 0 ? mergeKey[0] : -1;
         BufInit(B_SCENERY, 4096);
         if (mergeBlock == null) mergeBlock = new MaterialPropertyBlock();
     }
@@ -2423,8 +2466,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
         return false;
     }
 
-    void MergeOne(MeshRenderer mr)
+    void MergeOne(int idx)
     {
+        if (mergeKey[idx] != mergeCur) { FlushTile(); mergeCur = mergeKey[idx]; }
+        MeshRenderer mr = mergeList[idx];
         if (mr == null || !mr.enabled || mr.sharedMaterial != mergeMat || IsCloud(mr.transform)) return;
         MeshFilter mf = mr.GetComponent<MeshFilter>();
         if (mf == null || mf.sharedMesh == null) return;
@@ -2453,11 +2498,33 @@ public class MapBuilderUdon : UdonSharpBehaviour
         mr.enabled = false;
     }
 
+    // the tile gathered so far becomes a mesh of its own: the template holder for the first, a copy of it after
+    void FlushTile()
+    {
+        if (nv[B_SCENERY] == 0) return;
+        MeshFilter f = sceneryFilter;
+        if (nTiles > 0)
+        {
+            if (nTiles >= tiles.Length) { GameObject[] g = new GameObject[tiles.Length * 2]; System.Array.Copy(tiles, g, tiles.Length); tiles = g; }
+            GameObject go = Instantiate(sceneryFilter.gameObject);
+            go.transform.SetParent(sceneryFilter.transform.parent, false);
+            tiles[nTiles] = go;
+            f = go.GetComponent<MeshFilter>();
+        }
+        f.sharedMesh = ToMesh(B_SCENERY, "Scenery" + nTiles);
+        nTiles++;
+        nv[B_SCENERY] = 0; nt[B_SCENERY] = 0;
+    }
+
     void MergeEnd()
     {
-        if (mergeList != null && sceneryFilter != null) sceneryFilter.sharedMesh = ToMesh(B_SCENERY, "Scenery");
+        if (mergeList != null && sceneryFilter != null) FlushTile();
         mergeList = null;
     }
+
+    // the scenery tiles (PHSun bakes their shadows with the rest)
+    public int SceneryTileCount() { return nTiles; }
+    public GameObject SceneryTile(int i) { return i == 0 ? (sceneryFilter != null ? sceneryFilter.gameObject : null) : tiles[i]; }
 
     // ------------------------------------------------------------------ helpers for the game
     // an inner cell's centre in the world (a hider's spawn may be upstairs or in a basement)

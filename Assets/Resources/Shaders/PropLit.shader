@@ -121,6 +121,8 @@ Shader "PropHunt/Lit"
                 #if VRCLV_LIGHTS_SUPPORTED
                 uint count = min((uint) _UdonPointLightVolumeCount, VRCLV_MAX_LIGHTS_COUNT);
                 float3 shadingNormal = n * 1.5;   // the package's default point light shading (3), as LightVolumeAdditiveSH
+                // every light, not Light Volumes' clusters: those are built for the player's camera, and any other camera
+                // (the hider's third-person view) saw lamps and the sun cut off in blocks (tried while profiling)
                 for (uint id = 0; id < count; id++)
                 {
                     if (_UdonPointLightVolumePosition[id].w < 0) LV_AccumulatePointLightVolumeSH(id, worldPos, shadingNormal, 0.5, S0, S1r, S1g, S1b);

@@ -21,16 +21,43 @@ public partial class MapGen
     }
 
     // weighted pick among the defs a slot accepts in a room of this theme
-    int PickDef(int accept, int sizeClass, int theme, ref GenRng rng)
+    // The defs a slot takes, by (accept, size class, theme), worked out once per map and kept: PickDef ran over every
+    // def twice per slot, half a million checks a map, which in Udon took about a second (Cor: build freezes).
+    // The same defs in the same order as the full scan, so the picks are unchanged.
+    int[] pdKeyA = new int[256], pdKeyS = new int[256], pdKeyT = new int[256], pdStart = new int[256], pdCount = new int[256], pdTotal = new int[256];
+    int[] pdList = new int[4096];
+    int pdN, pdListN;
+
+    int PickDefKey(int accept, int sizeClass, int theme)
     {
-        int total = 0;
-        for (int d = 0; d < GenData.nDefs; d++)
-            if (SlotTakes(d, accept, sizeClass, theme)) total += GenData.defSlotWeight[d];
-        if (total == 0) return -1;
-        int r = rng.Range(total);
+        for (int i = 0; i < pdN; i++) if (pdKeyA[i] == accept && pdKeyS[i] == sizeClass && pdKeyT[i] == theme) return i;
+        if (pdN >= pdKeyA.Length) { pdN = 0; pdListN = 0; }
+        int k = pdN++;
+        pdKeyA[k] = accept; pdKeyS[k] = sizeClass; pdKeyT[k] = theme; pdStart[k] = pdListN; pdCount[k] = 0; pdTotal[k] = 0;
         for (int d = 0; d < GenData.nDefs; d++)
         {
             if (!SlotTakes(d, accept, sizeClass, theme)) continue;
+            if (pdListN >= pdList.Length)
+            {
+                int[] g = new int[pdList.Length * 2];
+                System.Array.Copy(pdList, g, pdListN);
+                pdList = g;
+            }
+            pdList[pdListN++] = d; pdCount[k]++; pdTotal[k] += GenData.defSlotWeight[d];
+        }
+        return k;
+    }
+
+    int PickDef(int accept, int sizeClass, int theme, ref GenRng rng)
+    {
+        int k = PickDefKey(accept, sizeClass, theme);
+        int total = pdTotal[k];
+        if (total == 0) return -1;
+        int r = rng.Range(total);
+        int s0 = pdStart[k], s1 = s0 + pdCount[k];
+        for (int i = s0; i < s1; i++)
+        {
+            int d = pdList[i];
             if (r < GenData.defSlotWeight[d]) return d;
             r -= GenData.defSlotWeight[d];
         }
@@ -378,9 +405,37 @@ public partial class MapGen
         return e;
     }
 
+    // The leak candidates by (table, zone, indoors or out, comedic), worked out once per map (they were summed over every
+    // def twice per attempt: Cor, build freezes). The same defs in the same order, so the picks are unchanged.
+    int[] lkKeyT = new int[128], lkKeyZ = new int[128], lkKeyF = new int[128], lkStart = new int[128], lkCount = new int[128], lkTotal = new int[128];
+    int[] lkDef = new int[4096], lkWeight = new int[4096];
+    int lkN, lkListN;
+
+    int LeakKey(int table, int zone, bool outdoor, bool comedic)
+    {
+        int f = (outdoor ? 1 : 0) + (comedic ? 2 : 0);
+        for (int i = 0; i < lkN; i++) if (lkKeyT[i] == table && lkKeyZ[i] == zone && lkKeyF[i] == f) return i;
+        if (lkN >= lkKeyT.Length) { lkN = 0; lkListN = 0; }
+        int k = lkN++;
+        lkKeyT[k] = table; lkKeyZ[k] = zone; lkKeyF[k] = f; lkStart[k] = lkListN; lkCount[k] = 0; lkTotal[k] = 0;
+        for (int d = 0; d < GenData.nDefs; d++)
+        {
+            int w = LeakWeight(d, table, zone, outdoor, comedic);
+            if (w == 0) continue;
+            if (lkListN >= lkDef.Length)
+            {
+                int[] a = new int[lkDef.Length * 2]; System.Array.Copy(lkDef, a, lkListN); lkDef = a;
+                int[] b = new int[lkWeight.Length * 2]; System.Array.Copy(lkWeight, b, lkListN); lkWeight = b;
+            }
+            lkDef[lkListN] = d; lkWeight[lkListN] = w; lkListN++; lkCount[k]++; lkTotal[k] += w;
+        }
+        return k;
+    }
+
     void PlaceLeaks()
     {
         BuildNative();
+        lkN = 0; lkListN = 0;   // the native sets are this map's
         GenRng rng = Rng(ST_LEAK, 0, 0);
         int target = GenData.SizeLeaks[size];
         int placed = 0, attempts = target * 14;
@@ -401,15 +456,15 @@ public partial class MapGen
             int zone = roomZone[room];
             bool outdoor = !GenData.IsBuilding(zone);
             int table = GenData.FindTable(zone, roomType[room]);
-            int total = 0;
-            for (int d = 0; d < GenData.nDefs; d++) total += LeakWeight(d, table, zone, outdoor, comedic);
+            int lk = LeakKey(table, zone, outdoor, comedic);
+            int total = lkTotal[lk];
             if (total == 0) continue;
             int rr = rng.Range(total), def = -1;
-            for (int d = 0; d < GenData.nDefs; d++)
+            int l1 = lkStart[lk] + lkCount[lk];
+            for (int i = lkStart[lk]; i < l1; i++)
             {
-                int wgt = LeakWeight(d, table, zone, outdoor, comedic);
-                if (wgt == 0) continue;
-                if (rr < wgt) { def = d; break; }
+                int wgt = lkWeight[i];
+                if (rr < wgt) { def = lkDef[i]; break; }
                 rr -= wgt;
             }
             if (def < 0) continue;

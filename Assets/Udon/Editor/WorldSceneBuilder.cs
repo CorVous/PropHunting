@@ -53,7 +53,8 @@ public static class WorldSceneBuilder
         // a procedural sky the map's mood tints (MapBuilderUdon.ApplyMood: dawn, dusk, night, a space base's sky)
         var skyPath = "Assets/Udon/Generated/Sky.mat";
         var skyMat = AssetDatabase.LoadAssetAtPath<Material>(skyPath);
-        if (skyMat == null) { skyMat = new Material(Shader.Find("Skybox/Procedural")); AssetDatabase.CreateAsset(skyMat, skyPath); }
+        if (skyMat == null) { skyMat = new Material(Shader.Find("PropHunt/SkyGradient")); AssetDatabase.CreateAsset(skyMat, skyPath); }
+        else if (skyMat.shader.name != "PropHunt/SkyGradient") skyMat.shader = Shader.Find("PropHunt/SkyGradient");   // the cheap sky (profiling)
         RenderSettings.skybox = skyMat;
         RenderSettings.sun = sun;
 
@@ -61,6 +62,7 @@ public static class WorldSceneBuilder
         var lobby = new GameObject("Lobby");
         lobby.transform.SetParent(world.transform, false);
         lobby.transform.position = LobbyOrigin;
+        lobby.AddUdonSharpComponent<PHLobbyCull>();   // not drawn while the player is out on the map (profiling)
         // the inside of a game box (LobbyBuilder dresses it)
         var floorMat = Mat("LobbyFloor", new Color(0.953f, 0.906f, 0.788f));
         var wallMat = Mat("LobbyWall", new Color(0.141f, 0.376f, 0.290f));

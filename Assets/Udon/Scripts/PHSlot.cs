@@ -152,9 +152,21 @@ public class PHSlot : UdonSharpBehaviour
         voice.PlayOneShot(c, 1f);
     }
 
+    bool emptyDone;
+
     void Update()
     {
         if (game == null) return;
+        // an empty slot (most of the 32): parked once, then nothing each frame (Cor: profiling, the slots were half the Udon time)
+        if (game.slotPlayer[index] == 0)
+        {
+            if (emptyDone && proxy == null) return;
+            UpdateRemote();
+            UpdateProxy(false);
+            emptyDone = true;
+            return;
+        }
+        emptyDone = false;
         int myId = Networking.LocalPlayer.playerId;
         // the player the host gave this slot takes it over (the host owns every slot until then)
         if (game.slotPlayer[index] == myId && myId != 0 && !Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);

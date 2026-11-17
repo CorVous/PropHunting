@@ -13,6 +13,7 @@ public class PHLamps : UdonSharpBehaviour
     public MapBuilderUdon builder;
     public PointLightVolumeInstance[] pool;
     public int questCap = 12;              // a lighter pool on Android
+    public int pcCap = 18;                 // every pixel weighs every lamp (profiling: 24 cost up to 0.7 ms of GPU)
     public float baseIntensity = 1.8f;   // with a soft source: about 0.6 of full light at 1 m, 0.1 at 3 m (Cor: no hot, shiny spots)
     public float sourceSize = 0.8f;        // metres: Light Volumes' falloff is size^2 / (d^2 + size^2)
     public float followSeconds = 0.5f;     // how often a knocked-over lamp prop's light catches up
@@ -71,6 +72,7 @@ public class PHLamps : UdonSharpBehaviour
         if (!builder.built) return;
         int n = builder.nLights;
         int cap = pool.Length;
+        if (pcCap < cap) cap = pcCap;
 #if UNITY_ANDROID
         if (questCap < cap) cap = questCap;
 #endif

@@ -437,6 +437,8 @@ public class PHGame : UdonSharpBehaviour
     }
 
     // ------------------------------------------------------------------ the map: every client builds it
+    public bool logSlowSteps = false;  // profiling: name the generator steps that take a frame's time
+
     void BeginMap()
     {
         genRound = round;
@@ -454,7 +456,14 @@ public class PHGame : UdonSharpBehaviour
                 // generation, a few steps per frame within a budget
                 float t0 = Time.realtimeSinceStartup;
                 bool finished = false;
-                while (!finished && Time.realtimeSinceStartup - t0 < 0.006f) finished = gen.Step();
+                while (!finished && Time.realtimeSinceStartup - t0 < 0.006f)
+                {
+                    float s0 = Time.realtimeSinceStartup;
+                    int st = gen.CurrentStage(), cu = gen.CurrentCursor();
+                    finished = gen.Step();
+                    float one = (Time.realtimeSinceStartup - s0) * 1000f;
+                    if (logSlowSteps && one > 20f) Debug.Log("[PHGame] slow generator step: stage " + st + " cursor " + cu + " " + one.ToString("0") + " ms");
+                }
                 if (finished)
                 {
                     if (gen.failed) { building = false; Debug.LogError("[PHGame] map generation failed: " + gen.failReason); }
