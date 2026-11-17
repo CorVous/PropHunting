@@ -71,3 +71,13 @@ ClientSimStorage/
 Assets/Screenshots/
 Assets/Screenshots.meta
 PropHunt_last_build.txt
+
+# Bakery (a paid asset, installed locally; never committed)
+/Assets/Bakery/
+/Assets/Bakery.meta
+/Assets/Editor/x64/
+/Assets/Editor/x64.meta
+/Assets/Settings/BakeryProjectSettings.asset
+/Assets/Settings/BakeryProjectSettings.asset.meta
+/Assets/Editor.meta
+/Assets/Settings.meta
