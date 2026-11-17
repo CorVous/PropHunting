@@ -9,30 +9,37 @@ no credit is required; it is given here with thanks.
 
 | Pack | Maker | Used for | Items used | Licence | Source |
 |---|---|---|---|---|---|
-| KayKit : Furniture Bits 1.0 (`furniture-bits`) | KayKit (Kay Lousberg) | models | 18 | CC0-1.0 | https://kaylousberg.itch.io/furniture-bits |
+| KayKit : Board Game Bits 1.0 (`board-game-bits`) | KayKit (Kay Lousberg) | models | 7 | CC0-1.0 | https://kaylousberg.itch.io/board-game-bits |
+| KayKit : Furniture Bits 1.0 (`furniture-bits`) | KayKit (Kay Lousberg) | models | 39 | CC0-1.0 | https://kaylousberg.itch.io/furniture-bits |
+| KayKit : Holiday Bits 1.0 (`holiday-bits`) | KayKit (Kay Lousberg) | models | 10 | CC0-1.0 | https://kaylousberg.itch.io/holiday-bits |
+| KayKit - Dungeon Pack 1.1 (`kaykit-dungeon-pack`) | KayKit (Kay Lousberg) | models | 11 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-dungeon-pack |
 | KayKit - Medieval Hexagon Pack 1.0 (`kaykit-medieval-hexagon`) | KayKit (Kay Lousberg) | models | 4 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-medieval-hexagon |
 | Kenney: Blaster Kit (`kenney-blaster-kit`) | Kenney | models | 2 | CC0-1.0 | https://kenney.nl/assets/blaster-kit |
 | Kenney: Car Kit (`kenney-car-kit`) | Kenney | models | 21 | CC0-1.0 | https://kenney.nl/assets/car-kit |
 | Kenney: Coaster Kit (`kenney-coaster-kit`) | Kenney | models | 7 | CC0-1.0 | https://kenney.nl/assets/coaster-kit |
-| Kenney: Cube Pets (`kenney-cube-pets`) | Kenney | models | 8 | CC0-1.0 | https://kenney.nl/assets/cube-pets |
+| Kenney: Cube Pets (`kenney-cube-pets`) | Kenney | models | 10 | CC0-1.0 | https://kenney.nl/assets/cube-pets |
 | Kenney: Digital Audio (`kenney-digital-audio`) | Kenney | sounds | 12 | CC0-1.0 | https://kenney.nl/assets/digital-audio |
-| Kenney: Fantasy Town Kit (`kenney-fantasy-town-kit`) | Kenney | models | 10 | CC0-1.0 | https://kenney.nl/assets/fantasy-town-kit |
+| Kenney: Fantasy Town Kit (`kenney-fantasy-town-kit`) | Kenney | models | 12 | CC0-1.0 | https://kenney.nl/assets/fantasy-town-kit |
 | Kenney: Food Kit (`kenney-food-kit`) | Kenney | models | 40 | CC0-1.0 | https://kenney.nl/assets/food-kit |
 | Kenney: Furniture Kit (`kenney-furniture-kit`) | Kenney | models | 57 | CC0-1.0 | https://kenney.nl/assets/furniture-kit |
 | Kenney: Graveyard Kit (`kenney-graveyard-kit`) | Kenney | models | 2 | CC0-1.0 | https://kenney.nl/assets/graveyard-kit |
 | Kenney: Impact Sounds (`kenney-impact-sounds`) | Kenney | sounds | 25 | CC0-1.0 | https://kenney.nl/assets/impact-sounds |
 | Kenney: Interface Sounds (`kenney-interface-sounds`) | Kenney | sounds | 18 | CC0-1.0 | https://kenney.nl/assets/interface-sounds |
 | Kenney: Kenney Fonts (`kenney-kenney-fonts`) | Kenney | font | 2 | CC0-1.0 | https://kenney.nl/assets/kenney-fonts |
+| Kenney: Mini Arcade (`kenney-mini-arcade`) | Kenney | models | 3 | CC0-1.0 | https://kenney.nl/assets/mini-arcade |
 | Kenney: Mini Shop (`kenney-mini-shop`) | Kenney | models | 19 | CC0-1.0 | https://kenney.nl/assets/mini-shop |
-| Kenney: Mini Skate (`kenney-mini-skate`) | Kenney | models | 10 | CC0-1.0 | https://kenney.nl/assets/mini-skate |
+| Kenney: Mini Skate (`kenney-mini-skate`) | Kenney | models | 14 | CC0-1.0 | https://kenney.nl/assets/mini-skate |
 | Kenney: Music Jingles (`kenney-music-jingles`) | Kenney | sounds | 9 | CC0-1.0 | https://kenney.nl/assets/music-jingles |
-| Kenney: Nature Kit (`kenney-nature-kit`) | Kenney | models | 77 | CC0-1.0 | https://kenney.nl/assets/nature-kit |
+| Kenney: Nature Kit (`kenney-nature-kit`) | Kenney | models | 79 | CC0-1.0 | https://kenney.nl/assets/nature-kit |
 | Kenney: RPG Audio (`kenney-rpg-audio`) | Kenney | sounds | 6 | CC0-1.0 | https://kenney.nl/assets/rpg-audio |
 | Kenney: Survival Kit (`kenney-survival-kit`) | Kenney | models | 20 | CC0-1.0 | https://kenney.nl/assets/survival-kit |
+| Kenney: Toy Car Kit (`kenney-toy-car-kit`) | Kenney | models | 4 | CC0-1.0 | https://kenney.nl/assets/toy-car-kit |
 | Kenney: Voiceover Pack (`kenney-voiceover-pack`) | Kenney | sounds | 8 | CC0-1.0 | https://kenney.nl/assets/voiceover-pack |
+| KayKit - Mixed Bag 1 (`mixed-bag-1`) | KayKit (Kay Lousberg) | models | 11 | CC0-1.0 | https://kaylousberg.itch.io/mixed-bag-1 |
+| KayKit - Mixed Bag 2 (`mixed-bag-2`) | KayKit (Kay Lousberg) | models | 14 | CC0-1.0 | https://kaylousberg.itch.io/mixed-bag-2 |
 | KayKit : Prototype Bits 1.1 (`prototype-bits`) | KayKit (Kay Lousberg) | models | 9 | CC0-1.0 | https://kaylousberg.itch.io/prototype-bits |
 | KayKit : Resource Bits 1.0 (`resource-bits`) | KayKit (Kay Lousberg) | models | 20 | CC0-1.0 | https://kaylousberg.itch.io/resource-bits |
-| KayKit : Restaurant Bits 1.0 (`restaurant-bits`) | KayKit (Kay Lousberg) | models | 30 | CC0-1.0 | https://kaylousberg.itch.io/restaurant-bits |
+| KayKit : Restaurant Bits 1.0 (`restaurant-bits`) | KayKit (Kay Lousberg) | models | 36 | CC0-1.0 | https://kaylousberg.itch.io/restaurant-bits |
 | KayKit : RPG Tools Bits 1.0 (`rpg-tools-bits`) | KayKit (Kay Lousberg) | models | 17 | CC0-1.0 | https://kaylousberg.itch.io/rpg-tools-bits |
 
 The models were converted from the packs' glTF/GLB files to vertex-coloured meshes by `prototype/tools/convert_models.py`;

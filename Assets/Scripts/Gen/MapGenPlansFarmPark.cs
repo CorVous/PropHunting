@@ -42,6 +42,7 @@ public partial class MapGen
         if (r10.Chance(550) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_rack"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r10) >= 0) Keep(first, false); }
         GenRng r11 = SR(11);
         if (r11.Chance(400) && Fit(1)) { first = nEmit; if (WallPlace(Pick(ref r11, "w_planks", 4, "w_logs", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(first, false); }
+        FillFromPool(50, new string[] { "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" });
     }
 
     // ============================================================================================ SKATE CORNER
@@ -52,7 +53,7 @@ public partial class MapGen
         int room = pRoom;
         GenRng r = SR(1);
         int axis = RoomLongAxis(room) == 0 ? 90 : 0;
-        string[] big = { "sk_halfPipe", "sk_halfPipeLow", "sk_ramp", "sk_rampRail", "sk_box", "sk_steps", "sk_rail" };
+        string[] big = { "sk_halfPipe", "sk_halfPipeLow", "sk_ramp", "sk_rampRail", "sk_box", "sk_steps", "sk_rail", "sk_grind", "sk_railLow", "sk_platform" };
         int s0 = r.Range(big.Length), got = 0;
         for (int k = 0; k < big.Length && Fit(1) && got < 3 + AreaM2(room) / 12; k++)
         {
@@ -96,6 +97,10 @@ public partial class MapGen
         }
         GenRng r10 = SR(10);
         if (r10.Chance(500) && Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("pots"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r10)) Keep(first, false); }
+        // revision 11: a pallet and a plank left by the ramps (things the skaters build with)
+        GenRng r11 = SR(11);
+        if (r11.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("sk_pallet"), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(first, false); }
+        FillFromPool(50, new string[] { "sk_benches", "ck_bench", "k_bench", "ck_trash", "c_cone", "f_lamp", "sk_pallet", "ck_drinks", "n_bush", "sk_railLow", "sk_grind" });
         ClearBans();
         Borders(30, 3, true);
     }
@@ -189,6 +194,18 @@ public partial class MapGen
         }
         GenRng r13 = SR(13);
         if (r13.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_trash"), WM_ANY, 0, 0, WIN_ANY, 0, ref r13) >= 0) Keep(first, false); }
+        // revision 11: the beaver on the bank by its stump, a log to sit on
+        GenRng r14 = SR(14);
+        if (r14.Chance(550) && Fit(1))
+        {
+            int cell = OpenSpot(1, WM_NEAR, wx, wz, 0, ref r14);
+            int first = nEmit;
+            if (cell >= 0 && FreePlace(Dn("p_beaver"), cell, r14.Range(360), 0, 0, H_FREE) >= 0) Keep(first, false);
+        }
+        GenRng r15 = SR(15);
+        if (r15.Chance(450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("n_log"), WM_ANY, 0, 0, WIN_ANY, 0, ref r15) >= 0) Keep(first, false); }
+        FillFromPool(50, new string[] { "n_rockLarge", "n_rockTall", "n_logLarge", "n_bushLarge", "n_bushDetailed", "ck_bench", "k_bench", "f_lamp", "n_stump", "ck_trash",
+            "n_grassLarge", "n_log", "p_beaver" });
         ClearBans();
         Borders(40, 4, true);
     }
@@ -243,6 +260,11 @@ public partial class MapGen
             int first = nEmit;
             if (cell >= 0 && FreePlace(Dn("f_lamp"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
         }
+        // revision 11: a vending machine and a pallet of drinks crates by the kiosks, stools at a stall
+        GenRng r18 = SR(18);
+        if (r18.Chance(550) && Fit(1)) { int first = nEmit; if (WallPlace(Dn(r18.Chance(600) ? "ma_vending" : "ma_claw"), WM_ANY, 0, 0, WIN_ANY, 0, ref r18) >= 0) Keep(first, false); }
+        GenRng r19 = SR(19);
+        if (r19.Chance(500) && Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("crates"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r19)) Keep(first, false); }
         // fruit set out by a kiosk, a plant, a second flower bed
         GenRng r16 = SR(16);
         if (r16.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(ref r16, "ms_dispFruit", 4, "k_plant", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r16) >= 0) Keep(first, false); }
@@ -252,6 +274,27 @@ public partial class MapGen
             int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r17);
             int first = nEmit;
             if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, r17.Range(4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+        }
+        FillFromPool(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter" });
+    }
+
+    // revision 11: what an area's own steps could not place is made up from the rest of what belongs there, each kind
+    // tried once in a shuffled order: at the fence or a wall, else (a thing that may stand alone) in the open
+    void FillFromPool(int k0, string[] pool)
+    {
+        int room = pRoom;
+        GenRng r = SR(k0);
+        int p0 = r.Range(pool.Length);
+        for (int k = 0; k < pool.Length && Fit(1); k++)
+        {
+            int def = Dn(pool[(p0 + k) % pool.Length]);
+            if (CountInRoom(def, room) >= ScaledCap(GenData.defRoomCap[def], room)) continue;
+            int first = nEmit;
+            if (WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0 && Keep(first, false)) continue;
+            if (Has(def, GenData.FL_LOOSE)) continue;
+            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r);
+            first = nEmit;
+            if (cell >= 0 && FreePlace(def, cell, r.Range(4) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
         }
     }
 

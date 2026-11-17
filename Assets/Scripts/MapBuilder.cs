@@ -59,6 +59,11 @@ public class MapBuilder
             case GenData.R_BACK_OFFICE: return C(222, 214, 200);
             case GenData.R_GARAGE_BAY: return C(178, 182, 186);
             case GenData.R_BARN: case GenData.R_FEED_STORE: case GenData.R_FARM_WORK: return C(176, 132, 92);
+            // revision 11
+            case GenData.R_TEEN: return C(178, 196, 226);
+            case GenData.R_PLAYROOM: return C(246, 222, 150);
+            case GenData.R_BOXROOM: return C(206, 194, 176);
+            case GenData.R_PANTRY: return C(232, 226, 206);
         }
         return C(220, 220, 220);
     }
@@ -66,16 +71,19 @@ public class MapBuilder
     // ---- revision 9: a colour scheme per building, so two houses (and their bedrooms) do not look alike. The
     // scheme comes from the seed and the building's instance, so a seed always looks the same. Interior walls are
     // tinted, wooden floors and the outside walls and roof take one of four looks per kind of building.
-    int Style(int inst) { return inst < 0 ? 0 : (int)(GenRng.Hash32(gen.seed, (uint)inst, 9091, 0, 0) & 3); }
+    // revision 11: a KayKit-furnished house takes schemes 4 to 7 (warmer, older: wallpaper tints, dark boards)
+    int Style(int inst) { return inst < 0 ? 0 : (int)(GenRng.Hash32(gen.seed, (uint)inst, 9091, 0, 0) & 3) + (gen.KayHouse(inst) ? 4 : 0); }
     int StyleAt(int cell) { return cell >= 0 && GenData.IsBuilding(gen.cellZone[cell]) ? Style(gen.cellInst[cell]) : 0; }
 
-    static readonly int[] TintR = { 0, 10, -14, 4 }, TintG = { 0, -6, 2, 8 }, TintB = { 0, -14, 10, -10 };
+    static readonly int[] TintR = { 0, 10, -14, 4, 14, -6, 18, 6 }, TintG = { 0, -6, 2, 8, 2, 10, -8, -4 }, TintB = { 0, -14, 10, -10, -20, -14, -2, 14 };
     static Color32 Tint(Color32 c, int style) { return C(Mathf.Clamp(c.r + TintR[style], 0, 255), Mathf.Clamp(c.g + TintG[style], 0, 255), Mathf.Clamp(c.b + TintB[style], 0, 255)); }
 
     Color32 WallColourAt(int cell) { return Tint(WallColour(gen.roomType[gen.cellRoom[cell]]), StyleAt(cell)); }
 
-    static readonly Color32[] HouseOut = { C(232, 212, 180), C(196, 214, 222), C(204, 216, 186), C(184, 112, 90) };
-    static readonly Color32[] HouseRoof = { C(172, 94, 80), C(92, 100, 112), C(84, 104, 92), C(122, 90, 70) };
+    static readonly Color32[] HouseOut = { C(232, 212, 180), C(196, 214, 222), C(204, 216, 186), C(184, 112, 90),
+        C(150, 170, 140), C(226, 190, 150), C(170, 120, 110), C(214, 214, 196) };
+    static readonly Color32[] HouseRoof = { C(172, 94, 80), C(92, 100, 112), C(84, 104, 92), C(122, 90, 70),
+        C(70, 74, 82), C(140, 78, 62), C(60, 70, 64), C(104, 70, 60) };
     static readonly Color32[] ShopOut = { C(240, 222, 150), C(140, 196, 190), C(236, 236, 228), C(200, 160, 196) };
     static readonly Color32[] GarageOut = { C(150, 160, 170), C(176, 104, 84), C(196, 190, 170), C(120, 136, 120) };
     static readonly Color32[] BarnOut = { C(170, 60, 50), C(150, 108, 72), C(186, 82, 58), C(132, 92, 64) };
@@ -106,8 +114,10 @@ public class MapBuilder
         return C(100, 106, 116);
     }
 
-    static readonly Color32[] PlankA = { C(198, 154, 106), C(150, 104, 70), C(214, 190, 150), C(170, 160, 150) };
-    static readonly Color32[] PlankB = { C(188, 144, 98), C(140, 96, 64), C(204, 178, 140), C(160, 150, 140) };
+    static readonly Color32[] PlankA = { C(198, 154, 106), C(150, 104, 70), C(214, 190, 150), C(170, 160, 150),
+        C(128, 86, 58), C(178, 128, 84), C(110, 78, 60), C(190, 160, 120) };
+    static readonly Color32[] PlankB = { C(188, 144, 98), C(140, 96, 64), C(204, 178, 140), C(160, 150, 140),
+        C(118, 78, 52), C(166, 118, 76), C(100, 70, 54), C(178, 148, 110) };
 
     Color32 FloorColour(int roomType, int ix, int iz, int style = 0)
     {
@@ -115,6 +125,7 @@ public class MapBuilder
         {
             case GenData.R_LIVING: case GenData.R_BEDROOM: case GenData.R_OFFICE: case GenData.R_DINING: case GenData.R_KIDS: case GenData.R_HALL:
             case GenData.R_WH_OFFICE: case GenData.R_BACK_OFFICE: case GenData.R_FEED_STORE: case GenData.R_FARM_WORK:
+            case GenData.R_TEEN: case GenData.R_PLAYROOM: case GenData.R_BOXROOM:
                 // wood planks: strips two cells wide, alternating shade; four kinds of wood (the building's scheme)
                 return Vary((((iz / 2) & 1) == 0) ? PlankA[style] : PlankB[style], ix / 4, iz / 2, 4);
             case GenData.R_SHOP_FLOOR:
@@ -123,7 +134,7 @@ public class MapBuilder
                 return Vary(C(150, 152, 156), ix, iz, 7);
             case GenData.R_BARN:
                 return Vary(C(184, 156, 104), ix, iz, 10);
-            case GenData.R_KITCHEN: case GenData.R_DINER_KITCHEN:
+            case GenData.R_KITCHEN: case GenData.R_DINER_KITCHEN: case GenData.R_PANTRY:
                 return (((ix + iz) & 1) == 0) ? C(226, 226, 218) : C(204, 210, 212);
             case GenData.R_BATH:
                 return (((ix + iz) & 1) == 0) ? C(214, 230, 234) : C(190, 212, 220);

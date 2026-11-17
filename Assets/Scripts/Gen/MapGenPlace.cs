@@ -545,6 +545,10 @@ public partial class MapGen
             case GenData.R_PLAYGROUND: PlanPlayground(); break;
             case GenData.R_POND: PlanPond(); break;
             case GenData.R_TERRACE: PlanTerrace(); break;
+            case GenData.R_TEEN: PlanTeen(); break;
+            case GenData.R_PLAYROOM: PlanPlayroom(); break;
+            case GenData.R_BOXROOM: PlanBoxRoom(); break;
+            case GenData.R_PANTRY: PlanPantry(); break;
         }
         if (roomFloorMin[room] > 0) FillToMinimum();
         // what sits on, in and under the furniture, thinned evenly to the room's cap

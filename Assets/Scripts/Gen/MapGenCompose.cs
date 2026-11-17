@@ -51,10 +51,23 @@ public partial class MapGen
 
     int Dn(string id)
     {
-        for (int i = 0; i < dnN; i++) if ((object)dnId[i] == (object)id) return dnDef[i];
+        for (int i = 0; i < dnN; i++) if ((object)dnId[i] == (object)id) return TwinIn(pRoom, dnDef[i]);
         int d = GenData.FindDef(id);
         if (dnN < dnId.Length) { dnId[dnN] = id; dnDef[dnN] = d; dnN++; }
-        return d;
+        return TwinIn(pRoom, d);
+    }
+
+    // revision 11: a house is furnished from the Kenney family or, two in five, from KayKit (GenData.BuildTwins). The
+    // plans name the Kenney pieces; in a KayKit house Dn and the slots give the twin instead.
+    public bool KayHouse(int inst)
+    {
+        return inst >= 0 && instZone[inst] == GenData.Z_HOUSE && GenRng.Hash32(seed, (uint)inst, 7717, 11, 0) % 1000 < 400;
+    }
+
+    int TwinIn(int room, int d)
+    {
+        if (d < 0 || room < 0 || GenData.defTwin[d] < 0 || !KayHouse(roomInst[room])) return d;
+        return GenData.defTwin[d];
     }
 
     // one of two or three ids by weight

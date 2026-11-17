@@ -147,10 +147,10 @@ public partial class MapGen
                 int cd;
                 if (mode == GenData.G_MATCHED && !mixed)
                 {
-                    if (chosen < 0) chosen = PickDef(GenData.slotAccept[sl], GenData.slotSize[sl], theme, ref rng);
+                    if (chosen < 0) chosen = TwinIn(room, PickDef(GenData.slotAccept[sl], GenData.slotSize[sl], theme, ref rng));
                     cd = chosen;
                 }
-                else cd = PickDef(GenData.slotAccept[sl], GenData.slotSize[sl], theme, ref rng);
+                else cd = TwinIn(room, PickDef(GenData.slotAccept[sl], GenData.slotSize[sl], theme, ref rng));
                 if (cd < 0) continue;
                 int child = EmitInSlot(host, sl, cd, 0, ref rng);
                 if (child >= 0) { groupUsed[g] = true; if (adjacent) seated++; }
@@ -159,7 +159,7 @@ public partial class MapGen
             // a table with no chair at all, a fire with no seat: the first seat is guaranteed (report 14, C8)
             if (pass == 0 && roll && seated == 0 && firstEmpty >= 0 && (emitFlags[host] & EF_BOOTH) == 0)
             {
-                int seat = chosen >= 0 ? chosen : PickDef(GenData.slotAccept[firstEmpty], GenData.slotSize[firstEmpty], theme, ref rng);
+                int seat = chosen >= 0 ? chosen : TwinIn(room, PickDef(GenData.slotAccept[firstEmpty], GenData.slotSize[firstEmpty], theme, ref rng));
                 if (seat >= 0 && EmitInSlot(host, firstEmpty, seat, 0, ref rng) >= 0)
                 {
                     groupUsed[g] = true;

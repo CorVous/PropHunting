@@ -5,7 +5,7 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 10;
+    public const int GEN_VERSION = 11;
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -13,7 +13,8 @@ public static class GenData
     // Layout 3 (generator 6): the same, at the smaller sizes of G36 "B" (no front garden at S, fewer and smaller plots).
     // Layout 4 (generator 9): more kinds of plot (shop, garage, farm, park) drawn into a mix per map, more plans.
     // Layout 5 (generator 10): barns with a farm workshop, a two-cell paddock, parks with a skate corner, a pond and a cafe terrace.
-    public const int LAYOUT_VERSION = 5;
+    // Layout 6 (generator 11): house plans with a pantry or a box room; kids' rooms and second bedrooms drawn as playroom, teen room or box room.
+    public const int LAYOUT_VERSION = 6;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell
@@ -107,6 +108,8 @@ public static class GenData
     public const int R_FORECOURT = 16, R_FARMYARD = 17, R_FIELD = 18, R_PADDOCK = 19, R_PARK = 42;
     // revision 10: the farm's workshop in the barn; the park's feature areas behind its lawn
     public const int R_FARM_WORK = 36, R_PLAYGROUND = 43, R_POND = 44, R_TERRACE = 45;
+    // revision 11: a house's box room (the attic's things: the generator has one storey), teen room, playroom, pantry
+    public const int R_BOXROOM = 9, R_TEEN = 37, R_PLAYROOM = 38, R_PANTRY = 39;
     public const int R_DINER_DINING = 30, R_DINER_KITCHEN = 31, R_DINER_STORE = 32;
     public const int R_FOREST_DENSE = 40, R_FOREST_CLEARING = 41;
     public const int R_RELEASE = 50;
@@ -150,6 +153,10 @@ public static class GenData
             case R_PADDOCK: return "Paddock";
             case R_PARK: return "Park";
             case R_FARM_WORK: return "Farm workshop";
+            case R_BOXROOM: return "Box room";
+            case R_TEEN: return "Teen room";
+            case R_PLAYROOM: return "Playroom";
+            case R_PANTRY: return "Pantry";
             case R_PLAYGROUND: return "Skate corner";
             case R_POND: return "Pond";
             case R_TERRACE: return "Cafe terrace";
@@ -198,7 +205,8 @@ public static class GenData
     public const int TH_KIDS = 1 << 6, TH_HALL = 1 << 7, TH_STORE = 1 << 8, TH_DINER = 1 << 9, TH_PRO_KITCHEN = 1 << 10, TH_PANTRY = 1 << 11;
     public const int TH_PATIO = 1 << 12, TH_GARDEN = 1 << 13, TH_CAMP = 1 << 14, TH_FOREST = 1 << 15;
     public const int TH_SHOP = 1 << 16, TH_FARM = 1 << 17;
-    public const int TH_HOME = TH_LIVING | TH_BED | TH_OFFICE | TH_KIDS | TH_HALL | TH_DINING;
+    public const int TH_TEEN = 1 << 18, TH_PLAY = 1 << 19, TH_ATTIC = 1 << 20;   // revision 11
+    public const int TH_HOME = TH_LIVING | TH_BED | TH_OFFICE | TH_KIDS | TH_HALL | TH_DINING | TH_TEEN | TH_PLAY | TH_ATTIC;
 
     public static int RoomTheme(int roomType)
     {
@@ -217,6 +225,10 @@ public static class GenData
             case R_PARK: case R_POND: case R_PLAYGROUND: return TH_GARDEN;
             case R_TERRACE: return TH_PATIO | TH_DINER;
             case R_FARM_WORK: return TH_FARM | TH_STORE;
+            case R_TEEN: return TH_TEEN | TH_BED;
+            case R_PLAYROOM: return TH_PLAY | TH_KIDS;
+            case R_BOXROOM: return TH_ATTIC | TH_STORE;
+            case R_PANTRY: return TH_PANTRY;
             case R_KIDS: return TH_KIDS;
             case R_HALL: return TH_HALL;
             case R_STORAGE: case R_LOADING: case R_YARD: return TH_STORE;
@@ -289,10 +301,11 @@ public static class GenData
     public static int[] defKind = new int[MAXD], defBeside = new int[MAXD];
     public static int[] defRoomCap = new int[MAXD];    // copies of the type standing on the floor of one room (16 m2; larger rooms scale it)
     public static int[] defKin = new int[MAXD];        // the prop group the type is a kind of (a hider bucket fits any row of buckets), -1 = none
+    public static int[] defTwin = new int[MAXD];       // revision 11: the type's twin in a KayKit-furnished house, -1 = none
     public static int[] defSeason = new int[MAXD * 3]; // revision 9: per def and season (0 summer, 1 autumn, 2 deep green) its twin, -1 = itself
 
     // ---- prop groups (G25): related props placed together as one tidy unit
-    const int MAXGR = 48, MAXGM = 256;
+    const int MAXGR = 96, MAXGM = 512;
     public static int nGrps;
     public static string[] grpId = new string[MAXGR];
     public static int[] grpLayout = new int[MAXGR], grpAnchor = new int[MAXGR], grpMin = new int[MAXGR], grpMax = new int[MAXGR];
@@ -319,7 +332,7 @@ public static class GenData
     public static int[] groupMode = new int[MAXG], groupChance = new int[MAXG], groupRef = new int[MAXG];
 
     // ---- native lists: what belongs in a room type (the plans place it; everything else is a wrong-category spawn) ----
-    const int MAXT = 64, MAXE = 1024;
+    const int MAXT = 64, MAXE = 2048;
     public static int nTables;
     public static int[] tableZone = new int[MAXT], tableRoom = new int[MAXT];
     public static int[] tableEntryStart = new int[MAXT], tableEntryCount = new int[MAXT];
@@ -602,6 +615,7 @@ public static class GenData
         if (built) return;
         built = true;
         for (int i = 0; i < defSeason.Length; i++) defSeason[i] = -1;
+        for (int i = 0; i < defTwin.Length; i++) defTwin[i] = -1;
 
         const int IN = FL_LEAK_IN, OUT = FL_LEAK_OUT, BOTH = FL_LEAK_IN | FL_LEAK_OUT;
         const int K = 2000;   // Kenney Furniture Kit (02 section 4.1)
@@ -1047,24 +1061,151 @@ public static class GenData
         D("p_duck", "animal-chick", 280, 0, A_OUT_OPEN, FL_LIGHT | OUT, 2); Jit(10, 180); Loose(); Cap(4);
         D("n_bushSmall", "plant_bushSmall", 3000, 0, A_OUT_OPEN, OUT, 0); Jit(10, 180); Kind(K_PLANT);
         D("n_bushTriangle", "plant_bushTriangle", 3000, 0, A_OUT_OPEN, OUT, 0); Jit(10, 180); Kind(K_PLANT);
+
+        // ===== revision 11: the KayKit-furnished house, the box room, teen room, playroom and pantry =====
+        // KayKit Furniture Bits twins of the Kenney house furniture (Twin below): same anchors, KayKit scales
+        D("q_couchPillows", "couch_pillows", 700, 0, A_WALL, FL_SOLID | BOTH, 2); Col(C_SEAT); Clear(1); Kind(K_SEAT);
+        D("q_armchairPillows", "armchair_pillows", 550, 0, A_WALL, FL_SOLID | BOTH, 1); Col(C_SEAT); Clear(1); Kind(K_SEAT); Cap(2);
+        D("q_bedDouble", "bed_double_A", 700, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_BED);
+        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, 0, defTopY[cur], 300, 0, SZ_M, I_TOY | I_PILLOW, 200); }
+        D("q_bedSingleB", "bed_single_B", 700, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Kind(K_BED);
+        { int g = Group(G_INDEPENDENT, 1000, 0); Slot(g, S_ON_TOP, 0, defTopY[cur], 300, 0, SZ_M, I_TOY | I_PILLOW, 250); }
+        D("q_cabinetDeco", "cabinet_medium_decorated", 800, 0, A_WALL, FL_SOLID | FL_HEAVY | IN, 1); Clear(1); Kind(K_STORE);
+        D("q_cabinetSmallDeco", "cabinet_small_decorated", 800, 0, A_WALL, FL_SOLID | IN, 1); Clear(1); Kind(K_STORE);
+        D("q_cactusB", "cactus_medium_B", 650, 0, A_CORNER, BOTH, 0);
+        D("q_cactusSmallB", "cactus_small_B", 500, I_DECOR, A_SLOT_ONLY, BOTH, 0);
+        D("q_chairB", "chair_B", 750, I_CHAIR, A_SLOT_ONLY, FL_LIGHT | BOTH, 0); Col(C_SEAT);
+        D("q_chairC", "chair_C", 750, I_CHAIR, A_SLOT_ONLY, FL_LIGHT | BOTH, 0); Col(C_SEAT);
+        D("q_chairWood", "chair_A_wood", 750, I_CHAIR, A_SLOT_ONLY, FL_LIGHT | BOTH, 0); Col(C_SEAT);
+        D("q_stoolWood", "chair_stool_wood", 700, I_STOOL, A_BESIDE, FL_LIGHT | BOTH, 0); Beside(K_COUNTER); Loose(); Cap(3);
+        D("q_rugOval", "rug_oval_A", 800, I_RUG, A_CENTER, FL_FLAT | IN, 1); Fp(5, 3);
+        D("q_rugStripes", "rug_rectangle_stripes_A", 800, I_RUG, A_SLOT_ONLY, FL_FLAT | IN, 1); Fp(5, 3);
+        D("q_tableLong", "table_medium_long", 750, 0, A_CENTER, FL_SOLID | IN, 1); Col(C_TABLE); SlotsDining(false, 900); Kind(K_TABLE);
+        D("q_sideTable", "table_small", 650, 0, A_WALL, FL_SOLID | IN, 1); Col(C_TABLE); SlotsTop(1, I_DECOR | I_LAMP, SZ_M, 550);
+        D("q_bedside", "cabinet_small", 500, 0, A_BESIDE, IN, 1); SlotsTop(1, I_LAMP | I_DECOR, SZ_M, 650); Beside(K_BED);
+        D("q_frameMedium", "pictureframe_medium", 450, I_DECOR, A_SLOT_ONLY, BOTH, 0);
+        D("q_pillowB", "pillow_B", 600, I_PILLOW, A_SLOT_ONLY, FL_LIGHT | BOTH, 0);
+        D("q_bookSingle", "book_single", 500, I_DECOR, A_SLOT_ONLY, BOTH, 0);
+        D("hb_armchairRed", "chair_large_red", 500, 0, A_WALL, FL_SOLID | BOTH, 1); Col(C_SEAT); Clear(1); Kind(K_SEAT); Cap(2);
+        D("hb_armchairBlue", "chair_large_blue", 500, 0, A_WALL, FL_SOLID | BOTH, 1); Col(C_SEAT); Clear(1); Kind(K_SEAT); Cap(2);
+        // the teen room (Mixed Bag 1 and 2 at about x0.55: their raw sizes are about 1.8 times real)
+        D("mb_gamerChairA", "gamer_chair_A", 650, I_DESKCHAIR, A_SLOT_ONLY, FL_LIGHT | IN, 1); Col(C_SEAT); Fp(1, 1);
+        D("mb_gamerChairB", "gamer_chair_B", 650, I_DESKCHAIR, A_SLOT_ONLY, FL_LIGHT | IN, 1); Col(C_SEAT); Fp(1, 1);
+        D("mb_headphonesA", "cat_headphones_A", 220, I_DECOR, A_SLOT_ONLY, BOTH, 1);
+        D("mb_headphonesC", "cat_headphones_C", 220, I_DECOR, A_SLOT_ONLY, BOTH, 1);
+        D("mb_console", "handheld_console", 450, I_DECOR | I_TOY, A_SLOT_ONLY, BOTH, 1);
+        D("mb_guitarA", "guitar_A", 550, 0, A_WALL, FL_LIGHT | IN, 1); Jit(2, 8); Cap(1);
+        D("mb_guitarB", "guitar_B", 550, 0, A_WALL, FL_LIGHT | IN, 1); Jit(2, 8); Cap(1);
+        D("mb_guitarCase", "guitarcase", 600, 0, A_WALL, FL_LIGHT | IN, 1); Jit(2, 8); Cap(1);
+        D("mb_comics", "comicbooks_stacked", 400, I_BOX | I_DECOR, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Jit(4, 30);
+        D("mb_comicBox", "comicbox_closed", 550, I_BOX, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Jit(4, 15);
+        D("mb_comicBoxFull", "comicbox_filled", 550, I_BOX, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Jit(4, 15);
+        D("mb_skates", "rollerskate_pair", 600, I_TOY, A_WALL, FL_LIGHT | BOTH, 1); Loose(); Jit(4, 30); Cap(1);
+        D("mb_plushA", "chicken_plushie_A", 450, I_TOY, A_BESIDE, FL_LIGHT | BOTH, 1); Jit(8, 180); Loose(); Beside(K_BED | K_SEAT);
+        D("mb_plushB", "chicken_plushie_B", 450, I_TOY, A_BESIDE, FL_LIGHT | BOTH, 1); Jit(8, 180); Loose(); Beside(K_BED | K_SEAT);
+        D("mb_puzzle", "puzzlecube_complete", 450, I_TOY | I_DECOR, A_SLOT_ONLY, BOTH, 0);
+        D("mb_bottle", "waterbottle_A", 380, I_DECOR, A_SLOT_ONLY, BOTH, 0);
+        D("mb_camera", "instantcamera", 380, I_DECOR, A_SLOT_ONLY, BOTH, 1);
+        D("mb_helmet", "bicycle_helmet", 260, 0, A_WALL, FL_LIGHT | BOTH, 1); Loose(); Jit(4, 40); Cap(1);
+        // the box room: trunks, chests and boxes (KayKit Dungeon at x0.5), frames and a mirror leaning at the walls
+        D("dg_trunkL", "trunk_large_A", 550, 0, A_WALL, FL_SOLID | BOTH, 1); Jit(3, 6); Kind(K_STORE);
+        D("dg_trunkM", "trunk_medium_B", 550, 0, A_WALL, FL_SOLID | BOTH, 1); Jit(3, 6);
+        D("dg_trunkS", "trunk_small_C", 550, I_BOX, A_WALL, FL_LIGHT | BOTH, 1); Jit(3, 10); Loose();
+        D("dg_chest", "chest", 500, 0, A_WALL, FL_SOLID | BOTH, 1); Jit(3, 6); Kind(K_STORE);
+        D("dg_boxL", "box_large", 450, 0, A_WALL, FL_SOLID | BOTH, 0); Jit(4, 8);
+        D("dg_boxS", "box_small", 450, I_BOX, A_WALL, FL_LIGHT | BOTH, 0); Jit(4, 12); Loose();
+        D("mb_frameA", "frame_A_large", 600, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 6);
+        D("mb_frameB", "frame_B_large", 500, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 6);
+        D("mb_frameC", "frame_C", 600, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 6);
+        D("q_frameLA", "pictureframe_large_A", 700, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 6);
+        D("q_frameLB", "pictureframe_large_B", 700, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(2, 6);
+        D("mb_mirror", "ornate_mirror", 450, 0, A_WALL, FL_SOLID | IN, 1); Cap(1);
+        D("mb_sled", "sled", 650, 0, A_WALL, FL_LIGHT | BOTH, 1); Jit(3, 10); Cap(1);
+        D("mb_mimic", "book_mimic", 450, 0, A_WALL, FL_LIGHT | IN, 1); Loose(); Cap(1);
+        // the pantry: shelves of jars and bottles, a keg, barrels, more crates of food
+        D("dg_shelves", "shelves", 900, 0, A_WALL, FL_SOLID | FL_HEAVY | FL_SEEINTO, 1); Col(C_SHELF); Clear(1); SlotsShelves(3, I_FOOD | I_KITCHENWARE | I_STORE, 650, true); Kind(K_STORE);
+        D("dg_keg", "keg", 400, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 1); Cap(1);
+        D("dg_barrel", "barrel_small", 600, 0, A_WALL, FL_SOLID | BOTH, 0); Jit(3, 30);
+        D("dg_bottleA", "bottle_A_green", 400, I_FOOD, A_SLOT_ONLY, BOTH, 0);
+        D("dg_bottleB", "bottle_B_brown", 400, I_FOOD, A_SLOT_ONLY, BOTH, 0);
+        D("r_jarB", "jar_B_medium", 400, I_KITCHENWARE | I_FOOD, A_SLOT_ONLY, BOTH, 0);
+        D("r_jarC", "jar_C_small", 400, I_KITCHENWARE | I_FOOD, A_SLOT_ONLY, BOTH, 0);
+        D("r_jarD", "jar_D_large", 400, I_KITCHENWARE | I_FOOD, A_SLOT_ONLY, BOTH, 0);
+        D("mb_pickles", "pickle_jar", 500, I_FOOD, A_SLOT_ONLY, BOTH, 0);
+        D("r_crateBuns", "crate_buns", 350, I_CRATE, A_WALL, BOTH, 0); Loose();
+        D("r_crateOnions", "crate_onions", 350, I_CRATE, A_WALL, BOTH, 0); Loose();
+        D("r_crateHam", "crate_ham", 350, I_CRATE, A_WALL, BOTH, 0); Loose();
+        // the playroom: soft-play dice and board-game pieces (Board Game Bits at x0.5 to x0.6), toy cars (Toy Car Kit
+        // at x0.7), a wooden train, footstools, a round carpet, balls (Holiday Bits)
+        string[] bg = { "bg_diceA", "D6_A_red", "600", "bg_diceB", "D6_B_blue", "600", "bg_d20", "D20_yellow", "500", "bg_pawn", "pawn_B_green", "500",
+            "bg_meeple", "meeple_red", "500", "bg_house", "building_blue", "500", "bg_hourglass", "hourglass", "300",
+            "tc_monster", "vehicle-monster-truck", "700", "tc_racer", "vehicle-racer", "700", "tc_truck", "vehicle-truck", "700", "tc_suv", "vehicle-suv", "700",
+            "hb_train", "train_locomotive", "1000", "hb_tender", "train_tender_coal", "1000" };
+        for (int k = 0; k < bg.Length; k += 3) { D(bg[k], bg[k + 1], int.Parse(bg[k + 2]), I_TOY, A_ANY, FL_LIGHT | BOTH, 1); Jit(8, 60); Loose(); }
+        D("hb_footstoolG", "footstool_green", 700, 0, A_ANY, FL_LIGHT | BOTH, 1); Col(C_SEAT); Jit(6, 30);
+        D("hb_footstoolR", "footstool_red", 700, 0, A_ANY, FL_LIGHT | BOTH, 1); Col(C_SEAT); Jit(6, 30);
+        D("hb_stool", "stool", 600, I_STOOL, A_WALL, FL_LIGHT | BOTH, 0); Col(C_SEAT); Loose(); Cap(2);
+        D("hb_carpet", "carpet_round_large", 700, I_RUG, A_CENTER, FL_FLAT | IN, 1); Fp(4, 4);
+        D("hb_basketball", "basketball", 340, I_TOY, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Jit(10, 180);
+        D("hb_football", "football", 420, I_TOY, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Jit(10, 180);
+        // the shop's machines by the door and the toy shop's stock (Mini Arcade at x2, the Mini Shop's scale)
+        D("ma_claw", "claw-machine", 2000, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Cap(1);
+        D("ma_vending", "vending-machine", 2000, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Cap(1);
+        D("ma_arcade", "arcade-machine", 2000, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 2); Clear(1); Cap(1);
+        // the park, more of it: a square fountain, a curved hedge, two statues, the pond's beaver, skate pieces
+        D("f_fountainSq", "fountain-square-detail", 1300, 0, A_CENTER, FL_SOLID | FL_HEAVY | FL_FIXTURE, 1); Cap(1); Jit(0, 0);
+        D("f_hedgeCurve", "hedge-large-curved", 1800, 0, A_OUT_EDGE, FL_SOLID | OUT, 0); Kind(K_PLANT); Jit(2, 2); Cap(2);
+        D("n_statueBlock", "statue_block", 2000, 0, A_OUT_OPEN, FL_SOLID | FL_HEAVY, 1); Cap(1); Jit(2, 10);
+        D("n_columnBroken", "statue_columnDamaged", 2000, 0, A_OUT_OPEN, FL_SOLID | FL_HEAVY, 1); Cap(1); Jit(2, 10);
+        D("p_beaver", "animal-beaver", 400, 0, A_OUT_OPEN, FL_LIGHT | OUT, 2); Jit(10, 180); Cap(1);
+        string[] sk2 = { "sk_grind", "obstacle-box-grind", "sk_railLow", "rail-low", "sk_platform", "structure-wood-platform" };
+        for (int k = 0; k < sk2.Length; k += 2) { D(sk2[k], sk2[k + 1], 2000, 0, A_CENTER, FL_SOLID | OUT, 1); Cap(1); Jit(0, 0); }
+        D("sk_pallet", "pallet", 2000, 0, A_OUT_EDGE, FL_SOLID | OUT, 0); Cap(2);
         D("f_hedge", "hedge-large", 1800, 0, A_OUT_EDGE, FL_SOLID | OUT, 0); Kind(K_PLANT); Jit(2, 2);
 
         BuildThemes();
         BuildGroups();
         BuildRanges();
+        BuildTwins();
         BuildTables();
+    }
+
+    // ---------------------------------------------------------------- revision 11: the KayKit-furnished house
+    // A house is furnished from one of two families (MapGen.KayHouse): the Kenney Furniture Kit (as before) or KayKit
+    // (Furniture Bits, Restaurant Bits' kitchen, Holiday Bits' big armchair). The plans name the Kenney pieces; in a
+    // KayKit house each is replaced by its twin here before it is placed. The bathroom has no KayKit set and stays.
+    static void Twin(string a, string b) { defTwin[FindDef(a)] = FindDef(b); }
+
+    static void BuildTwins()
+    {
+        Twin("k_sofa", "q_couchPillows"); Twin("k_designSofa", "q_couch"); Twin("k_loungeChair", "q_armchairPillows"); Twin("k_designChair", "q_armchair");
+        Twin("k_recliner", "hb_armchairRed"); Twin("k_tableCoffee", "q_tableLow"); Twin("k_table", "q_tableLong");
+        Twin("k_chair", "q_chairB"); Twin("k_chairCushion", "q_chairC"); Twin("k_bedDouble", "q_bedDouble"); Twin("k_bedSingle", "q_bedSingleB");
+        Twin("k_bookcase", "q_cabinetDeco"); Twin("k_bookcaseLow", "q_cabinetSmallDeco"); Twin("k_lampFloor", "q_lampStanding"); Twin("k_lampTable", "q_lampTable");
+        Twin("k_rug", "q_rugOval"); Twin("k_rugLong", "q_rugStripes"); Twin("k_sideTable", "q_sideTable"); Twin("k_bedside", "q_bedside");
+        Twin("k_plant", "q_cactusB"); Twin("k_plantSmall", "q_cactusSmallB"); Twin("k_books", "q_bookSingle"); Twin("k_pillow", "q_pillowB");
+        Twin("k_fridge", "r_fridge"); Twin("k_stove", "r_stove"); Twin("k_sink", "r_counterSink"); Twin("k_counter", "r_counter"); Twin("k_counterDrawer", "r_counter");
+        Twin("k_stool", "q_stoolWood");
     }
 
     // ---------------------------------------------------------------- room themes of the items that sit on furniture
     static void BuildThemes()
     {
-        ThOf("k_tv", TH_LIVING | TH_BED | TH_KIDS | TH_OFFICE); ThOf("k_tvVintage", TH_LIVING | TH_BED | TH_KIDS);
-        ThOf("k_screen", TH_OFFICE | TH_BED | TH_KIDS); ThOf("k_laptop", TH_LIVING | TH_OFFICE | TH_BED | TH_KIDS);
+        ThOf("k_tv", TH_LIVING | TH_BED | TH_KIDS | TH_OFFICE | TH_TEEN | TH_PLAY); ThOf("k_tvVintage", TH_LIVING | TH_BED | TH_KIDS);
+        ThOf("k_screen", TH_OFFICE | TH_BED | TH_KIDS | TH_TEEN); ThOf("k_laptop", TH_LIVING | TH_OFFICE | TH_BED | TH_KIDS | TH_TEEN);
+        // revision 11
+        ThOf("mb_gamerChairA", TH_TEEN); ThOf("mb_gamerChairB", TH_TEEN); ThOf("mb_headphonesA", TH_TEEN); ThOf("mb_headphonesC", TH_TEEN);
+        ThOf("mb_console", TH_TEEN | TH_KIDS | TH_PLAY | TH_LIVING); ThOf("mb_puzzle", TH_PLAY | TH_TEEN | TH_KIDS | TH_OFFICE | TH_ATTIC);
+        ThOf("mb_bottle", TH_TEEN | TH_OFFICE | TH_BED); ThOf("mb_camera", TH_TEEN | TH_LIVING | TH_ATTIC);
+        ThOf("dg_bottleA", TH_PANTRY | TH_KITCHEN | TH_ATTIC); ThOf("dg_bottleB", TH_PANTRY | TH_KITCHEN);
+        ThOf("r_jarB", TH_PANTRY | TH_KITCHEN | TH_PRO_KITCHEN); ThOf("r_jarC", TH_PANTRY | TH_KITCHEN); ThOf("r_jarD", TH_PANTRY | TH_KITCHEN | TH_PRO_KITCHEN);
+        ThOf("mb_pickles", TH_PANTRY | TH_KITCHEN); ThOf("q_frameMedium", TH_HOME); ThOf("q_cactusSmallB", TH_HOME); ThOf("q_bookSingle", TH_HOME);
+        ThOf("q_pillowB", TH_LIVING | TH_BED | TH_KIDS | TH_TEEN | TH_HALL);
         ThOf("k_lampTable", TH_HOME); ThOf("q_lampTable", TH_HOME);
         ThOf("k_books", TH_HOME); ThOf("q_books", TH_HOME); ThOf("q_frame", TH_HOME);
         ThOf("k_radio", TH_LIVING | TH_BED | TH_KITCHEN | TH_OFFICE | TH_STORE);
         ThOf("k_toaster", TH_KITCHEN); ThOf("k_microwave", TH_KITCHEN | TH_PRO_KITCHEN); ThOf("k_coffeeMachine", TH_KITCHEN | TH_OFFICE | TH_PRO_KITCHEN);
-        ThOf("k_pillow", TH_LIVING | TH_BED | TH_KIDS | TH_HALL | TH_DINER); ThOf("q_pillow", TH_LIVING | TH_BED | TH_KIDS | TH_HALL | TH_DINER);
+        ThOf("k_pillow", TH_LIVING | TH_BED | TH_KIDS | TH_TEEN | TH_HALL | TH_DINER); ThOf("q_pillow", TH_LIVING | TH_BED | TH_KIDS | TH_TEEN | TH_HALL | TH_DINER);
         ThOf("setting_basic", TH_DINING | TH_KITCHEN | TH_PATIO | TH_DINER); ThOf("setting_food", TH_DINER | TH_KITCHEN | TH_PATIO);
         ThOf("condiments", TH_DINER | TH_PATIO | TH_KITCHEN);
         ThOf("f_plate", TH_DINING | TH_KITCHEN | TH_PATIO | TH_LIVING); ThOf("f_apple", TH_KITCHEN | TH_DINING | TH_LIVING | TH_PANTRY);
@@ -1099,7 +1240,7 @@ public static class GenData
     {
         //  id           layout      where        members  gap   the kinds to choose from
         Grp("buckets", GL_ROW, A_WALL, 2, 3, 60, "s_bucket", "t_bucketMetal", "m_bucketWood", "m_bucketWater"); GrpBeside(K_WORK | K_WET | K_TENT | K_STORE);
-        Grp("crates", GL_ROW, A_WALL, 2, 3, 50, "r_crate", "r_crateTomatoes", "r_crateCheese", "r_crateCarrots", "r_crateLettuce", "r_cratePotatoes"); GrpBeside(K_STORE | K_COUNTER);
+        Grp("crates", GL_ROW, A_WALL, 2, 3, 50, "r_crate", "r_crateTomatoes", "r_crateCheese", "r_crateCarrots", "r_crateLettuce", "r_cratePotatoes", "r_crateBuns", "r_crateOnions", "r_crateHam"); GrpBeside(K_STORE | K_COUNTER);
         Grp("boxes", GL_ROW, A_WALL, 2, 3, 50, "w_boxA", "w_boxB", "w_boxC", "s_box", "s_boxOpen"); GrpBeside(K_STORE | K_WORK);
         Grp("cardboard", GL_ROW, A_WALL, 2, 3, 40, "k_boxClosed", "k_boxOpen", "w_boxB");
         Grp("barrels", GL_ROW, A_WALL, 2, 4, 60, "w_barrel", "w_barrelB", "w_barrelC", "s_barrel", "s_barrelOpen");
@@ -1147,6 +1288,16 @@ public static class GenData
         Grp("ducks", GL_CLUSTER, A_OUT_OPEN, 2, 4, 260, "p_duck");
         Grp("lilies", GL_CLUSTER, A_OUT_OPEN, 3, 5, 200, "n_lily", "n_lilySmall");
         Grp("shrubs", GL_ROW, A_OUT_EDGE, 2, 3, 120, "n_bushSmall", "n_bushTriangle", "n_bush");
+        // revision 11
+        Grp("plush", GL_CLUSTER, A_CENTER, 2, 3, 90, "mb_plushA", "mb_plushB", "toy_cat", "toy_dog", "toy_bunny", "toy_panda"); GrpBeside(K_BED | K_SEAT);
+        Grp("boardToys", GL_CLUSTER, A_CENTER, 2, 4, 120, "bg_diceA", "bg_diceB", "bg_d20", "bg_pawn", "bg_meeple", "bg_house", "bg_hourglass");
+        Grp("toyCars", GL_CLUSTER, A_CENTER, 2, 3, 140, "tc_monster", "tc_racer", "tc_truck", "tc_suv");
+        Grp("comics", GL_ROW, A_WALL, 2, 3, 60, "mb_comics", "mb_comicBox", "mb_comicBoxFull");
+        Grp("trunks", GL_ROW, A_WALL, 2, 3, 80, "dg_trunkL", "dg_trunkM", "dg_trunkS", "dg_chest");
+        Grp("oldBoxes", GL_ROW, A_WALL, 2, 3, 40, "dg_boxL", "dg_boxS", "k_boxClosed", "k_boxOpen");
+        Grp("frames", GL_ROW, A_WALL, 2, 3, 60, "mb_frameA", "mb_frameB", "mb_frameC", "q_frameLA", "q_frameLB");
+        Grp("balls", GL_CLUSTER, A_WALL, 2, 3, 80, "hb_basketball", "hb_football");
+        Grp("kegs", GL_ROW, A_WALL, 2, 3, 60, "dg_barrel", "dg_keg");
         // the kinds of a group stand in for each other: a hider's metal bucket fits any row of buckets (bots use this)
         int bk = FindGrp("buckets");
         defKin[FindDef("gen_wateringCan")] = bk;
@@ -1193,23 +1344,28 @@ public static class GenData
         rangeFloorAbs[R_LAWN_OPEN] = 5; rangeFloorAbs[R_GARDEN] = 8; rangeFloorAbs[R_PATIO] = 7; rangeFloorAbs[R_FIREPIT] = 7;
         rangeFloorAbs[R_FOREST_DENSE] = 6; rangeFloorAbs[R_FOREST_CLEARING] = 8; rangeFloorAbs[R_LANE] = 4; rangeFloorAbs[R_YARD] = 6;
         // revision 9
-        Range(R_SHOP_FLOOR,        34,   48,       14,             55);
-        Range(R_STOCKROOM,         38,   54,       30,             50);
-        Range(R_BACK_OFFICE,       32,   46,       30,             50);
+        Range(R_SHOP_FLOOR,        42,   58,       18,             58);   // revision 10: 34 to 48
+        Range(R_STOCKROOM,         44,   60,       36,             55);   // revision 10: 38 to 54
+        Range(R_BACK_OFFICE,       38,   52,       34,             55);   // revision 10: 32 to 46
         Range(R_GARAGE_BAY,        22,   34,       20,             55);
         Range(R_PARTS,             38,   54,       36,             50);
-        Range(R_BARN,              20,   32,        8,             50);
+        Range(R_BARN,              28,   40,       10,             52);   // revision 10: 20 to 32
         Range(R_FEED_STORE,        44,   60,       14,             55);   // revision 9: 36 to 52
         Range(R_FORECOURT,         14,   24,        4,             36);
-        Range(R_FARMYARD,          20,   30,        6,             40,      0,  1,    0,  0);   // revision 9: 14 to 24
+        Range(R_FARMYARD,          26,   36,        6,             40,      0,  1,    0,  0);   // revision 9: 14 to 24
         Range(R_FIELD,             30,   50,        0,             45);
-        Range(R_PADDOCK,           18,   28,        2,             36,      0,  1,    0,  0);   // revision 9: 10 to 18
-        Range(R_PARK,              28,   38,        8,             45,      1,  3,    0,  0);   // revision 9: 10 to 18
+        Range(R_PADDOCK,           24,   34,        2,             36,      0,  1,    0,  0);   // revision 9: 10 to 18
+        Range(R_PARK,              36,   48,        8,             48,      1,  3,    0,  0);   // revision 9: 10 to 18
         // revision 10
         Range(R_FARM_WORK,         38,   54,       30,             50);
-        Range(R_PLAYGROUND,        30,   42,        2,             55);
-        Range(R_POND,              30,   42,        2,             45,      0,  1,    0,  0);
-        Range(R_TERRACE,           34,   48,       30,             55);
+        Range(R_PLAYGROUND,        38,   50,        2,             58);   // revision 10: 30 to 42
+        Range(R_POND,              38,   50,        2,             48,      0,  1,    0,  0);
+        Range(R_TERRACE,           40,   54,       34,             58);   // revision 10: 34 to 48
+        // revision 11
+        Range(R_TEEN,              36,   50,       30,             55);
+        Range(R_PLAYROOM,          42,   58,       20,             55);
+        Range(R_BOXROOM,           44,   60,       20,             55);
+        Range(R_PANTRY,            40,   56,       44,             50);
         rangeFloorAbs[R_FARM_WORK] = 6; rangeFloorAbs[R_PLAYGROUND] = 6; rangeFloorAbs[R_POND] = 6; rangeFloorAbs[R_TERRACE] = 7;
         rangeFloorAbs[R_FORECOURT] = 6; rangeFloorAbs[R_FARMYARD] = 6; rangeFloorAbs[R_FIELD] = 10; rangeFloorAbs[R_PADDOCK] = 6; rangeFloorAbs[R_PARK] = 7;
     }
@@ -1235,9 +1391,10 @@ public static class GenData
                 int d = FindDef(ids[i]);
                 entryDef[e] = d; entryGrp[e] = -1;
                 tableEntryCount[nTables - 1]++;
-                // a tree's seasonal twins belong wherever the tree does
+                // a tree's seasonal twins belong wherever the tree does, and a piece's KayKit twin wherever the piece does
                 for (int s = 1; s < 3; s++)
                     if (defSeason[d * 3 + s] >= 0) { e = nEntries++; entryDef[e] = defSeason[d * 3 + s]; entryGrp[e] = -1; tableEntryCount[nTables - 1]++; }
+                if (defTwin[d] >= 0) { e = nEntries++; entryDef[e] = defTwin[d]; entryGrp[e] = -1; tableEntryCount[nTables - 1]++; }
             }
         }
     }
@@ -1256,6 +1413,14 @@ public static class GenData
         Native(Z_HOUSE, R_OFFICE, "k_desk", "k_bookcase", "q_cabinet", "k_bookcaseLow", "k_plant", "k_lampFloor", "k_sideTable", "q_armchair", "k_trashcan", "@cardboard", "q_tableSmall");
         Native(Z_HOUSE, R_KIDS, "k_bedSingle", "q_bed", "k_bookcaseLow", "k_desk", "gen_wardrobe", "k_rug", "k_bedside", "k_plant", "@toys", "k_boxOpen", "s_chest");
         Native(Z_HOUSE, R_HALL, "k_bench", "k_benchCushion", "k_coatRack", "gen_wardrobe", "k_plant", "q_cabinetSmall", "k_sideTable", "k_lampFloor", "@cardboard", "k_doormat", "gen_shoes");
+        // revision 11
+        Native(Z_HOUSE, R_TEEN, "k_bedSingle", "q_bed", "k_bedside", "k_desk", "gen_wardrobe", "k_bookcaseLow", "k_rug", "q_rug", "k_lampFloor", "k_speaker", "k_tvCabinet",
+            "mb_guitarA", "mb_guitarB", "mb_guitarCase", "@comics", "mb_skates", "mb_helmet", "sk_board", "@balls", "hb_armchairBlue", "k_loungeChair", "@plush", "k_plant", "k_trashcan");
+        Native(Z_HOUSE, R_PLAYROOM, "hb_carpet", "k_rug", "@boardToys", "@toyCars", "hb_train", "hb_tender", "@plush", "@toys", "hb_footstoolG", "hb_footstoolR", "hb_stool",
+            "@balls", "k_bookcaseLow", "s_chest", "k_boxOpen", "hb_armchairBlue", "q_table", "k_plant", "mb_skates", "k_lampFloor");
+        Native(Z_HOUSE, R_BOXROOM, "@trunks", "@oldBoxes", "@frames", "mb_mirror", "mb_sled", "mb_guitarCase", "mb_mimic", "mb_skates", "mb_helmet", "gen_wardrobe", "q_cabinet",
+            "k_lampFloor", "q_lampStanding", "s_chest", "@cardboard", "@comics", "q_armchair", "k_bookcaseLow", "hb_stool", "@balls");
+        Native(Z_HOUSE, R_PANTRY, "dg_shelves", "gen_rackPantry", "@crates", "@sacks", "@kegs", "ms_freezer", "k_fridge", "k_counter", "@cardboard", "k_trashcan", "@cleaning", "hb_stool");
 
         Native(Z_WAREHOUSE, R_STORAGE, "gen_rack", "w_pallet", "w_palletLoaded", "@crates", "@barrels", "@fuel", "@boxes", "w_planks", "w_logs", "w_textiles", "w_bricks", "w_ironStack",
             "w_parts", "s_boxLarge", "s_boxLargeOpen", "s_workbench", "@buckets", "@tools", "@cleaning", "ms_handTruck", "@sacks", "q_stool", "r_stool");
@@ -1290,8 +1455,10 @@ public static class GenData
         // revision 9: the shop, the garage, the farm, the park
         Native(Z_SHOP, R_SHOP_FLOOR, "ms_shelfBoxes", "ms_shelfBags", "ms_shelfEnd", "ms_freezers", "ms_freezer", "ms_dispBread", "ms_dispCans", "ms_dispFruit", "ms_dispSmall",
             "ms_checkout", "ms_clothesRack", "ms_clothesTable", "ms_cart", "@baskets", "ms_bottleReturn", "ms_gacha", "ms_mannequin", "k_plant", "k_trashcan", "k_doormat", "@crates",
-            "ms_dispFlowers", "@pots", "n_planter", "@watering", "@sacks", "ms_handTruck", "m_wheelbarrow");
+            "ms_dispFlowers", "@pots", "n_planter", "@watering", "@sacks", "ms_handTruck", "m_wheelbarrow",
+            "ma_claw", "ma_vending", "ma_arcade", "@plush", "@balls", "@toyCars", "@boardToys", "@toys", "hb_train", "hb_tender", "hb_stool");
         Native(Z_SHOP, R_STOCKROOM, "gen_rack", "gen_rackPantry", "w_pallet", "w_palletLoaded", "@crates", "@boxes", "@cardboard", "ms_handTruck", "s_boxLarge", "@sacks",
+            "dg_shelves", "@oldBoxes", "@kegs", "hb_stool", "ma_vending", "ms_freezers", "dg_trunkL",
             "@cleaning", "ms_dispCans", "ms_cart", "ms_freezer", "k_trashcan");
         string[] office = { "k_desk", "q_cabinet", "k_bookcase", "k_bookcaseLow", "k_trashcan", "k_plant", "s_workbench", "q_tableSmall", "k_lampFloor", "@cardboard", "r_tableRound" };
         Native(Z_SHOP, R_BACK_OFFICE, office);
@@ -1303,9 +1470,9 @@ public static class GenData
             "w_planks", "w_logs", "n_logStack", "p_dog", "p_cat", "s_workbench", "gen_rack", "@crates", "@fuel",
             "p_hog", "gen_trough", "@handtools", "g_lantern", "c_tractorWheel");
         Native(Z_BARN, R_FEED_STORE, "@sacks", "@hay", "@barrels", "@buckets", "@crates", "@tools", "w_pallet", "gen_rack", "m_wheelbarrow", "p_cat", "@fuel",
-            "@smallTools", "@handtools", "@boxes", "gen_trough");
+            "@smallTools", "@handtools", "@boxes", "gen_trough", "dg_barrel");
         Native(Z_LAWN, R_FORECOURT, "c_sedan", "c_suv", "c_van", "c_truck", "c_hatch", "c_taxi", "c_sports", "c_luxury", "c_police", "c_flatbed", "c_cone", "@tyres", "k_bench", "k_trashcan", "ms_dispFlowers", "ms_dispFruit",
-            "ms_cart", "ms_bottleReturn", "@pots", "n_pathStone", "n_sign", "@fuel", "gen_dumpster");
+            "ms_cart", "ms_bottleReturn", "@pots", "n_pathStone", "n_sign", "@fuel", "gen_dumpster", "ma_vending", "ma_claw", "c_bumper", "c_wheel");
         Native(Z_LAWN, R_FARMYARD, "f_cart", "f_cartHigh", "c_tractor", "@hay", "m_wheelbarrow", "@buckets", "@sacks", "@tools", "@hens", "n_logStack", "@barrels", "gen_tap",
             "n_sign", "n_treeFat", "n_treeOak", "n_pathStone", "@crates", "k_bench", "p_dog", "@logpile", "w_pallet", "@watering",
             "gen_coop", "gen_trough", "c_digger", "c_tractorWheel", "f_stallGreen", "f_stallRed", "f_stallBench", "f_stallStool", "@rabbits", "p_hog");
@@ -1314,17 +1481,19 @@ public static class GenData
         Native(Z_LAWN, R_PADDOCK, "p_cow", "p_pig", "@hens", "@hay", "@buckets", "n_treeFat", "n_treeOak", "n_bush", "@rocks", "n_bushLarge", "p_dog", "n_logStack",
             "p_hog", "@rabbits", "gen_coop", "gen_trough", "n_stump", "f_cart", "m_wheelbarrow", "@sacks");
         Native(Z_BARN, R_FARM_WORK, "s_workbench", "g_anvil", "g_grindstone", "@handtools", "@smallTools", "@tools", "@tyres", "c_tractorWheel", "f_wheel", "@fuel",
-            "@barrels", "gen_rack", "@boxes", "w_planks", "w_logs", "ms_handTruck", "@cleaning", "@buckets", "p_cat");
+            "@barrels", "gen_rack", "@boxes", "w_planks", "w_logs", "ms_handTruck", "@cleaning", "@buckets", "p_cat", "dg_barrel");
         Native(Z_LAWN, R_PLAYGROUND, "sk_halfPipe", "sk_halfPipeLow", "sk_ramp", "sk_rampRail", "sk_rail", "sk_box", "sk_steps", "sk_benches", "sk_scooter", "sk_board",
+            "sk_grind", "sk_railLow", "sk_platform", "sk_pallet",
             "ck_bench", "ck_trash", "f_lamp", "n_bush", "@shrubs", "k_bench", "c_cone", "ck_drinks", "@pots", "@flowersRed", "@flowersYellow", "@flowersPurple");
         Native(Z_LAWN, R_POND, "@lilies", "@ducks", "n_footbridge", "n_canoe", "@rocks", "n_rockLarge", "n_rockTall", "@shrubs", "n_bushLarge", "n_grassLarge",
-            "n_treeFat", "n_treeOak", "k_bench", "ck_bench", "f_lamp", "n_logLarge", "n_stump", "@mushrooms", "@flowersRed", "@flowersYellow", "@flowersPurple", "ck_trash", "n_bushDetailed");
+            "n_treeFat", "n_treeOak", "k_bench", "ck_bench", "f_lamp", "n_logLarge", "n_stump", "p_beaver", "n_log", "@mushrooms", "@flowersRed", "@flowersYellow", "@flowersPurple", "ck_trash", "n_bushDetailed");
         Native(Z_LAWN, R_TERRACE, "ck_food", "ck_drinks", "ck_info", "ck_toilets", "f_stallGreen", "f_stallRed", "f_stallBench", "f_stallStool", "r_tableRound", "r_chair",
-            "k_chair", "ck_bench", "ck_trash", "ck_flowers", "@pots", "f_lamp", "k_plant", "ms_dispFruit");
+            "k_chair", "ck_bench", "ck_trash", "ck_flowers", "@pots", "f_lamp", "k_plant", "ms_dispFruit", "ma_vending", "ma_claw", "@crates");
         Native(Z_LAWN, R_PARK, "f_fountain", "f_lamp", "k_bench", "k_benchCushion", "k_trashcan", "n_statueHead", "n_obelisk", "n_column", "n_statueRing", "n_planter",
             "r_chair", "k_chair", "n_treeFat", "n_treeOak", "n_bush", "n_bushLarge", "n_bushDetailed", "@flowersRed",
             "@flowersYellow", "@flowersPurple", "@pots", "n_pathStone", "r_tableRound", "@rocks",
-            "@shrubs", "ck_bench", "ck_trash", "ck_flowers", "f_hedge", "ck_info", "r_table", "k_chair");
+            "@shrubs", "ck_bench", "ck_trash", "ck_flowers", "f_hedge", "ck_info", "r_table", "k_chair", "f_fountainSq", "f_hedgeCurve", "n_statueBlock", "n_columnBroken",
+            "p_dog", "ma_vending");
 
         Table(Z_RELEASE, R_RELEASE);
     }

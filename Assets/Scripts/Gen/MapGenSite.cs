@@ -283,6 +283,18 @@ public partial class MapGen
         int bi = NewInst(zone), yi = NewInst(GenData.Z_LAWN);
         plotInstB[k] = bi; plotInstY[k] = yi;
         for (int r = 0; r < PlRooms(p); r++) { siteType[bi * 26 + r] = PlRole(p, r); sitePlace[bi * 26 + r] = PL_BUILDING; }
+        if (zone == GenData.Z_HOUSE)
+        {
+            // revision 11: a kids' room is a kids' room, a playroom or a teen's room; a second bedroom is now and then
+            // a teen's room or the box room (the first bedroom stays, so a house always has one)
+            int beds = 0;
+            for (int r = 0; r < PlRooms(p); r++)
+            {
+                int t = PlRole(p, r), roll = rng.Range(1000);
+                if (t == GenData.R_KIDS) siteType[bi * 26 + r] = roll < 350 ? GenData.R_KIDS : (roll < 700 ? GenData.R_PLAYROOM : GenData.R_TEEN);
+                else if (t == GenData.R_BEDROOM && beds++ > 0) siteType[bi * 26 + r] = roll < 220 ? GenData.R_TEEN : (roll < 440 ? GenData.R_BOXROOM : GenData.R_BEDROOM);
+            }
+        }
         int w = PlW(p), d = PlD(p);
         for (int u = 0; u < plotAlong[k]; u++)
             for (int v = 0; v < plotDepth[k]; v++)
@@ -703,6 +715,7 @@ public partial class MapGen
             else if (rt == GenData.R_GARAGE_BAY) chance = 0;
             else if (rt == GenData.R_STOCKROOM || rt == GenData.R_PARTS || rt == GenData.R_FEED_STORE) chance = 150;
             else if (rt == GenData.R_FARM_WORK) chance = 450;
+            else if (rt == GenData.R_PANTRY || rt == GenData.R_BOXROOM) chance = 150;   // revision 11
             else if (rt == GenData.R_BARN) chance = 250;
             for (int d = 0; d < 4; d++)
             {
@@ -714,7 +727,8 @@ public partial class MapGen
         {
             int rt = roomType[r];
             bool habitable = rt == GenData.R_LIVING || rt == GenData.R_DINING || rt == GenData.R_KITCHEN || rt == GenData.R_BEDROOM || rt == GenData.R_OFFICE
-                || rt == GenData.R_KIDS || rt == GenData.R_DINER_DINING || rt == GenData.R_WH_OFFICE || rt == GenData.R_SHOP_FLOOR || rt == GenData.R_BACK_OFFICE;
+                || rt == GenData.R_KIDS || rt == GenData.R_DINER_DINING || rt == GenData.R_WH_OFFICE || rt == GenData.R_SHOP_FLOOR || rt == GenData.R_BACK_OFFICE
+                || rt == GenData.R_TEEN || rt == GenData.R_PLAYROOM;
             if (!habitable) continue;
             int wall = -1, seen = 0;
             bool has = false;

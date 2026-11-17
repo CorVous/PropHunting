@@ -8,7 +8,8 @@
 //       to the lane without crossing a fence or a building
 //   T5  every house has a living room, a kitchen, a bedroom and a bathroom
 //   T6  doors inside a house only join rooms that may connect; a private room (bedroom, bathroom, office, kids'
-//       room) has one door, to the hall or the living room
+//       room, and since revision 11 the teen room, playroom and box room) has one door, to the hall or the living
+//       room; a pantry has one door, to the kitchen
 //   T7  no outside door into a private room
 //   T8  every outer cell can be reached from the hunter release
 //   T9  a house's back door opens onto its patio
@@ -27,7 +28,11 @@ public partial class MapGen
 
     int[] stMark;
 
-    static bool Private(int rt) { return rt == GenData.R_BEDROOM || rt == GenData.R_BATH || rt == GenData.R_OFFICE || rt == GenData.R_KIDS; }
+    static bool Private(int rt)
+    {
+        return rt == GenData.R_BEDROOM || rt == GenData.R_BATH || rt == GenData.R_OFFICE || rt == GenData.R_KIDS
+            || rt == GenData.R_TEEN || rt == GenData.R_PLAYROOM || rt == GenData.R_BOXROOM;   // revision 11
+    }
     static bool PublicRoom(int rt) { return rt == GenData.R_HALL || rt == GenData.R_LIVING || rt == GenData.R_DINING || rt == GenData.R_KITCHEN; }
 
     bool ValidateSite()
@@ -97,13 +102,14 @@ public partial class MapGen
                         {
                             bool ok = (PublicRoom(rt) && PublicRoom(nt))
                                 || (Private(rt) && (nt == GenData.R_HALL || nt == GenData.R_LIVING))
-                                || (Private(nt) && (rt == GenData.R_HALL || rt == GenData.R_LIVING));
+                                || (Private(nt) && (rt == GenData.R_HALL || rt == GenData.R_LIVING))
+                                || (rt == GenData.R_PANTRY && nt == GenData.R_KITCHEN) || (nt == GenData.R_PANTRY && rt == GenData.R_KITCHEN);
                             if (!ok) fail |= 1 << 5;
                         }
                         continue;
                     }
                     // an outside door
-                    if (zone == GenData.Z_HOUSE && Private(rt)) fail |= 1 << 6;
+                    if (zone == GenData.Z_HOUSE && (Private(rt) || rt == GenData.R_PANTRY)) fail |= 1 << 6;
                     if (cellPlot[n] == k && nt == GenData.R_PATIO) patio = true;
                     if (rt == GenData.R_LOADING) dockDoor = true;
                     if (rt == GenData.R_STOCKROOM) stockDoor = true;
@@ -123,7 +129,7 @@ public partial class MapGen
                 if (!patio) fail |= 1 << 8;
                 // T6: one door for every private room
                 for (int r = 0; r < nRooms; r++)
-                    if (roomInst[r] == bi && Private(roomType[r]) && InteriorDoors(r) != 1) fail |= 1 << 5;
+                    if (roomInst[r] == bi && (Private(roomType[r]) || roomType[r] == GenData.R_PANTRY) && InteriorDoors(r) != 1) fail |= 1 << 5;
             }
             else if (zone == GenData.Z_DINER) { if (frt != GenData.R_DINER_DINING || kitchenOnFront) fail |= 1 << 11; }
             else if (zone == GenData.Z_SHOP) { if (frt != GenData.R_SHOP_FLOOR || !stockDoor) fail |= 1 << 11; }
