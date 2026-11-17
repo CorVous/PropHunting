@@ -42,7 +42,7 @@ public partial class MapGen
         if (r10.Chance(550) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_rack"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r10) >= 0) Keep(first, false); }
         GenRng r11 = SR(11);
         if (r11.Chance(400) && Fit(1)) { first = nEmit; if (WallPlace(Pick(ref r11, "w_planks", 4, "w_logs", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" });
+        FillFromPool(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" });
     }
 
     // ============================================================================================ SKATE CORNER
@@ -100,7 +100,7 @@ public partial class MapGen
         // revision 11: a pallet and a plank left by the ramps (things the skaters build with)
         GenRng r11 = SR(11);
         if (r11.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("sk_pallet"), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "sk_benches", "ck_bench", "k_bench", "ck_trash", "c_cone", "f_lamp", "sk_pallet", "ck_drinks", "n_bush", "sk_railLow", "sk_grind" });
+        FillFromPool(50, new string[] { "sk_benches", "ck_bench", "k_bench", "ck_trash", "c_cone", "f_lamp", "sk_pallet", "ck_drinks", "n_bush", "sk_railLow", "sk_grind", "hk_benchShort", "hk_lantern", "n_planter" });
         ClearBans();
         Borders(30, 3, true);
     }
@@ -205,7 +205,7 @@ public partial class MapGen
         GenRng r15 = SR(15);
         if (r15.Chance(450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("n_log"), WM_ANY, 0, 0, WIN_ANY, 0, ref r15) >= 0) Keep(first, false); }
         FillFromPool(50, new string[] { "n_rockLarge", "n_rockTall", "n_logLarge", "n_bushLarge", "n_bushDetailed", "ck_bench", "k_bench", "f_lamp", "n_stump", "ck_trash",
-            "n_grassLarge", "n_log", "p_beaver" });
+            "n_grassLarge", "n_log", "p_beaver", "hk_bench", "n_paddle", "s_stoneL", "s_rockFlat" });
         ClearBans();
         Borders(40, 4, true);
     }
@@ -275,7 +275,7 @@ public partial class MapGen
             int first = nEmit;
             if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, r17.Range(4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
         }
-        FillFromPool(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter" });
+        FillFromPool(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" });
     }
 
     // revision 11: what an area's own steps could not place is made up from the rest of what belongs there, each kind

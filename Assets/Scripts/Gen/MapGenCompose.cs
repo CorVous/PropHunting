@@ -41,8 +41,8 @@ public partial class MapGen
     }
 
     // a piece the room cannot do without found no place
-    public int[] statTypeMandFail = new int[64];
-    void MandFail(int n) { statMandatoryFail += n; statTypeMandFail[roomType[pRoom] & 63] += n; }
+    public int[] statTypeMandFail = new int[128];
+    void MandFail(int n) { statMandatoryFail += n; statTypeMandFail[roomType[pRoom] & 127] += n; }
 
     // def lookup by id, remembered (in the VRChat world the ids are resolved when the tables are baked)
     string[] dnId = new string[400];
@@ -61,11 +61,12 @@ public partial class MapGen
     // plans name the Kenney pieces; in a KayKit house Dn and the slots give the twin instead.
     public bool KayHouse(int inst)
     {
-        return inst >= 0 && instZone[inst] == GenData.Z_HOUSE && GenRng.Hash32(seed, (uint)inst, 7717, 11, 0) % 1000 < 400;
+        return inst >= 0 && mapTheme == GenData.THEME_NONE && instZone[inst] == GenData.Z_HOUSE && GenRng.Hash32(seed, (uint)inst, 7717, 11, 0) % 1000 < 400;
     }
 
     int TwinIn(int room, int d)
     {
+        if (d >= 0 && mapTheme != GenData.THEME_NONE) { int t = GenData.defThemeTwin[d * 3 + mapTheme]; return t >= 0 ? t : d; }   // a themed map (revision 12)
         if (d < 0 || room < 0 || GenData.defTwin[d] < 0 || !KayHouse(roomInst[room])) return d;
         return GenData.defTwin[d];
     }

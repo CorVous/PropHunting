@@ -301,7 +301,7 @@ public partial class MapGen
         GenRng r = SR(1);
         int front = SideToward(room, GenData.R_FORECOURT);
         int yaw = front >= 0 ? DirYawSite(front) : 0;
-        string[] inRepair = { "c_sedan", "c_suv", "c_hatch", "c_sports", "c_luxury", "c_taxi" };
+        string[] inRepair = { "c_sedan", "c_suv", "c_hatch", "c_sports", "c_luxury", "c_taxi", "c_police", "c_ambulance" };   // revision 12: the police car and the ambulance
         int car = CentrePiece(Dn(inRepair[r.Range(inRepair.Length)]), yaw, false, 1, 0, WM_CENTRE, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, ref r);
         if (car < 0) car = CentrePiece(Dn("c_hatch"), yaw + 90, false, 0, 0, WM_ANY, 0, 0, 0, EF_MANDATORY, ref r);
         if (car < 0) MandFail(1);
@@ -336,7 +336,8 @@ public partial class MapGen
         }
         GenRng r10 = SR(10);
         if (r10.Chance(400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r10) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "s_workbench", "gen_rack", "ms_handTruck", "c_cone", "k_trashcan", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel" });
+        FillFromPool(50, new string[] { "gen_toolwall", "s_workbench", "gen_rack", "ms_handTruck", "c_cone", "k_trashcan", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
+            "c_spoiler", "c_axle", "c_wheelRacing" });
     }
 
     // a run of up to n racks along a wall (a, then b, a, ...), fewer if no wall is that long: kept, or false
@@ -374,7 +375,8 @@ public partial class MapGen
         }
         GenRng r7 = SR(7);
         if (r7.Chance(450) && Fit(1)) { first = nEmit; if (WallPlace(Pick(ref r7, "s_workbench", 4, "s_boxLarge", 4, "w_parts", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r7) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "gen_rack", "s_workbench", "w_parts", "s_boxLarge", "ms_handTruck", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel" });
+        FillFromPool(50, new string[] { "gen_toolwall", "gen_rack", "s_workbench", "w_parts", "s_boxLarge", "ms_handTruck", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
+            "c_spoiler", "c_axle", "c_wheelTruck" });
     }
 
     // ============================================================================================ BARN
@@ -514,7 +516,8 @@ public partial class MapGen
             {
                 GenRng rk = SR(1 + k);
                 int first = nEmit;
-                string[] waiting = { "c_sedan", "c_van", "c_truck", "c_taxi", "c_suv", "c_sports", "c_luxury", "c_police", "c_flatbed" };
+                string[] waiting = { "c_sedan", "c_van", "c_truck", "c_taxi", "c_suv", "c_sports", "c_luxury", "c_police", "c_flatbed", "c_ambulance", "c_delivery", "c_deliveryFlat",
+                    "c_binLorry", "c_firetruck" };
                 int car = Dn(waiting[rk.Range(waiting.Length)]);
                 if (WallPlace(car, WM_FAR, dx, dz, WIN_ANY, 0, ref rk) >= 0) Keep(first, false);
             }
@@ -795,6 +798,6 @@ public partial class MapGen
         ClearBans();
         Borders(30, 6, true);
         FillFromPool(50, new string[] { "ck_bench", "k_benchCushion", "n_planter", "ck_trash", "f_lamp", "n_bushDetailed", "n_bushLarge", "f_hedge", "ck_flowers", "n_statueBlock",
-            "n_obelisk", "n_column", "ck_info", "r_tableRound", "f_hedgeCurve" });
+            "n_obelisk", "n_column", "ck_info", "r_tableRound", "f_hedgeCurve", "hk_bench", "hk_lantern", "n_statueRing", "n_columnBroken" });
     }
 }

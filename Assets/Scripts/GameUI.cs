@@ -18,7 +18,7 @@ public class GameUI : MonoBehaviour
     static readonly string[] SizeNote =
     {
         "S: a house and a second plot on a lane, a wood; about 43 cells, 165 props at Normal density. For up to 8 players.",
-        "M: three plots (a house, then a mix of houses, a diner, warehouse, shop, garage, farm or park), about 75 cells, 275 props. For 9 to 16 players.",
+        "M: three plots (a house, then a mix of houses, a diner, warehouse, shop, garage, farm, park, zoo or log cabin), about 75 cells, 275 props. For 9 to 16 players.",
         "L: four plots, about 119 cells, 435 props. For 17 to 24 players.",
         "XL: five plots, about 154 cells, 570 props. For 25 to 32 players.",
     };
@@ -554,7 +554,7 @@ public class GameUI : MonoBehaviour
     {
         var gen = Game.I.map.gen;
         int rows = 0;
-        for (int t = 0; t < 64; t++) if (gen.statTypeRooms[t] > 0 && t != GenData.R_RELEASE) rows++;
+        for (int t = 0; t < gen.statTypeRooms.Length; t++) if (gen.statTypeRooms[t] > 0 && t != GenData.R_RELEASE) rows++;
         float[] col = { 8, 150, 200, 262, 372, 470, 580 };
         Rect r = new Rect(x, y, 700, 44 + rows * 17);
         GUI.Box(r, GUIContent.none, box);
@@ -563,7 +563,7 @@ public class GameUI : MonoBehaviour
         string[] head = { "Room type", "Rooms", "Area m2", "On the floor", "per 100 m2", "range per 100 m2", "On furniture (max)" };
         for (int c = 0; c < head.Length; c++) GUI.Label(new Rect(r.x + col[c], r.y + 21, 140, 20), "<color=#9fb4c8>" + head[c] + "</color>", small);
         float ry = r.y + 38;
-        for (int t = 0; t < 64; t++)
+        for (int t = 0; t < gen.statTypeRooms.Length; t++)
         {
             if (gen.statTypeRooms[t] == 0 || t == GenData.R_RELEASE) continue;
             int m2 = gen.statTypeCells[t] / 4;

@@ -15,6 +15,7 @@ public partial class MapGen
     // sits on furniture belongs to the room: no restaurant menu on a bedroom cabinet)
     static bool SlotTakes(int d, int accept, int sizeClass, int theme)
     {
+        if (GenData.defMapTheme[d] != 0) return false;   // revision 12: a themed map gets them as twins (TwinIn)
         if ((GenData.defTags[d] & accept) == 0 || GenData.defSizeClass[d] > sizeClass) return false;
         return GenData.defThemes[d] == 0 || (GenData.defThemes[d] & theme) != 0;
     }
@@ -87,7 +88,7 @@ public partial class MapGen
         int depth = emitDepth[host];
         if (depth > 2 || (emitFlags[host] & EF_REMOVED) != 0) return;
         int room = emitRoom[host];
-        int theme = GenData.RoomTheme(roomType[room]);
+        int theme = GenData.RoomTheme(roomType[room]) | (holiday == 1 ? GenData.TH_WINTER : (holiday == 2 ? GenData.TH_HALLOWEEN : 0));
         // the stream is the host's place among the room's hosts of its kind, not its emit index: the same table
         // gets the same chairs wherever a plan tries it
         int nth = 0;
@@ -288,13 +289,13 @@ public partial class MapGen
     // =====================================================================================================
     // Wrong-category spawns (04 section 4.3.5; Q13, Q14, D10)
     // =====================================================================================================
-    bool[] nativeIn;   // [def * 64 + table]: the def is in that room type's spawn table
+    bool[] nativeIn;   // [def * GenData.MAX_TABLES + table]: the def is in that room type's spawn table
     int[] nativeZones; // per def: bit per zone
 
     void BuildNative()
     {
         if (nativeIn != null) return;
-        nativeIn = new bool[GenData.nDefs * 64];
+        nativeIn = new bool[GenData.nDefs * GenData.MAX_TABLES];
         nativeZones = new int[GenData.nDefs];
         for (int t = 0; t < GenData.nTables; t++)
         {
@@ -306,7 +307,7 @@ public partial class MapGen
                 for (int m = 0; m < mc; m++)
                 {
                     int d = g < 0 ? GenData.entryDef[e] : GenData.grpMemberDef[ms + m];
-                    nativeIn[d * 64 + t] = true;
+                    nativeIn[d * GenData.MAX_TABLES + t] = true;
                     nativeZones[d] |= 1 << GenData.tableZone[t];
                 }
             }
@@ -318,7 +319,7 @@ public partial class MapGen
     {
         BuildNative();
         int table = GenData.FindTable(roomZone[room], roomType[room]);
-        return table >= 0 && nativeIn[def * 64 + table];
+        return table >= 0 && nativeIn[def * GenData.MAX_TABLES + table];
     }
 
     int LeakWeight(int d, int table, int zone, bool outdoor, bool comedic)
@@ -326,7 +327,7 @@ public partial class MapGen
         int w = GenData.defLeakWeight[d];
         if (w == 0) return 0;
         if (!Has(d, outdoor ? GenData.FL_LEAK_OUT : GenData.FL_LEAK_IN)) return 0;
-        if (table >= 0 && nativeIn[d * 64 + table]) return 0;                       // native here: not a leak
+        if (table >= 0 && nativeIn[d * GenData.MAX_TABLES + table]) return 0;                       // native here: not a leak
         if (comedic)
         {
             if (GenData.defAbsurd[d] < 2) return 0;
@@ -412,6 +413,7 @@ public partial class MapGen
                 rr -= wgt;
             }
             if (def < 0) continue;
+            def = TwinIn(room, def);   // a themed map's wrong-category things are of its theme too
             int flags = EF_LEAK | (comedic ? EF_COMEDIC : 0);
             int e = -1;
             int first = nEmit;

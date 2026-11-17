@@ -40,7 +40,7 @@ public partial class MapGen
             for (int m = 0; m < mc; m++)
             {
                 if (!MemberOk(g, m, room, fresh)) continue;
-                if (r < GenData.grpMemberWeight[ms + m]) { fUsed[m] = true; fDef[fN++] = GenData.grpMemberDef[ms + m]; break; }
+                if (r < GenData.grpMemberWeight[ms + m]) { fUsed[m] = true; fDef[fN++] = TwinIn(room, GenData.grpMemberDef[ms + m]); break; }
                 r -= GenData.grpMemberWeight[ms + m];
             }
         }
@@ -50,7 +50,8 @@ public partial class MapGen
     bool MemberOk(int g, int m, int room, bool fresh)
     {
         if (fresh && fUsed[m]) return false;
-        int def = GenData.grpMemberDef[GenData.grpMemberStart[g] + m];
+        // the member as it will stand: a KayKit house's or a themed map's twin (revision 12; groups used to skip it)
+        int def = TwinIn(room, GenData.grpMemberDef[GenData.grpMemberStart[g] + m]);
         int have = CountInRoom(def, room);
         for (int i = 0; i < fN; i++) if (fDef[i] == def) have++;
         return have < ScaledCap(GenData.defRoomCap[def], room);

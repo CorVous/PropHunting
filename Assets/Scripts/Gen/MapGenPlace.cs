@@ -549,7 +549,27 @@ public partial class MapGen
             case GenData.R_PLAYROOM: PlanPlayroom(); break;
             case GenData.R_BOXROOM: PlanBoxRoom(); break;
             case GenData.R_PANTRY: PlanPantry(); break;
+            // revision 12
+            case GenData.R_ZOO_PLAZA: PlanZooPlaza(); break;
+            case GenData.R_ZOO_WALK: PlanZooWalk(); break;
+            case GenData.R_ENC_FARM: case GenData.R_ENC_SAVANNA: case GenData.R_ENC_ARCTIC: case GenData.R_ENC_WOODS: case GenData.R_ENC_JUNGLE: case GenData.R_AVIARY: PlanEnclosure(); break;
+            case GenData.R_KEEPER: PlanKeeper(); break;
+            case GenData.R_CABIN_MAIN: PlanCabinMain(); break;
+            case GenData.R_BUNKROOM: PlanBunkRoom(); break;
+            case GenData.R_PORCH: PlanPorch(); break;
+            case GenData.R_WOODYARD: PlanWoodyard(); break;
+            case GenData.R_CAMPSITE: PlanCampsite(); break;
+            case GenData.R_ARCADE: PlanArcade(); break;
+            case GenData.R_SNACKBAR: PlanSnackbar(); break;
+            case GenData.R_PRIZE_STORE: PlanPrizeStore(); break;
+            case GenData.R_MIDWAY: PlanMidway(); break;
+            case GenData.R_RIDES: PlanRides(); break;
+            case GenData.R_NAVE: PlanNave(); break;
+            case GenData.R_VESTRY: PlanVestry(); break;
+            case GenData.R_CHURCHYARD: PlanChurchyard(); break;
+            case GenData.R_GRAVEYARD: PlanGraveyard(); break;
         }
+        if (holiday != 0) HolidayDecor();
         if (roomFloorMin[room] > 0) FillToMinimum();
         // what sits on, in and under the furniture, thinned evenly to the room's cap
         SetTopFactor(room, firstEmit);

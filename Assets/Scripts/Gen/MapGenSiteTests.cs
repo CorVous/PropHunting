@@ -18,7 +18,8 @@
 //   T12 a diner's front door is in its dining room and its kitchen is not on the forecourt; a warehouse's front
 //       door is in its office and its loading dock has a door of its own to the outside; a shop's front door is in
 //       its shop floor and its stock room has the service door; a garage's front door is in its office and its
-//       bay's front wall faces the forecourt (the roller door); a barn's front door is in the barn (revision 9)
+//       bay's front wall faces the forecourt (the roller door); a barn's front door is in the barn (revision 9); a
+//       cabin's front door is in its main room (revision 12)
 //   T13 every room is one piece
 public partial class MapGen
 {
@@ -135,6 +136,9 @@ public partial class MapGen
             else if (zone == GenData.Z_SHOP) { if (frt != GenData.R_SHOP_FLOOR || !stockDoor) fail |= 1 << 11; }
             else if (zone == GenData.Z_GARAGE) { if (frt != GenData.R_BACK_OFFICE || !bayFront) fail |= 1 << 11; }
             else if (zone == GenData.Z_BARN) { if (frt != GenData.R_BARN) fail |= 1 << 11; }
+            else if (zone == GenData.Z_CABIN) { if (frt != GenData.R_CABIN_MAIN) fail |= 1 << 11; }
+            else if (zone == GenData.Z_FAIR) { if (frt != GenData.R_ARCADE) fail |= 1 << 11; }
+            else if (zone == GenData.Z_CHAPEL) { if (frt != GenData.R_NAVE) fail |= 1 << 11; }
             else if (frt != GenData.R_WH_OFFICE || !dockDoor) fail |= 1 << 11;
         }
         // T8: everything reachable from the release

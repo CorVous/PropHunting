@@ -230,11 +230,11 @@ public partial class MapGen
 
         // counts for the statistics and the tuning overlay (G24): floor and on-furniture props per room type and zone
         statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0; statGroups = 0; statLoose = 0;
-        for (int i = 0; i < 64; i++) { statTypeRooms[i] = 0; statTypeCells[i] = 0; statTypeFloor[i] = 0; statTypeTop[i] = 0; }
+        for (int i = 0; i < statTypeRooms.Length; i++) { statTypeRooms[i] = 0; statTypeCells[i] = 0; statTypeFloor[i] = 0; statTypeTop[i] = 0; }
         for (int i = 0; i < statZoneFloor.Length; i++) { statZoneFloor[i] = 0; statZoneTop[i] = 0; }
         for (int r = 0; r < nRooms; r++)
         {
-            int t = roomType[r] & 63;
+            int t = roomType[r] & 127;
             statTypeRooms[t]++; statTypeCells[t] += roomCellCount[r];
         }
         for (int e = 0; e < nEmit; e++)
@@ -246,7 +246,7 @@ public partial class MapGen
             if (emitGroup[e] == e) statGroups++;
             if ((emitFlags[e] & EF_LOOSE) != 0) statLoose++;
             if (emitParent[e] >= 0) statSlotItems++;
-            int r = emitRoom[e], t = roomType[r] & 63, z = roomZone[r] & 7;
+            int r = emitRoom[e], t = roomType[r] & 127, z = roomZone[r] & 15;   // revision 12: zones above 7 were folded onto others (& 7)
             if (OnFloor(e)) { statFloor++; statTypeFloor[t]++; statZoneFloor[z]++; }
             else { statTop++; statTypeTop[t]++; statZoneTop[z]++; }
         }
@@ -475,7 +475,7 @@ public partial class MapGen
     // =====================================================================================================
     // Ground (G30): what the floor of every inner cell is made of. Outdoors the kinds blend at their borders.
     // =====================================================================================================
-    public const int GR_NONE = 0, GR_INDOOR = 1, GR_LAWN = 2, GR_FOREST = 3, GR_SOIL = 4, GR_PAVING = 5, GR_TRACK = 6, GR_RELEASE = 7, GR_WATER = 8;
+    public const int GR_NONE = 0, GR_INDOOR = 1, GR_LAWN = 2, GR_FOREST = 3, GR_SOIL = 4, GR_PAVING = 5, GR_TRACK = 6, GR_RELEASE = 7, GR_WATER = 8, GR_DECK = 9;
     public byte[] ground;
 
     int BaseGround(int i)
@@ -492,6 +492,12 @@ public partial class MapGen
         if (roomType[room] == GenData.R_PARK && (t & GenData.T_PATH) != 0) return GR_TRACK;   // a park's gravel paths
         if ((t & GenData.T_WATER) != 0) return GR_WATER;                                     // a pond (revision 10)
         if (roomType[room] == GenData.R_TERRACE || roomType[room] == GenData.R_PLAYGROUND) return GR_PAVING;
+        // revision 12: the zoo's plaza and the keepers' yard are paved, its walk is gravel, the savanna dry earth; the
+        // cabin's porch is decking, its wood yard trodden earth
+        int rt = roomType[room];
+        if (rt == GenData.R_ZOO_PLAZA || rt == GenData.R_KEEPER || rt == GenData.R_MIDWAY || rt == GenData.R_RIDES) return GR_PAVING;
+        if (rt == GenData.R_ZOO_WALK || rt == GenData.R_ENC_SAVANNA || rt == GenData.R_WOODYARD) return GR_TRACK;
+        if (rt == GenData.R_PORCH) return GR_DECK;
         if ((t & GenData.T_EARTH) != 0) return GR_TRACK;                 // trodden earth around a fire
         if (zone == GenData.Z_FOREST) return (t & GenData.T_PATH) != 0 ? GR_TRACK : GR_FOREST;
         if ((t & GenData.T_COVERED) != 0) return GR_PAVING;
@@ -513,7 +519,7 @@ public partial class MapGen
         for (int i = 0; i < n; i++)
         {
             int g = dist[i];
-            if (g < GR_LAWN || g == GR_RELEASE || g == GR_PAVING || g == GR_WATER) continue;
+            if (g < GR_LAWN || g == GR_RELEASE || g == GR_PAVING || g == GR_WATER || g == GR_DECK) continue;
             int ix = i % IW, iz = i / IW;
             int other = 0, away = 3;
             for (int d = 0; d < 4 && away > 1; d++)
@@ -524,7 +530,7 @@ public partial class MapGen
                     // a wall or a fence between the two cells is not a border to blend across
                     if (!CanStep(ix + DX[d] * (step - 1), iz + DZ[d] * (step - 1), d)) break;
                     int gj = dist[jz * IW + jx];
-                    if (gj < GR_LAWN || gj == GR_RELEASE || gj == GR_PAVING || gj == GR_WATER) break;
+                    if (gj < GR_LAWN || gj == GR_RELEASE || gj == GR_PAVING || gj == GR_WATER || gj == GR_DECK) break;
                     if (gj != g && step < away) { away = step; other = gj; }
                     if (gj != g) break;
                 }
