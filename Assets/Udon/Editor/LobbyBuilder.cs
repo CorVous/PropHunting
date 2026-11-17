@@ -485,9 +485,9 @@ public static class LobbyBuilder
 
         // the spawn disc
         var red = Mat("LobbySpawnRed", C("e05a48"));
-        Disc(root, "SpawnDisc", L(roomW / 2, roomD - 2.2f, 0.012f), 1.6f, red);   // between the top row and the path
-        Disc(root, "SpawnRing", L(roomW / 2, roomD - 2.2f, 0.016f), 1.3f, cream);
-        Disc(root, "SpawnDot", L(roomW / 2, roomD - 2.2f, 0.02f), 0.95f, red);
+        Disc(root, "SpawnDisc", L(roomW / 2, roomD - 2.3f, 0.012f), 1.6f, red);   // centred in the gap between the top row and the path
+        Disc(root, "SpawnRing", L(roomW / 2, roomD - 2.3f, 0.016f), 1.3f, cream);
+        Disc(root, "SpawnDot", L(roomW / 2, roomD - 2.3f, 0.02f), 0.95f, red);
 
         // the walls: a cream band with a dashed rule along the top, and the name over the spawn
         var band = Mat("LobbyWallBand", C("f3e7c9"));

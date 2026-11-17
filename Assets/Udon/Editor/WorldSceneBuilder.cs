@@ -81,7 +81,7 @@ public static class WorldSceneBuilder
         zone.layer = 2;   // Ignore Raycast
         var spawn = new GameObject("Spawn");
         spawn.transform.SetParent(lobby.transform, false);
-        spawn.transform.localPosition = new Vector3(0f, 0.05f, -RoomD / 2 + 2.2f);
+        spawn.transform.localPosition = new Vector3(0f, 0.05f, -RoomD / 2 + 2.3f);   // on the spawn disc
         LobbyBuilder.DressRoom(lobby.transform, RoomW, RoomD, WallH, ZoneHalf);
 
         // ---- the scene descriptor
