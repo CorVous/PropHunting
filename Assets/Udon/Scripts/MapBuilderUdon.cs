@@ -130,7 +130,42 @@ public class MapBuilderUdon : UdonSharpBehaviour
         return h;
     }
 
-    Color32 WallColour(int rt)
+    // ---- the map's palette (Cor: maps should not all look alike): drawn from the seed, so every client paints the
+    // same map the same way. Exterior and roof colours per kind of building, the door and window trim, the wood
+    // floors, a tint on the indoor walls, and the grass.
+    Color32 palHouse, palHouseRoof, palDiner, palDinerRoof, palWh, palWhRoof, palTrim, palWoodA, palWoodB, palWallTint, palGrass, palForest, palSoil;
+
+    Color32 Pick(Color32[] list, uint h) { return list[(int)(h - (h / (uint)list.Length) * (uint)list.Length)]; }
+
+    void InitPalette(uint seed)
+    {
+        Color32[] houses = { C(232, 212, 180), C(176, 198, 214), C(184, 204, 170), C(236, 222, 160), C(178, 98, 78), C(236, 234, 228), C(196, 184, 214), C(236, 190, 160) };
+        Color32[] houseRoofs = { C(172, 94, 80), C(88, 92, 100), C(120, 86, 64), C(84, 100, 122), C(84, 112, 86), C(196, 112, 72) };
+        Color32[] diners = { C(214, 92, 80), C(70, 160, 160), C(150, 210, 180), C(230, 190, 70), C(230, 140, 160) };
+        Color32[] dinerRoofs = { C(232, 230, 222), C(200, 200, 196), C(198, 70, 64), C(64, 120, 150) };
+        Color32[] warehouses = { C(122, 142, 160), C(186, 170, 140), C(130, 150, 130), C(160, 100, 80), C(110, 114, 120) };
+        Color32[] warehouseRoofs = { C(100, 106, 116), C(90, 96, 90), C(140, 140, 140), C(120, 80, 60) };
+        Color32[] trims = { C(122, 88, 62), C(238, 238, 232), C(54, 54, 58), C(60, 90, 70), C(50, 64, 96) };
+        Color32[] woods = { C(198, 154, 106), C(160, 110, 74), C(214, 186, 150), C(130, 96, 70) };
+        Color32[] tints = { C(255, 255, 255), C(255, 236, 214), C(214, 232, 255), C(226, 255, 222), C(255, 222, 236) };
+        Color32[] grasses = { C(116, 170, 86), C(140, 168, 80), C(100, 150, 96), C(150, 160, 90), C(108, 160, 110) };
+        palHouse = Pick(houses, Mix(seed ^ 0x1001u)); palHouseRoof = Pick(houseRoofs, Mix(seed ^ 0x1002u));
+        palDiner = Pick(diners, Mix(seed ^ 0x1003u)); palDinerRoof = Pick(dinerRoofs, Mix(seed ^ 0x1004u));
+        palWh = Pick(warehouses, Mix(seed ^ 0x1005u)); palWhRoof = Pick(warehouseRoofs, Mix(seed ^ 0x1006u));
+        palTrim = Pick(trims, Mix(seed ^ 0x1007u));
+        palWoodA = Pick(woods, Mix(seed ^ 0x1008u));
+        palWoodB = C(Mathf.Max(0, palWoodA.r - 10), Mathf.Max(0, palWoodA.g - 10), Mathf.Max(0, palWoodA.b - 8));
+        palWallTint = Pick(tints, Mix(seed ^ 0x1009u));
+        palGrass = Pick(grasses, Mix(seed ^ 0x100Au));
+        palForest = C(palGrass.r * 76 / 100, palGrass.g * 81 / 100, palGrass.b * 86 / 100);
+        palSoil = C(138 + (palGrass.r - 116) / 3, 104, 74);
+    }
+
+    Color32 Tinted(Color32 c) { return C(c.r * palWallTint.r / 255, c.g * palWallTint.g / 255, c.b * palWallTint.b / 255); }
+
+    Color32 WallColour(int rt) { return Tinted(BaseWallColour(rt)); }
+
+    Color32 BaseWallColour(int rt)
     {
         switch (rt)
         {
@@ -153,12 +188,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     Color32 ExteriorColour(int zone)
     {
-        return zone == GenData.Z_HOUSE ? C(232, 212, 180) : (zone == GenData.Z_DINER ? C(214, 92, 80) : C(122, 142, 160));
+        return zone == GenData.Z_HOUSE ? palHouse : (zone == GenData.Z_DINER ? palDiner : palWh);
     }
 
     Color32 RoofColour(int zone)
     {
-        return zone == GenData.Z_HOUSE ? C(172, 94, 80) : (zone == GenData.Z_DINER ? C(232, 230, 222) : C(100, 106, 116));
+        return zone == GenData.Z_HOUSE ? palHouseRoof : (zone == GenData.Z_DINER ? palDinerRoof : palWhRoof);
     }
 
     Color32 FloorColour(int rt, int ix, int iz)
@@ -167,7 +202,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         {
             case GenData.R_LIVING: case GenData.R_BEDROOM: case GenData.R_OFFICE: case GenData.R_DINING: case GenData.R_KIDS: case GenData.R_HALL:
             case GenData.R_WH_OFFICE:
-                return Vary((((iz / 2) & 1) == 0) ? C(198, 154, 106) : C(188, 144, 98), ix / 4, iz / 2, 4);
+                return Vary((((iz / 2) & 1) == 0) ? palWoodA : palWoodB, ix / 4, iz / 2, 4);
             case GenData.R_KITCHEN: case GenData.R_DINER_KITCHEN:
                 return (((ix + iz) & 1) == 0) ? C(226, 226, 218) : C(204, 210, 212);
             case GenData.R_BATH:
@@ -177,13 +212,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
             case GenData.R_STORAGE: case GenData.R_LOADING: case GenData.R_DINER_STORE:
                 return Vary(C(160, 162, 164), ix, iz, 5);
             case GenData.R_LAWN_OPEN: case GenData.R_FIREPIT:
-                return Vary(C(116, 170, 86), ix, iz, 7);
+                return Vary(palGrass, ix, iz, 7);
             case GenData.R_GARDEN:
-                return Vary(C(138, 104, 74), ix, iz, 8);
+                return Vary(palSoil, ix, iz, 8);
             case GenData.R_PATIO:
                 return (((ix / 2 + iz / 2) & 1) == 0) ? C(196, 190, 178) : C(182, 176, 166);
             case GenData.R_FOREST_DENSE: case GenData.R_FOREST_CLEARING:
-                return Vary(C(88, 138, 74), ix, iz, 9);
+                return Vary(palForest, ix, iz, 9);
             case GenData.R_RELEASE:
                 return (((ix + iz) & 1) == 0) ? C(214, 196, 120) : C(196, 178, 108);
         }
@@ -197,6 +232,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (watch == null) watch = new System.Diagnostics.Stopwatch();
         Clear();
         W = gen.W; H = gen.H; IW = gen.IW; IH = gen.IH;
+        InitPalette(gen.seed);
+        ListBuildings();
         cellZone = gen.cellZone; cellRoom = gen.cellRoom; roomType = gen.roomType; tags = gen.tags; innerRoom = gen.innerRoom;
         emitDef = gen.emitDef; emitX = gen.emitX; emitY = gen.emitY; emitZ = gen.emitZ; emitYaw = gen.emitYaw;
         defFlags = gen.defFlags; zoneWallMm = gen.ZoneWallMm; groundKind = gen.ground;
@@ -278,9 +315,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         switch (groundKind[i])
         {
-            case MapGenUdon.GR_LAWN: return Vary(C(116, 170, 86), ix, iz, 7);
-            case MapGenUdon.GR_FOREST: return Vary(C(88, 138, 74), ix, iz, 9);
-            case MapGenUdon.GR_SOIL: return Vary(C(138, 104, 74), ix, iz, 8);
+            case MapGenUdon.GR_LAWN: return Vary(palGrass, ix, iz, 7);
+            case MapGenUdon.GR_FOREST: return Vary(palForest, ix, iz, 9);
+            case MapGenUdon.GR_SOIL: return Vary(palSoil, ix, iz, 8);
             case MapGenUdon.GR_PAVING: return (((ix / 2 + iz / 2) & 1) == 0) ? C(196, 190, 178) : C(182, 176, 166);
             case MapGenUdon.GR_TRACK: return Vary(C(158, 134, 100), ix, iz, 6);
         }
@@ -334,7 +371,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     void FinishGround()
     {
         float m = 60f, w = W * CELL, h = H * CELL;
-        Quad(B_GROUND, new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, C(98, 150, 78));
+        Quad(B_GROUND, new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, C(palGrass.r * 85 / 100, palGrass.g * 88 / 100, palGrass.b * 90 / 100));
         groundFilter.sharedMesh = ToMesh(B_GROUND, "Ground");
         Collider(new Vector3(-m, -1f, -m), new Vector3(w + m, 0f, h + m));
         cellColour = null;
@@ -437,7 +474,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             hi = (h1 || north) ? CELL - WALL_HALF : CELL + WALL_HALF;
             if (!h1 && !north) { hiA = CapColour(vx - 1, vz + 1, bz); hiB = CapColour(vx, vz + 1, bz); }
         }
-        Color32 frame = C(122, 88, 62), windowFrame = C(238, 238, 232);
+        // door frames take the map's trim; window frames stay white unless the trim is light
+        Color32 frame = palTrim, windowFrame = palTrim.r > 200 ? C(54, 54, 58) : C(238, 238, 232);
         if (type == GenData.E_WALL)
         {
             WallPiece(horizontal, ex, ez, lo, hi, 0f, h, colA, colB, true, loA, loB, hiA, hiB);
@@ -485,6 +523,94 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     bool Bld(int x, int z) { return InGrid(x, z) && IsBuilding(cellZone[z * W + x]); }
 
+    // ------------------------------------------------------------------ pitched roofs
+    // One gable over each house's bounding box, its ridge along the box's long side, 30 degrees. Each roof cell
+    // draws its part of the slopes; where the house ends (or an L's inner corner), a gable or side face closes the
+    // roof down to the flat slab. Drawn from both sides (the cell's slopes are cut in pieces), no collider.
+    int[] instMinX, instMaxX, instMinZ, instMaxZ;
+    int[] cellInst;
+    const float PITCH = 0.577f, MAX_RISE = 2.4f;
+
+    void ListBuildings()
+    {
+        int n = gen.nInst;
+        cellInst = gen.cellInst;
+        instMinX = new int[n]; instMaxX = new int[n]; instMinZ = new int[n]; instMaxZ = new int[n];
+        for (int i = 0; i < n; i++) { instMinX[i] = 9999; instMinZ[i] = 9999; instMaxX[i] = -1; instMaxZ[i] = -1; }
+        for (int c = 0; c < W * H; c++)
+        {
+            int i = cellInst[c];
+            if (i < 0 || i >= n) continue;
+            int x = c % W, z = c / W;
+            if (x < instMinX[i]) instMinX[i] = x;
+            if (x > instMaxX[i]) instMaxX[i] = x;
+            if (z < instMinZ[i]) instMinZ[i] = z;
+            if (z > instMaxZ[i]) instMaxZ[i] = z;
+        }
+    }
+
+    bool SameInst(int x, int z, int inst) { return InGrid(x, z) && cellInst[z * W + x] == inst; }
+
+    // roof height across the ridge at `b` (metres across the box)
+    float RoofY(float b, float b0, float b1, float t)
+    {
+        float mid = (b0 + b1) * 0.5f, half = (b1 - b0) * 0.5f;
+        float rise = Mathf.Min(half * PITCH, MAX_RISE);
+        return t + rise * Mathf.Clamp01(1f - Mathf.Abs(b - mid) / half);
+    }
+
+    // a point from (along the ridge, height, across it)
+    Vector3 RP(bool alongX, float a, float y, float b) { return alongX ? new Vector3(a, y, b) : new Vector3(b, y, a); }
+
+    void QuadBoth(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color32 c)
+    {
+        Vector3 n = Vector3.Cross(p1 - p0, p3 - p0);
+        if (n.sqrMagnitude < 1e-8f) return;
+        n.Normalize();
+        Quad(B_ROOFS, p0, p1, p2, p3, n, c);
+        Quad(B_ROOFS, p3, p2, p1, p0, -n, c);
+    }
+
+    void PitchedCell(int x, int z, float t)
+    {
+        int inst = cellInst[z * W + x];
+        if (instMinX == null || inst < 0 || inst >= instMinX.Length) return;
+        float bx0 = instMinX[inst] * CELL - WALL_HALF, bx1 = (instMaxX[inst] + 1) * CELL + WALL_HALF;
+        float bz0 = instMinZ[inst] * CELL - WALL_HALF, bz1 = (instMaxZ[inst] + 1) * CELL + WALL_HALF;
+        bool alongX = (bx1 - bx0) >= (bz1 - bz0);
+        float b0 = alongX ? bz0 : bx0, b1 = alongX ? bz1 : bx1;
+        // this cell's extent, out to the overhang where the house ends
+        float cx0 = x * CELL - (SameInst(x - 1, z, inst) ? 0f : WALL_HALF), cx1 = (x + 1) * CELL + (SameInst(x + 1, z, inst) ? 0f : WALL_HALF);
+        float cz0 = z * CELL - (SameInst(x, z - 1, inst) ? 0f : WALL_HALF), cz1 = (z + 1) * CELL + (SameInst(x, z + 1, inst) ? 0f : WALL_HALF);
+        float a0 = alongX ? cx0 : cz0, a1 = alongX ? cx1 : cz1;   // along the ridge
+        float c0 = alongX ? cz0 : cx0, c1 = alongX ? cz1 : cx1;   // across it
+        float mid = (b0 + b1) * 0.5f;
+        Color32 roof = RoofColour(GenData.Z_HOUSE), wall = ExteriorColour(GenData.Z_HOUSE);
+        // the slopes: split at the ridge when it runs through this cell
+        float[] cuts = new float[3];
+        int nc = 0;
+        cuts[nc++] = c0;
+        if (mid > c0 + 0.01f && mid < c1 - 0.01f) cuts[nc++] = mid;
+        cuts[nc++] = c1;
+        for (int k = 0; k + 1 < nc; k++)
+        {
+            float u0 = cuts[k], u1 = cuts[k + 1];
+            float y0 = RoofY(u0, b0, b1, t), y1 = RoofY(u1, b0, b1, t);
+            QuadBoth(RP(alongX, a0, y0, u0), RP(alongX, a0, y1, u1), RP(alongX, a1, y1, u1), RP(alongX, a1, y0, u0), roof);
+            // gable ends where the house stops along the ridge
+            bool endLo = alongX ? !SameInst(x - 1, z, inst) : !SameInst(x, z - 1, inst);
+            bool endHi = alongX ? !SameInst(x + 1, z, inst) : !SameInst(x, z + 1, inst);
+            if (endLo) QuadBoth(RP(alongX, a0, t, u0), RP(alongX, a0, y0, u0), RP(alongX, a0, y1, u1), RP(alongX, a0, t, u1), wall);
+            if (endHi) QuadBoth(RP(alongX, a1, t, u0), RP(alongX, a1, y0, u0), RP(alongX, a1, y1, u1), RP(alongX, a1, t, u1), wall);
+        }
+        // a side face where the house stops across the ridge but the roof is still high (an L's inner edge)
+        bool sideLo = alongX ? !SameInst(x, z - 1, inst) : !SameInst(x - 1, z, inst);
+        bool sideHi = alongX ? !SameInst(x, z + 1, inst) : !SameInst(x + 1, z, inst);
+        float yl = RoofY(c0, b0, b1, t), yh = RoofY(c1, b0, b1, t);
+        if (sideLo && yl > t + 0.02f) QuadBoth(RP(alongX, a0, t, c0), RP(alongX, a0, yl, c0), RP(alongX, a1, yl, c0), RP(alongX, a1, t, c0), wall);
+        if (sideHi && yh > t + 0.02f) QuadBoth(RP(alongX, a0, t, c1), RP(alongX, a0, yh, c1), RP(alongX, a1, yh, c1), RP(alongX, a1, t, c1), wall);
+    }
+
     readonly int[] DX = { 0, 1, 0, -1 };
     readonly int[] DZ = { 1, 0, -1, 0 };
 
@@ -526,6 +652,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Box3(B_ROOFS, new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, ceiling, FACE_ALL);
             }
             Collider(new Vector3(x * CELL - WALL_HALF, h, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, t, (z + 1) * CELL + WALL_HALF));
+            // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider)
+            if (zone == GenData.Z_HOUSE) PitchedCell(x, z, t);
         }
     }
 
