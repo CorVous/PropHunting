@@ -8,7 +8,7 @@ using UnityEngine;
 // and fences. Called by PropHunt > Bake prop prefabs, which hands it the prefabs.
 public static class MapBuilderBaker
 {
-    public static void Assign(GameObject[] prefabs, GameObject fence, Material mat, Bounds fenceBounds, GameObject rail = null, GameObject[] fixtures = null, GameObject[] decor = null)
+    public static void Assign(GameObject[] prefabs, GameObject fence, Material mat, Bounds fenceBounds, GameObject rail = null, GameObject[] fixtures = null, GameObject[] decor = null, Mesh[] parts = null, Vector4[] partOpening = null, Color[] partBody = null)
     {
         var builder = Object.FindObjectOfType<MapBuilderUdon>(true);
         GameObject root;
@@ -35,6 +35,9 @@ public static class MapBuilderBaker
         builder.fixtureRoot = Child(root.transform, "Fixtures").transform;
         builder.fixturePrefabs = fixtures;
         builder.decorPrefabs = decor;
+        builder.partMeshes = parts;
+        builder.partOpening = partOpening;
+        builder.partBody = partBody;
         builder.propPrefabs = prefabs;
         builder.fencePrefab = fence;
         builder.fenceModelSize = fenceBounds.size;

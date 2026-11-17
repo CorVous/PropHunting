@@ -21,6 +21,144 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // the themes' set dressing (PropPrefabBaker.DecorModel, same order): roof modules and dishes on a space base, craters
     // and rocks beyond its fence; a fountain or a well and market stalls on a medieval village's square
     public GameObject[] decorPrefabs;
+    // CC0 building parts on the outside walls (Tools/make_parts.py -> parts.bytes, baked by PropPrefabBaker): per theme
+    // (index theme * 3) a plain wall, a wall with a window, a wall with a door, normalised to 0..1 along and up the
+    // wall; partOpening is each window's or door's hole (x0, y0, x1, y1, normalised), partBody the colour the builder
+    // repaints with the building's own
+    public Mesh[] partMeshes;
+    public Vector4[] partOpening;
+    public Color[] partBody;
+    Vector3[][] pv, pn;
+    Color32[][] pc;
+    int[][] pt;
+    Color32[] pBody;
+    bool partsReady;
+    float facadeDepth;   // how far the facade on the wall being drawn stands out (the porch light sits on it)
+
+    void InitParts()
+    {
+        if (partsReady || partMeshes == null) return;
+        int n = partMeshes.Length;
+        pv = new Vector3[n][]; pn = new Vector3[n][]; pc = new Color32[n][]; pt = new int[n][]; pBody = new Color32[n];
+        for (int i = 0; i < n; i++)
+        {
+            if (partMeshes[i] == null) continue;
+            pv[i] = partMeshes[i].vertices; pn[i] = partMeshes[i].normals; pc[i] = partMeshes[i].colors32; pt[i] = partMeshes[i].triangles;
+            Color b = partBody[i];
+            pBody[i] = new Color32((byte)Mathf.RoundToInt(b.r * 255f), (byte)Mathf.RoundToInt(b.g * 255f), (byte)Mathf.RoundToInt(b.b * 255f), 255);
+        }
+        partsReady = true;
+    }
+
+    bool HasFacade(int k) { return partsReady && k < pv.Length && pv[k] != null; }
+
+    // part k over the wall from s0 to s1 along the edge (metres from its start) and y0 to y1 up, on the side outSign
+    // (+1: the +z or +x side); triangles whose middle lies in the hole (c0..c1, cy0..cy1) are left out
+    void AppendPart(int k, bool horizontal, float ex, float ez, float outSign, float s0, float s1, float y0, float y1, Color32 body,
+                    float c0, float c1, float cy0, float cy1)
+    {
+        Vector3[] v = pv[k], n = pn[k];
+        Color32[] c = pc[k];
+        int[] tri = pt[k];
+        // the wall's own shades (the kit's plain wall's colour, lighter or darker) take the building's colour, shade for
+        // shade; frames, doors and trims keep theirs
+        Color32 pb = pBody[(k / 3) * 3];
+        float pbl = Mathf.Sqrt((float)pb.r * pb.r + (float)pb.g * pb.g + (float)pb.b * pb.b) + 0.001f;
+        float pbr = pb.r / pbl, pbg = pb.g / pbl, pbb = pb.b / pbl;
+        float w = s1 - s0, h = y1 - y0;
+        // a rotation (never a mirror): along x up = out
+        Vector3 a, o, org;
+        if (horizontal)
+        {
+            o = new Vector3(0f, 0f, outSign);
+            a = outSign > 0 ? Vector3.right : Vector3.left;
+            org = new Vector3(ex + (outSign > 0 ? s0 : s1), y0, ez + outSign * WALL_HALF);
+        }
+        else
+        {
+            o = new Vector3(outSign, 0f, 0f);
+            a = outSign > 0 ? Vector3.back : Vector3.forward;
+            org = new Vector3(ex + outSign * WALL_HALF, y0, ez + (outSign > 0 ? s1 : s0));
+        }
+        bool cull = c1 > c0;
+        int b = B_WALLS;
+        for (int i = 0; i + 2 < tri.Length; i += 3)
+        {
+            Vector3 p0 = v[tri[i]], p1 = v[tri[i + 1]], p2 = v[tri[i + 2]];
+            if (cull)
+            {
+                float mx = (p0.x + p1.x + p2.x) / 3f, my = (p0.y + p1.y + p2.y) / 3f;
+                float e = s0 + mx * w, yy = y0 + my * h;
+                if (e > c0 && e < c1 && yy > cy0 && yy < cy1) continue;
+            }
+            while (nv[b] + 3 > bv[b].Length || nt[b] + 3 > bt[b].Length) BufGrow(b);
+            for (int q = 0; q < 3; q++)
+            {
+                int vi = tri[i + q];
+                Vector3 p = v[vi], nn = n[vi];
+                bv[b][nv[b]] = org + a * (p.x * w) + Vector3.up * (p.y * h) + o * p.z;
+                bn[b][nv[b]] = a * nn.x + Vector3.up * nn.y + o * nn.z;
+                Color32 col = c[vi];
+                float cl = Mathf.Sqrt((float)col.r * col.r + (float)col.g * col.g + (float)col.b * col.b) + 0.001f;
+                if (theme == GenData.THEME_NONE && (col.r * pbr + col.g * pbg + col.b * pbb) / cl > 0.998f)   // the space and medieval kits keep their own colours
+                {
+                    float s = cl / pbl;
+                    bc[b][nv[b]] = new Color32((byte)Mathf.Min(255, (int)(body.r * s)), (byte)Mathf.Min(255, (int)(body.g * s)), (byte)Mathf.Min(255, (int)(body.b * s)), 255);
+                }
+                else bc[b][nv[b]] = col;
+                bt[b][nt[b]] = nv[b];
+                nv[b]++; nt[b]++;
+            }
+        }
+    }
+
+    // the facade over one outside wall: plain parts, the window part over a window, the door part round a doorway.
+    // Returns the window's hole (x0, sill, x1, head) through w0..head when the wall has a window part.
+    float fW0, fW1, fSill, fHead;
+    bool Facade(bool horizontal, float ex, float ez, int type, int off, int cellIn, int cellOut, float h, Color32 body)
+    {
+        facadeDepth = 0f;
+        if (!partsReady || cellIn < 0) return false;
+        int zone = cellZone[cellIn];
+        if (zone == GenData.Z_CABIN) return false;   // the log cabin keeps its logs
+        if (cellOut >= 0 && cellRoom[cellOut] >= 0)
+        {
+            int rt = roomType[cellRoom[cellIn]], ot = roomType[cellRoom[cellOut]];
+            if ((rt == GenData.R_GARAGE_BAY && ot == GenData.R_FORECOURT) || (rt == GenData.R_BARN && ot == GenData.R_FARMYARD)) return false;   // the big doors
+        }
+        int k0 = (theme >= 0 && theme < 3 ? theme : 0) * 3;
+        if (!HasFacade(k0)) return false;
+        float sgn = cellIn == cellLowOf ? 1f : -1f;
+        if (type == GenData.E_WALL)
+        {
+            AppendPart(k0, horizontal, ex, ez, sgn, 0f, CELL, 0f, h, body, 0f, 0f, 0f, 0f);
+        }
+        else if (type == GenData.E_WINDOW && HasFacade(k0 + 1))
+        {
+            Vector4 op = partOpening[k0 + 1];
+            fW0 = 1f + op.x * 2f; fW1 = 1f + op.z * 2f; fSill = op.y * h; fHead = op.w * h;
+            AppendPart(k0, horizontal, ex, ez, sgn, 0f, 1f, 0f, h, body, 0f, 0f, 0f, 0f);
+            AppendPart(k0 + 1, horizontal, ex, ez, sgn, 1f, 3f, 0f, h, body, fW0, fW1, fSill, fHead);
+            AppendPart(k0, horizontal, ex, ez, sgn, 3f, CELL, 0f, h, body, 0f, 0f, 0f, 0f);
+        }
+        else if (type == GenData.E_DOOR && HasFacade(k0 + 2))
+        {
+            Vector4 op = partOpening[k0 + 2];
+            float d0 = off * INNER, d1 = (off + GenData.DOOR_CELLS) * INNER, dh = GenData.DOOR_HEIGHT_MM / 1000f;
+            float pw = (d1 - d0) / Mathf.Max(0.05f, op.z - op.x), ph = Mathf.Min(h, dh / Mathf.Max(0.05f, op.w - op.y));
+            float p0 = d0 - op.x * pw, p1 = p0 + pw;
+            if (p0 < 0f) { p1 -= p0; p0 = 0f; }
+            if (p1 > CELL) { p0 -= p1 - CELL; p1 = CELL; }
+            if (p0 > 0.01f) AppendPart(k0, horizontal, ex, ez, sgn, 0f, p0, 0f, h, body, 0f, 0f, 0f, 0f);
+            AppendPart(k0 + 2, horizontal, ex, ez, sgn, p0, p1, 0f, ph, body, d0, d1, 0f, dh);
+            if (ph < h - 0.01f) AppendPart(k0, horizontal, ex, ez, sgn, p0, p1, ph, h, body, 0f, 0f, 0f, 0f);
+            if (p1 < CELL - 0.01f) AppendPart(k0, horizontal, ex, ez, sgn, p1, CELL, 0f, h, body, 0f, 0f, 0f, 0f);
+        }
+        else return false;
+        facadeDepth = theme == GenData.THEME_SPACE ? 0.3f : (theme == GenData.THEME_MEDIEVAL ? 0.15f : 0.2f);
+        return true;
+    }
+    int cellLowOf;   // Edge's low-side cell (the facade on a building on that side faces +)
     const int DECOR_SOLAR = 0, DECOR_CARGO = 1, DECOR_DISH = 2, DECOR_CRATER = 3, DECOR_CRATER_S = 4, DECOR_METEOR = 5, DECOR_CRYSTAL = 6,
         DECOR_FOUNTAIN = 7, DECOR_WELL = 8, DECOR_STALL_R = 9, DECOR_STALL_G = 10, DECOR_BANNER = 11, DECOR_HEDGE = 12;
     public Transform fixtureRoot;
@@ -447,6 +585,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         else moodSeason = (int)UModB(Mix(gen.seed ^ 0x2002u), 2u);
         InitPalette(gen.seed);
         InitSchemes();
+        InitParts();
         ApplyMood();
         ListBuildings();
         cellZone = gen.cellZone; cellRoom = gen.cellRoom; roomType = gen.roomType; tags = gen.tags; innerRoom = gen.innerRoom;
@@ -742,6 +881,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
         // dark timber in a medieval village, gunmetal on a space base
         if (theme == GenData.THEME_MEDIEVAL) { frame = C(84, 58, 38); windowFrame = frame; }
         else if (theme == GenData.THEME_SPACE) { frame = C(84, 90, 102); windowFrame = frame; }
+        // the CC0 facade on a building's outside wall (Cor: more interesting buildings)
+        bool facade = false;
+        facadeDepth = 0f;
+        cellLowOf = cellA;
+        if (IsBuilding(zoneA) != IsBuilding(zoneB))
+        {
+            int inC = IsBuilding(zoneA) ? cellA : cellB, outC = IsBuilding(zoneA) ? cellB : cellA;
+            // the outside colour is what the generated wall shows on the outside face
+            facade = Facade(horizontal, ex, ez, type, off, inC, outC, h, IsBuilding(zoneA) ? colB : colA);
+        }
         if (type == GenData.E_WALL)
         {
             WallPiece(horizontal, ex, ez, lo, hi, 0f, h, colA, colB, true, loA, loB, hiA, hiB);
@@ -764,6 +913,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         else if (type == GenData.E_WINDOW)
         {
             float w0 = 1.0f, w1 = 3.0f, sill = 0.9f, head = 2.05f;
+            if (facade) { w0 = fW0; w1 = fW1; sill = fSill; head = fHead; }   // the hole of the facade's window
             WallPiece(horizontal, ex, ez, lo, w0, 0f, h, colA, colB, false, loA, loB, colA, colB);
             WallPiece(horizontal, ex, ez, w1, hi, 0f, h, colA, colB, false, colA, colB, hiA, hiB);
             WallPiece(horizontal, ex, ez, w0, w1, 0f, sill, colA, colB, false, none, none, none, none);
@@ -1111,7 +1261,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         if (a > CELL - 0.2f) return;
         float yaw = horizontal ? (side > 0 ? 0f : 180f) : (side > 0 ? 90f : -90f);
-        Vector3 at = horizontal ? new Vector3(ex + a, doorTop - 0.05f, ez + side * WALL_HALF) : new Vector3(ex + side * WALL_HALF, doorTop - 0.05f, ez + a);
+        float fd = WALL_HALF + facadeDepth;
+        Vector3 at = horizontal ? new Vector3(ex + a, doorTop - 0.05f, ez + side * fd) : new Vector3(ex + side * fd, doorTop - 0.05f, ez + a);
         if (PlaceFixture(1, at, yaw, LK_PORCH)) return;
         float y0 = doorTop - 0.25f, y1 = doorTop + 0.15f;
         float n0 = WALL_HALF, n1 = WALL_HALF + 0.05f, g1 = WALL_HALF + 0.2f;

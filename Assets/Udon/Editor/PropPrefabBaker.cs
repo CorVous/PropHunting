@@ -79,8 +79,9 @@ public static class PropPrefabBaker
         // the light fixtures (fixtures.bytes, Tools/make_fixtures.py): ceiling, wall, street x ordinary, space, medieval
         var fixtures = BakeFixtures(mat);
         var decor = BakeDecor(mat);
+        BakeParts();
         AssetDatabase.SaveAssets();
-        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor);
+        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor, partMesh, partOpening, partBody);
         Debug.Log("[prophunt] baked " + mesh.Length + " meshes and " + prefabs.Length + " prop prefabs");
     }
 
@@ -132,6 +133,52 @@ public static class PropPrefabBaker
         "meteor_detailed", "rock_crystalsLargeA", "fountain-round-detail", "building_well_blue", "stall-red", "stall-green", "banner-red", "hedge-large" };
     static readonly float[] DecorSize = { 3.2f, 2.6f, 2.4f, 7f, 3.5f, 2.2f, 2.6f, 3.2f, 2.2f, 2.8f, 2.8f, 2.6f, 2.2f };
     static readonly bool[] DecorSolid = { false, false, false, false, false, true, true, true, true, true, true, true, true };
+
+    // the CC0 facade parts (parts.bytes, Tools/make_parts.py): meshes for the builder to merge into the walls; the
+    // file's pivot field is a part's body colour and its bounds its window or door hole
+    static Mesh[] partMesh;
+    static Vector4[] partOpening;
+    static Color[] partBody;
+
+    static void BakeParts()
+    {
+        partMesh = null; partOpening = null; partBody = null;
+        var asset = Resources.Load<TextAsset>("PropHunt/parts");
+        if (asset == null) { Debug.LogWarning("[prophunt] parts.bytes is missing: no facades"); return; }
+        byte[] b = asset.bytes;
+        int p = 4, n = BitConverter.ToInt32(b, p); p += 4;
+        partMesh = new Mesh[n]; partOpening = new Vector4[n]; partBody = new Color[n];
+        string path = OUT + "/Parts.asset";
+        AssetDatabase.DeleteAsset(path);
+        for (int m = 0; m < n; m++)
+        {
+            int nameLen = b[p++];
+            string name = System.Text.Encoding.UTF8.GetString(b, p, nameLen); p += nameLen;
+            int parLen = b[p++]; p += parLen;
+            Vector3 body = V(b, p); p += 12;
+            Vector3 mn = V(b, p); p += 12;
+            Vector3 mx = V(b, p); p += 12;
+            int nv = BitConverter.ToInt32(b, p); p += 4;
+            int ni = BitConverter.ToInt32(b, p); p += 4;
+            var verts = new Vector3[nv]; var norms = new Vector3[nv]; var cols = new Color32[nv];
+            for (int i = 0; i < nv; i++)
+            {
+                verts[i] = V(b, p);
+                norms[i] = new Vector3((sbyte)b[p + 12] / 127f, (sbyte)b[p + 13] / 127f, (sbyte)b[p + 14] / 127f);
+                cols[i] = new Color32(b[p + 15], b[p + 16], b[p + 17], 255);
+                p += 19;
+            }
+            var tris = new int[ni];
+            for (int i = 0; i < ni; i++) { tris[i] = BitConverter.ToUInt16(b, p); p += 2; }
+            var me = new Mesh { name = name };
+            me.vertices = verts; me.normals = norms; me.colors32 = cols; me.triangles = tris;
+            me.RecalculateBounds();
+            if (m == 0) AssetDatabase.CreateAsset(me, path); else AssetDatabase.AddObjectToAsset(me, partMesh[0]);
+            partMesh[m] = me;
+            partOpening[m] = new Vector4(mn.x, mn.y, mx.x, mx.y);
+            partBody[m] = new Color(body.x, body.y, body.z, 1f);
+        }
+    }
 
     static GameObject[] BakeDecor(Material mat)
     {

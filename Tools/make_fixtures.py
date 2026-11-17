@@ -59,7 +59,7 @@ def srgb(c):
     return max(0, min(255, int(round(c * 255))))
 
 
-def load_obj(folder, model):
+def load_obj(folder, model, skip=()):
     path = os.path.join(folder, model + ".obj")
     base = os.path.dirname(path)
     v, vt, vn, tris = [], [], [], []   # tris: (pos, uv, normal, material) x 3
@@ -108,6 +108,8 @@ def load_obj(folder, model):
         return (srgb(kd[0]), srgb(kd[1]), srgb(kd[2]))
     out = []
     for a, b, c, m in tris:
+        if m in skip:
+            continue   # a window's glass: left out, so a window stays a window
         pa, pb, pc = v[a[0]], v[b[0]], v[c[0]]
         # the face normal (flat shading, like the rest of the map)
         ux, uy, uz = pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]
