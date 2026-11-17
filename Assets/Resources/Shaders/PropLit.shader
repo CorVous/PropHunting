@@ -10,6 +10,7 @@ Shader "PropHunt/Lit"
     Properties
     {
         _Color ("Tint", Color) = (1,1,1,1)
+        _Toon ("Toon ramp", Range(0, 1)) = 1   // Cor: the direct light in three flat bands (lit, half, shade)
     }
     SubShader
     {
@@ -32,7 +33,22 @@ Shader "PropHunt/Lit"
             UNITY_INSTANCING_BUFFER_END(Props)
 
             float _UdonPHSunSpot;   // 1 once the spot sun's shadows are baked (PHSun)
-            float4 _UdonPHSunArea;  // the map's rectangle (centre x, z, half width, half depth): the spot sun inside, the base sun 6 m past it
+            float4 _UdonPHSunArea;
+            float _Toon;
+
+            // the toon ramp: three flat bands with short soft edges; above full light (a bright lamp) it stays linear
+            float Ramp(float x)
+            {
+                return 0.5 * smoothstep(0.08, 0.14, x) + 0.5 * smoothstep(0.45, 0.52, x) + max(x - 1.0, 0.0);
+            }
+
+            // the direct light, quantised by its strength against the sun's full light on this surface
+            float3 Toon(float3 direct, float3 albedo)
+            {
+                float ref = dot(albedo * _LightColor0.rgb * 0.8, float3(0.3, 0.59, 0.11)) + 1e-4;
+                float f = dot(direct, float3(0.3, 0.59, 0.11)) / ref;
+                return lerp(direct, direct * (Ramp(f) / max(f, 1e-4)), _Toon);
+            }  // the map's rectangle (centre x, z, half width, half depth): the spot sun inside, the base sun 6 m past it
 
             struct appdata
             {
@@ -120,9 +136,9 @@ Shader "PropHunt/Lit"
                     // the spot sun (with the lamps) over the map, handing back to the base sun at the spot's edge
                     float2 o = abs(i.worldPos.xz - _UdonPHSunArea.xy) - _UdonPHSunArea.zw;
                     float r = max(o.x, o.y);   // metres past the map's edge
-                    c = i.ambient + lerp(add, i.sun, smoothstep(0.5, 6.0, r));   // the base sun from 6 m past the fence
+                    c = i.ambient + Toon(lerp(add, i.sun, smoothstep(0.5, 6.0, r)), i.albedo);   // the base sun from 6 m past the fence
                 }
-                else c = i.ambient + i.sun + add;   // before the spot is baked: the base sun, the lamps on top
+                else c = i.ambient + Toon(i.sun + add, i.albedo);   // before the spot is baked: the base sun, the lamps on top
                 c = lerp(c, i.albedo * 1.4, i.emit);
                 fixed4 col = fixed4(c, 1);
                 UNITY_APPLY_FOG(i.fogCoord, col);
