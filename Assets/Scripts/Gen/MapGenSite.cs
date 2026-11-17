@@ -227,6 +227,10 @@ public partial class MapGen
             kinds[nk++] = z;
         }
         if (rng.Chance(GenData.SizeExtraHouse[size])) kinds[nk++] = GenData.Z_HOUSE;
+        // open plots (Cor: more kinds of plot): a park or an empty lot, now and then a second one on big maps
+        int opens = rng.Chance(size == 0 ? 250 : 450) ? 1 : 0;
+        if (size >= 2 && opens == 1 && rng.Chance(200)) opens = 2;
+        for (int q = 0; q < opens && nk < 15; q++) kinds[nk++] = rng.Chance(550) ? KIND_PARK : KIND_LOT;
         Shuffle(kinds, nk, ref rng);
         if (rng.Chance(600))
         {
@@ -291,11 +295,13 @@ public partial class MapGen
             }
             int k = nPlots;
             plotSeg[k] = seg;
-            int p = PickPlan(kinds[i], ref rng);
-            if (p < 0) continue;
+            bool open = kinds[i] == KIND_PARK || kinds[i] == KIND_LOT;
+            int p = open ? -1 : PickPlan(kinds[i], ref rng);
+            if (p < 0 && !open) continue;
+            plotKind[k] = kinds[i] == KIND_PARK ? 1 : (kinds[i] == KIND_LOT ? 2 : 0);
             // evolution step 3: one plot's building takes another plan of its kind (the main draw stays as it was,
             // so the other plots keep theirs)
-            if (evo >= 3 && i == (int)(GenRng.Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk)
+            if (!open && evo >= 3 && i == (int)(GenRng.Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk)
             {
                 GenRng alt = Rng(ST_LAYOUT, 7, 3);
                 for (int tries = 0; tries < 8; tries++)
@@ -305,18 +311,20 @@ public partial class MapGen
                 }
             }
             nPlots++;
-            plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = rng.Chance(500) ? 1 : 0;
+            plotZone[k] = open ? GenData.Z_LAWN : kinds[i]; plotPlan[k] = p; plotMir[k] = rng.Chance(500) ? 1 : 0;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (rng.Chance(500) ? -1 : 1));
             if (siteShape == SHAPE_CUL && seg == 1) side = -1;   // the cul-de-sac's plot lies across the lane's end
             plotSide[k] = side;
-            int w = PlW(p), d = PlD(p);
+            int w = open ? 3 + rng.Range(2) : PlW(p), d = open ? 2 + rng.Range(2) : PlD(p);
+            plotBodyD[k] = d;
             // front garden 1 cell (2 now and then on L and XL), back garden 1 or 2 cells deep (2 or 3 on L and XL)
             if (kinds[i] == GenData.Z_HOUSE) { plotSet[k] = GenData.SizeHouseFront[size] + (GenData.SizeHouseFront2[size] > 0 && rng.Chance(GenData.SizeHouseFront2[size]) ? 1 : 0); plotBack[k] = GenData.SizeHouseBack[size] + (rng.Chance(GenData.SizeHouseBackExtra[size]) ? 1 : 0); }
             else if (kinds[i] == GenData.Z_DINER) { plotSet[k] = 1; plotBack[k] = 1; }
+            else if (open) { plotSet[k] = 0; plotBack[k] = 0; }
             else { plotSet[k] = GenData.SizeWarehouseFront[size]; plotBack[k] = GenData.SizeWarehouseBack2[size] > 0 && rng.Chance(GenData.SizeWarehouseBack2[size]) ? 2 : 1; }
             plotSL[k] = rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0; plotSR[k] = rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0;
             // a back door in a side wall opens onto this plot's own side yard
-            int bd = PlBack(p) & 3;
+            int bd = open ? 0 : PlBack(p) & 3;
             if (bd == 1 || bd == 3) { if ((bd == 1) != (plotMir[k] != 0)) plotSR[k] = 1; else plotSL[k] = 1; }
             // a building never touches the map's edge or its neighbour's building (report 16, T3, T12)
             int off = side < 0 ? offL : offR, prev = side < 0 ? lastL : lastR;
@@ -326,7 +334,7 @@ public partial class MapGen
                 // nor stands beside the open end of a shallower neighbour: this plot's side yard, or a deeper garden
                 // beside the neighbour's building
                 if (plotSL[k] == 0 && plotDepth[prev] < plotSet[k] + d) plotSL[k] = 1;
-                int prevEnd = plotSet[prev] + PlD(plotPlan[prev]);
+                int prevEnd = plotSet[prev] + plotBodyD[prev];
                 if (plotSR[prev] == 0 && plotSet[k] + d + plotBack[k] < prevEnd) plotBack[k] = prevEnd - plotSet[k] - d;
             }
             plotY0[k] = off;
@@ -395,6 +403,7 @@ public partial class MapGen
     void StampPlot(int k, ref GenRng rng)
     {
         int p = plotPlan[k], zone = plotZone[k];
+        if (p < 0) { StampOpenPlot(k); return; }
         int bi = NewInst(zone), yi = NewInst(GenData.Z_LAWN);
         plotInstB[k] = bi; plotInstY[k] = yi;
         for (int r = 0; r < PlRooms(p); r++) { siteType[bi * 26 + r] = PlRole(p, r); sitePlace[bi * 26 + r] = PL_BUILDING; }
@@ -416,6 +425,37 @@ public partial class MapGen
         PlanDoor(k, PlFront(p), SD_FRONT);
         PlanDoor(k, PlBack(p), SD_BACK);
         TypeYard(k, ref rng);
+    }
+
+    // a park or an empty lot: no building, only outdoor rooms. A park: a paved plaza in the middle, flower beds
+    // along the back fence (when it is deep enough), lawn the rest. An empty lot: a lawn verge to the lane and a
+    // yard behind it (the yard's crates, barrels and sheds, left to themselves).
+    public int[] plotKind = new int[16];        // 0 a building, 1 a park, 2 an empty lot
+    int[] plotBodyD = new int[16];
+    public const int KIND_PARK = 100, KIND_LOT = 101;
+
+    void StampOpenPlot(int k)
+    {
+        plotInstB[k] = -1;
+        int yi = NewInst(GenData.Z_LAWN);
+        plotInstY[k] = yi;
+        int[] type = cand;
+        for (int u = 0; u < plotAlong[k]; u++)
+            for (int v = 0; v < plotDepth[k]; v++)
+            {
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                Put(x, y, GenData.Z_LAWN, yi, -1, v == 0 ? PL_FRONT : PL_BACK, k);
+                int t;
+                if (plotKind[k] == 1)
+                {
+                    bool plaza = u == plotAlong[k] / 2 && v == plotDepth[k] / 2;
+                    t = plaza ? GenData.R_PATIO : ((v == plotDepth[k] - 1 && plotDepth[k] >= 3) ? GenData.R_GARDEN : GenData.R_LAWN_OPEN);
+                }
+                else t = v == 0 ? GenData.R_LAWN_OPEN : GenData.R_YARD;
+                type[u * 16 + v] = t;
+            }
+        LetterRooms(k, yi, type);
     }
 
     void PlanDoor(int k, int code, int kind)
@@ -496,7 +536,12 @@ public partial class MapGen
                 }
             if (n > 0) type[cand[2048 + rng.Range(n)]] = GenData.R_FIREPIT;
         }
-        // connected pieces of one type: one room letter each
+        LetterRooms(k, yi, type);
+    }
+
+    // connected pieces of one type: one room letter each
+    void LetterRooms(int k, int yi, int[] type)
+    {
         int letters = 0;
         for (int u = 0; u < plotAlong[k]; u++)
             for (int v = 0; v < plotDepth[k]; v++)

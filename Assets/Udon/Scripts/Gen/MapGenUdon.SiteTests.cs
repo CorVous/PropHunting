@@ -65,6 +65,7 @@ public partial class MapGenUdon
         for (int k = 0; k < nPlots; k++)
         {
             int bi = plotInstB[k], zone = plotZone[k];
+            if (bi < 0) continue;   // a park or an empty lot: no building to test
             bool hasL = false, hasK = false, hasB = false, hasT = false, hasH = false;
             for (int r = 0; r < nRooms; r++)
             {
