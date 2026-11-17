@@ -181,6 +181,17 @@ public partial class MapGen
             int k = nPlots;
             int p = PickPlan(kinds[i], ref rng);
             if (p < 0) continue;
+            // evolution step 3: one plot's building takes another plan of its kind (the main draw stays as it was,
+            // so the other plots keep theirs)
+            if (evo >= 3 && i == (int)(GenRng.Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk)
+            {
+                GenRng alt = Rng(ST_LAYOUT, 7, 3);
+                for (int tries = 0; tries < 8; tries++)
+                {
+                    int q = PickPlan(kinds[i], ref alt);
+                    if (q >= 0 && q != p) { p = q; break; }
+                }
+            }
             nPlots++;
             plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = rng.Chance(500) ? 1 : 0;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (rng.Chance(500) ? -1 : 1));

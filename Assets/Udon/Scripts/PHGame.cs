@@ -21,6 +21,32 @@ public class PHGame : UdonSharpBehaviour
     public PHSlot[] slots;
     public PHLocal local;
     public PHKnock[] knocks;            // the pool of synced prop knocks
+    public PHSeed seedTool;             // seed codes (encode, decode)
+
+    // ---- seeds (04 section 6.1): the code of the map being (or last) played, and a code the host entered for
+    // the next map. A code for another size than the players fit, or from an older generator, waits for the
+    // host's "play anyway" or "discard".
+    [UdonSynced] public string seedCode = "";
+    [UdonSynced] public string pendingCode = "";
+    [UdonSynced] public string seedStatus = "";
+    [UdonSynced] public bool seedNeedsConfirm;
+    string confirmCode = "";
+
+    // ---- map rotation (C1, C6, D2-D6, D8, G49): three maps per size, played in turn; each keeps its run count
+    // while the group plays other sizes. After runCap runs (host setting, default 10) a map retires and a new
+    // one takes its place. Between rounds, more than half of everyone here can vote to scrap the last map
+    // (replaced at once) or to undo the last scrap (one level). A shared seed plays next as a one-off.
+    public const int ROT_PER_SIZE = 3;
+    [UdonSynced] public uint[] rotSeed = new uint[12];        // size * 3 + i; 0 = not made yet
+    [UdonSynced] public int[] rotRuns = new int[12];
+    [UdonSynced] public int[] rotDensity = new int[12];
+    [UdonSynced] public int[] rotNext = new int[4];
+    [UdonSynced] public int runCap = 10;
+    [UdonSynced] public int lastRot = -1;                     // the rotation slot the last round played (-1: a one-off)
+    [UdonSynced] public int undoRot = -1;                     // the slot the last scrap replaced, and what it held
+    [UdonSynced] public uint undoSeed;
+    [UdonSynced] public int undoRuns, undoDensity;
+    [UdonSynced] public int voteId = 1;                       // votes count only for the current id (PHSlot.scrapVote/undoVote)
     public BoxCollider lobbyZone;
     public Transform lobbySpawn;
     public int minPlayers = 2;          // START needs this many in the zone (1 for solo tests: everyone hides)
@@ -33,11 +59,21 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public int huntStartMs;
     [UdonSynced] public uint seed;
     [UdonSynced] public int mapSize, mapDensity;
+    [UdonSynced] public int mapEvo;             // the map's evolution step (0 to 3, MapGen.evo)
     [UdonSynced] public int[] slotPlayer = new int[32];   // player id per slot, 0 = free
     [UdonSynced] public int[] slotRole = new int[32];     // ROLE_* for this round
     // the host is whoever owns this object (the instance master to begin with). Locked, only the host keeps
     // it; unlocked, anyone may claim it (the host panel's Unlock host / Claim host)
     [UdonSynced] public bool hostLocked = true;
+    // handover (C5): an unlock lapses after 60 s; a host idle for 5 minutes can be replaced by anyone; when the
+    // host leaves there is a 30 s claim window, then the player who has been here longest becomes host
+    [UdonSynced] public int unlockedAtMs;
+    [UdonSynced] public int hostActiveMs;
+    [UdonSynced] public int claimWindowEndMs;
+    [UdonSynced] public bool handoverPending;
+    [UdonSynced] public int lastHostId;
+    [UdonSynced] public int[] slotJoinMs = new int[32];
+    public const int UNLOCK_LAPSE_MS = 60000, HOST_IDLE_MS = 300000, CLAIM_WINDOW_MS = 30000;
     [UdonSynced] public bool hidersWin;
     [UdonSynced] public string endReason = "";
 
@@ -102,7 +138,7 @@ public class PHGame : UdonSharpBehaviour
             int id = players[p].playerId;
             if (SlotOf(id) >= 0) continue;
             for (int i = 0; i < slotPlayer.Length && i < slots.Length; i++)
-                if (slotPlayer[i] == 0) { slotPlayer[i] = id; slotRole[i] = ROLE_NONE; break; }
+                if (slotPlayer[i] == 0) { slotPlayer[i] = id; slotRole[i] = ROLE_NONE; slotJoinMs[i] = Now; break; }
         }
     }
 
@@ -122,25 +158,80 @@ public class PHGame : UdonSharpBehaviour
 
     public override void OnOwnershipTransferred(VRCPlayerApi player)
     {
-        // a new host: tidy the slot table, lock the host again, and carry on with the round's clock
-        if (IsHost) { hostLocked = true; AssignSlots(); RequestSerialization(); }
+        // a new host: tidy the slot table and carry on with the round's clock. If the old host left (VRChat handed
+        // the game on by itself), open a 30 s claim window; if this was a claim or a handover, lock it again.
+        if (!IsHost) return;
+        VRCPlayerApi old = VRCPlayerApi.GetPlayerById(lastHostId);
+        bool oldLeft = lastHostId != 0 && !Utilities.IsValid(old);
+        if (oldLeft)
+        {
+            hostLocked = false; handoverPending = true; claimWindowEndMs = Now + CLAIM_WINDOW_MS;
+        }
+        else { hostLocked = true; handoverPending = false; }
+        lastHostId = Networking.LocalPlayer.playerId;
+        hostActiveMs = Now;
+        AssignSlots();
+        RequestSerialization();
     }
 
     // ------------------------------------------------------------------ who hosts
-    public void UnlockHost() { if (!IsHost) return; hostLocked = false; RequestSerialization(); }
-    public void LockHost() { if (!IsHost) return; hostLocked = true; RequestSerialization(); }
+    public void UnlockHost() { if (!IsHost) return; hostLocked = false; unlockedAtMs = Now; RequestSerialization(); }
+    public void LockHost() { if (!IsHost) return; hostLocked = true; handoverPending = false; RequestSerialization(); }
 
-    // anyone, while the host is unlocked: take over the game (OnOwnershipTransferred locks it again)
+    // may someone else take the host now? It is unlocked (by the host, or while a departed host's claim window
+    // runs), or the host has been idle for 5 minutes
+    public bool CanClaim() { return !hostLocked || (hostActiveMs != 0 && Now - hostActiveMs > HOST_IDLE_MS); }
+
+    // anyone, while it can be claimed: take over the game (OnOwnershipTransferred locks it again)
     public void ClaimHost()
     {
-        if (IsHost || hostLocked) return;
+        if (IsHost || !CanClaim()) return;
         Networking.SetOwner(Networking.LocalPlayer, gameObject);
     }
 
-    // a claim is only granted while unlocked (the master leaving still hands the game on: VRChat does that)
+    // a claim is only granted while it can be claimed (the master leaving still hands the game on: VRChat does that)
     public override bool OnOwnershipRequest(VRCPlayerApi requester, VRCPlayerApi newOwner)
     {
-        return !hostLocked;
+        return CanClaim();
+    }
+
+    // the host's own clock for the handover: activity, the unlock lapsing, the end of a claim window
+    Vector3 hostSeenPos;
+    Quaternion hostSeenRot;
+    float nextActiveSend;
+
+    void HostHandover()
+    {
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (lastHostId != me.playerId) { lastHostId = me.playerId; RequestSerialization(); }
+        // activity: moving or looking around (a host who is away keeps still)
+        Vector3 p = me.GetPosition();
+        Quaternion r = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation;
+        if ((p - hostSeenPos).sqrMagnitude > 0.04f || Quaternion.Angle(r, hostSeenRot) > 10f || hostActiveMs == 0)
+        {
+            hostSeenPos = p; hostSeenRot = r;
+            if (Time.time >= nextActiveSend) { nextActiveSend = Time.time + 20f; hostActiveMs = Now; RequestSerialization(); }
+        }
+        if (handoverPending)
+        {
+            if (Now < claimWindowEndMs) return;
+            // nobody claimed it: the player who has been here longest takes it
+            handoverPending = false;
+            int best = -1;
+            for (int i = 0; i < slotPlayer.Length; i++)
+                if (slotPlayer[i] != 0 && Utilities.IsValid(VRCPlayerApi.GetPlayerById(slotPlayer[i])) && (best < 0 || slotJoinMs[i] < slotJoinMs[best])) best = i;
+            if (best >= 0 && slotPlayer[best] != me.playerId)
+            {
+                VRCPlayerApi heir = VRCPlayerApi.GetPlayerById(slotPlayer[best]);
+                RequestSerialization();
+                Networking.SetOwner(heir, gameObject);
+                return;
+            }
+            hostLocked = true;
+            RequestSerialization();
+            return;
+        }
+        if (!hostLocked && Now - unlockedAtMs > UNLOCK_LAPSE_MS) { hostLocked = true; RequestSerialization(); }
     }
 
     public string HostName()
@@ -179,6 +270,91 @@ public class PHGame : UdonSharpBehaviour
     public void SetTauntInterval(int v) { if (!IsHost || phase != PH_LOBBY) return; tauntInterval = v; RequestSerialization(); }
     public void SetWrongPenalty(int v) { if (!IsHost || phase != PH_LOBBY) return; wrongPenalty = v; RequestSerialization(); }
 
+    // the host enters a seed code for the next map (the panel's text field)
+    public void SubmitSeed(string text)
+    {
+        if (!IsHost || phase != PH_LOBBY || seedTool == null) return;
+        seedNeedsConfirm = false; confirmCode = "";
+        int st = seedTool.Decode(text, GenData.GEN_VERSION);
+        if (st == PHSeed.TYPO) { seedStatus = "Typo in the code. A code looks like v" + GenData.GEN_VERSION + "-XXXX-XXXX-XXXX."; }
+        else if (st == PHSeed.NEWER) { seedStatus = "This code needs a newer world (generator v" + seedTool.genVersion + ")."; }
+        else
+        {
+            string code = seedTool.Encode(seedTool.genVersion, seedTool.size, seedTool.seed, seedTool.flags);
+            int fits = RoundSize();
+            if (st == PHSeed.OLDER) { seedStatus = "Made with generator v" + seedTool.genVersion + ": the map will differ."; seedNeedsConfirm = true; confirmCode = code; }
+            else if (seedTool.size != fits) { seedStatus = "This map is size " + sizeName[seedTool.size] + "; the players here fit " + sizeName[fits] + "."; seedNeedsConfirm = true; confirmCode = code; }
+            else { pendingCode = code; seedStatus = "Next map: " + code; }
+        }
+        RequestSerialization();
+    }
+
+    public void SeedPlayAnyway()
+    {
+        if (!IsHost || !seedNeedsConfirm) return;
+        pendingCode = confirmCode; seedNeedsConfirm = false;
+        seedStatus = "Next map: " + pendingCode;
+        RequestSerialization();
+    }
+
+    public void SeedDiscard()
+    {
+        if (!IsHost) return;
+        pendingCode = ""; confirmCode = ""; seedNeedsConfirm = false; seedStatus = "";
+        RequestSerialization();
+    }
+
+    // Maps evolve (Cor): with the default cap of 10 a map changes after runs 2, 5 and 8, each step bigger; other
+    // caps spread the three steps the same way (after round(0.3 k cap) - 1 runs)
+    public int EvoStep(int runs)
+    {
+        int step = 0;
+        for (int k = 1; k <= 3; k++) if (runs >= Mathf.Max(1, Mathf.RoundToInt(k * runCap * 0.3f) - 1)) step = k;
+        return step;
+    }
+
+    void NewMap(int r)
+    {
+        rotSeed[r] = (uint)Random.Range(1, int.MaxValue);
+        rotRuns[r] = 0;
+        rotDensity[r] = densityChoice;
+    }
+
+    public void SetRunCap(int v) { if (!IsHost || phase != PH_LOBBY) return; runCap = Mathf.Clamp(v, 1, 99); RequestSerialization(); }
+
+    // ---- votes (D2-D4, G49): anyone, between rounds; PHSlot keeps each player's vote
+    public void VoteScrap() { PHSlot s = LocalSlot(); if (s == null || phase != PH_LOBBY || lastRot < 0) return; s.scrapVote = s.scrapVote == voteId ? 0 : voteId; s.Send(); }
+    public void VoteUndo() { PHSlot s = LocalSlot(); if (s == null || phase != PH_LOBBY || undoRot < 0) return; s.undoVote = s.undoVote == voteId ? 0 : voteId; s.Send(); }
+
+    public int ScrapVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (slotPlayer[i] != 0 && slots[i].scrapVote == voteId) n++; return n; }
+    public int UndoVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (slotPlayer[i] != 0 && slots[i].undoVote == voteId) n++; return n; }
+    public int VotesNeeded() { return VRCPlayerApi.GetPlayerCount() / 2 + 1; }
+    public bool CanScrap() { return phase == PH_LOBBY && lastRot >= 0; }
+    public bool CanUndo() { return phase == PH_LOBBY && undoRot >= 0; }
+
+    // the host applies a vote once more than half of everyone here agrees
+    void HostVotes()
+    {
+        if (phase != PH_LOBBY) return;
+        int need = VotesNeeded();
+        if (lastRot >= 0 && ScrapVotes() >= need)
+        {
+            undoRot = lastRot; undoSeed = rotSeed[lastRot]; undoRuns = rotRuns[lastRot]; undoDensity = rotDensity[lastRot];
+            NewMap(lastRot);
+            lastRot = -1;
+            voteId++;
+            RequestSerialization();
+        }
+        else if (undoRot >= 0 && UndoVotes() >= need)
+        {
+            rotSeed[undoRot] = undoSeed; rotRuns[undoRot] = undoRuns; rotDensity[undoRot] = undoDensity;
+            lastRot = undoRot;
+            undoRot = -1;
+            voteId++;
+            RequestSerialization();
+        }
+    }
+
     public int Participants()
     {
         int n = 0;
@@ -206,7 +382,26 @@ public class PHGame : UdonSharpBehaviour
         for (int i = 0; i < k; i++) slotRole[idx[i]] = i < hunters ? ROLE_HUNTER : ROLE_HIDER;
         mapSize = RoundSize();
         mapDensity = densityChoice;
-        seed = (uint)Random.Range(1, int.MaxValue);
+        // the next map of this size's rotation, or a shared seed as a one-off (D8)
+        lastRot = -1;
+        mapEvo = 0;   // a shared seed always plays as generated
+        bool shared = false;
+        if (pendingCode != "" && seedTool != null)
+        {
+            int st = seedTool.Decode(pendingCode, GenData.GEN_VERSION);
+            if (st == PHSeed.OK || st == PHSeed.OLDER) { seed = seedTool.seed; mapSize = seedTool.size; mapDensity = seedTool.flags & 7; shared = true; }
+        }
+        if (!shared)
+        {
+            int r = mapSize * ROT_PER_SIZE + rotNext[mapSize];
+            if (rotSeed[r] == 0) NewMap(r);
+            seed = rotSeed[r]; mapDensity = rotDensity[r];
+            mapEvo = EvoStep(rotRuns[r]);
+            lastRot = r;
+            rotNext[mapSize] = (rotNext[mapSize] + 1) % ROT_PER_SIZE;
+        }
+        pendingCode = ""; seedStatus = ""; seedNeedsConfirm = false;
+        if (seedTool != null) seedCode = seedTool.Encode(GenData.GEN_VERSION, mapSize, seed, mapDensity);
         round++;
         hidersWin = false; endReason = "";
         SetPhase(PH_LOADING, LOADING_TIMEOUT);
@@ -247,7 +442,7 @@ public class PHGame : UdonSharpBehaviour
         genRound = round;
         building = true;
         builder.Clear();
-        gen.Begin(seed, mapSize, mapDensity);
+        gen.Begin(seed, mapSize, mapDensity, mapEvo);
     }
 
     void Update()
@@ -273,7 +468,7 @@ public class PHGame : UdonSharpBehaviour
                 if (me != null) me.ReportReady(round);
             }
         }
-        if (IsHost) HostTick();
+        if (IsHost) { HostTick(); HostHandover(); HostVotes(); }
     }
 
     // ------------------------------------------------------------------ the host's clock
@@ -318,6 +513,13 @@ public class PHGame : UdonSharpBehaviour
     void End(bool hiders, string why)
     {
         hidersWin = hiders; endReason = why;
+        // the run counts; a map at its cap retires and a new one takes its slot (D6)
+        if (lastRot >= 0)
+        {
+            rotRuns[lastRot]++;
+            if (rotRuns[lastRot] >= runCap) NewMap(lastRot);
+        }
+        voteId++;
         SetPhase(PH_END, ROUND_END);
     }
 

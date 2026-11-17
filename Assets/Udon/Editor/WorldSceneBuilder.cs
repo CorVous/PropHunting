@@ -111,6 +111,16 @@ public static class WorldSceneBuilder
         local.sound = BuildAudio(gameGo.transform);
         local.hud = null; local.hudRoot = null;   // no head-locked text (Cor): PHView shows the little there is
         game.local = local;
+        var seedTool = gameGo.AddUdonSharpComponent<PHSeed>();
+        UdonSharpEditorUtility.CopyProxyToUdon(seedTool);
+        game.seedTool = seedTool;
+        // its own object: it changes owner with every toggle, which must never move the game (the host) along
+        var doorsGo = new GameObject("Doors");
+        doorsGo.transform.SetParent(gameGo.transform, false);
+        var doors = doorsGo.AddUdonSharpComponent<PHDoors>();
+        doors.game = game;
+        UdonSharpEditorUtility.CopyProxyToUdon(doors);
+        local.doors = doors;
         BuildView(gameGo.transform, game, local);
         var body = localGo.AddUdonSharpComponent<PHHiderBody>();
         body.game = game; body.local = local;

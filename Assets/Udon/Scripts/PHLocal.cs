@@ -18,6 +18,8 @@ public class PHLocal : UdonSharpBehaviour
     public TextMeshProUGUI hud;          // head-locked text
     public Transform hudRoot;
     public PHAudio sound;
+    public PHDoors doors;                // openable props' doors and lids
+    public const float HANDLE_RANGE = 1.5f, HUNTER_HANDLE_RANGE = 2.5f, GRAB_REACH = 0.25f;
     public PHHiderBody body;             // the hider's prop-shaped body (custom controller in the station)
     public TextMeshPro panelText;
     public TextMeshProUGUI panelUiText;  // the same, on the host panel's canvas
@@ -343,8 +345,49 @@ public class PHLocal : UdonSharpBehaviour
     {
         if (!value) return;
         int phase = game.phase;
+        // desktop: a click on a door within reach works it (C7), before anything else
+        if (!Networking.LocalPlayer.IsUserInVR() && TryDoor()) return;
         if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) TryTakeDisguise();
         else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT) Fire();
+    }
+
+    // VR: a hider taunts by squeezing the left grip (the right hand grabs the third-person panel); desktop: T
+    public override void InputGrab(bool value, VRC.Udon.Common.UdonInputEventArgs args)
+    {
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (!value || !me.IsUserInVR()) return;
+        // VR: a grip with the hand on or close to a door works it (grab-open)
+        if (doors != null && InRound())
+        {
+            bool left = args.handType == VRC.Udon.Common.HandType.LEFT;
+            Vector3 hand = me.GetTrackingData(left ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand).position;
+            int d = doors.NearPart(hand, GRAB_REACH);
+            if (d >= 0) { doors.Toggle(d); return; }
+        }
+        if (args.handType == VRC.Udon.Common.HandType.LEFT) Taunt();
+    }
+
+    bool InRound()
+    {
+        int p = game.phase;
+        return p == PHGame.PH_HIDE || p == PHGame.PH_HUNT || p == PHGame.PH_BRIEF;
+    }
+
+    // desktop: the door (or the openable prop) under the cross-hair, within the role's reach of the prop
+    bool TryDoor()
+    {
+        if (doors == null || !InRound() || game.phase == PHGame.PH_BRIEF) return false;
+        float reach = role == PHGame.ROLE_HUNTER ? HUNTER_HANDLE_RANGE : HANDLE_RANGE;
+        if (!Aim(reach + 1f)) return false;
+        if (!hit.collider.gameObject.name.StartsWith("door")) return false;
+        int i = doors.IndexOf(hit.collider.transform);
+        if (i < 0) return false;
+        GameObject o = game.builder.objects[doors.EmitOf(i)];
+        Vector3 me = Networking.LocalPlayer.GetPosition();
+        Vector3 d = o.transform.position - me; d.y = 0f;
+        if (d.magnitude > reach + 0.5f) return false;
+        doors.Toggle(i);
+        return true;
     }
 
     void Update()

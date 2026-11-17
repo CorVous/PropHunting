@@ -36,6 +36,7 @@ public class PHSlot : UdonSharpBehaviour
     // a ghost: a caught hider, an eliminated hunter or a mid-round joiner. Seated (Mobile on their own client, so
     // they walk as their own avatar) and seen only by the other ghosts: every other client parks the station
     [UdonSynced] public bool ghost;
+    [UdonSynced] public int scrapVote, undoVote;      // PHGame.voteId when this player votes to scrap the last map / undo a scrap
     [UdonSynced] public Vector3 walkPos;
     [UdonSynced] public float walkYaw;
     [UdonSynced] public int health, maxHealth;

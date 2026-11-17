@@ -141,8 +141,11 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
 
     public void Begin(uint seedValue, int sizeBucket) { Begin(seedValue, sizeBucket, 0); }
 
-    public void Begin(uint seedValue, int sizeBucket, int densityIndex)
+    public void Begin(uint seedValue, int sizeBucket, int densityIndex) { Begin(seedValue, sizeBucket, densityIndex, 0); }
+
+    public void Begin(uint seedValue, int sizeBucket, int densityIndex, int evoStep)
     {
+        evo = evoStep < 0 ? 0 : (evoStep > 3 ? 3 : evoStep);
         Init();
         seed = seedValue; size = sizeBucket;
         density = densityIndex < 0 || densityIndex >= DensityPercent.Length ? 0 : densityIndex;
@@ -242,7 +245,32 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     uint[] Rng(int st, int a, int b)
     {
         int version = (st == ST_LAYOUT || st == ST_EDGES) ? GenData.LAYOUT_VERSION : GenData.GEN_VERSION;
-        return RngSub(seed, U32(version), st * 16 + attempt, a, b + size * 1000);
+        return RngSub(seed, U32(version), st * 16 + attempt, a, b + size * 1000 + EvoSalt(st, a));
+    }
+
+    // ---- evolution (Cor: maps evolve over their runs; the rotation passes the step, 0 = as generated)
+    //   1 (small):  the things on furniture move in about a third of the rooms, and new wrong-category spawns
+    //   2 (medium): about a third of the indoor rooms are furnished afresh, and every outdoor area regrows
+    //   3 (big):    one building takes a different plan of its kind (LayoutSite); the rest keeps step 2
+    // Each step only changes which numbers some streams draw, so a seed and a step give the same map everywhere.
+    public int evo;
+
+    bool EvoPick(int room, int salt) { return UMod(Hash32(seed, 0xE70u, U32(salt), U32(room), 0u), 3u) == 0u; }
+
+    int EvoSalt(int st, int a)
+    {
+        if (evo <= 0) return 0;
+        if (st == ST_LEAK) return 1000003;
+        if (st == ST_SLOT && (EvoPick(a / 4, 1) || (evo >= 2 && RoomEvolves(a / 4)))) return 2000003;
+        if (st == ST_ROOM && evo >= 2 && RoomEvolves(a)) return 3000017;
+        return 0;
+    }
+
+    // from step 2: outdoor areas, and a third of the indoor rooms
+    bool RoomEvolves(int room)
+    {
+        if (room < 0 || room >= nRooms) return false;
+        return !IsBuilding(roomZone[room]) || EvoPick(room, 2);
     }
 
     int Abs(int v) { return v < 0 ? -v : v; }
