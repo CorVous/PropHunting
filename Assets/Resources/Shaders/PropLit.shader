@@ -109,36 +109,58 @@ Shader "PropHunt/Lit"
                 return false;
             }
 
+            // every Point Light Volume reaching this pixel, split in two: spot lights (the spot sun) and the rest (the lamps).
+            // Our own loop, not LightVolumeAdditiveSH's: that one stops after AdditiveMaxOverdraw lights, so where several
+            // lamp pools overlap, the extra lamps drop out with a hard edge (Cor: the overlaps looked wrong).
+            void PointLights(float3 worldPos, float3 n, out float3 sun, out float3 lamps)
+            {
+                float3 S0 = 0, S1r = 0, S1g = 0, S1b = 0;
+                float3 P0 = 0, P1r = 0, P1g = 0, P1b = 0;
+                #if VRCLV_LIGHTS_SUPPORTED
+                uint count = min((uint) _UdonPointLightVolumeCount, VRCLV_MAX_LIGHTS_COUNT);
+                float3 shadingNormal = n * 1.5;   // the package's default point light shading (3), as LightVolumeAdditiveSH
+                for (uint id = 0; id < count; id++)
+                {
+                    if (_UdonPointLightVolumePosition[id].w < 0) LV_AccumulatePointLightVolumeSH(id, worldPos, shadingNormal, 0.5, S0, S1r, S1g, S1b);
+                    else LV_AccumulatePointLightVolumeSH(id, worldPos, shadingNormal, 0.5, P0, P1r, P1g, P1b);
+                }
+                #endif
+                // additive volumes (none on a map yet) count with the lamps
+                LV_LightVolumeAdditiveSH(worldPos, P0, P1r, P1g, P1b);
+                sun = max(0, LightVolumeEvaluate(n, S0, S1r, S1g, S1b));
+                lamps = max(0, LightVolumeEvaluate(n, P0, P1r, P1g, P1b));
+            }
+
             fixed4 frag (v2f i) : SV_Target
             {
                 float3 c;
                 float3 n = normalize(i.normal);
                 bool lvOn = LightVolumesEnabled() > 0;
-                // additive volumes and point light volumes: the lamps (MapBuilderUdon's light points), and the spot sun
-                // once PHSun has baked it
-                float3 add = 0;
+                // the spot sun (once PHSun has baked it) and the lamps (MapBuilderUdon's light points)
+                float3 spot = 0, lamps = 0;
                 if (lvOn)
                 {
-                    float3 A0, A1r, A1g, A1b;
-                    LightVolumeAdditiveSH(i.worldPos, A0, A1r, A1g, A1b, 0, n);
-                    add = i.albedo * max(0, LightVolumeEvaluate(n, A0, A1r, A1g, A1b));
-                    add = min(add, i.albedo * 1.3);   // never blown out next to a lamp (a hot spot reads as shine)
+                    PointLights(i.worldPos, n, spot, lamps);
+                    spot *= i.albedo;
+                    // the lamps stay out of the toon bands: summed pools would cut each other into rings. Soft light,
+                    // never blown out next to a lamp (a hot spot reads as shine)
+                    lamps = min(i.albedo * lamps, i.albedo * 1.3);
                 }
                 if (lvOn && InBakedVolume(i.worldPos))
                 {
                     // a baked volume carries its own sky, sun and bounce: it replaces the ambient and the base sun
                     float3 L0 = 0, L1r = 0, L1g = 0, L1b = 0;
                     LV_LightVolumeRegularSH(i.worldPos, L0, L1r, L1g, L1b);
-                    c = i.albedo * max(0, LightVolumeEvaluate(n, L0, L1r, L1g, L1b)) + add;
+                    c = i.albedo * max(0, LightVolumeEvaluate(n, L0, L1r, L1g, L1b)) + spot + lamps;
                 }
                 else if (_UdonPHSunSpot > 0.5)
                 {
-                    // the spot sun (with the lamps) over the map, handing back to the base sun at the spot's edge
+                    // the spot sun over the map, handing back to the base sun at the spot's edge
                     float2 o = abs(i.worldPos.xz - _UdonPHSunArea.xy) - _UdonPHSunArea.zw;
                     float r = max(o.x, o.y);   // metres past the map's edge
-                    c = i.ambient + Toon(lerp(add, i.sun, smoothstep(0.5, 6.0, r)), i.albedo);   // the base sun from 6 m past the fence
+                    c = i.ambient + Toon(lerp(spot, i.sun, smoothstep(0.5, 6.0, r)), i.albedo) + lamps;   // the base sun from 6 m past the fence
                 }
-                else c = i.ambient + Toon(i.sun + add, i.albedo);   // before the spot is baked: the base sun, the lamps on top
+                else c = i.ambient + Toon(i.sun, i.albedo) + lamps;   // before the spot is baked: the base sun, the lamps on top
                 c = lerp(c, i.albedo * 1.4, i.emit);
                 fixed4 col = fixed4(c, 1);
                 UNITY_APPLY_FOG(i.fogCoord, col);
