@@ -36,6 +36,7 @@ public partial class MapGenUdon
     // plots
     public int nPlots;
     [System.NonSerialized] public int[] plotZone = new int[16], plotPlan = new int[16], plotSide = new int[16], plotInstB = new int[16], plotInstY = new int[16];
+    [System.NonSerialized] public int[] plotTheme = new int[16];   // generator 16: on a mixed map, each plot's own theme
     int[] plotY0 = new int[16], plotAlong = new int[16], plotDepth = new int[16], plotSet = new int[16], plotSL = new int[16], plotSR = new int[16];
     int[] plotBack = new int[16], plotMir = new int[16];
     int laneEnd, siteInstLane, siteInstWood;
@@ -375,6 +376,7 @@ public partial class MapGenUdon
             }
             nPlots++;
             plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = RngChance(rng, 500) ? 1 : 0;
+            plotTheme[k] = mapTheme == GenData.THEME_MIXED ? MixedTheme(k, kinds[i]) : mapTheme;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (RngChance(rng, 500) ? -1 : 1));
             if (siteShape == SHAPE_CUL && seg == 1) side = -1;   // the cul-de-sac's plot lies across the lane's end
             if (siteShape == SHAPE_U && seg == 2) side = -1;     // the back lane's plots stand on its far side
@@ -500,11 +502,26 @@ public partial class MapGenUdon
 
     bool Has(int[] a, int n, int v) { for (int i = 0; i < n; i++) if (a[i] == v) return true; return false; }
 
+    // a mixed map's plot: ordinary, space or medieval from the seed, but only a theme that has that kind of place
+    int MixedTheme(int k, int zone)
+    {
+        int first = (int)(UMod(Hash32(seed, 0x3A1u, U32Of(k), 0u, 0u), 3u));
+        for (int i = 0; i < 3; i++)
+        {
+            int th = (first + i) % 3;
+            if (th == GenData.THEME_NONE || zone == GenData.Z_HOUSE) return th;
+            int[] ok = ThemeKinds[th];
+            for (int j = 0; j < ok.Length; j++) if (ok[j] == zone) return th;
+        }
+        return GenData.THEME_NONE;
+    }
+    uint U32Of(int v) { return U32(v); }
+
     // a kind the map has not drawn yet and its theme allows (revision 12)
     bool KindAllowed(int[] kinds, int nk, int z)
     {
         if (Has(kinds, nk, z)) return false;
-        if (mapTheme == GenData.THEME_NONE) return true;
+        if (mapTheme == GenData.THEME_NONE || mapTheme == GenData.THEME_MIXED) return true;
         int[] ok = ThemeKinds[mapTheme];
         for (int i = 0; i < ok.Length; i++) if (ok[i] == z) return true;
         return false;

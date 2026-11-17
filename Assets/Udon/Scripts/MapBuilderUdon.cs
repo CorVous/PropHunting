@@ -18,6 +18,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // each for an ordinary map, a space base and a medieval village (index kind * 3 + GenData.THEME_*). Each has a
     // "LightPoint" child. A missing one is drawn from boxes instead.
     public GameObject[] fixturePrefabs;
+    // the themes' set dressing (PropPrefabBaker.DecorModel, same order): roof modules and dishes on a space base, craters
+    // and rocks beyond its fence; a fountain or a well and market stalls on a medieval village's square
+    public GameObject[] decorPrefabs;
+    const int DECOR_SOLAR = 0, DECOR_CARGO = 1, DECOR_DISH = 2, DECOR_CRATER = 3, DECOR_CRATER_S = 4, DECOR_METEOR = 5, DECOR_CRYSTAL = 6,
+        DECOR_FOUNTAIN = 7, DECOR_WELL = 8, DECOR_STALL_R = 9, DECOR_STALL_G = 10, DECOR_BANNER = 11, DECOR_HEDGE = 12;
     public Transform fixtureRoot;
     public Vector3 fenceModelSize = Vector3.one;
     public Transform propRoot, fenceRoot;
@@ -213,8 +218,20 @@ public class MapBuilderUdon : UdonSharpBehaviour
         else if (moodTime == 4) { elev = 60f; sunCol = new Color(0.82f, 0.84f, 0.88f); intensity = 0.55f; sky = new Color(0.66f, 0.68f, 0.70f); eq = new Color(0.60f, 0.61f, 0.62f); gr = new Color(0.52f, 0.52f, 0.52f); fog = new Color(0.70f, 0.72f, 0.74f); fogStart = 30f; fogEnd = 120f; }
         if (moodSeason == 3) { fog = Color.Lerp(fog, new Color(0.88f, 0.90f, 0.94f), 0.5f); gr = Color.Lerp(gr, new Color(0.80f, 0.82f, 0.86f), 0.6f); }
         // the map themes' skies (more-places, revision 12): a red planet's dusk, a softer blue over a medieval village
-        if (gen.mapTheme == GenData.THEME_SPACE) { fog = Color.Lerp(fog, new Color(0.82f, 0.58f, 0.44f), 0.8f); sky = Color.Lerp(sky, new Color(0.78f, 0.60f, 0.52f), 0.5f); gr = new Color(0.50f, 0.38f, 0.32f); }
-        else if (gen.mapTheme == GenData.THEME_MEDIEVAL) fog = Color.Lerp(fog, new Color(0.62f, 0.78f, 0.90f), 0.6f);
+        // Cor: the themes should look distinct. A space base: a dark violet sky, cold light, the ground lit dimly; a
+        // medieval village: warm golden light and a warm haze
+        if (gen.mapTheme == GenData.THEME_SPACE)
+        {
+            fog = new Color(0.22f, 0.17f, 0.30f); fogStart = 40f; fogEnd = 150f;
+            sky = new Color(0.42f, 0.40f, 0.58f); eq = new Color(0.40f, 0.34f, 0.44f); gr = new Color(0.36f, 0.26f, 0.24f);
+            sunCol = new Color(0.86f, 0.90f, 1f); intensity *= 0.9f;
+        }
+        else if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+        {
+            fog = Color.Lerp(fog, new Color(0.88f, 0.80f, 0.64f), 0.55f);
+            sunCol = Color.Lerp(sunCol, new Color(1f, 0.84f, 0.60f), 0.5f);
+            sky = Color.Lerp(sky, new Color(0.74f, 0.66f, 0.52f), 0.35f);
+        }
         if (sun != null)
         {
             sun.transform.rotation = Quaternion.Euler(elev, azim, 0f);
@@ -234,7 +251,22 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // ---- more-places (revision 9): a colour scheme per building on top of the map's palette, so two houses on one map
     // do not look alike. From the seed and the building's instance: every client paints it the same. A KayKit-furnished
     // house takes schemes 4 to 7 (warmer, older). Revision 12/13: a space base or a medieval village has its own look.
-    int theme;
+    int theme;          // the theme of the place being drawn: the map's, or on a mixed map the plot's (UseCell)
+    int baseTheme;      // the map-wide theme (ordinary on a mixed map: the lane, the wood, the sky)
+    bool mixed;
+    int[] plotTheme, roomPlot;
+
+    // on a mixed map, draw in the theme of the plot cell c belongs to
+    void UseCell(int c)
+    {
+        if (!mixed) return;
+        theme = GenData.THEME_NONE;
+        if (c < 0 || c >= W * H) return;
+        int r = cellRoom[c];
+        if (r < 0 || r >= roomPlot.Length) return;
+        int p = roomPlot[r];
+        if (p >= 0 && p < plotTheme.Length) theme = plotTheme[p];
+    }
     int Style(int inst) { return inst < 0 ? 0 : (int)(Mix(gen.seed ^ U32(inst * 9091 + 77)) & 3u) + (gen.KayHouse(inst) ? 4 : 0); }
     int StyleAt(int cell) { return cell >= 0 && IsBuilding(cellZone[cell]) ? Style(cellInst[cell]) : 0; }
 
@@ -295,7 +327,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         houseRoof = new Color32[] { C(172, 94, 80), C(92, 100, 112), C(84, 104, 92), C(122, 90, 70), C(70, 74, 82), C(140, 78, 62), C(60, 70, 64), C(104, 70, 60) };
         shopOut = new Color32[] { C(240, 222, 150), C(140, 196, 190), C(236, 236, 228), C(200, 160, 196) };
         garageOut = new Color32[] { C(150, 160, 170), C(176, 104, 84), C(196, 190, 170), C(120, 136, 120) };
-        spaceOut = new Color32[] { C(214, 218, 224), C(196, 202, 212), C(226, 222, 214), C(186, 194, 204) };
+        spaceOut = new Color32[] { C(96, 102, 114), C(110, 116, 128), C(86, 92, 104), C(120, 124, 132) };   // gunmetal hulls
         medievalOut = new Color32[] { C(236, 226, 200), C(222, 206, 172), C(214, 214, 204), C(240, 232, 214) };
         fairOut = new Color32[] { C(250, 210, 80), C(120, 200, 230), C(240, 140, 170), C(150, 220, 140) };
         cabinOut = new Color32[] { C(140, 96, 62), C(120, 82, 54), C(158, 112, 72), C(110, 86, 64) };
@@ -326,7 +358,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     Color32 RoofColour(int zone, int style)
     {
-        if (theme == GenData.THEME_SPACE) return (style & 1) == 0 ? C(84, 90, 102) : C(210, 140, 60);
+        if (theme == GenData.THEME_SPACE) return (style & 1) == 0 ? C(62, 66, 76) : C(74, 78, 88);
         if (theme == GenData.THEME_MEDIEVAL) return (style & 1) == 0 ? C(176, 146, 86) : C(150, 76, 58);   // thatch, red tiles
         switch (zone)
         {
@@ -405,10 +437,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
         moodTime = (int)UModB(Mix(gen.seed ^ 0x2001u), 5u);
         // the ground's season follows the generator's (its trees and decorations): autumn trees, winter decorations
         // and deep-summer green come from it; an ordinary summer map is summer or spring
-        theme = gen.mapTheme;
+        mixed = gen.mapTheme == GenData.THEME_MIXED;
+        baseTheme = mixed ? GenData.THEME_NONE : gen.mapTheme;
+        theme = baseTheme;
+        if (mixed) { plotTheme = gen.plotTheme; roomPlot = gen.roomPlot; }
         if (gen.holiday == 1) moodSeason = 3;
         else if (gen.season == 1) moodSeason = 2;
-        else if (gen.season == 2 || theme != GenData.THEME_NONE) moodSeason = 0;
+        else if (gen.season == 2 || baseTheme != GenData.THEME_NONE) moodSeason = 0;
         else moodSeason = (int)UModB(Mix(gen.seed ^ 0x2002u), 2u);
         InitPalette(gen.seed);
         InitSchemes();
@@ -476,8 +511,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 else
                 {
                     Fixtures();
+                    theme = baseTheme;
                     wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls");
                     Canopies();
+                    Dressing();
                     roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs");
                     collisionCollider.sharedMesh = ToMesh(B_COLL, "ArchCollision");
                     stage = 3; cursor = 0; phase = "Placing props";
@@ -498,15 +535,30 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // ------------------------------------------------------------------ ground (MapBuilder: blended outdoor ground, G30)
     Color32[] cellColour;
 
+    bool LaneAt(int ix, int iz)
+    {
+        if (ix < 0 || iz < 0 || ix >= IW || iz >= IH) return false;
+        int r = innerRoom[iz * IW + ix];
+        return r >= 0 && r < roomType.Length && roomType[r] == GenData.R_LANE;
+    }
+
     Color32 CellColour(int i, int ix, int iz)
     {
+        UseCell(ix / GenData.INNER_PER_CELL + iz / GenData.INNER_PER_CELL * W);
+        if (theme != GenData.THEME_NONE && LaneAt(ix, iz))
+        {
+            if (theme == GenData.THEME_MEDIEVAL) return Vary(C(146, 116, 82), ix, iz, 9);
+            bool edge = !LaneAt(ix - 1, iz) || !LaneAt(ix + 1, iz) || !LaneAt(ix, iz - 1) || !LaneAt(ix, iz + 1);
+            if (edge) return C(90, 210, 230);   // the walkway's light strip
+            return ((ix + iz) & 1) == 0 ? C(158, 166, 178) : C(146, 154, 166);
+        }
         if (theme == GenData.THEME_SPACE)
             switch (groundKind[i])
             {
                 // a red planet: regolith for grass, dark scree for the wood, metal deck for paving, ice for water
-                case MapGenUdon.GR_LAWN: return Vary(C(186, 118, 86), ix, iz, 7);
-                case MapGenUdon.GR_FOREST: return Vary(C(132, 86, 70), ix, iz, 9);
-                case MapGenUdon.GR_SOIL: return Vary(C(150, 96, 72), ix, iz, 8);
+                case MapGenUdon.GR_LAWN: return Vary(C(150, 84, 64), ix, iz, 9);
+                case MapGenUdon.GR_FOREST: return Vary(C(104, 64, 56), ix, iz, 9);
+                case MapGenUdon.GR_SOIL: return Vary(C(124, 76, 58), ix, iz, 8);
                 case MapGenUdon.GR_PAVING: case MapGenUdon.GR_DECK: return (((ix / 2 + iz / 2) & 1) == 0) ? C(150, 156, 166) : C(138, 144, 154);
                 case MapGenUdon.GR_TRACK: return Vary(C(204, 152, 112), ix, iz, 6);
                 case MapGenUdon.GR_WATER: return Vary(C(120, 196, 210), ix, iz, 5);
@@ -576,8 +628,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void FinishGround()
     {
+        theme = baseTheme;
         float m = 60f, w = W * CELL, h = H * CELL;
-        Quad(B_GROUND, new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, theme == GenData.THEME_SPACE ? C(176, 110, 82) : C(palGrass.r * 85 / 100, palGrass.g * 88 / 100, palGrass.b * 90 / 100));   // a red planet beyond a space base's fence
+        Quad(B_GROUND, new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, theme == GenData.THEME_SPACE ? C(140, 80, 62) : C(palGrass.r * 85 / 100, palGrass.g * 88 / 100, palGrass.b * 90 / 100));   // a red planet beyond a space base's fence
         groundFilter.sharedMesh = ToMesh(B_GROUND, "Ground");
         Collider(new Vector3(-m, -1f, -m), new Vector3(w + m, 0f, h + m));
         cellColour = null;
@@ -654,6 +707,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         int zoneA = cellA >= 0 ? cellZone[cellA] : GenData.Z_NONE, zoneB = cellB >= 0 ? cellZone[cellB] : GenData.Z_NONE;
         float ex = cx * CELL, ez = cz * CELL;
+        // a mixed map: the building's theme for its walls, the yard's for a fence
+        UseCell(IsBuilding(zoneA) ? cellA : (IsBuilding(zoneB) ? cellB : (cellA >= 0 ? cellA : cellB)));
         if (type == GenData.E_FENCE) { Fence(horizontal, ex, ez); return; }
         float hA = zoneWallMm[zoneA] / 1000f, hB = zoneWallMm[zoneB] / 1000f;
         float h = Mathf.Max(hA, hB);
@@ -802,6 +857,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             {
                 Color32 tc = C(84, 58, 38);
                 float d = face + 0.03f * sgn, a0 = 0.17f, a1 = CELL - 0.17f, post = 0.16f;
+                // outside: a rubble-stone base, standing out past the timbers
+                if (!tb) Panel(horizontal, ex, ez, 0.02f, CELL - 0.02f, 0f, 0.75f, face, face + 0.05f * sgn, Vary(C(146, 142, 132), (int)ex, (int)ez, 8));
                 Panel(horizontal, ex, ez, a0, a1, 0.02f, 0.18f, face, d, tc);
                 Panel(horizontal, ex, ez, a0, a1, h - 0.26f, h - 0.1f, face, d, tc);
                 Panel(horizontal, ex, ez, a0, a0 + post, 0.18f + e, h - 0.26f - e, face, d, tc);
@@ -816,7 +873,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Color32 seam = C(150, 158, 170), skirt = C(70, 76, 88);
                 float d = face + 0.012f * sgn;
                 Panel(horizontal, ex, ez, 0.12f, CELL - 0.12f, 0.02f, 0.14f, face, face + 0.02f * sgn, skirt);
-                for (int k = 1; k < 4; k++) Panel(horizontal, ex, ez, k - 0.015f, k + 0.015f, 0.14f + e, h - 0.06f, face, d, seam);
+                if (!tb)
+                {
+                    // outside: an orange hazard stripe and a lit band under the eaves
+                    Panel(horizontal, ex, ez, 0.02f, CELL - 0.02f, h - 0.75f, h - 0.55f, face, face + 0.025f * sgn, C(224, 122, 40));
+                    Panel(horizontal, ex, ez, 0.3f, CELL - 0.3f, h - 0.3f, h - 0.22f, face, face + 0.025f * sgn, C(90, 210, 230));
+                }
+                else for (int k = 1; k < 4; k++) Panel(horizontal, ex, ez, k - 0.015f, k + 0.015f, 0.14f + e, h - 0.06f, face, d, seam);
             }
         }
     }
@@ -897,6 +960,113 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (InGrid(cx, cz) && cellRoom[cz * W + cx] == r) return true;
         }
         return false;
+    }
+
+    // ------------------------------------------------------------------ the themes' dressing (Cor: make them distinct)
+    GameObject PlaceDecor(int k, Vector3 p, float yaw)
+    {
+        if (decorPrefabs == null || fixtureRoot == null || k >= decorPrefabs.Length || decorPrefabs[k] == null) return null;
+        GameObject go = Instantiate(decorPrefabs[k]);
+        Transform tr = go.transform;
+        tr.SetParent(fixtureRoot, false);
+        tr.position = p;
+        tr.rotation = Quaternion.Euler(0f, yaw, 0f);
+        return go;
+    }
+
+    float Rand01(uint salt) { return (Mix(gen.seed ^ salt) & 0xFFFFu) / 65535f; }
+
+    void Dressing()
+    {
+        int n = instMinX == null ? 0 : instMinX.Length;
+        for (int inst = 0; inst < n; inst++)
+        {
+            if (instMaxX[inst] < 0) continue;
+            int c = -1;
+            for (int q = 0; q < W * H; q++) if (cellInst[q] == inst && IsBuilding(cellZone[q])) { c = q; break; }
+            if (c < 0) continue;
+            UseCell(c);
+            if (theme == GenData.THEME_SPACE) RoofModules(inst);
+            else if (theme == GenData.THEME_MEDIEVAL && (cellZone[c] == GenData.Z_HOUSE || cellZone[c] == GenData.Z_CABIN)) Chimney(inst, cellZone[c]);
+        }
+        theme = baseTheme;
+        if (theme == GenData.THEME_SPACE) SpacePlain();
+        else if (theme == GenData.THEME_MEDIEVAL) MedievalSquare();
+    }
+
+    // roof modules: one to three per building, on cells of its own roof
+    void RoofModules(int inst)
+    {
+        int placed = 0, want = 1 + (int)UModB(Mix(gen.seed ^ U32(inst * 131 + 7)), 3u);
+        for (int z = instMinZ[inst]; z <= instMaxZ[inst] && placed < want; z++)
+            for (int x = instMinX[inst]; x <= instMaxX[inst] && placed < want; x++)
+            {
+                int c = z * W + x;
+                if (cellInst[c] != inst || !IsBuilding(cellZone[c])) continue;
+                if (UModB(Mix(gen.seed ^ U32(c * 977 + 3)), 3u) != 0) continue;
+                float t = zoneWallMm[cellZone[c]] / 1000f + 0.14f;
+                int kind = placed == 0 ? DECOR_SOLAR : (placed == 1 ? DECOR_DISH : DECOR_CARGO);
+                PlaceDecor(kind, new Vector3((x + 0.5f) * CELL, t, (z + 0.5f) * CELL), 90f * (int)UModB(Mix(gen.seed ^ U32(c)), 4u));
+                placed++;
+            }
+    }
+
+    // craters, meteors and crystals out on the plain beyond a space base's fence
+    void SpacePlain()
+    {
+        float w = W * CELL, h = H * CELL;
+        for (int k = 0; k < 26; k++)
+        {
+            float a = Rand01(U32(k * 2 + 1001)), b = Rand01(U32(k * 2 + 1002));
+            float px, pz, out1 = 4f + 36f * b;
+            int edge = (int)(a * 4f) & 3;
+            float along = Rand01(U32(k + 2003));
+            if (edge == 0) { px = -out1; pz = along * (h + 40f) - 20f; }
+            else if (edge == 1) { px = w + out1; pz = along * (h + 40f) - 20f; }
+            else if (edge == 2) { pz = -out1; px = along * (w + 40f) - 20f; }
+            else { pz = h + out1; px = along * (w + 40f) - 20f; }
+            int kind = k % 4 == 0 ? DECOR_CRATER : (k % 4 == 1 ? DECOR_CRATER_S : (k % 4 == 2 ? DECOR_METEOR : DECOR_CRYSTAL));
+            PlaceDecor(kind, new Vector3(px, kind <= DECOR_CRATER_S ? -0.05f : 0f, pz), Rand01(U32(k + 3001)) * 360f);
+        }
+    }
+
+    // a medieval village's square: a lane cell with lane all round it is the square's middle
+    void MedievalSquare()
+    {
+        for (int c = 0; c < W * H; c++)
+        {
+            if (!IsLaneCell(c % W, c / W)) continue;
+            bool middle = true;
+            for (int dz = -1; dz <= 1 && middle; dz++) for (int dx = -1; dx <= 1 && middle; dx++) if (!IsLaneCell(c % W + dx, c / W + dz)) middle = false;
+            if (!middle) continue;
+            float cx = (c % W + 0.5f) * CELL, cz = (c / W + 0.5f) * CELL;
+            PlaceDecor(Rand01(41u) < 0.6f ? DECOR_FOUNTAIN : DECOR_WELL, new Vector3(cx, 0f, cz), 0f);
+            PlaceDecor(DECOR_STALL_R, new Vector3(cx - 4.6f, 0f, cz + 4.6f), 135f);
+            PlaceDecor(DECOR_STALL_G, new Vector3(cx + 4.6f, 0f, cz - 4.6f), -45f);
+            PlaceDecor(DECOR_BANNER, new Vector3(cx + 5.2f, 0f, cz + 5.2f), 45f);
+            return;
+        }
+    }
+
+    // a stone chimney at a gable end, above the ridge
+    void Chimney(int inst, int zone)
+    {
+        float bx0 = instMinX[inst] * CELL, bx1 = (instMaxX[inst] + 1) * CELL, bz0 = instMinZ[inst] * CELL, bz1 = (instMaxZ[inst] + 1) * CELL;
+        bool alongX = (bx1 - bx0) >= (bz1 - bz0);
+        float t = zoneWallMm[zone] / 1000f + 0.14f;
+        float half = (alongX ? bz1 - bz0 : bx1 - bx0) * 0.5f, rise = Mathf.Min(half, 3.6f);
+        float cx = alongX ? bx0 + 1.2f : (bx0 + bx1) * 0.5f + 0.6f, cz = alongX ? (bz0 + bz1) * 0.5f + 0.6f : bz0 + 1.2f;
+        int cc = (int)(cz / CELL) * W + (int)(cx / CELL);
+        if (cc < 0 || cc >= W * H || cellInst[cc] != inst) return;
+        Box(B_ROOFS, new Vector3(cx - 0.35f, t, cz - 0.35f), new Vector3(cx + 0.35f, t + rise + 0.9f, cz + 0.35f), C(128, 122, 114), FACE_ALL & ~FACE_YN);
+        Box(B_ROOFS, new Vector3(cx - 0.42f, t + rise + 0.9f, cz - 0.42f), new Vector3(cx + 0.42f, t + rise + 1.05f, cz + 0.42f), C(100, 96, 90), FACE_ALL);
+    }
+
+    bool IsLaneCell(int x, int z)
+    {
+        if (!InGrid(x, z)) return false;
+        int r = cellRoom[z * W + x];
+        return r >= 0 && r < roomType.Length && roomType[r] == GenData.R_LANE;
     }
 
     // ------------------------------------------------------------------ light fixtures (see lightPos)
@@ -987,6 +1157,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (!place) continue;
             float h = zoneWallMm[cellZone[c]] / 1000f;
             float cx = (c % W + 0.5f) * CELL, cz = (c / W + 0.5f) * CELL;
+            UseCell(c);
             if (PlaceFixture(0, new Vector3(cx, h, cz), 0f, LK_CEILING)) continue;
             Box(B_ROOFS, new Vector3(cx - 0.28f, h - 0.05f, cz - 0.28f), new Vector3(cx + 0.28f, h, cz + 0.28f), rim, FACE_ALL & ~FACE_YP);
             Box(B_ROOFS, new Vector3(cx - 0.21f, h - 0.09f, cz - 0.21f), new Vector3(cx + 0.21f, h - 0.05f, cz + 0.21f), glow, FACE_ALL & ~FACE_YP);
@@ -1022,6 +1193,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Collider(mn, mx);
             sx[ns] = x; sz[ns] = z; ns++;
             // the model's arm reaches along its +z: turn it over the lane
+            UseCell(c);
             if (PlaceFixture(2, new Vector3(px, 0f, pz), Mathf.Atan2(-dx, -dz) * Mathf.Rad2Deg, LK_STREET)) continue;
             Box(B_WALLS, mn, mx, pole, FACE_ALL & ~FACE_YN);
             Box(B_WALLS, new Vector3(px - 0.12f, 0f, pz - 0.12f), new Vector3(px + 0.12f, 0.3f, pz + 0.12f), pole, FACE_ALL & ~FACE_YN);
@@ -1066,7 +1238,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     float RoofY(float b, float b0, float b1, float t)
     {
         float mid = (b0 + b1) * 0.5f, half = (b1 - b0) * 0.5f;
-        float rise = Mathf.Min(half * PITCH, MAX_RISE);
+        float rise = theme == GenData.THEME_MEDIEVAL ? Mathf.Min(half * 1.0f, 3.6f) : Mathf.Min(half * PITCH, MAX_RISE);   // steep thatch
         return t + rise * Mathf.Clamp01(1f - Mathf.Abs(b - mid) / half);
     }
 
@@ -1084,6 +1256,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void PitchedCell(int x, int z, float t)
     {
+        UseCell(z * W + x);
         int inst = cellInst[z * W + x];
         if (instMinX == null || inst < 0 || inst >= instMinX.Length) return;
         float bx0 = instMinX[inst] * CELL - WALL_HALF, bx1 = (instMaxX[inst] + 1) * CELL + WALL_HALF;
@@ -1128,6 +1301,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void CellWalls(int c)
     {
+        UseCell(c);
         int x = c % W, z = c / W;
         int zone = cellZone[c];
         for (int d = 0; d < 4; d++)
@@ -1147,6 +1321,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (cellHigh >= 0 && cellZone[cellHigh] == GenData.Z_NONE) cellHigh = -1;
             Edge(horizontal, ecx, ecz, type, off, cellLow, cellHigh);
         }
+        UseCell(c);
         if (IsBuilding(zone))
         {
             float h = zoneWallMm[zone] / 1000f, t = h + 0.14f;
@@ -1164,8 +1339,18 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Box3(B_ROOFS, new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, ceiling, FACE_ALL);
             }
             Collider(new Vector3(x * CELL - WALL_HALF, h, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, t, (z + 1) * CELL + WALL_HALF));
-            // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider)
-            if (zone == GenData.Z_HOUSE || zone == GenData.Z_CABIN || zone == GenData.Z_BARN || zone == GenData.Z_CHAPEL) PitchedCell(x, z, t);
+            // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider);
+            // a space base keeps its roofs flat, with an orange parapet round the edge
+            if (theme == GenData.THEME_SPACE)
+            {
+                Color32 rim = C(224, 122, 40);
+                float rx0 = x * CELL - WALL_HALF, rx1 = (x + 1) * CELL + WALL_HALF, rz0 = z * CELL - WALL_HALF, rz1 = (z + 1) * CELL + WALL_HALF;
+                if (!bw) Box(B_ROOFS, new Vector3(rx0, t, rz0), new Vector3(rx0 + 0.15f, t + 0.32f, rz1), rim, FACE_ALL & ~FACE_YN);
+                if (!be) Box(B_ROOFS, new Vector3(rx1 - 0.15f, t, rz0), new Vector3(rx1, t + 0.32f, rz1), rim, FACE_ALL & ~FACE_YN);
+                if (!bs) Box(B_ROOFS, new Vector3(rx0, t, rz0), new Vector3(rx1, t + 0.32f, rz0 + 0.15f), rim, FACE_ALL & ~FACE_YN);
+                if (!bn2) Box(B_ROOFS, new Vector3(rx0, t, rz1 - 0.15f), new Vector3(rx1, t + 0.32f, rz1), rim, FACE_ALL & ~FACE_YN);
+            }
+            else if (zone == GenData.Z_HOUSE || zone == GenData.Z_CABIN || zone == GenData.Z_BARN || zone == GenData.Z_CHAPEL || theme == GenData.THEME_MEDIEVAL) PitchedCell(x, z, t);
         }
     }
 

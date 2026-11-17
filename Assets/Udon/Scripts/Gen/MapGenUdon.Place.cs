@@ -571,7 +571,7 @@ public partial class MapGenUdon
             case GenData.R_GRAVEYARD: PlanGraveyard(); break;
         }
         if (holiday != 0) HolidayDecor();
-        if (mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE) ThemeDecor();
+        if (RoomThemeOf(room) != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE) ThemeDecor();
         if (roomFloorMin[room] > 0) FillToMinimum();
         // what sits on, in and under the furniture, thinned evenly to the room's cap
         SetTopFactor(room, firstEmit);

@@ -78,8 +78,9 @@ public static class PropPrefabBaker
         AssetDatabase.SaveAssets();
         // the light fixtures (fixtures.bytes, Tools/make_fixtures.py): ceiling, wall, street x ordinary, space, medieval
         var fixtures = BakeFixtures(mat);
+        var decor = BakeDecor(mat);
         AssetDatabase.SaveAssets();
-        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures);
+        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor);
         Debug.Log("[prophunt] baked " + mesh.Length + " meshes and " + prefabs.Length + " prop prefabs");
     }
 
@@ -126,6 +127,44 @@ public static class PropPrefabBaker
     }
 
     // ------------------------------------------------------------------ the blob (as ModelLibrary.Load)
+    // the themes' set dressing (MapBuilderUdon.DECOR_*): model, its largest side in metres, solid (a collider)
+    static readonly string[] DecorModel = { "roofmodule_solarpanels", "roofmodule_cargo_A", "satelliteDish_large", "craterLarge", "crater",
+        "meteor_detailed", "rock_crystalsLargeA", "fountain-round-detail", "building_well_blue", "stall-red", "stall-green", "banner-red", "hedge-large" };
+    static readonly float[] DecorSize = { 3.2f, 2.6f, 2.4f, 7f, 3.5f, 2.2f, 2.6f, 3.2f, 2.2f, 2.8f, 2.8f, 2.6f, 2.2f };
+    static readonly bool[] DecorSolid = { false, false, false, false, false, true, true, true, true, true, true, true, true };
+
+    static GameObject[] BakeDecor(Material mat)
+    {
+        var result = new GameObject[DecorModel.Length];
+        for (int i = 0; i < DecorModel.Length; i++)
+        {
+            int m = Array.IndexOf(GenModels.Name, DecorModel[i]);
+            if (m < 0 || mesh[m] == null) { Debug.LogWarning("[prophunt] decor model missing: " + DecorModel[i]); continue; }
+            Bounds b = bounds[m];
+            float big = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+            if (DecorModel[i] == "banner-red") big = b.size.y;
+            float s = DecorSize[i] / Mathf.Max(1e-4f, big);
+            var go = new GameObject("decor_" + DecorModel[i]);
+            var inner = new GameObject("mesh");
+            inner.transform.SetParent(go.transform, false);
+            inner.transform.localScale = new Vector3(s, s, s);
+            // standing on its origin, centred
+            inner.transform.localPosition = new Vector3(-b.center.x * s, -b.min.y * s, -b.center.z * s);
+            inner.AddComponent<MeshFilter>().sharedMesh = mesh[m];
+            inner.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            if (DecorSolid[i])
+            {
+                var bc = go.AddComponent<BoxCollider>();
+                bc.center = new Vector3(0f, b.size.y * s * 0.5f, 0f);
+                bc.size = new Vector3(b.size.x * s, b.size.y * s, b.size.z * s);
+                go.layer = 11;
+            }
+            result[i] = PrefabUtility.SaveAsPrefabAsset(go, OUT + "/Fixtures/" + go.name + ".prefab");
+            UnityEngine.Object.DestroyImmediate(go);
+        }
+        return result;
+    }
+
     static readonly string[] FixtureNames = {
         "fx_ceiling_modern", "fx_ceiling_space", "fx_ceiling_medieval",
         "fx_wall_modern", "fx_wall_space", "fx_wall_medieval",

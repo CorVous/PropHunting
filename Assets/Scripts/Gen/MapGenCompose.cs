@@ -61,12 +61,23 @@ public partial class MapGen
     // plans name the Kenney pieces; in a KayKit house Dn and the slots give the twin instead.
     public bool KayHouse(int inst)
     {
-        return inst >= 0 && mapTheme == GenData.THEME_NONE && instZone[inst] == GenData.Z_HOUSE && GenRng.Hash32(seed, (uint)inst, 7717, 11, 0) % 1000 < 400;
+        return inst >= 0 && InstTheme(inst) == GenData.THEME_NONE && instZone[inst] == GenData.Z_HOUSE && GenRng.Hash32(seed, (uint)inst, 7717, 11, 0) % 1000 < 400;
+    }
+
+    // the theme a place takes: the map's, or on a mixed map its plot's (the lane and the wood are ordinary)
+    public int PlotThemeOf(int plot) { return mapTheme != GenData.THEME_MIXED ? mapTheme : (plot >= 0 && plot < nPlots ? plotTheme[plot] : GenData.THEME_NONE); }
+    public int RoomThemeOf(int room) { return mapTheme != GenData.THEME_MIXED ? mapTheme : (room >= 0 ? PlotThemeOf(roomPlot[room]) : GenData.THEME_NONE); }
+    public int InstTheme(int inst)
+    {
+        if (mapTheme != GenData.THEME_MIXED) return mapTheme;
+        for (int k = 0; k < nPlots; k++) if (plotInstB[k] == inst || plotInstY[k] == inst) return plotTheme[k];
+        return GenData.THEME_NONE;
     }
 
     int TwinIn(int room, int d)
     {
-        if (d >= 0 && mapTheme != GenData.THEME_NONE) { int t = GenData.defThemeTwin[d * 3 + mapTheme]; return t >= 0 ? t : d; }   // a themed map (revision 12)
+        int th = RoomThemeOf(room);
+        if (d >= 0 && th != GenData.THEME_NONE) { int t = GenData.defThemeTwin[d * 3 + th]; return t >= 0 ? t : d; }   // a themed place (revision 12)
         if (d < 0 || room < 0 || GenData.defTwin[d] < 0 || !KayHouse(roomInst[room])) return d;
         return GenData.defTwin[d];
     }

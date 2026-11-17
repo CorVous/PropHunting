@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 15;   // 15: bigger plans (Tools/make_plans.py), less outside, buildings at the map's edge, the crossroads, the village square and the U, themes a third each
+    public const int GEN_VERSION = 16;   // 16: the mixed theme (each plot its own), themes a quarter each with the ordinary maps
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -105,12 +105,14 @@ public static partial class GenData
     // revision 12, the whole-map themes (G58): now and then a seed's map is a space base or a medieval village. The
     // same generator lays it out; every prop is replaced by its theme twin (BuildThemeTwins), the buildings, the
     // ground, the fences and the sky take the theme's colours, and only the kinds of plot that suit it are drawn.
-    public const int THEME_NONE = 0, THEME_SPACE = 1, THEME_MEDIEVAL = 2;
-    public static readonly string[] ThemeName = { "", "Space base", "Medieval village" };
-    public const int THEME_SPACE_PERMILLE = 333, THEME_MEDIEVAL_PERMILLE = 333;   // Cor: a third each (generator 15)   // generator 13 (0 in 12)
+    // generator 16 (Cor's prototype): the mixed map, each plot ordinary, a space base or medieval (MapGen.plotTheme)
+    public const int THEME_NONE = 0, THEME_SPACE = 1, THEME_MEDIEVAL = 2, THEME_MIXED = 3;
+    public static readonly string[] ThemeName = { "", "Space base", "Medieval village", "Mixed" };
+    public const int THEME_SPACE_PERMILLE = 250, THEME_MEDIEVAL_PERMILLE = 250, THEME_MIXED_PERMILLE = 250;   // a quarter each with the ordinary maps (generator 16; a third each in 15)
     public static readonly int[][] ThemeKinds = { null,
         new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE },   // space: mess hall, cargo bay, supply depot, rover garage (revision 13: the park held back, G58: 54 models per place against 59)
-        new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_BARN, Z_PARK, Z_CABIN, Z_CHAPEL } };     // medieval: tavern, granary, market, farm, green, woodcutter's hut, chapel
+        new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_BARN, Z_PARK, Z_CABIN, Z_CHAPEL },     // medieval: tavern, granary, market, farm, green, woodcutter's hut, chapel
+        null };   // mixed: every kind (each plot then takes a theme that suits it)
     public const int Z_ZOO = 11, Z_CABIN = 12, Z_FAIR = 13, Z_CHAPEL = 14;   // revision 12: a zoo (no main building, like the park), a log cabin, a funfair, a chapel
     public static readonly string[] ZoneName = { "-", "House", "Warehouse", "Diner", "Lawn", "Forest", "Hunter release", "Shop", "Garage", "Farm", "Park", "Zoo", "Cabin", "Funfair", "Chapel" };
     public static readonly int[] ZoneWallMm = { 0, 2600, 2800, 2800, 0, 0, 0, 2800, 3000, 3400, 0, 0, 2700, 3200, 3800 };   // KayKit buildings at the reduced height (Z4 option R); a barn is taller
