@@ -41,6 +41,8 @@ public class PHHiderBody : UdonSharpBehaviour
 
     float moveV, moveH, look;
     float lastFaceYaw;
+    const float EDGE_DEG = 55f;           // how far the desktop view may turn from the station before the station follows
+    public float desktopTurn = 4f;        // degrees the station turns per unit of mouse movement at that edge
     bool jumpPressed;
     RaycastHit hit;
 
@@ -113,6 +115,16 @@ public class PHHiderBody : UdonSharpBehaviour
         hf.y = 0f;
         float headYaw = hf.sqrMagnitude > 1e-4f ? Mathf.Atan2(hf.x, hf.z) * Mathf.Rad2Deg : stationYaw;
         if (vr && !frozen && Mathf.Abs(look) > 0.1f) stationYaw += look * 120f * dt;
+        // desktop: VRChat lets a seated player's view turn only about 90 degrees either way from the station (Cor: a
+        // hider could only turn 180 degrees). Near that limit, mouse movement that keeps turning the same way turns the
+        // station instead, so the view (and the prop with it) can go all the way round. Only mouse movement does
+        // this: turning the station to chase the view would spin it.
+        if (!vr && !frozen)
+        {
+            float rel = Mathf.DeltaAngle(stationYaw, headYaw);
+            float mx = Input.GetAxis("Mouse X");
+            if ((rel > EDGE_DEG && mx > 0f) || (rel < -EDGE_DEG && mx < 0f)) stationYaw += mx * desktopTurn;
+        }
         stationYaw = Mathf.Repeat(stationYaw, 360f);
         lastFaceYaw = vr ? stationYaw : headYaw;
         float faceYaw = headYaw;
