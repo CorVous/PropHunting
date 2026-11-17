@@ -147,7 +147,7 @@ public class PHHiderBody : UdonSharpBehaviour
             jump = false;
             left -= step;
         }
-        if (ghost && pos.y < 0f) { pos.y = 0f; velY = 0f; grounded = true; }
+        if (ghost && pos.y < -12f) { pos.y = 0f; velY = 0f; grounded = true; }   // fell out of the world
     }
 
     // ------------------------------------------------------------------ casts (BoxBody)
@@ -169,7 +169,19 @@ public class PHHiderBody : UdonSharpBehaviour
 
     bool GroundBelow(Vector3 from, float dist)
     {
-        if (mask == 0) { groundY = 0f; groundN = Vector3.up; return from.y - dist <= 0f; }
+        if (mask == 0)
+        {
+            // a ghost passes through walls and props but keeps to the floors (the architecture, layer 11), so it can go
+            // up a stair to an upper floor or down into a basement (generator 18); the ground when there is none
+            RaycastHit g;
+            groundY = 0f; groundN = Vector3.up;
+            if (Physics.Raycast(from + Vector3.up * 0.5f, Vector3.down, out g, dist + 0.5f, 1 << 11, QueryTriggerInteraction.Ignore))
+            {
+                groundY = g.point.y; groundN = g.normal;
+                return true;
+            }
+            return from.y - dist <= 0f && from.y >= -0.05f;
+        }
         Vector3 h = new Vector3(half.x - 0.005f, half.y - RAISE * 0.5f, half.z - 0.005f);
         Vector3 c = from + Vector3.up * (half.y + RAISE * 0.5f);
         RaycastHit r;

@@ -242,6 +242,7 @@ public partial class MapGenUdon
             }
         }
         RoomEntries();
+        StairTags();   // generator 18: the stairs between levels (MapGenLevels.cs)
         // nothing spawns within 1.5 m of the release exit (04 section 4.7.2)
         {
             int hx = releaseX + DX[releaseDir], hz = releaseZ + DZ[releaseDir];

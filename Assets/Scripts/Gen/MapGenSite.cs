@@ -995,6 +995,7 @@ public partial class MapGen
         }
         statGroundCells = 0;
         for (int c = 0; c < W * H; c++) if (cellZone[c] != GenData.Z_NONE && cellZone[c] != GenData.Z_RELEASE) statGroundCells++;
+        AddLevels();   // generator 18: upper floors and basements, beside the map (MapGenLevels.cs)
         return true;
     }
 
@@ -1041,7 +1042,7 @@ public partial class MapGen
         for (int c = 0; c < W * H; c++)
         {
             int za = cellZone[c];
-            if (!GenData.IsBuilding(za)) continue;
+            if (!GenData.IsBuilding(za) || instLevel[cellInst[c]] < 0) continue;   // no windows in a basement
             int x = c % W, z = c / W, rt = roomType[cellRoom[c]];
             int chance = za == GenData.Z_WAREHOUSE ? (rt == GenData.R_WH_OFFICE ? 700 : 220) : (rt == GenData.R_BATH || rt == GenData.R_HALL ? 350 : (rt == GenData.R_DINER_STORE ? 150 : 650));
             // revision 9: a shop's windows on its floor; a garage bay's walls carry its roller door, not windows
@@ -1063,7 +1064,7 @@ public partial class MapGen
             bool habitable = rt == GenData.R_LIVING || rt == GenData.R_DINING || rt == GenData.R_KITCHEN || rt == GenData.R_BEDROOM || rt == GenData.R_OFFICE
                 || rt == GenData.R_KIDS || rt == GenData.R_DINER_DINING || rt == GenData.R_WH_OFFICE || rt == GenData.R_SHOP_FLOOR || rt == GenData.R_BACK_OFFICE
                 || rt == GenData.R_TEEN || rt == GenData.R_PLAYROOM;
-            if (!habitable) continue;
+            if (!habitable || instLevel[roomInst[r]] < 0) continue;
             int wall = -1, seen = 0;
             bool has = false;
             for (int c = 0; c < W * H && !has; c++)

@@ -97,7 +97,7 @@ public class PHLocal : UdonSharpBehaviour
                     if (game.gen.nSpawns > 0)
                     {
                         int c = game.gen.spawnCell[Random.Range(0, game.gen.nSpawns)];
-                        at = new Vector3((c % game.gen.IW + 0.5f) * 0.5f, 0f, (c / game.gen.IW + 0.5f) * 0.5f);
+                        at = game.builder.InnerWorld(c);   // upstairs or in a basement too
                     }
                     float facing = Random.Range(0, 24) * 15f;
                     me.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));

@@ -28,6 +28,7 @@ public partial class MapGenUdon
     [UnityEngine.HideInInspector] public int[] SizeHouseFront;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeHouseFront2;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeLeaks;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeLevelsMax;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeParkAlong;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeParkDeep;   // GenData
     [UnityEngine.HideInInspector] public string[] SizePlots;   // GenData

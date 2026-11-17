@@ -44,6 +44,8 @@ public partial class MapGenUdon
                 if (reach[j] != 0 || SolidAt(j)) continue;
                 reach[j] = 1; queue[qt++] = j;
             }
+            int l = link[i];   // up or down a stair
+            if (l >= 0 && reach[l] == 0 && !SolidAt(l)) { reach[l] = 1; queue[qt++] = l; }
         }
     }
 
@@ -385,6 +387,8 @@ public partial class MapGenUdon
                 if (exitN >= exitCell.Length) return;
                 exitCell[exitN] = i; exitTo[exitN] = j; exitN++; exitCount[room]++;
             }
+            int lk = link[i];   // a stair to another level
+            if (lk >= 0 && innerRoom[lk] >= 0 && innerRoom[lk] != room && exitN < exitCell.Length) { exitCell[exitN] = i; exitTo[exitN] = lk; exitN++; exitCount[room]++; }
         }
     }
 

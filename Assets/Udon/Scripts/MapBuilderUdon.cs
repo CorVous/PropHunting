@@ -104,7 +104,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             {
                 int vi = tri[i + q];
                 Vector3 p = v[vi], nn = n[vi];
-                bv[b][nv[b]] = org + a * (p.x * w) + Vector3.up * (p.y * h) + o * p.z;
+                bv[b][nv[b]] = lv + org + a * (p.x * w) + Vector3.up * (p.y * h) + o * p.z;
                 bn[b][nv[b]] = a * nn.x + Vector3.up * nn.y + o * nn.z;
                 Color32 col = c[vi];
                 float cl = Mathf.Sqrt((float)col.r * col.r + (float)col.g * col.g + (float)col.b * col.b) + 0.001f;
@@ -129,6 +129,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (!partsReady || cellIn < 0) return false;
         int zone = cellZone[cellIn];
         if (zone == GenData.Z_CABIN) return false;   // the log cabin keeps its logs
+        int li = cellInst[cellIn];
+        if (li >= 0 && li < instLevelB.Length && instLevelB[li] < 0) return false;   // nobody sees a basement's outside
         if (cellOut >= 0 && cellRoom[cellOut] >= 0)
         {
             int rt = roomType[cellRoom[cellIn]], ot = roomType[cellRoom[cellOut]];
@@ -212,6 +214,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     // the generator's arrays, cached once per build (reading another behaviour's field is slow)
     int W, H, IW, IH;
+    // generator 18 (Cor: upper floors and basements): each level lies beside the map in the generator's grid and is drawn
+    // where it belongs, lifted or sunk over its ground floor. lv is the offset of whatever is being drawn (Quad4,
+    // AppendPart, PlaceFixture, PlaceDecor and AddLight add it); siteW x siteH is the map without the levels.
+    int siteW, siteH;
+    Vector3 lv;
+    Vector3[] instOff;
+    int[] instLevelB, instBaseB;
+    bool[] instHasUpper;
+    int[] stairLowB, stairHighB, stairRunB, stairSideB;
+    int nStairsB;
     int[] cellZone, cellRoom, roomType, tags, innerRoom, emitDef, emitX, emitY, emitZ, emitYaw, defFlags, zoneWallMm;
     byte[] groundKind;
 
@@ -246,7 +258,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         int s = nv[b];
         if (s + 4 > bv[b].Length) BufGrow(b);
         Vector3[] v = bv[b]; Vector3[] no = bn[b]; Color32[] c = bc[b]; int[] t = bt[b];
-        v[s] = a; v[s + 1] = p1; v[s + 2] = p2; v[s + 3] = d;
+        v[s] = a + lv; v[s + 1] = p1 + lv; v[s + 2] = p2 + lv; v[s + 3] = d + lv;
         no[s] = n; no[s + 1] = n; no[s + 2] = n; no[s + 3] = n;
         c[s] = ca; c[s + 1] = cb; c[s + 2] = cc; c[s + 3] = cd;
         int k = nt[b];
@@ -437,7 +449,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // house takes schemes 4 to 7 (warmer, older). Revision 12/13: a space base or a medieval village has its own look.
     int theme;          // the map's theme
 
-    int Style(int inst) { return inst < 0 ? 0 : (int)(Mix(gen.seed ^ U32(inst * 9091 + 77)) & 3u) + (gen.KayHouse(inst) ? 4 : 0); }
+    int Style(int inst)
+    {
+        if (inst < 0) return 0;
+        if (instBaseB != null && inst < instBaseB.Length) inst = instBaseB[inst];   // an upper floor or a basement looks like its ground floor
+        return (int)(Mix(gen.seed ^ U32(inst * 9091 + 77)) & 3u) + (gen.KayHouse(inst) ? 4 : 0);
+    }
     int StyleAt(int cell) { return cell >= 0 && IsBuilding(cellZone[cell]) ? Style(cellInst[cell]) : 0; }
 
     readonly int[] TintR = { 0, 10, -14, 4, 14, -6, 18, 6 }, TintG = { 0, -6, 2, 8, 2, 10, -8, -4 }, TintB = { 0, -14, 10, -10, -20, -14, -2, 14 };
@@ -617,9 +634,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
         InitParts();
         ApplyMood();
         ListBuildings();
+        lv = Vector3.zero;
         cellZone = gen.cellZone; cellRoom = gen.cellRoom; roomType = gen.roomType; tags = gen.tags; innerRoom = gen.innerRoom;
         emitDef = gen.emitDef; emitX = gen.emitX; emitY = gen.emitY; emitZ = gen.emitZ; emitYaw = gen.emitYaw;
         defFlags = gen.defFlags; zoneWallMm = gen.ZoneWallMm; groundKind = gen.ground;
+        LevelOffsets();
         objects = new GameObject[gen.nEmit];
         lightPos = new Vector3[64]; lightKind = new int[64]; lightFollow = new Transform[64]; nLights = 0;
         glow = new Color32(255, 240, 196, 0);   // alpha 0: PropHunt/Lit draws it glowing
@@ -690,6 +709,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 else
                 {
                     Fixtures();
+                    Stairs();
                     wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls");
                     Canopies();
                     PitchedRoofs();
@@ -798,19 +818,245 @@ public class MapBuilderUdon : UdonSharpBehaviour
             int i = iz * IW + ix;
             if ((tags[i] & GenData.T_FLOOR) == 0) continue;
             float x = ix * INNER, z = iz * INNER;
+            lv = InnerOff(i);
             Vector3 a = new Vector3(x, 0, z), b = new Vector3(x, 0, z + INNER), c = new Vector3(x + INNER, 0, z + INNER), d = new Vector3(x + INNER, 0, z);
             if (Blends(i)) Quad4(B_GROUND, a, b, c, d, Vector3.up, CornerColour(ix, iz, i), CornerColour(ix, iz + 1, i), CornerColour(ix + 1, iz + 1, i), CornerColour(ix + 1, iz, i));
             else Quad(B_GROUND, a, b, c, d, Vector3.up, cellColour[i]);
         }
+        lv = Vector3.zero;
     }
 
     void FinishGround()
     {
-        float m = 260f, w = W * CELL, h = H * CELL;   // out past the hills round the map (SkyDressing)
-        Quad(B_GROUND, new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, theme == GenData.THEME_SPACE ? C(140, 80, 62) : C(palGrass.r * 85 / 100, palGrass.g * 88 / 100, palGrass.b * 90 / 100));   // a red planet beyond a space base's fence
+        lv = Vector3.zero;
+        float m = 260f, w = siteW * CELL, h = siteH * CELL;   // out past the hills round the map (SkyDressing)
+        Color32 land = theme == GenData.THEME_SPACE ? C(140, 80, 62) : C(palGrass.r * 85 / 100, palGrass.g * 88 / 100, palGrass.b * 90 / 100);   // a red planet beyond a space base's fence
+        // round the map, then under it a row of cells at a time, open over a basement's stair
+        GroundPiece(-m, 0f, -m, h + m, land, -1f); GroundPiece(w, w + m, -m, h + m, land, -1f);
+        GroundPiece(0f, w, -m, 0f, land, -1f); GroundPiece(0f, w, h, h + m, land, -1f);
+        // over a basement the ground is a thin skin (the basement's ceiling is just under it)
+        bool[] cellar = new bool[instOff.Length];
+        for (int i = 0; i < instOff.Length; i++) if (instLevelB[i] < 0) cellar[instBaseB[i]] = true;
+        for (int z = 0; z < siteH; z++)
+        {
+            int run = 0;
+            for (int x = 0; x <= siteW; x++)
+            {
+                int c = z * W + x;
+                int s = x < siteW ? StairAbove(c) : -1;
+                int ci = x < siteW ? cellInst[c] : -1;
+                bool thin = ci >= 0 && ci < cellar.Length && cellar[ci];
+                if (x < siteW && s < 0 && !thin) continue;
+                if (x > run) GroundPiece(run * CELL, x * CELL, z * CELL, (z + 1) * CELL, land, -1f);
+                run = x + 1;
+                if (x >= siteW) continue;
+                float x0 = x * CELL, x1 = (x + 1) * CELL, z0 = z * CELL, z1 = (z + 1) * CELL;
+                if (s < 0) { GroundPiece(x0, x1, z0, z1, land, -0.015f); continue; }
+                float hx0, hx1, hz0, hz1;
+                StairHole(s, c, out hx0, out hx1, out hz0, out hz1);
+                GroundPiece(x0, x1, z0, hz0, land, -0.015f); GroundPiece(x0, x1, hz1, z1, land, -0.015f);
+                GroundPiece(x0, hx0, hz0, hz1, land, -0.015f); GroundPiece(hx1, x1, hz0, hz1, land, -0.015f);
+            }
+        }
         groundFilter.sharedMesh = ToMesh(B_GROUND, "Ground");
-        Collider(new Vector3(-m, -1f, -m), new Vector3(w + m, 0f, h + m));
         cellColour = null;
+    }
+
+    void GroundPiece(float x0, float x1, float z0, float z1, Color32 col, float bottom)
+    {
+        if (x1 - x0 < 0.001f || z1 - z0 < 0.001f) return;
+        if (bottom < -0.5f) Quad(B_GROUND, new Vector3(x0, -0.03f, z0), new Vector3(x0, -0.03f, z1), new Vector3(x1, -0.03f, z1), new Vector3(x1, -0.03f, z0), Vector3.up, col);
+        Collider(new Vector3(x0, bottom, z0), new Vector3(x1, 0f, z1));
+    }
+
+    // ------------------------------------------------------------------ levels and stairs (generator 18)
+    void LevelOffsets()
+    {
+        siteW = gen.siteW > 0 ? gen.siteW : W; siteH = gen.siteH > 0 ? gen.siteH : H;
+        int n = gen.nInst;
+        instLevelB = gen.instLevel; instBaseB = gen.instBase;
+        instOff = new Vector3[n]; instHasUpper = new bool[n];
+        int[] dx = gen.instDX, dz = gen.instDZ, iz = gen.instZone;
+        for (int i = 0; i < n; i++)
+        {
+            int l = instLevelB[i];
+            if (l == 0) continue;
+            int b = instBaseB[i];
+            float lh = LevelHeight(iz[b]);
+            instOff[i] = new Vector3(-dx[i] * CELL, l > 0 ? lh : -(lh + 0.02f), -dz[i] * CELL);
+            if (l > 0) instHasUpper[b] = true;
+        }
+        nStairsB = gen.nStairs; stairLowB = gen.stairLow; stairHighB = gen.stairHigh; stairRunB = gen.stairRun; stairSideB = gen.stairSide;
+    }
+
+    // floor to floor: the walls and the slab over them
+    float LevelHeight(int zone) { return zoneWallMm[zone] / 1000f + 0.14f; }
+
+    Vector3 CellOff(int c)
+    {
+        if (c < 0 || c >= W * H) return Vector3.zero;
+        int i = cellInst[c];
+        return i >= 0 && i < instOff.Length ? instOff[i] : Vector3.zero;
+    }
+
+    Vector3 InnerOff(int i) { return CellOff((i / IW / 8) * W + (i % IW) / 8); }
+
+    // the topmost level of a building carries its roof
+    bool IsTop(int inst) { return inst < 0 || inst >= instOff.Length || (instLevelB[inst] >= 0 && !instHasUpper[inst]); }
+
+    // the stair whose lower end is in cell c (the slab over it has the stair's hole), whose upper end is (a ground floor
+    // over a basement: the ground has the hole), -1
+    int StairBelow(int c) { for (int s = 0; s < nStairsB; s++) if (stairLowB[s] == c) return s; return -1; }
+    int StairAbove(int c) { for (int s = 0; s < nStairsB; s++) if (stairHighB[s] == c) return s; return -1; }
+
+    // stair-local (a metres across from its wall, b metres along from its entry edge) to cell-local metres
+    float StairLX(int run, int side, float a, float b) { return side == 1 ? CELL - a : (side == 3 ? a : (run == 1 ? b : (run == 3 ? CELL - b : 0f))); }
+    float StairLZ(int run, int side, float a, float b) { return side == 0 ? CELL - a : (side == 2 ? a : (run == 0 ? b : (run == 2 ? CELL - b : 0f))); }
+
+    // the hole over a stair in cell c (rows 1 to 7, the 2 m beside its wall), in metres
+    void StairHole(int s, int c, out float x0, out float x1, out float z0, out float z1)
+    {
+        int run = stairRunB[s], side = stairSideB[s];
+        float ax = StairLX(run, side, 0f, 0.5f), bx = StairLX(run, side, 2f, CELL), az = StairLZ(run, side, 0f, 0.5f), bz = StairLZ(run, side, 2f, CELL);
+        float cx = (c % W) * CELL, cz = (c / W) * CELL;
+        x0 = cx + Mathf.Min(ax, bx); x1 = cx + Mathf.Max(ax, bx); z0 = cz + Mathf.Min(az, bz); z1 = cz + Mathf.Max(az, bz);
+    }
+
+    // a box between stair-local corners (a, b, y): the current stair's cell, at lv
+    int stCell, stRun, stSide;
+    Vector3 SP(float a, float b, float y) { return new Vector3((stCell % W) * CELL + StairLX(stRun, stSide, a, b), y, (stCell / W) * CELL + StairLZ(stRun, stSide, a, b)); }
+    void SBox(int buf, float a0, float a1, float b0, float b1, float y0, float y1, Color32 side, Color32 top)
+    {
+        Vector3 p = SP(a0, b0, y0), q = SP(a1, b1, y1);
+        Vector3 mn = Vector3.Min(p, q), mx = Vector3.Max(p, q);
+        if (buf == B_COLL) Collider(mn, mx);
+        else Box3(buf, mn, mx, side, top, side, FACE_ALL);
+    }
+
+    // a sloped walking surface for the collision mesh, both faces: across a0..a1, from (b0, y0) to (b1, y1)
+    void SRamp(float a0, float a1, float b0, float y0, float b1, float y1)
+    {
+        Vector3 p0 = SP(a0, b0, y0), p1 = SP(a0, b1, y1), p2 = SP(a1, b1, y1), p3 = SP(a1, b0, y0);
+        Vector3 n = Vector3.Cross(p1 - p0, p3 - p0).normalized;
+        Color32 k = new Color32(0, 0, 0, 255);
+        Quad(B_COLL, p0, p1, p2, p3, n, k);
+        Quad(B_COLL, p3, p2, p1, p0, -n, k);
+    }
+
+    // Every stair: a half-turn stair in one cell (MapGenLevels). The first flight climbs 2.5 m on the room's side from
+    // the entry row to a landing at the far end, the second comes back along the wall to the level above. Solid steps
+    // down to the floor, a smooth ramp over them for walking (the collision mesh), rails where there is a drop.
+    void Stairs()
+    {
+        Color32 tread = theme == GenData.THEME_SPACE ? C(150, 156, 166) : (theme == GenData.THEME_MEDIEVAL ? C(150, 140, 128) : C(156, 112, 72));
+        Color32 rail = theme == GenData.THEME_SPACE ? C(224, 122, 40) : (theme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : C(92, 66, 46));
+        for (int s = 0; s < nStairsB; s++)
+        {
+            int lo = stairLowB[s], hi = stairHighB[s];
+            stRun = stairRunB[s]; stSide = stairSideB[s];
+            Vector3 oLo = CellOff(lo), oHi = CellOff(hi);
+            float dy = oHi.y - oLo.y, half = dy * 0.5f;
+            Color32 wall = WallColourAt(lo);
+            int n = Mathf.Max(4, Mathf.RoundToInt(half / 0.19f));
+            float r = half / n, tr = 2.5f / n;
+            // the lower level: the flights and the landing
+            stCell = lo; lv = oLo;
+            for (int k = 0; k < n; k++)
+            {
+                float b0 = 0.5f + k * tr;
+                SBox(B_WALLS, 1f, 2f, b0, b0 + tr, 0f, (k + 1) * r, wall, tread);              // up on the room's side
+                if (k > 0) SBox(B_COLL, 1f, 2f, b0, b0 + tr, 0f, k * r, wall, wall);
+                float c1 = 3.0f - k * tr;
+                SBox(B_WALLS, 0f, 1f, c1 - tr, c1, 0f, half + (k + 1) * r, wall, tread);       // and back along the wall
+                SBox(B_COLL, 0f, 1f, c1 - tr, c1, 0f, half + k * r, wall, wall);
+            }
+            SBox(B_WALLS, 0f, 2f, 3.0f, CELL, 0f, half, wall, tread);
+            SBox(B_COLL, 0f, 2f, 3.0f, CELL, 0f, half, wall, wall);
+            SRamp(1f, 2f, 0.5f, 0f, 3.0f, half);
+            SRamp(0f, 1f, 3.0f, half, 0.5f, dy);
+            // rails: on the open side of the first flight and the landing, and between the flights
+            Rail(1.97f, 2.03f, 0.5f, 3.0f, 0f, half, rail);
+            Rail(1.97f, 2.03f, 3.0f, CELL, half, half, rail);
+            Rail(0.97f, 1.03f, 3.0f, 0.5f, half, dy, rail);
+            // the upper level: rails round the hole (not where the second flight arrives)
+            stCell = hi; lv = oHi;
+            Rail(1f, 2f, 0.47f, 0.53f, 0f, 0f, rail);
+            Rail(1.97f, 2.03f, 0.5f, CELL, 0f, 0f, rail);
+            if (gen.EdgeType(hi % W, hi / W, stSide) == GenData.E_NONE) Rail(0.0f, 0.06f, 0.5f, CELL, 0f, 0f, rail);
+            if (gen.EdgeType(hi % W, hi / W, stRun) == GenData.E_NONE) Rail(0f, 2f, CELL - 0.06f, CELL, 0f, 0f, rail);
+        }
+        lv = Vector3.zero;
+    }
+
+    // a rail 0.95 m over a line of the stair (across a0..a1, along b0 to b1, its foot rising y0 to y1 along it): posts,
+    // a handrail and a solid collider
+    void Rail(float a0, float a1, float b0, float b1, float y0, float y1, Color32 col)
+    {
+        bool alongB = Mathf.Abs(b1 - b0) >= Mathf.Abs(a1 - a0);
+        float len = alongB ? Mathf.Abs(b1 - b0) : Mathf.Abs(a1 - a0);
+        int posts = Mathf.Max(2, Mathf.CeilToInt(len / 0.55f) + 1);
+        float am = (a0 + a1) * 0.5f, bm = (b0 + b1) * 0.5f;
+        for (int k = 0; k < posts; k++)
+        {
+            float t = k / (float)(posts - 1);
+            float a = alongB ? am : Mathf.Lerp(a0, a1, t), b = alongB ? Mathf.Lerp(b0, b1, t) : bm, y = Mathf.Lerp(y0, y1, t);
+            a = Mathf.Clamp(a, Mathf.Min(a0, a1) + 0.03f, Mathf.Max(a0, a1) - 0.03f);
+            b = Mathf.Clamp(b, Mathf.Min(b0, b1) + 0.03f, Mathf.Max(b0, b1) - 0.03f);
+            SBox(B_WALLS, a - 0.025f, a + 0.025f, b - 0.025f, b + 0.025f, y, y + 0.95f, col, col);
+        }
+        // the handrail (sloped with the stair), and the collider in steps where the rail climbs
+        if (alongB && Mathf.Abs(y1 - y0) > 0.01f)
+        {
+            float ra0 = am - 0.035f, ra1 = am + 0.035f, h0 = y0 + 0.92f, h1 = y1 + 0.92f;
+            Vector3 p0 = SP(ra0, b0, h0), p1 = SP(ra1, b0, h0), p2 = SP(ra1, b1, h1), p3 = SP(ra0, b1, h1);
+            Vector3 up = new Vector3(0f, 0.06f, 0f);
+            Beam(p0, p1, p2, p3, up, col);
+        }
+        else SBox(B_WALLS, a0, a1, b0, b1, y0 + 0.9f, y0 + 0.96f, col, col);
+        int seg = Mathf.Abs(y1 - y0) > 0.01f ? posts - 1 : 1;
+        for (int k = 0; k < seg; k++)
+        {
+            float t0 = k / (float)seg, t1 = (k + 1) / (float)seg;
+            float ya = Mathf.Lerp(y0, y1, t0), yb = Mathf.Lerp(y0, y1, t1), y = Mathf.Max(ya, yb);
+            float sa0 = alongB ? a0 : Mathf.Lerp(a0, a1, t0), sa1 = alongB ? a1 : Mathf.Lerp(a0, a1, t1);
+            float sb0 = alongB ? Mathf.Lerp(b0, b1, t0) : b0, sb1 = alongB ? Mathf.Lerp(b0, b1, t1) : b1;
+            SBox(B_COLL, sa0, sa1, sb0, sb1, Mathf.Min(ya, yb), y + 0.96f, col, col);
+        }
+    }
+
+    // a sloped bar: the bottom face p0 p1 p2 p3 and the same lifted by up, all four long faces from both sides
+    void Beam(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 up, Color32 col)
+    {
+        WQuad(p0 + up, p1 + up, p2 + up, p3 + up, col);
+        WQuad(p0, p1, p2, p3, col);
+        WQuad(p0, p0 + up, p3 + up, p3, col);
+        WQuad(p1, p1 + up, p2 + up, p2, col);
+    }
+
+    void WQuad(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color32 c)
+    {
+        Vector3 n = Vector3.Cross(p1 - p0, p3 - p0);
+        if (n.sqrMagnitude < 1e-10f) return;
+        n.Normalize();
+        Quad(B_WALLS, p0, p1, p2, p3, n, c);
+        Quad(B_WALLS, p3, p2, p1, p0, -n, c);
+    }
+
+    // a slab from (x0, z0) to (x1, z1), y0 to y1, with the hole hx0..hx1 x hz0..hz1 left open (none when hx1 <= hx0)
+    void Slab(int buf, float x0, float x1, float z0, float z1, float y0, float y1, float hx0, float hx1, float hz0, float hz1, Color32 side, Color32 top, Color32 bottom)
+    {
+        if (hx1 <= hx0) { SlabBox(buf, x0, x1, z0, z1, y0, y1, side, top, bottom); return; }
+        SlabBox(buf, x0, x1, z0, hz0, y0, y1, side, top, bottom);
+        SlabBox(buf, x0, x1, hz1, z1, y0, y1, side, top, bottom);
+        SlabBox(buf, x0, hx0, Mathf.Max(z0, hz0), Mathf.Min(z1, hz1), y0, y1, side, top, bottom);
+        SlabBox(buf, hx1, x1, Mathf.Max(z0, hz0), Mathf.Min(z1, hz1), y0, y1, side, top, bottom);
+    }
+
+    void SlabBox(int buf, float x0, float x1, float z0, float z1, float y0, float y1, Color32 side, Color32 top, Color32 bottom)
+    {
+        if (x1 - x0 < 0.001f || z1 - z0 < 0.001f) return;
+        if (buf == B_COLL) Collider(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1));
+        else Box3(buf, new Vector3(x0, y0, z0), new Vector3(x1, y1, z1), side, top, bottom, FACE_ALL);
     }
 
     // ------------------------------------------------------------------ walls (MapBuilder: corners G40)
@@ -884,6 +1130,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         int zoneA = cellA >= 0 ? cellZone[cellA] : GenData.Z_NONE, zoneB = cellB >= 0 ? cellZone[cellB] : GenData.Z_NONE;
         float ex = cx * CELL, ez = cz * CELL;
+        lv = CellOff(cellA >= 0 ? cellA : cellB);   // an upper floor's or a basement's walls where they belong
         if (type == GenData.E_FENCE) { Fence(horizontal, ex, ez); return; }
         float hA = zoneWallMm[zoneA] / 1000f, hB = zoneWallMm[zoneB] / 1000f;
         float h = Mathf.Max(hA, hB);
@@ -1155,7 +1402,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         GameObject go = Instantiate(decorPrefabs[k]);
         Transform tr = go.transform;
         tr.SetParent(fixtureRoot, false);
-        tr.position = p;
+        tr.position = p + lv;
         tr.rotation = Quaternion.Euler(0f, yaw, 0f);
         return go;
     }
@@ -1170,10 +1417,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (instMaxX[inst] < 0) continue;
             int c = -1;
             for (int q = 0; q < W * H; q++) if (cellInst[q] == inst && IsBuilding(cellZone[q])) { c = q; break; }
-            if (c < 0) continue;
+            if (c < 0 || !IsTop(inst)) continue;
+            lv = instOff[inst];
             if (theme == GenData.THEME_SPACE) RoofModules(inst);
             else if (theme == GenData.THEME_MEDIEVAL && (cellZone[c] == GenData.Z_HOUSE || cellZone[c] == GenData.Z_CABIN)) Chimney(inst, cellZone[c]);
         }
+        lv = Vector3.zero;
         SkyDressing();
         if (theme == GenData.THEME_SPACE) SpacePlain();
         else if (theme == GenData.THEME_MEDIEVAL) MedievalSquare();
@@ -1195,7 +1444,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         nClouds = 0;
         if (skyPrefabs == null || skyPrefabs.Length < 9) return;
-        float w = W * CELL, h = H * CELL;
+        float w = siteW * CELL, h = siteH * CELL;
         skyCentre = new Vector3(w * 0.5f, 0f, h * 0.5f);
         float r0 = Mathf.Max(w, h) * 0.5f + 75f;
         bool space = theme == GenData.THEME_SPACE;
@@ -1266,7 +1515,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // craters, meteors and crystals out on the plain beyond a space base's fence
     void SpacePlain()
     {
-        float w = W * CELL, h = H * CELL;
+        float w = siteW * CELL, h = siteH * CELL;
         for (int k = 0; k < 26; k++)
         {
             float a = Rand01(U32(k * 2 + 1001)), b = Rand01(U32(k * 2 + 1002));
@@ -1331,7 +1580,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             System.Array.Copy(lightPos, p2, nLights); System.Array.Copy(lightKind, k2, nLights); System.Array.Copy(lightFollow, f2, nLights);
             lightPos = p2; lightKind = k2; lightFollow = f2;
         }
-        lightPos[nLights] = p; lightKind[nLights] = kind; lightFollow[nLights] = follow;
+        lightPos[nLights] = follow == null ? p + lv : p; lightKind[nLights] = kind; lightFollow[nLights] = follow;
         nLights++;
     }
 
@@ -1344,10 +1593,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
         GameObject go = Instantiate(fixturePrefabs[k]);
         Transform t = go.transform;
         t.SetParent(fixtureRoot, false);
-        t.position = p;
+        t.position = p + lv;
         t.rotation = Quaternion.Euler(0f, yaw, 0f);
         Transform lp = t.Find("LightPoint");
-        AddLight(lp != null ? lp.position : p, lightKind, null);
+        AddLight(lp != null ? lp.position - lv : p, lightKind, null);
         return true;
     }
 
@@ -1402,11 +1651,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
         {
             int r = cellRoom[c];
             if (r < 0 || r >= nr || !IsBuilding(cellZone[c])) continue;
+            lv = CellOff(c);
             int n = count[r], k = Mathf.Clamp((n + 3) / 5, 1, 4), i = seen[r];
             seen[r] = i + 1;
             // the middle cell of each of k equal runs of the room's cells
             bool place = false;
             for (int j = 0; j < k; j++) if (i == ((2 * j + 1) * n) / (2 * k)) place = true;
+            if (place && StairBelow(c) >= 0 && i + 1 < n) { place = false; seen[r] = i; }   // under a stair's hole: the room's next cell takes it
             if (!place) continue;
             float h = zoneWallMm[cellZone[c]] / 1000f;
             float cx = (c % W + 0.5f) * CELL, cz = (c / W + 0.5f) * CELL;
@@ -1415,6 +1666,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Box(B_ROOFS, new Vector3(cx - 0.21f, h - 0.09f, cz - 0.21f), new Vector3(cx + 0.21f, h - 0.05f, cz + 0.21f), glow, FACE_ALL & ~FACE_YP);
             AddLight(new Vector3(cx, h - 0.25f, cz), LK_CEILING, null);
         }
+        lv = Vector3.zero;
 
         // street lamps: walk the lane cells, one lamp unless another stands within two cells, on a side that
         // borders something other than lane
@@ -1508,9 +1760,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
             int x0 = instMinX[inst], x1 = instMaxX[inst], z0 = instMinZ[inst], z1 = instMaxZ[inst];
             int first = -1;
             for (int z = z0; z <= z1 && first < 0; z++) for (int x = x0; x <= x1; x++) if (cellInst[z * W + x] == inst) { first = z * W + x; break; }
-            if (first < 0 || !IsBuilding(cellZone[first])) continue;
+            if (first < 0 || !IsBuilding(cellZone[first]) || !IsTop(inst)) continue;
             int zone = cellZone[first];
             if (theme == GenData.THEME_SPACE) continue;   // flat roofs
+            lv = instOff[inst];
             if (!(zone == GenData.Z_HOUSE || zone == GenData.Z_CABIN || zone == GenData.Z_BARN || zone == GenData.Z_CHAPEL || theme == GenData.THEME_MEDIEVAL)) continue;
             float t = zoneWallMm[zone] / 1000f + 0.14f;
             int st = Style(inst);
@@ -1540,6 +1793,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 GableRoof((x0 + rx) * CELL - WALL_HALF, (x0 + rx + rw) * CELL + WALL_HALF, (z0 + rz) * CELL - WALL_HALF, (z0 + rz + rd) * CELL + WALL_HALF, t, roof, wall);
             }
         }
+        lv = Vector3.zero;
     }
 
     void GableRoof(float bx0, float bx1, float bz0, float bz1, float t, Color32 roof, Color32 wall)
@@ -1631,11 +1885,21 @@ public class MapBuilderUdon : UdonSharpBehaviour
         }
         if (IsBuilding(zone))
         {
+            lv = CellOff(c);
+            int ci = cellInst[c];
+            bool top = IsTop(ci);
             float h = zoneWallMm[zone] / 1000f, t = h + 0.14f;
             bool bw = Bld(x - 1, z), be = Bld(x + 1, z), bs = Bld(x, z - 1), bn2 = Bld(x, z + 1);
             float x0 = x * CELL - (bw ? 0f : WALL_HALF), x1 = (x + 1) * CELL + (be ? 0f : WALL_HALF);
-            Color32 rc = RoofColour(zone, Style(cellInst[c])), ceiling = C(236, 234, 226);
-            Box3(B_ROOFS, new Vector3(x0, h, z * CELL), new Vector3(x1, t, (z + 1) * CELL), rc, rc, ceiling, FACE_ALL);
+            Color32 rc = RoofColour(zone, Style(ci)), ceiling = C(236, 234, 226);
+            // the slab over the room: the roof, or the floor of the level above, open over a stair
+            float hx0 = 0f, hx1 = 0f, hz0 = 0f, hz1 = 0f;
+            int sb = StairBelow(c);
+            if (sb >= 0) StairHole(sb, c, out hx0, out hx1, out hz0, out hz1);
+            if (!top) rc = ceiling;
+            Slab(B_ROOFS, x0, x1, z * CELL, (z + 1) * CELL, h, t, hx0, hx1, hz0, hz1, rc, rc, ceiling);
+            // a basement's floor
+            if (ci >= 0 && ci < instLevelB.Length && instLevelB[ci] < 0) Collider(new Vector3(x * CELL - WALL_HALF, -0.4f, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, 0f, (z + 1) * CELL + WALL_HALF));
             for (int side = -1; side <= 1; side += 2)
             {
                 if (side < 0 ? bs : bn2) continue;
@@ -1645,10 +1909,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 float zz0 = side < 0 ? z * CELL - WALL_HALF : (z + 1) * CELL, zz1 = side < 0 ? z * CELL : (z + 1) * CELL + WALL_HALF;
                 Box3(B_ROOFS, new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, ceiling, FACE_ALL);
             }
-            Collider(new Vector3(x * CELL - WALL_HALF, h, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, t, (z + 1) * CELL + WALL_HALF));
+            Slab(B_COLL, x * CELL - WALL_HALF, (x + 1) * CELL + WALL_HALF, z * CELL - WALL_HALF, (z + 1) * CELL + WALL_HALF, h, t, hx0, hx1, hz0, hz1, rc, rc, rc);
             // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider);
             // a space base keeps its roofs flat, with an orange parapet round the edge
-            if (theme == GenData.THEME_SPACE)
+            if (theme == GenData.THEME_SPACE && top)
             {
                 Color32 rim = C(224, 122, 40);
                 float rx0 = x * CELL - WALL_HALF, rx1 = (x + 1) * CELL + WALL_HALF, rz0 = z * CELL - WALL_HALF, rz1 = (z + 1) * CELL + WALL_HALF;
@@ -1659,6 +1923,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             }
             // pitched roofs: PitchedRoofs, once per building after the walls
         }
+        lv = Vector3.zero;
     }
 
     // ------------------------------------------------------------------ props
@@ -1669,7 +1934,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         GameObject go = Instantiate(prefab);
         Transform t = go.transform;
         t.SetParent(propRoot, true);
-        t.position = new Vector3(emitX[e], emitY[e], emitZ[e]) / 1000f;
+        int ix = Mathf.Clamp(emitX[e] / 500, 0, IW - 1), iz = Mathf.Clamp(emitZ[e] / 500, 0, IH - 1);
+        t.position = new Vector3(emitX[e], emitY[e], emitZ[e]) / 1000f + InnerOff(iz * IW + ix);   // upstairs or in a basement: where it belongs
         t.rotation = Quaternion.Euler(0, emitYaw[e], 0);
         objects[e] = go;
         int def = emitDef[e];
@@ -1685,6 +1951,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
     }
 
     // ------------------------------------------------------------------ helpers for the game
+    // an inner cell's centre in the world (a hider's spawn may be upstairs or in a basement)
+    public Vector3 InnerWorld(int i) { return new Vector3((i % IW + 0.5f) * INNER, 0f, (i / IW + 0.5f) * INNER) + InnerOff(i); }
+    public float SiteWidth() { return siteW * CELL; }
+    public float SiteDepth() { return siteH * CELL; }
     public Vector3 ReleasePoint() { return new Vector3((gen.releaseX + 0.5f) * CELL, 0f, (gen.releaseZ + 0.5f) * CELL); }
     public float ReleaseYaw() { return gen.releaseDir * 90f; }
     public void ShowRoofs(bool show) { if (roofsFilter != null) roofsFilter.GetComponent<MeshRenderer>().enabled = show; }

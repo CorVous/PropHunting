@@ -184,6 +184,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         roomCells = new int[IW * IH];
         queue = new int[IW * IH]; dist = new int[IW * IH];
         wideMark = new int[IW * IH]; wideStamp = 0;
+        link = new int[IW * IH];
     }
 
     public void RunAll(uint seedValue, int sizeBucket) { RunAll(seedValue, sizeBucket, 0); }
@@ -210,6 +211,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
             case 1:
                 BuildRooms();
                 BuildEdgesSite();
+                if (!PlaceStairs()) { Retry("stairs"); break; }
                 if (!ValidateSite()) { Retry("layout tests"); break; }
                 BuildTags();
                 ResetExits();
@@ -241,8 +243,11 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         return done || failed;
     }
 
+    public string lastRetry = "";
+
     void Retry(string why)
     {
+        lastRetry = why;
         attempt++;
         if (attempt >= 12)
         {

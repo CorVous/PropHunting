@@ -59,7 +59,7 @@ public class PHExplore : UdonSharpBehaviour
             if (gen.nSpawns > 0)
             {
                 int c = gen.spawnCell[Random.Range(0, gen.nSpawns)];
-                at = new Vector3((c % gen.IW + 0.5f) * 0.5f, 0f, (c / gen.IW + 0.5f) * 0.5f);
+                at = builder.InnerWorld(c);   // upstairs or in a basement too
             }
             Networking.LocalPlayer.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, Random.Range(0, 24) * 15f, 0f));
             if (sfx != null && done != null) sfx.PlayOneShot(done);

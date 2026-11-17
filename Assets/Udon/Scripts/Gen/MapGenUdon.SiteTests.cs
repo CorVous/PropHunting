@@ -158,6 +158,12 @@ public partial class MapGenUdon
                     if (stMark[n] != 0 || cellZone[n] == GenData.Z_NONE || (et != GenData.E_NONE && et != GenData.E_DOOR)) continue;
                     stMark[n] = 1; queue[qt++] = n;
                 }
+                // generator 18: up or down a stair
+                for (int s = 0; s < nStairs; s++)
+                {
+                    int o = stairLow[s] == c ? stairHigh[s] : (stairHigh[s] == c ? stairLow[s] : -1);
+                    if (o >= 0 && stMark[o] == 0) { stMark[o] = 1; queue[qt++] = o; }
+                }
             }
             for (int c = 0; c < W * H; c++) if (cellZone[c] != GenData.Z_NONE && stMark[c] == 0) fail |= 1 << 7;
         }

@@ -51,7 +51,7 @@ public class PHSun : UdonSharpBehaviour
     {
         if (!builder.built) return;
         MapGenUdon gen = builder.gen;
-        float w = gen.W * 4f, h = gen.H * 4f;                     // MapBuilderUdon.CELL
+        float w = builder.SiteWidth(), h = builder.SiteDepth();   // the map without its upper floors and basements, laid out beside it in the generator
         Vector3 centre = new Vector3(w * 0.5f, 0f, h * 0.5f);
         float radius = Mathf.Sqrt(w * w + h * h) * 0.5f + margin;
         float height = radius / Mathf.Tan(coneDeg * 0.5f * Mathf.Deg2Rad);
