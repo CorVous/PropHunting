@@ -35,8 +35,14 @@ public class PHPanel : UdonSharpBehaviour
     // the host bar: who hosts, and the buttons to hand the panel over (PHGame's hostLocked / UnlockHost / LockHost /
     // ClaimHost, called by name)
     public TextMeshProUGUI hostName;
-    public GameObject claimLock;           // shown on Claim host instead of its text while it cannot be used
-    public RectTransform[] hostButton;     // 0 unlock/lock (the host's), 1 claim (everyone else's)
+    public GameObject claimLock;
+    // the map bar: the map's code, a host-only code entry, the seed message (or Play anyway / Discard), runs, votes
+    public TextMeshProUGUI seedCodeText, seedStatusText, runsText, scrapText, undoText;
+    public TMP_InputField seedInput;
+    public GameObject seedInputRoot, confirmRoot;           // shown on Claim host instead of its text while it cannot be used
+    // the bar buttons (PHPanelTile index -2 - k): 0 unlock/lock host, 1 claim host, 2 the seed field, 3 play anyway,
+    // 4 discard, 5 fewer runs, 6 more runs, 7 scrap vote, 8 undo vote
+    public RectTransform[] hostButton;
     public Image[] hostButtonImage;
     public TextMeshProUGUI[] hostButtonText;
     public Transform spinner;           // the ceiling spinner's arrow: spins when a round starts
@@ -94,23 +100,71 @@ public class PHPanel : UdonSharpBehaviour
         game.StartRound();
     }
 
+    void Fade(int k, bool on)
+    {
+        Color c = hostButtonImage[k].color; float a = on ? 1f : 0.35f;
+        if (c.a != a) { c.a = a; hostButtonImage[k].color = c; }
+    }
+
     bool HostLocked
     {
         get { object o = game.GetProgramVariable("hostLocked"); return o == null || (bool)o; }
     }
 
-    public void UnlockPress()
+    public void BarPress(int k)
     {
-        if (!Host) { Deny(-2); return; }
-        Queue(select, 0f, 1f);
-        game.SendCustomEvent(HostLocked ? "UnlockHost" : "LockHost");
+        bool host = Host;
+        if (k == 0)
+        {
+            if (!host) { Deny(-2); return; }
+            Queue(select, 0f, 1f);
+            game.SendCustomEvent(HostLocked ? "UnlockHost" : "LockHost");
+        }
+        else if (k == 1)
+        {
+            if (host || !game.CanClaim()) { Deny(-3); return; }
+            Queue(jingle, 0f, 1.25f);
+            game.SendCustomEvent("ClaimHost");
+        }
+        else if (k == 2) { if (!CanEdit) Deny(-4); }   // the field itself: typing happens in SeedEntered
+        else if (k == 3 || k == 4)
+        {
+            if (!host || !game.seedNeedsConfirm) { Deny(-2 - k); return; }
+            Queue(select, 0f, 1f);
+            if (k == 3) game.SeedPlayAnyway(); else game.SeedDiscard();
+        }
+        else if (k == 5 || k == 6)
+        {
+            if (!CanEdit) { Deny(-2 - k); return; }
+            int v = game.runCap + (k == 5 ? -1 : 1);
+            if (v < 1 || v > 99) { Deny(-2 - k); return; }
+            Queue(tick, 0f, k == 5 ? 0.85f : 1.15f);
+            game.SetRunCap(v);
+        }
+        else if (k == 7)
+        {
+            if (!game.CanScrap()) { Deny(-9); return; }
+            Queue(select, 0f, 0.9f);
+            game.VoteScrap();
+        }
+        else if (k == 8)
+        {
+            if (!game.CanUndo()) { Deny(-10); return; }
+            Queue(select, 0f, 1.1f);
+            game.VoteUndo();
+        }
+        Refresh();
     }
 
-    public void ClaimPress()
+    // the seed field's OnEndEdit
+    public void SeedEntered()
     {
-        if (Host || HostLocked) { Deny(-3); return; }
-        Queue(jingle, 0f, 1.25f);
-        game.SendCustomEvent("ClaimHost");
+        string t = seedInput.text;
+        if (t == null || t.Trim().Length == 0) return;
+        if (!CanEdit) { Deny(-4); return; }
+        Queue(select, 0f, 1f);
+        game.SubmitSeed(t.Trim());
+        seedInput.text = "";
     }
 
     void Deny(int i)
@@ -256,10 +310,27 @@ public class PHPanel : UdonSharpBehaviour
             bool locked = HostLocked, host = Host;
             hostButtonText[0].text = locked ? "UNLOCK HOST" : "LOCK HOST";
             Color c0 = hostButtonImage[0].color; c0.a = host ? 1f : 0.35f; hostButtonImage[0].color = c0;
-            bool claimable = !host && !locked;
+            bool claimable = !host && game.CanClaim();
             Color c1 = hostButtonImage[1].color; c1.a = claimable ? 1f : 0.35f; hostButtonImage[1].color = c1;
             if (hostButtonText[1].gameObject.activeSelf != claimable) hostButtonText[1].gameObject.SetActive(claimable);
             if (claimLock.activeSelf == claimable) claimLock.SetActive(!claimable);
+        }
+        if (seedCodeText != null)
+        {
+            bool lobby = game.phase == PHGame.PH_LOBBY, hostNow = Host;
+            seedCodeText.text = game.seedCode == "" ? "-" : game.seedCode;
+            bool confirm = game.seedNeedsConfirm && hostNow;
+            if (confirmRoot.activeSelf != confirm) confirmRoot.SetActive(confirm);
+            seedStatusText.text = confirm ? "" : game.seedStatus;
+            bool entry = hostNow && lobby;
+            if (seedInputRoot.activeSelf != entry) seedInputRoot.SetActive(entry);
+            int runs = game.lastRot >= 0 && game.lastRot < game.rotRuns.Length ? game.rotRuns[game.lastRot] : 0;
+            runsText.text = "RUN " + runs + "/" + game.runCap;
+            Fade(5, hostNow && lobby); Fade(6, hostNow && lobby);
+            int need = game.VotesNeeded();
+            scrapText.text = "SCRAP " + game.ScrapVotes() + "/" + need;
+            undoText.text = "UNDO " + game.UndoVotes() + "/" + need;
+            Fade(7, game.CanScrap()); Fade(8, game.CanUndo());
         }
         bool lockOn = game.phase != PHGame.PH_LOBBY;
         if (veil.activeSelf != lockOn) veil.SetActive(lockOn);

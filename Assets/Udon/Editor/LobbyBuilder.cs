@@ -117,8 +117,8 @@ public static class LobbyBuilder
     }
 
     // ------------------------------------------------------------------ the host panel
-    // 1200 x 500 canvas units at 6 mm: 7.2 x 3 m. Mock-up coordinates are top-left based; P() converts.
-    const float PW = 1200f, PH = 500f;   // the board is the top 440; the host bar is under it
+    // 1200 x 560 canvas units at 6 mm: 7.2 x 3.36 m. Mock-up coordinates are top-left based; P() converts.
+    const float PW = 1200f, PH = 560f;   // the board is the top 440; the host bar and the map bar are under it
     static Vector2 P(float x, float y) { return new Vector2(x - PW / 2, PH / 2 - y); }
 
     public static PHPanel BuildPanel(Transform lobby, PHGame game, Vector3 localPos)
@@ -210,9 +210,9 @@ public static class LobbyBuilder
         Txt(cv, "HostLabel", P(110, 470), new Vector2(80, 26), "HOST", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
         panel.hostName = Txt(cv, "HostName", P(330, 470), new Vector2(360, 34), "", null, 24, Color.white, TextAlignmentOptions.Left);
         panel.hostName.fontStyle = FontStyles.Bold;
-        panel.hostButton = new RectTransform[2]; panel.hostButtonImage = new Image[2]; panel.hostButtonText = new TextMeshProUGUI[2];
+        panel.hostButton = new RectTransform[9]; panel.hostButtonImage = new Image[9]; panel.hostButtonText = new TextMeshProUGUI[9];
         string[] hb = { "UNLOCK HOST", "CLAIM HOST" };
-        var hostTiles = new PHPanelTile[2];
+        var hostTiles = new PHPanelTile[9];
         for (int k = 0; k < 2; k++)
         {
             var bimg = Img(cv, "HostButton " + hb[k], P(880 + k * 200, 470), new Vector2(186, 38), sRound, new Color(1f, 1f, 1f, 0.01f), 4f);
@@ -230,6 +230,54 @@ public static class LobbyBuilder
             }
         }
 
+        // the map bar: the map's code, a code entry for the host, the seed message (or Play anyway / Discard), the
+        // rotation's run count and cap, and the scrap / undo votes
+        Img(cv, "MapBar", P(600, 530), new Vector2(1168, 48), sRound, C("173d2c"), 3f);
+        Txt(cv, "MapLabel", P(64, 530), new Vector2(80, 26), "MAP", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
+        panel.seedCodeText = Txt(cv, "SeedCode", P(205, 530), new Vector2(200, 30), "-", future, 15, Color.white, TextAlignmentOptions.Left);
+        // host-only code entry (a TMP input field: VRChat opens its keyboard)
+        var fieldBg = Img(cv, "SeedField", P(400, 530), new Vector2(180, 38), sRound, C("f6ecd4"), 4f);
+        fieldBg.raycastTarget = true;
+        panel.seedInputRoot = fieldBg.gameObject;
+        var area = Rect(fieldBg.transform, "Text Area", Vector2.zero, new Vector2(164, 32));
+        area.gameObject.AddComponent<RectMask2D>();
+        var ph = Txt(area, "Placeholder", Vector2.zero, new Vector2(164, 32), "ENTER CODE", future, 14, C("6d5524", 0.55f), TextAlignmentOptions.Center);
+        var tx = Txt(area, "Text", Vector2.zero, new Vector2(164, 32), "", future, 16, C("1e190f"), TextAlignmentOptions.Center);
+        var input = fieldBg.gameObject.AddComponent<TMP_InputField>();
+        input.textViewport = area; input.textComponent = tx; input.placeholder = ph; input.fontAsset = future;
+        input.characterLimit = 24; input.lineType = TMP_InputField.LineType.SingleLine; input.targetGraphic = fieldBg;
+        var inav = input.navigation; inav.mode = Navigation.Mode.None; input.navigation = inav;
+        panel.seedInput = input;
+        panel.hostButton[2] = fieldBg.rectTransform; panel.hostButtonImage[2] = fieldBg;
+        var panelUdon = UdonSharpEditorUtility.GetBackingUdonBehaviour(panel);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onEndEdit, panelUdon.SendCustomEvent, nameof(PHPanel.SeedEntered));
+        panel.seedStatusText = Txt(cv, "SeedStatus", P(612, 530), new Vector2(232, 40), "", future, 11, C("c9d8c9"), TextAlignmentOptions.Center);
+        panel.seedStatusText.enableWordWrapping = true;
+        var confirm = Rect(cv, "SeedConfirm", P(600, 530), new Vector2(240, 40));
+        panel.confirmRoot = confirm.gameObject;
+        // the remaining bar buttons: k, label, centre x, width, colour, parent
+        object[][] bar = {
+            new object[] { 3, "PLAY ANYWAY", 545f, 116f, C("9bd18a") }, new object[] { 4, "DISCARD", 662f, 104f, C("f19a8a") },
+            new object[] { 5, "-", 765f, 38f, C("e1cfa5") }, new object[] { 6, "+", 905f, 38f, C("e1cfa5") },
+            new object[] { 7, "SCRAP", 1002f, 124f, C("f19a8a") }, new object[] { 8, "UNDO", 1122f, 108f, C("7fb3e6") } };
+        foreach (var b in bar)
+        {
+            int k = (int)b[0]; float x = (float)b[2], w = (float)b[3];
+            Transform parent = k == 3 || k == 4 ? confirm : cv;
+            Vector2 at = k == 3 || k == 4 ? new Vector2(x - 600f, 0f) : P(x, 530);
+            var bimg = Img(parent, "BarButton " + b[1], at, new Vector2(w, 36), sRound, new Color(1f, 1f, 1f, 0.01f), 4f);
+            bimg.raycastTarget = true;
+            var bt = bimg.gameObject.AddComponent<Button>();
+            var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = bimg;
+            var face = Img(bimg.transform, "Face", Vector2.zero, new Vector2(w, 36), sRound, (Color)b[4], 4f);
+            panel.hostButtonText[k] = Txt(bimg.transform, "Text", Vector2.zero, new Vector2(w - 6, 30), (string)b[1], future, k == 5 || k == 6 ? 22 : 13, C("1e190f"), TextAlignmentOptions.Center);
+            panel.hostButton[k] = bimg.rectTransform; panel.hostButtonImage[k] = face;
+            hostTiles[k] = AddTile(bimg.gameObject, bt, -2 - k);
+        }
+        panel.runsText = Txt(cv, "Runs", P(835, 530), new Vector2(96, 30), "RUN 0/10", future, 14, Color.white, TextAlignmentOptions.Center);
+        panel.scrapText = panel.hostButtonText[7]; panel.undoText = panel.hostButtonText[8];
+        confirm.gameObject.SetActive(false);
+
         // sounds, for everyone near the panel
         var src = cv.gameObject.AddComponent<AudioSource>();
         src.spatialBlend = 1f; src.rolloffMode = AudioRolloffMode.Linear; src.minDistance = 4f; src.maxDistance = 30f; src.playOnAwake = false; src.volume = 0.7f;
@@ -240,7 +288,7 @@ public static class LobbyBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(panel);
         foreach (var tl in tiles) { tl.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(tl); }
         diceTile.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(diceTile);
-        foreach (var ht in hostTiles) { ht.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(ht); }
+        foreach (var ht in hostTiles) if (ht != null) { ht.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(ht); }
         return panel;
     }
 
