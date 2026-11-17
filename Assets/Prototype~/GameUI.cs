@@ -17,10 +17,10 @@ public class GameUI : MonoBehaviour
     // prop counts at Normal density, from the generator console test (they scale with the density setting)
     static readonly string[] SizeNote =
     {
-        "S: a house and a second plot (a house, a diner or a warehouse) on a lane, a wood; about 44 cells, 175 props at Normal density. For up to 8 players.",
-        "M: two houses and a diner or a warehouse, about 80 cells, 300 props. For 9 to 16 players.",
-        "L: two houses, a diner and a warehouse, about 131 cells, 525 props. For 17 to 24 players.",
-        "XL: three houses, a diner and a warehouse, about 168 cells, 655 props. For 25 to 32 players.",
+        "S: a house and a second plot on a lane, a wood; about 43 cells, 165 props at Normal density. For up to 8 players.",
+        "M: three plots (a house, then a mix of houses, a diner, warehouse, shop, garage, farm, park, zoo or log cabin), about 75 cells, 275 props. For 9 to 16 players.",
+        "L: four plots, about 119 cells, 435 props. For 17 to 24 players.",
+        "XL: five plots, about 154 cells, 570 props. For 25 to 32 players.",
     };
     static readonly string[] ModeName = { "Explore", "Hunter", "Hider", "Drawn at random" };
     static readonly int[] ModeOrder = { 3, 1, 2, 0 };
@@ -31,6 +31,14 @@ public class GameUI : MonoBehaviour
         "You hide, with the other hiders (bots). Pick a prop, find a spot, lock in place. Bot hunters come looking after the hide phase.",
         "As in the game: about 1 in 4 of the players in the zone hunt, drawn at random every round; everyone else hides.",
     };
+
+    static string ZoneCells(MapGen gen)
+    {
+        string s = "";
+        for (int z = GenData.Z_HOUSE; z < GenData.ZoneName.Length; z++)
+            if (z != GenData.Z_RELEASE && gen.statZoneCells[z] > 0) s += (s.Length > 0 ? ", " : "") + GenData.ZoneName[z] + " " + gen.statZoneCells[z];
+        return s;
+    }
 
     static Texture2D Tex(Color c)
     {
@@ -327,7 +335,7 @@ public class GameUI : MonoBehaviour
         // top left: the seed and basic generation statistics, always on screen
         // top left: the seed and the prop counts, always on screen: on the floor + on furniture, in all and by zone
         string zones = "";
-        for (int z = GenData.Z_HOUSE; z <= GenData.Z_FOREST; z++)
+        for (int z = GenData.Z_HOUSE; z < GenData.ZoneName.Length; z++)
             if (gen.statZoneCells[z] > 0) zones += (zones.Length > 0 ? ", " : "") + GenData.ZoneName[z] + " " + gen.statZoneFloor[z] + "+" + gen.statZoneTop[z];
         string stats = "Seed <b>" + g.seedCode + "</b>   size " + GenData.SizeName[gen.size] + "   density " + GenData.DensityName[gen.density] + "   generator v" + GenData.GEN_VERSION
             + "\n" + gen.statProps + " props: " + gen.statFloor + " on the floor + " + gen.statTop + " on furniture, " + gen.statScenery + " trees, " + gen.nRooms + " rooms, "
@@ -520,7 +528,8 @@ public class GameUI : MonoBehaviour
         }
         string text = "<b>Debug</b>  " + g.fps.ToString("0") + " fps   " + Screen.width + " x " + Screen.height
             + "\nMap hash " + gen.mapHash.ToString("X8") + "   generated in " + g.map.genMs.ToString("0") + " ms, built in " + g.map.buildMs.ToString("0") + " ms, over " + g.genFrames + " frames (" + g.map.wallMs.ToString("0") + " ms)"
-            + "\nCells " + gen.statGroundCells + ": House " + gen.statZoneCells[1] + ", Warehouse " + gen.statZoneCells[2] + ", Diner " + gen.statZoneCells[3] + ", Lawn " + gen.statZoneCells[4] + ", Forest " + gen.statZoneCells[5]
+            + "\nCells " + gen.statGroundCells + ": " + ZoneCells(gen)
+            + (gen.mapTheme != GenData.THEME_NONE ? "\nTheme: " + GenData.ThemeName[gen.mapTheme] : "") + (gen.holiday != 0 ? "\nDecorations: " + (gen.holiday == 1 ? "winter" : "Halloween") : "")
             + "\nEmits " + gen.nEmit + ": props " + gen.statProps + " (" + gen.statFloor + " floor, " + gen.statTop + " furniture), prop groups " + gen.statGroups + ", loose remainder " + gen.statLoose + ", leaks " + gen.statLeakPlausible + " plausible + " + gen.statLeakComedic + " comedic"
             + "\nHiding sockets " + gen.nSockets + ", seed re-rolls " + gen.attempt + ", repairs " + gen.statRepairs + ", renderers " + g.map.rendererCount + ", colliders " + g.map.colliderCount
             + "\nPlayer " + p.body.pos.x.ToString("0.00") + ", " + p.body.pos.y.ToString("0.00") + ", " + p.body.pos.z.ToString("0.00") + "  eye " + p.eye.ToString("0.00") + (p.body.grounded ? "  grounded" : "  in the air")
@@ -546,7 +555,7 @@ public class GameUI : MonoBehaviour
     {
         var gen = Game.I.map.gen;
         int rows = 0;
-        for (int t = 0; t < 64; t++) if (gen.statTypeRooms[t] > 0 && t != GenData.R_RELEASE) rows++;
+        for (int t = 0; t < gen.statTypeRooms.Length; t++) if (gen.statTypeRooms[t] > 0 && t != GenData.R_RELEASE) rows++;
         float[] col = { 8, 150, 200, 262, 372, 470, 580 };
         Rect r = new Rect(x, y, 700, 44 + rows * 17);
         GUI.Box(r, GUIContent.none, box);
@@ -555,7 +564,7 @@ public class GameUI : MonoBehaviour
         string[] head = { "Room type", "Rooms", "Area m2", "On the floor", "per 100 m2", "range per 100 m2", "On furniture (max)" };
         for (int c = 0; c < head.Length; c++) GUI.Label(new Rect(r.x + col[c], r.y + 21, 140, 20), "<color=#9fb4c8>" + head[c] + "</color>", small);
         float ry = r.y + 38;
-        for (int t = 0; t < 64; t++)
+        for (int t = 0; t < gen.statTypeRooms.Length; t++)
         {
             if (gen.statTypeRooms[t] == 0 || t == GenData.R_RELEASE) continue;
             int m2 = gen.statTypeCells[t] / 4;

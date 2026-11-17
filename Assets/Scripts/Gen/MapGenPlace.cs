@@ -199,6 +199,8 @@ public partial class MapGen
     // reserveFront = false: the caller reserves the front clearance itself, once a whole run stands
     int StampObject(int def, int room, int x0, int z0, int gw, int gd, int rot, int px, int pz, int yaw, int flags, bool reserveFront)
     {
+        // a broadleaf tree takes the map's season (its twin has the same size)
+        if (season > 0 && GenData.defSeason[def * 3 + season] >= 0) def = GenData.defSeason[def * 3 + season];
         // the whole object, not only the cells its base stands on, has to be clear of walls and fences (G31)
         if (!ExtentClear(def, px, pz, yaw, -1)) return -1;
         if (!NeighboursClear(def, px, pz, yaw, x0, z0, gw, gd, -1)) return -1;
@@ -526,8 +528,49 @@ public partial class MapGen
             case GenData.R_FOREST_CLEARING: PlanForest(true); break;
             case GenData.R_LANE: PlanLane(); break;
             case GenData.R_YARD: PlanYard(); break;
-            case GenData.R_PUMPS: PlanPumps(); break;
+            // revision 9
+            case GenData.R_SHOP_FLOOR: PlanShopFloor(); break;
+            case GenData.R_STOCKROOM: PlanStockroom(); break;
+            case GenData.R_BACK_OFFICE: PlanOffice(true); break;
+            case GenData.R_GARAGE_BAY: PlanGarageBay(); break;
+            case GenData.R_PARTS: PlanParts(); break;
+            case GenData.R_BARN: PlanBarn(); break;
+            case GenData.R_FEED_STORE: PlanFeedStore(); break;
+            case GenData.R_FORECOURT: PlanForecourt(); break;
+            case GenData.R_FARMYARD: PlanFarmyard(); break;
+            case GenData.R_FIELD: PlanField(); break;
+            case GenData.R_PADDOCK: PlanPaddock(); break;
+            case GenData.R_PARK: PlanPark(); break;
+            case GenData.R_FARM_WORK: PlanFarmWork(); break;
+            case GenData.R_PLAYGROUND: PlanPlayground(); break;
+            case GenData.R_POND: PlanPond(); break;
+            case GenData.R_TERRACE: PlanTerrace(); break;
+            case GenData.R_TEEN: PlanTeen(); break;
+            case GenData.R_PLAYROOM: PlanPlayroom(); break;
+            case GenData.R_BOXROOM: PlanBoxRoom(); break;
+            case GenData.R_PANTRY: PlanPantry(); break;
+            // revision 12
+            case GenData.R_ZOO_PLAZA: PlanZooPlaza(); break;
+            case GenData.R_ZOO_WALK: PlanZooWalk(); break;
+            case GenData.R_ENC_FARM: case GenData.R_ENC_SAVANNA: case GenData.R_ENC_ARCTIC: case GenData.R_ENC_WOODS: case GenData.R_ENC_JUNGLE: case GenData.R_AVIARY: PlanEnclosure(); break;
+            case GenData.R_KEEPER: PlanKeeper(); break;
+            case GenData.R_CABIN_MAIN: PlanCabinMain(); break;
+            case GenData.R_BUNKROOM: PlanBunkRoom(); break;
+            case GenData.R_PORCH: PlanPorch(); break;
+            case GenData.R_WOODYARD: PlanWoodyard(); break;
+            case GenData.R_CAMPSITE: PlanCampsite(); break;
+            case GenData.R_ARCADE: PlanArcade(); break;
+            case GenData.R_SNACKBAR: PlanSnackbar(); break;
+            case GenData.R_PRIZE_STORE: PlanPrizeStore(); break;
+            case GenData.R_MIDWAY: PlanMidway(); break;
+            case GenData.R_RIDES: PlanRides(); break;
+            case GenData.R_NAVE: PlanNave(); break;
+            case GenData.R_VESTRY: PlanVestry(); break;
+            case GenData.R_CHURCHYARD: PlanChurchyard(); break;
+            case GenData.R_GRAVEYARD: PlanGraveyard(); break;
         }
+        if (holiday != 0) HolidayDecor();
+        if (mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE) ThemeDecor();
         if (roomFloorMin[room] > 0) FillToMinimum();
         // what sits on, in and under the furniture, thinned evenly to the room's cap
         SetTopFactor(room, firstEmit);

@@ -236,8 +236,21 @@ public class Game : MonoBehaviour
             + " frames " + genFrames + " renderers " + map.rendererCount + " colliders " + map.colliderCount;
     }
 
+    // revision 12: the sky of the map's theme (a red planet's dusk for a space base, a softer blue for a medieval
+    // village), set once the map stands
+    int skyTheme = 0;
+    void ThemeSky()
+    {
+        if (!map.built || map.gen.mapTheme == skyTheme) return;
+        skyTheme = map.gen.mapTheme;
+        Color sky = skyTheme == GenData.THEME_SPACE ? new Color(0.82f, 0.58f, 0.44f) : (skyTheme == GenData.THEME_MEDIEVAL ? new Color(0.62f, 0.78f, 0.90f) : new Color(0.56f, 0.76f, 0.93f));
+        cam.backgroundColor = sky;
+        RenderSettings.fogColor = sky;
+    }
+
     void Update()
     {
+        ThemeSky();
         fpsFrames++; fpsTimer += Time.unscaledDeltaTime;
         if (fpsTimer >= 0.5f) { fps = fpsFrames / fpsTimer; fpsFrames = 0; fpsTimer = 0f; }
 
@@ -421,7 +434,7 @@ public class Game : MonoBehaviour
     {
         var g = map.gen;
         var sb = new System.Text.StringBuilder();
-        for (int t = 0; t < 64; t++)
+        for (int t = 0; t < g.statTypeRooms.Length; t++)
         {
             if (g.statTypeRooms[t] == 0 || t == GenData.R_RELEASE) continue;
             sb.Append(GenData.RoomName(t) + ": " + g.statTypeRooms[t] + " rooms " + g.statTypeCells[t] / 4 + " m2 floor " + g.statTypeFloor[t] + " furniture " + g.statTypeTop[t] + " | ");

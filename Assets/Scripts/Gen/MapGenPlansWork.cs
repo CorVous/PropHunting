@@ -113,6 +113,9 @@ public partial class MapGen
                 }
             }
         }
+        // revision 12: the tool wall beside the workbench corner, now and then
+        GenRng r18 = SR(18);
+        if (r18.Chance(400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_toolwall"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r18) >= 0) Keep(first, false); }
         GenRng r4 = SR(4);
         if (r4.Chance(700) && Fit(3)) DrumRow(Fit(5) ? r4.Between(3, 5) : 3, ref r4);
         // (d) rows of goods beside the racks and at the walls

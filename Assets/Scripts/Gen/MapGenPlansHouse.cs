@@ -1,0 +1,204 @@
+// MapGen, revision 11 plans: the house's new rooms (research 18, pick 1). A teen's room, a playroom, the box room
+// (what an attic holds, on the ground floor: the generator has one storey) and the pantry off the kitchen. Same tools
+// and rules as the other house plans; in a KayKit-furnished house Dn gives each piece's twin.
+public partial class MapGen
+{
+    // a bed against a wall, in a corner where it can be, its bedside cabinet beside it: the bed, or -1
+    int CornerBed(int bedDef, ref GenRng r)
+    {
+        int first = nEmit;
+        int bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_NEVER, EF_MANDATORY, ref r);
+        if (bed < 0) bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, ref r);
+        if (bed >= 0 && !Keep(first, true)) bed = -1;
+        if (bed < 0) { MandFail(1); return -1; }
+        if (Fit(1))
+        {
+            first = nEmit;
+            if (RelBeside(Dn("k_bedside"), bed, 0, 50, 0, ref r) >= 0) Keep(first, false);
+        }
+        return bed;
+    }
+
+    // ============================================================================================ TEEN ROOM
+    // Areas: the bed in a corner with a plush on it; the gaming desk under the window (screen, gaming chair,
+    // headphones from the slots); the music corner (a guitar and its case leaning at the wall); the floor of things
+    // left lying: comics, skates, a skateboard and its helmet, balls; an armchair or a lounge chair with the TV.
+    void PlanTeen()
+    {
+        int room = pRoom;
+        GenRng r = SR(1);
+        int bed = CornerBed(Pick(ref r, "k_bedSingle", 6, "q_bed", 4), ref r);
+        int bx = bed >= 0 ? emitX[bed] : RoomMidX(room), bz = bed >= 0 ? emitZ[bed] : RoomMidZ(room);
+        GenRng r2 = SR(2);
+        if (Fit(2))
+        {
+            int first = nEmit;
+            if (WallPlace(Dn("k_desk"), WM_FAR, bx, bz, WIN_PREFER, 0, ref r2) >= 0) Keep(first, false);
+        }
+        GenRng r3 = SR(3);
+        if (r3.Chance(800) && Fit(1))
+        {
+            int first = nEmit;
+            int g = WallPlace(Dn(r3.Chance(500) ? "mb_guitarA" : "mb_guitarB"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3);
+            if (g >= 0 && Keep(first, false) && r3.Chance(550) && Fit(1)) { first = nEmit; if (RelBeside(Dn("mb_guitarCase"), g, 0, 80, 0, ref r3) >= 0) Keep(first, false); }
+        }
+        GenRng r4 = SR(4);
+        if (r4.Chance(750) && Fit(2)) { int first = nEmit; if (PlaceGroup(GenData.FindGrp("comics"), room, GenData.A_WALL, r4.Between(2, 3), 0, ref r4)) Keep(first, false); }
+        GenRng r5 = SR(5);
+        if (r5.Chance(650) && LooseFit(2))
+        {
+            int first = nEmit;
+            FSet(Dn("sk_board"), Dn(r5.Chance(500) ? "mb_helmet" : "mb_skates"));
+            if (FormAt(GenData.GL_ROW, 120, GenData.A_WALL, WM_ANY, 0, 0, 0, ref r5) >= 0 && Keep(first, false)) MarkLoose(first);
+        }
+        GenRng r6 = SR(6);
+        if (r6.Chance(600) && Fit(1))
+        {
+            int first = nEmit;
+            int seat = WallPlace(Dn(r6.Chance(550) ? "hb_armchairBlue" : "k_loungeChair"), WM_ANY, 0, 0, WIN_AVOID, 0, ref r6);
+            if (seat >= 0 && Keep(first, false) && r6.Chance(450) && Fit(1)) { first = nEmit; if (RelBeside(Dn("k_speaker"), seat, 0, 120, 0, ref r6) >= 0) Keep(first, false); }
+        }
+        GenRng r7 = SR(7);
+        if (r7.Chance(650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r7) >= 0) Keep(first, false); }
+        GenRng r8 = SR(8);
+        if (r8.Chance(500) && Fit(2)) { int first = nEmit; if (PlaceGroup(GenData.FindGrp("balls"), room, GenData.A_WALL, 2, 0, ref r8)) Keep(first, false); }
+        GenRng r9 = SR(9);
+        if (r9.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_bookcaseLow"), WM_ANY, 0, 0, WIN_AVOID, 0, ref r9) >= 0) Keep(first, false); }
+        GenRng r10 = SR(10);
+        if (r10.Chance(550) && Fit(1))
+        {
+            int cell = OpenSpot(2, WM_NEAR, bx, bz, 0, ref r10);
+            if (cell >= 0) FreePlace(Dn(r10.Chance(500) ? "k_rug" : "q_rug"), cell, r10.Range(2) * 90, 0, 0, H_FREE);
+        }
+        if (bed >= 0)
+        {
+            GenRng r11 = SR(11);
+            if (r11.Chance(450) && Fit(1)) { int first = nEmit; if (GroupBeside(GenData.FindGrp("plush"), bed, 1, 0, ref r11)) Keep(first, false); }
+        }
+        Extras(20, 500, "ck_lampFloor", "wk_trashcan", "ck_plant");
+    }
+
+    // ============================================================================================ PLAYROOM
+    // Areas: the round carpet in the middle with the board-game giants, the toy cars and the wooden train on it; the
+    // footstools round it; the toy box in a corner, the bookcase of toys; plush toys and balls at the walls; a little
+    // table; a reading armchair.
+    void PlanPlayroom()
+    {
+        int room = pRoom;
+        GenRng r = SR(1);
+        int mx = RoomMidX(room), mz = RoomMidZ(room);
+        int cell = OpenSpot(2, WM_NEAR, mx, mz, 0, ref r);
+        int carpet = cell >= 0 ? FreePlace(Dn(r.Chance(600) ? "hb_carpet" : "k_rug"), cell, 0, 0, 0, H_FREE) : -1;
+        int cx = cell >= 0 ? cell % IW * GenData.INNER_MM + 250 : mx, cz = cell >= 0 ? cell / IW * GenData.INNER_MM + 250 : mz;
+        string[] play = { "boardToys", "toyCars", "toys" };
+        int got = 0;
+        for (int k = 0; k < play.Length; k++)
+        {
+            GenRng rk = SR(2 + k);
+            if (!Fit(2)) break;
+            int first = nEmit;
+            fHost = carpet >= 0 ? carpet : H_FREE;
+            bool ok = GroupAt(GenData.FindGrp(play[k]), GenData.A_ANY, rk.Between(2, 3), WM_NEAR, cx, cz, 0, ref rk);
+            fHost = H_NONE;
+            if (ok && Keep(first, false)) got++;
+        }
+        if (got == 0) MandFail(1);
+        GenRng r5 = SR(5);
+        if (r5.Chance(700) && Fit(2))
+        {
+            int first = nEmit;
+            FSet(Dn("hb_train"), Dn("hb_tender"));
+            if (FormAt(GenData.GL_ROW, 40, GenData.A_ANY, WM_NEAR, cx, cz, 0, ref r5) >= 0) Keep(first, false);
+        }
+        GenRng r6 = SR(6);
+        for (int k = 0; k < 2 && Fit(1); k++)
+        {
+            int c2 = OpenSpot(1, WM_NEAR, cx, cz, 0, ref r6);
+            int first = nEmit;
+            if (c2 >= 0 && FreePlace(Dn(k == 0 ? "hb_footstoolG" : "hb_footstoolR"), c2, r6.Range(4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+        }
+        GenRng r7 = SR(7);
+        if (Fit(2))
+        {
+            int first = nEmit;
+            int box = CornerPlace(Pick(ref r7, "s_chest", 5, "k_boxOpen", 4), WM_ANY, 0, 0, false, 0, ref r7);
+            if (box >= 0 && Keep(first, false) && Fit(2)) { first = nEmit; if (GroupBeside(GenData.FindGrp("plush"), box, 2, 0, ref r7)) Keep(first, false); }
+        }
+        GenRng r8 = SR(8);
+        if (r8.Chance(750) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_bookcaseLow"), WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r8) >= 0) Keep(first, false); }
+        GenRng r9 = SR(9);
+        if (r9.Chance(600) && Fit(2)) { int first = nEmit; if (PlaceGroup(GenData.FindGrp("balls"), room, GenData.A_WALL, 2, 0, ref r9)) Keep(first, false); }
+        GenRng r10 = SR(10);
+        if (r10.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("hb_armchairBlue"), WM_ANY, 0, 0, WIN_PREFER, 0, ref r10) >= 0) Keep(first, false); }
+        GenRng r11 = SR(11);
+        if (r11.Chance(450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("hb_stool"), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(first, false); }
+        GenRng r12 = SR(12);
+        if (r12.Chance(400) && LooseFit(1)) { int first = nEmit; if (WallPlace(Dn("mb_skates"), WM_ANY, 0, 0, WIN_ANY, 0, ref r12) >= 0 && Keep(first, false)) MarkLoose(first); }
+        Extras(20, 450, "ck_lampFloor", "ck_plant", "wq_cabinetSmall");
+    }
+
+    // ============================================================================================ BOX ROOM
+    // What an attic holds: trunks and a chest in a row at a wall, stacks of boxes, old pictures and the big mirror
+    // leaning at the walls, the sled, a guitar case, an old wardrobe or cabinet, a standard lamp and an armchair put
+    // away, comics in their boxes, skates, a helmet, and the odd book that is not a book.
+    void PlanBoxRoom()
+    {
+        int room = pRoom;
+        GenRng r = SR(1);
+        int first = nEmit;
+        if (PlaceGroup(GenData.FindGrp("trunks"), room, GenData.A_WALL, Fit(3) ? 3 : 2, EF_MANDATORY, ref r)) Keep(first, true); else MandFail(1);
+        string[] rows = { "oldBoxes", "frames", "cardboard", "comics", "oldBoxes" };
+        int[] chance = { 900, 850, 650, 500, 500 };
+        for (int k = 0; k < rows.Length; k++)
+        {
+            GenRng rk = SR(2 + k);
+            if (!rk.Chance(chance[k]) || !Fit(2)) continue;
+            first = nEmit;
+            if (PlaceGroup(GenData.FindGrp(rows[k]), room, GenData.A_WALL, rk.Between(2, 3), 0, ref rk)) Keep(first, false);
+        }
+        string[] one = { "mb_mirror", "mb_sled", "mb_guitarCase", "gen_wardrobe", "q_cabinet", "q_armchair", "k_bookcaseLow", "hb_stool" };
+        int[] ch = { 700, 550, 500, 450, 450, 400, 400, 300 };
+        for (int k = 0; k < one.Length; k++)
+        {
+            GenRng rk = SR(10 + k);
+            if (!rk.Chance(ch[k]) || !Fit(1)) continue;
+            first = nEmit;
+            if (WallPlace(Dn(one[k]), WM_ANY, 0, 0, WIN_ANY, 0, ref rk) >= 0) Keep(first, false);
+        }
+        GenRng r20 = SR(20);
+        if (r20.Chance(500) && LooseFit(2))
+        {
+            first = nEmit;
+            FSet(Dn("mb_skates"), Dn(r20.Chance(500) ? "mb_helmet" : "mb_mimic"));
+            if (FormAt(GenData.GL_ROW, 100, GenData.A_WALL, WM_ANY, 0, 0, 0, ref r20) >= 0 && Keep(first, false)) MarkLoose(first);
+        }
+        Extras(30, 600, "cq_lampStanding", "ck_lampFloor", "cs_chest");
+    }
+
+    // ============================================================================================ PANTRY
+    // Shelves of jars, bottles and food along the walls (the slots fill them), the chest freezer, crates of
+    // vegetables and sacks of flour at the foot of the shelves, a keg and small barrels, a stool to reach the top.
+    void PlanPantry()
+    {
+        int room = pRoom;
+        GenRng r = SR(1);
+        if (!RackRun(2, Dn("dg_shelves"), Dn("gen_rackPantry"), WM_FAR, RoomMidX(room), RoomMidZ(room), ref r)) MandFail(1);
+        GenRng r2 = SR(2);
+        if (r2.Chance(650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("dg_shelves"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r2) >= 0) Keep(first, false); }
+        GenRng r3 = SR(3);
+        if (r3.Chance(650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn(r3.Chance(550) ? "ms_freezer" : "k_fridge"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(first, false); }
+        string[] rows = { "crates", "sacks", "kegs", "crates", "cardboard" };
+        int[] chance = { 900, 750, 600, 500, 350 };
+        for (int k = 0; k < rows.Length; k++)
+        {
+            GenRng rk = SR(4 + k);
+            if (!rk.Chance(chance[k]) || !Fit(2)) continue;
+            int first = nEmit;
+            if (PlaceGroup(GenData.FindGrp(rows[k]), room, GenData.A_WALL, rk.Between(2, 3), 0, ref rk)) Keep(first, false);
+        }
+        GenRng r10 = SR(10);
+        if (r10.Chance(450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("hb_stool"), WM_ANY, 0, 0, WIN_ANY, 0, ref r10) >= 0) Keep(first, false); }
+        GenRng r11 = SR(11);
+        if (r11.Chance(400) && Fit(2)) { int first = nEmit; if (PlaceGroup(GenData.FindGrp("cleaning"), room, GenData.A_WALL, 2, 0, ref r11)) Keep(first, false); }
+    }
+}

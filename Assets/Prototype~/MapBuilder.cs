@@ -27,7 +27,10 @@ public class MapBuilder
 
     // ---- colours (sRGB) ----
     static Color32 C(int r, int g, int b) { return new Color32((byte)r, (byte)g, (byte)b, 255); }
-    static readonly Color32 Frame = C(122, 88, 62), WindowFrame = C(238, 238, 232), Ceiling = C(236, 234, 226);
+    static readonly Color32 Ceiling = C(236, 234, 226);
+    // door and window trims; revision 13: dark timber in a medieval village, gunmetal on a space base
+    Color32 Frame { get { return gen.mapTheme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : (gen.mapTheme == GenData.THEME_SPACE ? C(84, 90, 102) : C(122, 88, 62)); } }
+    Color32 WindowFrame { get { return gen.mapTheme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : (gen.mapTheme == GenData.THEME_SPACE ? C(84, 90, 102) : C(238, 238, 232)); } }
 
     static Color32 Vary(Color32 c, int ix, int iz, int amount)
     {
@@ -53,29 +56,140 @@ public class MapBuilder
             case GenData.R_DINER_DINING: return C(246, 236, 216);
             case GenData.R_DINER_KITCHEN: return C(226, 232, 232);
             case GenData.R_DINER_STORE: return C(206, 204, 198);
+            // revision 9
+            case GenData.R_SHOP_FLOOR: return C(240, 240, 232);
+            case GenData.R_STOCKROOM: case GenData.R_PARTS: return C(196, 198, 200);
+            case GenData.R_BACK_OFFICE: return C(222, 214, 200);
+            case GenData.R_GARAGE_BAY: return C(178, 182, 186);
+            case GenData.R_BARN: case GenData.R_FEED_STORE: case GenData.R_FARM_WORK: return C(176, 132, 92);
+            // revision 11
+            case GenData.R_TEEN: return C(178, 196, 226);
+            case GenData.R_PLAYROOM: return C(246, 222, 150);
+            case GenData.R_BOXROOM: return C(206, 194, 176);
+            case GenData.R_PANTRY: return C(232, 226, 206);
+            // revision 12: inside the log cabin, the logs' own colour
+            case GenData.R_CABIN_MAIN: return C(186, 138, 92);
+            case GenData.R_BUNKROOM: return C(196, 150, 104);
+            // the funfair: a dark hall for the machines' colours, a white snack bar
+            case GenData.R_ARCADE: return C(70, 60, 96);
+            case GenData.R_SNACKBAR: return C(240, 236, 226);
+            case GenData.R_PRIZE_STORE: return C(200, 196, 190);
+            // the chapel: limewashed stone
+            case GenData.R_NAVE: return C(232, 228, 214);
+            case GenData.R_VESTRY: return C(214, 206, 190);
         }
         return C(220, 220, 220);
     }
 
-    static Color32 ExteriorColour(int zone)
+    // ---- revision 9: a colour scheme per building, so two houses (and their bedrooms) do not look alike. The
+    // scheme comes from the seed and the building's instance, so a seed always looks the same. Interior walls are
+    // tinted, wooden floors and the outside walls and roof take one of four looks per kind of building.
+    // revision 11: a KayKit-furnished house takes schemes 4 to 7 (warmer, older: wallpaper tints, dark boards)
+    int Style(int inst) { return inst < 0 ? 0 : (int)(GenRng.Hash32(gen.seed, (uint)inst, 9091, 0, 0) & 3) + (gen.KayHouse(inst) ? 4 : 0); }
+    int StyleAt(int cell) { return cell >= 0 && GenData.IsBuilding(gen.cellZone[cell]) ? Style(gen.cellInst[cell]) : 0; }
+
+    static readonly int[] TintR = { 0, 10, -14, 4, 14, -6, 18, 6 }, TintG = { 0, -6, 2, 8, 2, 10, -8, -4 }, TintB = { 0, -14, 10, -10, -20, -14, -2, 14 };
+    static Color32 Tint(Color32 c, int style) { return C(Mathf.Clamp(c.r + TintR[style], 0, 255), Mathf.Clamp(c.g + TintG[style], 0, 255), Mathf.Clamp(c.b + TintB[style], 0, 255)); }
+
+    Color32 WallColourAt(int cell)
     {
-        return zone == GenData.Z_HOUSE ? C(232, 212, 180) : (zone == GenData.Z_DINER ? C(214, 92, 80) : C(122, 142, 160));
+        Color32 c = Tint(WallColour(gen.roomType[gen.cellRoom[cell]]), StyleAt(cell));
+        // revision 12, the map themes: a space base's inside walls are pale panels, a medieval village's limewash
+        if (gen.mapTheme == GenData.THEME_SPACE) return Mix(c, C(214, 220, 228), 70);
+        if (gen.mapTheme == GenData.THEME_MEDIEVAL) return Mix(c, C(232, 222, 198), 60);
+        return c;
     }
 
-    static Color32 RoofColour(int zone)
+    static Color32 Mix(Color32 a, Color32 b, int pctB)
     {
-        return zone == GenData.Z_HOUSE ? C(172, 94, 80) : (zone == GenData.Z_DINER ? C(232, 230, 222) : C(100, 106, 116));
+        return C((a.r * (100 - pctB) + b.r * pctB) / 100, (a.g * (100 - pctB) + b.g * pctB) / 100, (a.b * (100 - pctB) + b.b * pctB) / 100);
     }
 
-    Color32 FloorColour(int roomType, int ix, int iz)
+    static readonly Color32[] HouseOut = { C(232, 212, 180), C(196, 214, 222), C(204, 216, 186), C(184, 112, 90),
+        C(150, 170, 140), C(226, 190, 150), C(170, 120, 110), C(214, 214, 196) };
+    static readonly Color32[] HouseRoof = { C(172, 94, 80), C(92, 100, 112), C(84, 104, 92), C(122, 90, 70),
+        C(70, 74, 82), C(140, 78, 62), C(60, 70, 64), C(104, 70, 60) };
+    static readonly Color32[] ShopOut = { C(240, 222, 150), C(140, 196, 190), C(236, 236, 228), C(200, 160, 196) };
+    static readonly Color32[] GarageOut = { C(150, 160, 170), C(176, 104, 84), C(196, 190, 170), C(120, 136, 120) };
+    static readonly Color32[] SpaceOut = { C(214, 218, 224), C(196, 202, 212), C(226, 222, 214), C(186, 194, 204) };     // revision 12: hull panels
+    static readonly Color32[] MedievalOut = { C(236, 226, 200), C(222, 206, 172), C(214, 214, 204), C(240, 232, 214) }; // limewash and daub
+    static readonly Color32[] FairOut = { C(250, 210, 80), C(120, 200, 230), C(240, 140, 170), C(150, 220, 140) };   // revision 12: the arcade hall
+    static readonly Color32[] CabinOut = { C(140, 96, 62), C(120, 82, 54), C(158, 112, 72), C(110, 86, 64) };   // revision 12: log colours
+    static readonly Color32[] BarnOut = { C(170, 60, 50), C(150, 108, 72), C(186, 82, 58), C(132, 92, 64) };
+
+    Color32 ExteriorColour(int zone, int style)
     {
+        if (gen.mapTheme == GenData.THEME_SPACE) return SpaceOut[style & 3];
+        if (gen.mapTheme == GenData.THEME_MEDIEVAL) return zone == GenData.Z_CHAPEL || zone == GenData.Z_WAREHOUSE ? C(176, 170, 158) : MedievalOut[style & 3];
+        switch (zone)
+        {
+            case GenData.Z_HOUSE: return HouseOut[style];
+            case GenData.Z_DINER: return C(214, 92, 80);
+            case GenData.Z_SHOP: return ShopOut[style];
+            case GenData.Z_GARAGE: return GarageOut[style];
+            case GenData.Z_BARN: return BarnOut[style];
+            case GenData.Z_CABIN: return CabinOut[style & 3];
+            case GenData.Z_FAIR: return FairOut[style & 3];
+            case GenData.Z_CHAPEL: return (style & 1) == 0 ? C(170, 166, 156) : C(196, 186, 168);
+        }
+        return C(122, 142, 160);
+    }
+
+    Color32 RoofColour(int zone, int style)
+    {
+        if (gen.mapTheme == GenData.THEME_SPACE) return (style & 1) == 0 ? C(84, 90, 102) : C(210, 140, 60);
+        if (gen.mapTheme == GenData.THEME_MEDIEVAL) return (style & 1) == 0 ? C(176, 146, 86) : C(150, 76, 58);   // thatch, red tiles
+        switch (zone)
+        {
+            case GenData.Z_HOUSE: return HouseRoof[style];
+            case GenData.Z_DINER: return C(232, 230, 222);
+            case GenData.Z_SHOP: return C(84, 88, 96);
+            case GenData.Z_GARAGE: return C(110, 116, 124);
+            case GenData.Z_BARN: return (style & 1) == 0 ? C(78, 82, 90) : C(112, 86, 66);
+            case GenData.Z_CABIN: return (style & 1) == 0 ? C(70, 92, 70) : C(96, 70, 56);
+            case GenData.Z_FAIR: return (style & 1) == 0 ? C(200, 60, 60) : C(60, 90, 170);
+            case GenData.Z_CHAPEL: return C(74, 80, 92);
+        }
+        return C(100, 106, 116);
+    }
+
+    static readonly Color32[] PlankA = { C(198, 154, 106), C(150, 104, 70), C(214, 190, 150), C(170, 160, 150),
+        C(128, 86, 58), C(178, 128, 84), C(110, 78, 60), C(190, 160, 120) };
+    static readonly Color32[] PlankB = { C(188, 144, 98), C(140, 96, 64), C(204, 178, 140), C(160, 150, 140),
+        C(118, 78, 52), C(166, 118, 76), C(100, 70, 54), C(178, 148, 110) };
+
+    Color32 FloorColour(int roomType, int ix, int iz, int style = 0)
+    {
+        // revision 12: a space base's floors are deck plates, a medieval village's kitchens and halls stone flags
+        if (gen.mapTheme == GenData.THEME_SPACE) return (((ix / 2 + iz / 2) & 1) == 0) ? C(132, 138, 148) : C(120, 126, 136);
+        if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+        {
+            // stone flags where there is water, fire or traffic; dark boards in every other room
+            if (roomType == GenData.R_KITCHEN || roomType == GenData.R_HALL || roomType == GenData.R_DINER_KITCHEN || roomType == GenData.R_PANTRY || roomType == GenData.R_BATH
+                || roomType == GenData.R_NAVE || roomType == GenData.R_VESTRY || roomType == GenData.R_STORAGE || roomType == GenData.R_LOADING || roomType == GenData.R_DINER_STORE)
+                return Vary((((ix / 2 + iz / 2) & 1) == 0) ? C(160, 154, 142) : C(146, 140, 130), ix / 2, iz / 2, 5);
+            return Vary(((ix & 1) == 0) ? C(118, 84, 56) : C(108, 76, 50), ix, iz / 3, 4);
+        }
         switch (roomType)
         {
             case GenData.R_LIVING: case GenData.R_BEDROOM: case GenData.R_OFFICE: case GenData.R_DINING: case GenData.R_KIDS: case GenData.R_HALL:
-            case GenData.R_WH_OFFICE:
-                // wood planks: strips two cells wide, alternating shade
-                return Vary((((iz / 2) & 1) == 0) ? C(198, 154, 106) : C(188, 144, 98), ix / 4, iz / 2, 4);
-            case GenData.R_KITCHEN: case GenData.R_DINER_KITCHEN:
+            case GenData.R_WH_OFFICE: case GenData.R_BACK_OFFICE: case GenData.R_FEED_STORE: case GenData.R_FARM_WORK:
+            case GenData.R_TEEN: case GenData.R_PLAYROOM: case GenData.R_BOXROOM: case GenData.R_CABIN_MAIN: case GenData.R_BUNKROOM:
+                // wood planks: strips two cells wide, alternating shade; four kinds of wood (the building's scheme)
+                return Vary((((iz / 2) & 1) == 0) ? PlankA[style] : PlankB[style], ix / 4, iz / 2, 4);
+            case GenData.R_SHOP_FLOOR:
+                return (((ix + iz) & 1) == 0) ? C(232, 232, 226) : C(196, 204, 208);
+            case GenData.R_STOCKROOM: case GenData.R_PARTS: case GenData.R_GARAGE_BAY:
+                return Vary(C(150, 152, 156), ix, iz, 7);
+            case GenData.R_BARN:
+                return Vary(C(184, 156, 104), ix, iz, 10);
+            case GenData.R_ARCADE:   // a carpet of red and dark blue squares
+                return ((((ix / 2) + (iz / 2)) & 1) == 0) ? C(150, 46, 60) : C(44, 50, 96);
+            case GenData.R_SNACKBAR: case GenData.R_PRIZE_STORE:
+                return (((ix + iz) & 1) == 0) ? C(230, 230, 222) : C(200, 206, 210);
+            case GenData.R_NAVE: case GenData.R_VESTRY:   // stone flags, two cells each
+                return Vary((((ix / 2 + iz / 2) & 1) == 0) ? C(178, 172, 160) : C(164, 158, 148), ix / 2, iz / 2, 5);
+            case GenData.R_KITCHEN: case GenData.R_DINER_KITCHEN: case GenData.R_PANTRY:
                 return (((ix + iz) & 1) == 0) ? C(226, 226, 218) : C(204, 210, 212);
             case GenData.R_BATH:
                 return (((ix + iz) & 1) == 0) ? C(214, 230, 234) : C(190, 212, 220);
@@ -117,6 +231,7 @@ public class MapBuilder
         PropInstance.simulating.Clear();
         if (root != null) Object.Destroy(root);
         root = null; props = null; objects = null; built = false;
+        fenceModel = -1;   // the next map's theme may want other fences
     }
 
     // Does work for about budgetMs, then returns. True when the map is complete (or generation failed).
@@ -194,6 +309,23 @@ public class MapBuilder
 
     Color32 CellColour(int i, int ix, int iz)
     {
+        if (gen.mapTheme == GenData.THEME_SPACE)
+            switch (gen.ground[i])
+            {
+                // a red planet: regolith for grass, dark scree for the wood, metal deck for paving
+                case MapGen.GR_LAWN: return Vary(C(186, 118, 86), ix, iz, 7);
+                case MapGen.GR_FOREST: return Vary(C(132, 86, 70), ix, iz, 9);
+                case MapGen.GR_SOIL: return Vary(C(150, 96, 72), ix, iz, 8);
+                case MapGen.GR_PAVING: case MapGen.GR_DECK: return (((ix / 2 + iz / 2) & 1) == 0) ? C(150, 156, 166) : C(138, 144, 154);
+                case MapGen.GR_TRACK: return Vary(C(204, 152, 112), ix, iz, 6);
+                case MapGen.GR_WATER: return Vary(C(120, 196, 210), ix, iz, 5);   // ice
+            }
+        else if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+            switch (gen.ground[i])
+            {
+                case MapGen.GR_PAVING: return Vary(((ix + iz) % 3 == 0) ? C(150, 146, 138) : C(166, 160, 150), ix, iz, 8);   // cobbles
+                case MapGen.GR_TRACK: return Vary(C(150, 120, 86), ix, iz, 7);
+            }
         switch (gen.ground[i])
         {
             case MapGen.GR_LAWN: return Vary(C(116, 170, 86), ix, iz, 7);
@@ -201,14 +333,16 @@ public class MapBuilder
             case MapGen.GR_SOIL: return Vary(C(138, 104, 74), ix, iz, 8);
             case MapGen.GR_PAVING: return (((ix / 2 + iz / 2) & 1) == 0) ? C(196, 190, 178) : C(182, 176, 166);
             case MapGen.GR_TRACK: return Vary(C(158, 134, 100), ix, iz, 6);
+            case MapGen.GR_WATER: return Vary(C(86, 150, 196), ix, iz, 5);
+            case MapGen.GR_DECK: return Vary((((ix / 2) & 1) == 0) ? C(170, 124, 82) : C(156, 112, 74), ix / 2, iz / 4, 4);   // decking boards
         }
-        return FloorColour(gen.roomType[gen.innerRoom[i]], ix, iz);
+        return FloorColour(gen.roomType[gen.innerRoom[i]], ix, iz, StyleAt(ix / GenData.INNER_PER_CELL + iz / GenData.INNER_PER_CELL * gen.W));
     }
 
     bool Blends(int i)
     {
         int g = gen.ground[i];
-        return g >= MapGen.GR_LAWN && g != MapGen.GR_RELEASE && g != MapGen.GR_PAVING;
+        return g >= MapGen.GR_LAWN && g != MapGen.GR_RELEASE && g != MapGen.GR_PAVING && g != MapGen.GR_WATER && g != MapGen.GR_DECK;
     }
 
     // the colour of the grid corner at (cx, cz) for the cell `self`: the mean of the outdoor cells around the
@@ -255,7 +389,7 @@ public class MapBuilder
     {
         // the land outside the fence, a little lower so it never fights with the floors
         float m = 60f, w = gen.W * CELL, h = gen.H * CELL;
-        ground.Quad(new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, C(98, 150, 78));
+        ground.Quad(new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, gen.mapTheme == GenData.THEME_SPACE ? C(176, 110, 82) : C(98, 150, 78));   // revision 13: a red planet beyond a space base's fence
         ground.ToObject("Ground", archRoot, ModelLibrary.lit);
         rendererCount++;
         var col = new GameObject("GroundCollider");
@@ -345,9 +479,9 @@ public class MapBuilder
         if (gen.InGrid(cx, cz))
         {
             int c = cz * gen.W + cx;
-            if (GenData.IsBuilding(gen.cellZone[c])) return WallColour(gen.roomType[gen.cellRoom[c]]);
+            if (GenData.IsBuilding(gen.cellZone[c])) return WallColourAt(c);
         }
-        return ExteriorColour(buildingZone);
+        return ExteriorColour(buildingZone, capStyle);
     }
 
     // trim around an opening: sticks out 2 cm on both faces
@@ -358,6 +492,118 @@ public class MapBuilder
         float t = WALL_HALF + 0.02f;
         if (horizontal) walls.Box(new Vector3(ex + a0, y0, ez - t), new Vector3(ex + a1, y1, ez + t), col, faces);
         else walls.Box(new Vector3(ex - t, y0, ez + a0), new Vector3(ex + t, y1, ez + a1), col, faces);
+    }
+
+    int capStyle;   // the scheme of the building whose wall Edge is drawing (CapColour's outside colour)
+
+    // Revision 9: the big doors drawn on an outside wall: a garage bay's roller door on its wall to the forecourt,
+    // a barn's double doors on its wall to the farmyard. Drawn on the outside face, standing 3 cm proud of it (no
+    // face in the wall's plane, G40); the people's door is the plan's own door beside it.
+    void BigDoor(bool horizontal, float ex, float ez, int cellA, int cellB)
+    {
+        for (int side = 0; side < 2; side++)
+        {
+            int inC = side == 0 ? cellA : cellB, outC = side == 0 ? cellB : cellA;
+            if (inC < 0 || outC < 0 || !GenData.IsBuilding(gen.cellZone[inC]) || GenData.IsBuilding(gen.cellZone[outC])) continue;
+            int rt = gen.roomType[gen.cellRoom[inC]], ot = gen.roomType[gen.cellRoom[outC]];
+            bool roller = rt == GenData.R_GARAGE_BAY && ot == GenData.R_FORECOURT, barn = rt == GenData.R_BARN && ot == GenData.R_FARMYARD;
+            if (!roller && !barn) continue;
+            // the outside face: side A (low) is south or west of the edge, so its outside is +, side B's is -
+            float s = side == 0 ? 1f : -1f, face = WALL_HALF * s, t = 0.03f * s;
+            float a0 = 0.45f, a1 = CELL - 0.45f, top = roller ? 2.6f : 2.9f;
+            Color32 panel = roller ? C(206, 210, 214) : C(150, 54, 44), rib = roller ? C(170, 176, 182) : C(236, 230, 214);
+            Panel(horizontal, ex, ez, a0, a1, 0f, top, face, face + t, panel);
+            if (roller)
+            {
+                // the slats: a rib every 25 cm, standing 1 cm proud of the door
+                for (float y = 0.3f; y < top - 0.05f; y += 0.25f) Panel(horizontal, ex, ez, a0, a1, y, y + 0.04f, face + t, face + t + 0.01f * s, rib);
+            }
+            else
+            {
+                // two leaves: a frame round each and a rail across, in white
+                float mid = (a0 + a1) / 2;
+                float[] xs = { a0, mid - 0.04f, mid + 0.04f, a1 - 0.08f };
+                // the uprights stop at the rails (no two strips overlap in one plane, G40)
+                for (int k = 0; k < xs.Length; k++)
+                {
+                    Panel(horizontal, ex, ez, xs[k], xs[k] + 0.08f, 0.08f, top / 2 - 0.05f, face + t, face + t + 0.015f * s, rib);
+                    Panel(horizontal, ex, ez, xs[k], xs[k] + 0.08f, top / 2 + 0.05f, top - 0.08f, face + t, face + t + 0.015f * s, rib);
+                }
+                Panel(horizontal, ex, ez, a0, a1, top - 0.08f, top, face + t, face + t + 0.015f * s, rib);
+                Panel(horizontal, ex, ez, a0, a1, 0f, 0.08f, face + t, face + t + 0.015f * s, rib);
+                Panel(horizontal, ex, ez, a0, a1, top / 2 - 0.05f, top / 2 + 0.05f, face + t, face + t + 0.015f * s, rib);
+            }
+        }
+    }
+
+    // Revision 12: a log cabin's outside walls show their logs: a rounded course every 0.32 m, 2.5 cm proud of the
+    // wall, stopping 5 cm short of the cell's corners so two walls in a line never share a face (G40). Doors and
+    // windows are other edge kinds and keep their openings clear.
+    void LogCourses(bool horizontal, float ex, float ez, int cellA, int cellB, float h)
+    {
+        for (int side = 0; side < 2; side++)
+        {
+            int inC = side == 0 ? cellA : cellB, outC = side == 0 ? cellB : cellA;
+            if (inC < 0 || gen.cellZone[inC] != GenData.Z_CABIN || (outC >= 0 && GenData.IsBuilding(gen.cellZone[outC]))) continue;
+            float s = side == 0 ? 1f : -1f, face = WALL_HALF * s;
+            Color32 log = C(112, 76, 48);
+            for (float y = 0.16f; y < h - 0.1f; y += 0.32f) Panel(horizontal, ex, ez, 0.05f, CELL - 0.05f, y, y + 0.09f, face, face + 0.025f * s, log);
+        }
+    }
+
+    // Revision 13, the map themes' wall finish on a plain wall, on every face that is a room's inside or a building's
+    // outside (not the log cabin's, which has its logs): a medieval village's half-timbering (corner posts, a sill
+    // rail, a mid rail and the head beam, 3 cm proud, each kept 4 mm from the next so no two share a face), a space
+    // base's panel seams and dark skirting.
+    void ThemeTrim(bool horizontal, float ex, float ez, int cellA, int cellB, float h)
+    {
+        if (gen.mapTheme == GenData.THEME_NONE) return;
+        for (int side = 0; side < 2; side++)
+        {
+            int toward = side == 0 ? cellB : cellA, other = side == 0 ? cellA : cellB;
+            bool tb = toward >= 0 && GenData.IsBuilding(gen.cellZone[toward]), ob = other >= 0 && GenData.IsBuilding(gen.cellZone[other]);
+            if (!tb && !ob) continue;
+            if (!tb && gen.cellZone[other] == GenData.Z_CABIN) continue;
+            // the face that carries a barn's doors or a garage's roller door has them instead (BigDoor)
+            if (!tb && toward >= 0 && other >= 0)
+            {
+                int rt = gen.roomType[gen.cellRoom[other]], ot = gen.roomType[gen.cellRoom[toward]];
+                if ((rt == GenData.R_GARAGE_BAY && ot == GenData.R_FORECOURT) || (rt == GenData.R_BARN && ot == GenData.R_FARMYARD)) continue;
+            }
+            float sgn = side == 0 ? 1f : -1f, face = WALL_HALF * sgn, e = 0.004f;
+            if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+            {
+                Color32 t = C(84, 58, 38);
+                // 17 cm from the cell's ends: at an inside corner the other wall's timber stands 13 cm out, and the rails'
+                // tops would share a plane with it
+                float d = face + 0.03f * sgn, a0 = 0.17f, a1 = CELL - 0.17f, post = 0.16f;
+                Panel(horizontal, ex, ez, a0, a1, 0.02f, 0.18f, face, d, t);                       // sill rail
+                Panel(horizontal, ex, ez, a0, a1, h - 0.26f, h - 0.1f, face, d, t);                // head beam
+                Panel(horizontal, ex, ez, a0, a0 + post, 0.18f + e, h - 0.26f - e, face, d, t);    // corner posts
+                Panel(horizontal, ex, ez, a1 - post, a1, 0.18f + e, h - 0.26f - e, face, d, t);
+                Panel(horizontal, ex, ez, CELL / 2 - post / 2, CELL / 2 + post / 2, 0.18f + e, h - 0.26f - e, face, d, t);   // middle post
+                float my = h * 0.48f;
+                Panel(horizontal, ex, ez, a0 + post + e, CELL / 2 - post / 2 - e, my, my + 0.12f, face, d, t);              // mid rails
+                Panel(horizontal, ex, ez, CELL / 2 + post / 2 + e, a1 - post - e, my, my + 0.12f, face, d, t);
+            }
+            else
+            {
+                Color32 seam = C(150, 158, 170), skirt = C(70, 76, 88);
+                float d = face + 0.012f * sgn;
+                Panel(horizontal, ex, ez, 0.12f, CELL - 0.12f, 0.02f, 0.14f, face, face + 0.02f * sgn, skirt);
+                for (int k = 1; k < 4; k++) Panel(horizontal, ex, ez, k - 0.015f, k + 0.015f, 0.14f + e, h - 0.06f, face, d, seam);
+            }
+        }
+    }
+
+    // a flat box on a wall's face: from a0 to a1 along the edge, y0 to y1, and from n0 to n1 off the wall line (no
+    // face toward the wall: it lies on the wall or on the panel under it)
+    void Panel(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, float n0, float n1, Color32 col)
+    {
+        float lo = Mathf.Min(n0, n1), hi = Mathf.Max(n0, n1);
+        bool outPlus = n1 > n0;
+        if (horizontal) walls.Box(new Vector3(ex + a0, y0, ez + lo), new Vector3(ex + a1, y1, ez + hi), col, MeshBuf.FACE_ALL & ~(outPlus ? MeshBuf.FACE_ZN : MeshBuf.FACE_ZP));
+        else walls.Box(new Vector3(ex + lo, y0, ez + a0), new Vector3(ex + hi, y1, ez + a1), col, MeshBuf.FACE_ALL & ~(outPlus ? MeshBuf.FACE_XN : MeshBuf.FACE_XP));
     }
 
     void Edge(bool horizontal, int cx, int cz, int type, int off, int cellA, int cellB)
@@ -372,8 +618,10 @@ public class MapBuilder
         }
         float hA = GenData.ZoneWallMm[zoneA] / 1000f, hB = GenData.ZoneWallMm[zoneB] / 1000f;
         float h = Mathf.Max(hA, hB);
-        Color32 colA = GenData.IsBuilding(zoneA) ? WallColour(gen.roomType[gen.cellRoom[cellA]]) : ExteriorColour(zoneB);
-        Color32 colB = GenData.IsBuilding(zoneB) ? WallColour(gen.roomType[gen.cellRoom[cellB]]) : ExteriorColour(zoneA);
+        int styleA = StyleAt(cellA), styleB = StyleAt(cellB);
+        Color32 colA = GenData.IsBuilding(zoneA) ? WallColourAt(cellA) : ExteriorColour(zoneB, styleB);
+        Color32 colB = GenData.IsBuilding(zoneB) ? WallColourAt(cellB) : ExteriorColour(zoneA, styleA);
+        capStyle = GenData.IsBuilding(zoneA) ? styleA : styleB;
         // the ends: how far past the cell corners this wall runs (it owns the corner square or stops at its edge),
         // and the colours of the end faces that can be seen (alpha 0: none)
         int vx = cx, vz = cz, bz = GenData.IsBuilding(zoneA) ? zoneA : zoneB;
@@ -399,6 +647,9 @@ public class MapBuilder
         if (type == GenData.E_WALL)
         {
             WallPiece(horizontal, ex, ez, lo, hi, 0f, h, colA, colB, true, loA, loB, hiA, hiB);
+            BigDoor(horizontal, ex, ez, cellA, cellB);
+            LogCourses(horizontal, ex, ez, cellA, cellB, h);
+            ThemeTrim(horizontal, ex, ez, cellA, cellB, h);
         }
         else if (type == GenData.E_DOOR)
         {
@@ -426,6 +677,13 @@ public class MapBuilder
             Trim(horizontal, ex, ez, w0 - 0.05f, w0 + e, sill + e, head - e, WindowFrame);
             Trim(horizontal, ex, ez, w1 - e, w1 + 0.05f, sill + e, head - e, WindowFrame);
             Trim(horizontal, ex, ez, (w0 + w1) / 2 - 0.02f, (w0 + w1) / 2 + 0.02f, sill + e, head - e, WindowFrame);
+            if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+            {
+                // leaded lights: a transom either side of the mullion, kept clear of it and of the frame
+                float m = (w0 + w1) / 2, ty = (sill + head) / 2;
+                Trim(horizontal, ex, ez, w0 + 2 * e, m - 0.02f - e, ty - 0.015f, ty + 0.015f, WindowFrame);
+                Trim(horizontal, ex, ez, m + 0.02f + e, w1 - 2 * e, ty - 0.015f, ty + 0.015f, WindowFrame);
+            }
             // a window is a wall for movement and for darts (04 section 4.1.1): one collider for the whole edge
             if (horizontal) Collider(new Vector3(ex + lo, 0, ez - WALL_HALF), new Vector3(ex + hi, h, ez + WALL_HALF), "WindowWall");
             else Collider(new Vector3(ex - WALL_HALF, 0, ez + lo), new Vector3(ex + WALL_HALF, h, ez + hi), "WindowWall");
@@ -436,7 +694,8 @@ public class MapBuilder
 
     void Fence(bool horizontal, float ex, float ez)
     {
-        if (fenceModel < 0) fenceModel = ModelLibrary.Find("fence_planks");
+        // revision 12: a space base's fences are the station's rails
+        if (fenceModel < 0) fenceModel = ModelLibrary.Find(gen.mapTheme == GenData.THEME_SPACE && ModelLibrary.Find("rail") >= 0 ? "rail" : "fence_planks");
         // the Nature Kit fence, stretched to one cell: 4 m long, 1.1 m high
         Bounds b = ModelLibrary.bounds[fenceModel];
         var go = new GameObject("Fence");
@@ -483,7 +742,7 @@ public class MapBuilder
             float h = GenData.ZoneWallMm[zone] / 1000f, t = h + 0.14f;
             bool bw = Bld(x - 1, z), be = Bld(x + 1, z), bs = Bld(x, z - 1), bn = Bld(x, z + 1);
             float x0 = x * CELL - (bw ? 0f : WALL_HALF), x1 = (x + 1) * CELL + (be ? 0f : WALL_HALF);
-            Color32 rc = RoofColour(zone);
+            Color32 rc = RoofColour(zone, Style(gen.cellInst[c]));
             roofs.Box(new Vector3(x0, h, z * CELL), new Vector3(x1, t, (z + 1) * CELL), rc, rc, Ceiling);
             for (int side = -1; side <= 1; side += 2)
             {

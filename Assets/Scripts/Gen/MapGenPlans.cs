@@ -135,7 +135,7 @@ public partial class MapGen
         int room = pRoom, area = AreaM2(room);
         GenRng r = SR(1);
         int tvDef = Dn("k_tvCabinet");
-        int sofaDef = Pick(ref r, "k_sofa", 6, "q_couch", 4);
+        int sofaDef = Pick(ref r, "k_sofa", 5, "q_couch", 4, "k_designSofa", 3);
         int dx, dz;
         MainDoor(room, out dx, out dz);
         // (b) the focal point: the TV cabinet centred on a wall without a window, the sofa facing it
@@ -186,7 +186,7 @@ public partial class MapGen
             }
             GenRng r4 = SR(4);
             int chairs = area >= 26 ? r4.Between(1, 2) : r4.Between(0, 1);
-            int chairDef = Pick(ref r4, "q_armchair", 5, "k_loungeChair", 4);
+            int chairDef = r4.Chance(350) ? Pick(ref r4, "k_designChair", 5, "k_recliner", 4) : Pick(ref r4, "q_armchair", 5, "k_loungeChair", 4);
             int side0 = r4.Chance(500) ? 1 : -1;
             // at right angles to the sofa, facing the table; where the room is narrow the chair moves back beside the
             // sofa's end, so a metre stays free in front of the screen (K1)
