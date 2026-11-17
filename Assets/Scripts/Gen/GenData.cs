@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 16;   // 16: the mixed theme (each plot its own), themes a quarter each with the ordinary maps
+    public const int GEN_VERSION = 17;   // 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -108,7 +108,7 @@ public static partial class GenData
     // generator 16 (Cor's prototype): the mixed map, each plot ordinary, a space base or medieval (MapGen.plotTheme)
     public const int THEME_NONE = 0, THEME_SPACE = 1, THEME_MEDIEVAL = 2, THEME_MIXED = 3;
     public static readonly string[] ThemeName = { "", "Space base", "Medieval village", "Mixed" };
-    public const int THEME_SPACE_PERMILLE = 250, THEME_MEDIEVAL_PERMILLE = 250, THEME_MIXED_PERMILLE = 250;   // a quarter each with the ordinary maps (generator 16; a third each in 15)
+    public const int THEME_SPACE_PERMILLE = 333, THEME_MEDIEVAL_PERMILLE = 333, THEME_MIXED_PERMILLE = 0;   // generator 17, Cor: three distinct themes, a third each; the mixed map stays in the code, off
     public static readonly int[][] ThemeKinds = { null,
         new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE },   // space: mess hall, cargo bay, supply depot, rover garage (revision 13: the park held back, G58: 54 models per place against 59)
         new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_BARN, Z_PARK, Z_CABIN, Z_CHAPEL },     // medieval: tavern, granary, market, farm, green, woodcutter's hut, chapel
