@@ -653,6 +653,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                     theme = baseTheme;
                     wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls");
                     Canopies();
+                    PitchedRoofs();
                     Dressing();
                     roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs");
                     collisionCollider.sharedMesh = ToMesh(B_COLL, "ArchCollision");
@@ -1396,6 +1397,67 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // a point from (along the ridge, height, across it)
     Vector3 RP(bool alongX, float a, float y, float b) { return alongX ? new Vector3(a, y, b) : new Vector3(b, y, a); }
 
+    // Pitched roofs (Cor: there were holes where an L's roof met itself). A building's footprint is cut into
+    // rectangles, the largest first; each gets its own gabled roof along its longer side, gable ends closed. Where two
+    // meet they cross like real cross-gables, and every roof is closed on all sides.
+    void PitchedRoofs()
+    {
+        int n = instMinX == null ? 0 : instMinX.Length;
+        for (int inst = 0; inst < n; inst++)
+        {
+            if (instMaxX[inst] < 0) continue;
+            int x0 = instMinX[inst], x1 = instMaxX[inst], z0 = instMinZ[inst], z1 = instMaxZ[inst];
+            int first = -1;
+            for (int z = z0; z <= z1 && first < 0; z++) for (int x = x0; x <= x1; x++) if (cellInst[z * W + x] == inst) { first = z * W + x; break; }
+            if (first < 0 || !IsBuilding(cellZone[first])) continue;
+            UseCell(first);
+            int zone = cellZone[first];
+            if (theme == GenData.THEME_SPACE) continue;   // flat roofs
+            if (!(zone == GenData.Z_HOUSE || zone == GenData.Z_CABIN || zone == GenData.Z_BARN || zone == GenData.Z_CHAPEL || theme == GenData.THEME_MEDIEVAL)) continue;
+            float t = zoneWallMm[zone] / 1000f + 0.14f;
+            int st = Style(inst);
+            Color32 roof = RoofColour(zone, st), wall = ExteriorColour(zone, st);
+            int bw = x1 - x0 + 1, bd = z1 - z0 + 1;
+            bool[] done = new bool[bw * bd];
+            for (int guard = 0; guard < 16; guard++)
+            {
+                // the largest rectangle of this building's cells not yet roofed
+                int best = 0, rx = 0, rz = 0, rw = 0, rd = 0;
+                for (int sz = 0; sz < bd; sz++)
+                    for (int sx = 0; sx < bw; sx++)
+                    {
+                        if (done[sz * bw + sx] || cellInst[(z0 + sz) * W + x0 + sx] != inst) continue;
+                        int maxW = bw - sx;
+                        for (int d = 1; sz + d - 1 < bd; d++)
+                        {
+                            int row = 0;
+                            while (row < maxW && !done[(sz + d - 1) * bw + sx + row] && cellInst[(z0 + sz + d - 1) * W + x0 + sx + row] == inst) row++;
+                            if (row == 0) break;
+                            if (row < maxW) maxW = row;
+                            if (maxW * d > best) { best = maxW * d; rx = sx; rz = sz; rw = maxW; rd = d; }
+                        }
+                    }
+                if (best == 0) break;
+                for (int dz = 0; dz < rd; dz++) for (int dx = 0; dx < rw; dx++) done[(rz + dz) * bw + rx + dx] = true;
+                GableRoof((x0 + rx) * CELL - WALL_HALF, (x0 + rx + rw) * CELL + WALL_HALF, (z0 + rz) * CELL - WALL_HALF, (z0 + rz + rd) * CELL + WALL_HALF, t, roof, wall);
+            }
+        }
+        theme = baseTheme;
+    }
+
+    void GableRoof(float bx0, float bx1, float bz0, float bz1, float t, Color32 roof, Color32 wall)
+    {
+        bool alongX = (bx1 - bx0) >= (bz1 - bz0);
+        float a0 = alongX ? bx0 : bz0, a1 = alongX ? bx1 : bz1, c0 = alongX ? bz0 : bx0, c1 = alongX ? bz1 : bx1;
+        float mid = (c0 + c1) * 0.5f, top = RoofY(mid, c0, c1, t);
+        // the two slopes
+        QuadBoth(RP(alongX, a0, t, c0), RP(alongX, a0, top, mid), RP(alongX, a1, top, mid), RP(alongX, a1, t, c0), roof);
+        QuadBoth(RP(alongX, a0, top, mid), RP(alongX, a0, t, c1), RP(alongX, a1, t, c1), RP(alongX, a1, top, mid), roof);
+        // the gable ends
+        QuadBoth(RP(alongX, a0, t, c0), RP(alongX, a0, top, mid), RP(alongX, a0, top, mid), RP(alongX, a0, t, c1), wall);
+        QuadBoth(RP(alongX, a1, t, c0), RP(alongX, a1, top, mid), RP(alongX, a1, top, mid), RP(alongX, a1, t, c1), wall);
+    }
+
     void QuadBoth(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color32 c)
     {
         Vector3 n = Vector3.Cross(p1 - p0, p3 - p0);
@@ -1501,7 +1563,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 if (!bs) Box(B_ROOFS, new Vector3(rx0, t, rz0), new Vector3(rx1, t + 0.32f, rz0 + 0.15f), rim, FACE_ALL & ~FACE_YN);
                 if (!bn2) Box(B_ROOFS, new Vector3(rx0, t, rz1 - 0.15f), new Vector3(rx1, t + 0.32f, rz1), rim, FACE_ALL & ~FACE_YN);
             }
-            else if (zone == GenData.Z_HOUSE || zone == GenData.Z_CABIN || zone == GenData.Z_BARN || zone == GenData.Z_CHAPEL || theme == GenData.THEME_MEDIEVAL) PitchedCell(x, z, t);
+            // pitched roofs: PitchedRoofs, once per building after the walls
         }
     }
 
