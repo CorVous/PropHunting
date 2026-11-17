@@ -27,6 +27,7 @@ public static class WorldSceneBuilder
     public static void Build()
     {
         if (Object.FindObjectOfType<MapBuilderUdon>(true) == null) PropPrefabBaker.Bake();
+        LobbyBuilder.EnsureAssets();
         var builder = Object.FindObjectOfType<MapBuilderUdon>(true);
         var gen = Object.FindObjectOfType<MapGenUdon>(true);
         var bench = Object.FindObjectOfType<MapGenBench>(true);
@@ -54,9 +55,10 @@ public static class WorldSceneBuilder
         var lobby = new GameObject("Lobby");
         lobby.transform.SetParent(world.transform, false);
         lobby.transform.position = LobbyOrigin;
-        var floorMat = Mat("LobbyFloor", new Color(0.78f, 0.74f, 0.68f));
-        var wallMat = Mat("LobbyWall", new Color(0.86f, 0.84f, 0.80f));
-        var zoneMat = Mat("LobbyZone", new Color(0.35f, 0.75f, 0.35f));
+        // the inside of a game box (LobbyBuilder dresses it)
+        var floorMat = Mat("LobbyFloor", new Color(0.953f, 0.906f, 0.788f));
+        var wallMat = Mat("LobbyWall", new Color(0.141f, 0.376f, 0.290f));
+        var zoneMat = Mat("LobbyZone", new Color(0.373f, 0.749f, 0.447f));
         var buttonMat = Mat("StartButton", new Color(0.9f, 0.35f, 0.25f));
         Box(lobby.transform, "Floor", new Vector3(0, -0.25f, 0), new Vector3(RoomW, 0.5f, RoomD), floorMat, true);
         Box(lobby.transform, "WallN", new Vector3(0, WallH / 2, RoomD / 2 + 0.1f), new Vector3(RoomW, WallH, 0.2f), wallMat, true);
@@ -74,6 +76,7 @@ public static class WorldSceneBuilder
         var spawn = new GameObject("Spawn");
         spawn.transform.SetParent(lobby.transform, false);
         spawn.transform.localPosition = new Vector3(0f, 0.05f, -RoomD / 2 + 2.2f);
+        LobbyBuilder.DressRoom(lobby.transform, RoomW, RoomD, WallH, ZoneHalf);
 
         // ---- the scene descriptor
         var vrcWorld = new GameObject("VRCWorld");
@@ -171,25 +174,13 @@ public static class WorldSceneBuilder
         }
         game.knocks = knocks;
 
-        // the host panel on the north wall, above the zone (G50, G51): every setting and START. Everyone can read
-        // it; only the host's presses count (PHGame checks)
-        // a world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR
-        float wz = RoomD / 2 - 0.12f;
-        var canvas = PanelCanvas(lobby.transform, new Vector3(0f, 3.0f, wz), new Vector2(1800f, 560f));
-        PanelText(canvas, "Stand in the green square to play. The host sets up the round here.", new Vector2(0f, 245f), new Vector2(1740f, 60f), 40f, TextAlignmentOptions.Center);
-        Row(canvas, game, "Size", nameof(PHGame.PanelSize), new[] { "Auto", "S", "M", "L", "XL" }, new[] { -1, 0, 1, 2, 3 }, 160f);
-        Row(canvas, game, "Props", nameof(PHGame.PanelDensity), new[] { "Normal", "Sparse", "Dense", "V. sparse", "V. dense" }, new[] { 0, 1, 2, 3, 4 }, 90f);
-        Row(canvas, game, "Round", nameof(PHGame.PanelRoundLength), new[] { "Short", "Normal", "Long" }, new[] { 0, 1, 2 }, 20f);
-        Row(canvas, game, "Taunt every", nameof(PHGame.PanelTaunt), new[] { "30 s", "40 s", "60 s" }, new[] { 30, 40, 60 }, -50f);
-        UiButton(canvas, game, "START", nameof(PHGame.StartRound), 0, new Vector2(-260f, -215f), new Vector2(300f, 80f), new Color(0.85f, 0.32f, 0.22f));
-        var settings = PanelText(canvas, "", new Vector2(650f, 20f), new Vector2(440f, 380f), 30f, TextAlignmentOptions.TopLeft);
-        local.panelUiText = settings;
-        // the last round's results, on the west wall
-        var results = Label(lobby.transform, "No round played yet.", new Vector3(-RoomW / 2 + 0.05f, 2.8f, 0f), 0.24f, 14f);
-        results.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
-        results.alignment = TextAlignmentOptions.TopLeft;
-        results.rectTransform.sizeDelta = new Vector2(14f, 4f);
-        local.resultsText = results;
+        // the host panel on the north wall, above the zone (G50, G51): every setting and START, the "Board Game"
+        // design (LobbyBuilder). Everyone can read it; only the host's presses count (PHPanel and PHGame check).
+        // A world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR.
+        LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 1.4f + 1.65f, RoomD / 2 - 0.12f));
+        // the last round's results, a score pad on the west wall
+        LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
+        local.panelUiText = null; local.resultsText = null;
 
         UdonSharpEditorUtility.CopyProxyToUdon(local);
         UdonSharpEditorUtility.CopyProxyToUdon(game);
