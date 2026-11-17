@@ -63,6 +63,7 @@ public class PHSun : UdonSharpBehaviour
         builder.roofsFilter.gameObject.layer = casterLayer;
         Transform fences = builder.fenceRoot;
         for (int i = 0; i < fences.childCount; i++) fences.GetChild(i).gameObject.layer = casterLayer;
+        if (builder.sceneryFilter != null) builder.sceneryFilter.gameObject.layer = casterLayer;   // the fences, hedges and decor, merged (batching)
 
         Vector3 dir = sun.transform.forward;
         Transform t = spot.transform;
@@ -92,6 +93,7 @@ public class PHSun : UdonSharpBehaviour
         builder.wallsFilter.gameObject.layer = 11;
         builder.roofsFilter.gameObject.layer = 11;
         for (int i = 0; i < fences.childCount; i++) fences.GetChild(i).gameObject.layer = 11;
+        if (builder.sceneryFilter != null) builder.sceneryFilter.gameObject.layer = 11;
         builder.ShowRoofs(roofsShown);
         // where the spot reaches: the shader blends back to the shadowless base sun towards the cone's edge
         // where the spot hands back to the base sun: the map's own rectangle (centre, half width, half depth). The land

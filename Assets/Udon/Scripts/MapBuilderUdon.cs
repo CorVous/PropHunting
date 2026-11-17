@@ -180,6 +180,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     public Vector3 fenceModelSize = Vector3.one;
     public Transform propRoot, fenceRoot;
     public MeshFilter groundFilter, wallsFilter, roofsFilter;
+    public MeshFilter sceneryFilter;        // Cor (batching): the static scenery merged into one mesh after the build
     public MeshCollider collisionCollider;
     public float budgetMs = 6f;
     public Light sun;                       // the scene's directional light: the map's mood turns and tints it
@@ -215,7 +216,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     const float CELL = 4f, INNER = 0.5f, WALL_HALF = 0.1f;
     const int FACE_XN = 1, FACE_XP = 2, FACE_YN = 4, FACE_YP = 8, FACE_ZN = 16, FACE_ZP = 32, FACE_ALL = 63;
-    const int B_GROUND = 0, B_WALLS = 1, B_ROOFS = 2, B_COLL = 3;
+    const int B_GROUND = 0, B_WALLS = 1, B_ROOFS = 2, B_COLL = 3, B_SCENERY = 4;
 
     // the generator's arrays, cached once per build (reading another behaviour's field is slow)
     int W, H, IW, IH;
@@ -241,7 +242,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void BufInit(int b, int quads)
     {
-        if (bv == null) { bv = new Vector3[4][]; bn = new Vector3[4][]; bc = new Color32[4][]; bt = new int[4][]; nv = new int[4]; nt = new int[4]; }
+        if (bv == null || bv.Length < 5) { bv = new Vector3[5][]; bn = new Vector3[5][]; bc = new Color32[5][]; bt = new int[5][]; nv = new int[5]; nt = new int[5]; }
         if (bv[b] == null || bv[b].Length < quads * 4)
         {
             bv[b] = new Vector3[quads * 4]; bn[b] = new Vector3[quads * 4]; bc[b] = new Color32[quads * 4]; bt[b] = new int[quads * 6];
@@ -682,6 +683,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (groundFilter != null) groundFilter.sharedMesh = null;
         if (wallsFilter != null) wallsFilter.sharedMesh = null;
         if (roofsFilter != null) roofsFilter.sharedMesh = null;
+        if (sceneryFilter != null) sceneryFilter.sharedMesh = null;
         if (collisionCollider != null) collisionCollider.sharedMesh = null;
         built = false; busy = false; stage = 0;
     }
@@ -739,8 +741,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 }
                 break;
             case 3:
-                if (cursor < objects.Length) { MakeProp(cursor); cursor++; progress = 0.4f + 0.6f * cursor / objects.Length; }
-                else { stage = 4; }
+                if (cursor < objects.Length) { MakeProp(cursor); cursor++; progress = 0.4f + 0.55f * cursor / objects.Length; }
+                else { stage = 5; cursor = 0; MergeBegin(); phase = "Merging scenery"; }
+                break;
+            case 5:
+                if (mergeList != null && cursor < mergeList.Length) { MergeOne(mergeList[cursor]); cursor++; progress = 0.95f + 0.05f * cursor / mergeList.Length; }
+                else { MergeEnd(); stage = 4; }
                 break;
             case 4:
                 progress = 1f;
@@ -2386,6 +2392,71 @@ public class MapBuilderUdon : UdonSharpBehaviour
             AddLight(new Vector3(0f, top * 0.85f / Mathf.Max(0.01f, t.lossyScale.y), 0f), LK_LAMP, t);
             break;
         }
+    }
+
+    // ------------------------------------------------------------------ scenery batching (Cor: batching)
+    // Everything under the fixture and fence roots that never moves (hills, decor, the country's trees and bushes,
+    // light fixtures, fences, hedges) is drawn by one merged mesh instead of one renderer each: its renderers are
+    // switched off (their colliders and light points stay). Clouds drift and the sky's own objects (stars, the moon, the
+    // planet) have their own shader, so they stay as they are. One renderer per step, so the build stays time-sliced.
+    public bool mergeScenery = false;  // measured mixed (one mesh is never culled): off until it is split into tiles
+    MeshRenderer[] mergeList;
+    Material mergeMat;
+    MaterialPropertyBlock mergeBlock;
+
+    void MergeBegin()
+    {
+        mergeList = null;
+        if (!mergeScenery || sceneryFilter == null || fixtureRoot == null || fenceRoot == null) return;
+        mergeMat = wallsFilter.GetComponent<MeshRenderer>().sharedMaterial;
+        MeshRenderer[] a = fixtureRoot.GetComponentsInChildren<MeshRenderer>(), b = fenceRoot.GetComponentsInChildren<MeshRenderer>();
+        mergeList = new MeshRenderer[a.Length + b.Length];
+        System.Array.Copy(a, mergeList, a.Length);
+        System.Array.Copy(b, 0, mergeList, a.Length, b.Length);
+        BufInit(B_SCENERY, 4096);
+        if (mergeBlock == null) mergeBlock = new MaterialPropertyBlock();
+    }
+
+    bool IsCloud(Transform t)
+    {
+        for (int i = 0; i < nClouds; i++) if (clouds[i] != null && t.IsChildOf(clouds[i])) return true;
+        return false;
+    }
+
+    void MergeOne(MeshRenderer mr)
+    {
+        if (mr == null || !mr.enabled || mr.sharedMaterial != mergeMat || IsCloud(mr.transform)) return;
+        MeshFilter mf = mr.GetComponent<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null) return;
+        Mesh m = mf.sharedMesh;
+        Vector3[] v = m.vertices, n = m.normals;
+        Color32[] c = m.colors32;
+        int[] tri = m.triangles;
+        Color tint = Color.white;
+        mr.GetPropertyBlock(mergeBlock);
+        Color pc = mergeBlock.GetColor("_Color");
+        if (pc.a > 0f) tint = pc;
+        Matrix4x4 M = mr.transform.localToWorldMatrix;
+        int b = B_SCENERY, s = nv[b];
+        while (nv[b] + v.Length > bv[b].Length || nt[b] + tri.Length > bt[b].Length) BufGrow(b);
+        bool hasN = n != null && n.Length == v.Length, hasC = c != null && c.Length == v.Length;
+        for (int i = 0; i < v.Length; i++)
+        {
+            bv[b][s + i] = M.MultiplyPoint3x4(v[i]);
+            bn[b][s + i] = hasN ? M.MultiplyVector(n[i]).normalized : Vector3.up;
+            Color32 k = hasC ? c[i] : new Color32(255, 255, 255, 255);
+            bc[b][s + i] = new Color32((byte)Mathf.Min(255, (int)(k.r * tint.r)), (byte)Mathf.Min(255, (int)(k.g * tint.g)), (byte)Mathf.Min(255, (int)(k.b * tint.b)), k.a);
+        }
+        int t0 = nt[b];
+        for (int i = 0; i < tri.Length; i++) bt[b][t0 + i] = s + tri[i];
+        nv[b] = s + v.Length; nt[b] = t0 + tri.Length;
+        mr.enabled = false;
+    }
+
+    void MergeEnd()
+    {
+        if (mergeList != null && sceneryFilter != null) sceneryFilter.sharedMesh = ToMesh(B_SCENERY, "Scenery");
+        mergeList = null;
     }
 
     // ------------------------------------------------------------------ helpers for the game

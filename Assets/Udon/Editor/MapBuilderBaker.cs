@@ -27,6 +27,7 @@ public static class MapBuilderBaker
         builder.groundFilter = Holder(root.transform, "Ground", mat, false);
         builder.wallsFilter = Holder(root.transform, "Walls", mat, false);
         builder.roofsFilter = Holder(root.transform, "Roofs", mat, false);
+        builder.sceneryFilter = Holder(root.transform, "Scenery", mat, false);   // the static scenery, merged after each build
         var coll = Child(root.transform, "ArchCollision");
         coll.layer = 11;   // Environment
         builder.collisionCollider = Get<MeshCollider>(coll);
