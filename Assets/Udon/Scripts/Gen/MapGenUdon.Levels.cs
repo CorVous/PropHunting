@@ -158,6 +158,27 @@ public partial class MapGenUdon
                 siteType[li * 26 + letters[q]] = LevelRoomType(zone, up, q, rng);
                 sitePlace[li * 26 + letters[q]] = PL_BUILDING;
             }
+            // the room sizes: a bathroom takes the smallest room, a room of three cells or more is a playroom or a living
+            // room, not a bedroom or a bathroom (review 7: big rooms upstairs held three to five props)
+            int[] size = new int[26];
+            for (int c = 0; c < oldW * oldH; c++) if (oInst[c] == bi && oRoom[c] >= 0 && oRoom[c] < 26) size[oRoom[c]]++;
+            if (up && nl >= 2)
+            {
+                int small = letters[0], bath = -1;
+                for (int q = 0; q < nl; q++)
+                {
+                    if (size[letters[q]] < size[small]) small = letters[q];
+                    if (siteType[li * 26 + letters[q]] == GenData.R_BATH) bath = letters[q];
+                }
+                if (bath >= 0 && bath != small) { siteType[li * 26 + bath] = siteType[li * 26 + small]; siteType[li * 26 + small] = GenData.R_BATH; }
+                for (int q = 0; q < nl; q++)
+                {
+                    int l = letters[q], t = siteType[li * 26 + l];
+                    if (size[l] < 3 || l == small) continue;
+                    if (t == GenData.R_BEDROOM || t == GenData.R_BATH || t == GenData.R_OFFICE || t == GenData.R_BOXROOM)
+                        siteType[li * 26 + l] = zone == GenData.Z_HOUSE ? (RngChance(rng, 500) ? GenData.R_PLAYROOM : GenData.R_LIVING) : GenData.R_LIVING;
+                }
+            }
             // the ground floor's interior doors
             for (int s = 0; s < nSd0; s++)
             {

@@ -108,11 +108,14 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 bn[b][nv[b]] = a * nn.x + Vector3.up * nn.y + o * nn.z;
                 Color32 col = c[vi];
                 float cl = Mathf.Sqrt((float)col.r * col.r + (float)col.g * col.g + (float)col.b * col.b) + 0.001f;
-                if (theme == GenData.THEME_NONE && (col.r * pbr + col.g * pbg + col.b * pbb) / cl > 0.998f)   // the space and medieval kits keep their own colours
+                bool bodyShade = (col.r * pbr + col.g * pbg + col.b * pbb) / cl > 0.998f;
+                if ((theme == GenData.THEME_NONE || partLimewash) && bodyShade)   // the space kit keeps its own colours
                 {
                     float s = cl / pbl;
                     bc[b][nv[b]] = new Color32((byte)Mathf.Min(255, (int)(body.r * s)), (byte)Mathf.Min(255, (int)(body.g * s)), (byte)Mathf.Min(255, (int)(body.b * s)), 255);
                 }
+                // a medieval house: limewash between dark timbers, as inside (review 6); the kit's pale strips become the timbers
+                else if (partLimewash && col.r + col.g + col.b > 420) bc[b][nv[b]] = new Color32(84, 58, 38, 255);
                 else bc[b][nv[b]] = col;
                 bt[b][nt[b]] = nv[b];
                 nv[b]++; nt[b]++;
@@ -138,6 +141,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         }
         int k0 = (theme >= 0 && theme < 3 ? theme : 0) * 3;
         if (!HasFacade(k0)) return false;
+        partLimewash = theme == GenData.THEME_MEDIEVAL && zone != GenData.Z_CHAPEL && zone != GenData.Z_WAREHOUSE;   // stone stays stone
         float sgn = cellIn == cellLowOf ? 1f : -1f;
         if (type == GenData.E_WALL)
         {
@@ -168,7 +172,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         facadeDepth = theme == GenData.THEME_SPACE ? 0.3f : (theme == GenData.THEME_MEDIEVAL ? 0.15f : 0.2f);
         return true;
     }
-    int cellLowOf;   // Edge's low-side cell (the facade on a building on that side faces +)
+    int cellLowOf;
+    bool partLimewash;   // Facade: a medieval building's parts take limewash and timber   // Edge's low-side cell (the facade on a building on that side faces +)
     const int DECOR_SOLAR = 0, DECOR_CARGO = 1, DECOR_DISH = 2, DECOR_CRATER = 3, DECOR_CRATER_S = 4, DECOR_METEOR = 5, DECOR_CRYSTAL = 6,
         DECOR_FOUNTAIN = 7, DECOR_WELL = 8, DECOR_STALL_R = 9, DECOR_STALL_G = 10, DECOR_BANNER = 11, DECOR_HEDGE = 12;
     public Transform fixtureRoot;
@@ -352,7 +357,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         // the season on the ground
         if (moodSeason == 1) { palGrass = Blend(palGrass, C(110, 186, 92), 50); palForest = Blend(palForest, C(84, 150, 80), 50); }
         else if (moodSeason == 2) { palGrass = Blend(palGrass, C(176, 146, 72), 60); palForest = Blend(palForest, C(150, 104, 60), 55); palSoil = Blend(palSoil, C(120, 86, 60), 40); }
-        else if (moodSeason == 3) { palGrass = Blend(palGrass, C(228, 232, 238), 80); palForest = Blend(palForest, C(214, 220, 228), 70); palSoil = Blend(palSoil, C(200, 200, 206), 60); }
+        else if (moodSeason == 3) { palGrass = Blend(palGrass, C(236, 236, 234), 85); palForest = Blend(palForest, C(222, 224, 224), 75); palSoil = Blend(palSoil, C(204, 202, 200), 60); }
     }
 
     // a % b for uint (Udon has no uint remainder)
@@ -372,6 +377,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         return new Color(c.r * s, c.g * s, c.b * s, 1f);
     }
 
+    Color moodSun = Color.white, moodFog = Color.grey;   // ApplyMood's light and haze, for the clouds
+
     void ApplyMood()
     {
         float elev = 52f, intensity = 1f;
@@ -381,7 +388,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         float azim = 38f + (int)UModB(Mix(gen.seed ^ 0x2003u), 60u) - 30f;
         if (moodTime == 0) { elev = 22f; sunCol = new Color(1f, 0.86f, 0.70f); intensity = 0.9f; sky = new Color(0.66f, 0.66f, 0.74f); fog = new Color(0.78f, 0.80f, 0.86f); fogStart = 45f; fogEnd = 160f; azim -= 90f; }
         else if (moodTime == 1) { elev = 72f; sunCol = new Color(1f, 0.99f, 0.95f); intensity = 1.1f; sky = new Color(0.66f, 0.72f, 0.80f); fog = new Color(0.60f, 0.78f, 0.95f); fogStart = 60f; fogEnd = 200f; }
-        else if (moodTime == 3) { elev = 14f; sunCol = new Color(1f, 0.66f, 0.42f); intensity = 0.85f; sky = new Color(0.52f, 0.46f, 0.60f); eq = new Color(0.58f, 0.46f, 0.44f); gr = new Color(0.40f, 0.34f, 0.34f); fog = new Color(0.80f, 0.66f, 0.62f); fogStart = 50f; fogEnd = 170f; azim += 120f; }
+        else if (moodTime == 3) { elev = 14f; sunCol = new Color(1f, 0.80f, 0.62f); intensity = 0.85f; sky = new Color(0.46f, 0.50f, 0.66f); eq = new Color(0.58f, 0.46f, 0.44f); gr = new Color(0.40f, 0.34f, 0.34f); fog = new Color(0.80f, 0.66f, 0.62f); fogStart = 50f; fogEnd = 170f; azim += 120f; }
         else if (moodTime == 4) { elev = 60f; sunCol = new Color(0.82f, 0.84f, 0.88f); intensity = 0.55f; sky = new Color(0.66f, 0.68f, 0.70f); eq = new Color(0.60f, 0.61f, 0.62f); gr = new Color(0.52f, 0.52f, 0.52f); fog = new Color(0.70f, 0.72f, 0.74f); fogStart = 30f; fogEnd = 120f; }
         if (moodSeason == 3) { fog = Color.Lerp(fog, new Color(0.88f, 0.90f, 0.94f), 0.5f); gr = Color.Lerp(gr, new Color(0.80f, 0.82f, 0.86f), 0.6f); }
         // the map themes' skies (more-places, revision 12): a red planet's dusk, a softer blue over a medieval village
@@ -392,6 +399,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
             fog = new Color(0.22f, 0.17f, 0.30f); fogStart = 40f; fogEnd = 150f;
             sky = new Color(0.42f, 0.40f, 0.58f); eq = new Color(0.40f, 0.34f, 0.44f); gr = new Color(0.36f, 0.26f, 0.24f);
             sunCol = new Color(0.86f, 0.90f, 1f); intensity *= 0.9f;
+            // the time of day still shows (review 8): a brighter, bluer noon, a warm dim evening, a flat grey overcast
+            if (moodTime == 1) { fog = new Color(0.30f, 0.26f, 0.40f); sky *= 1.12f; }
+            else if (moodTime == 3) { fog = new Color(0.30f, 0.16f, 0.22f); sunCol = new Color(1f, 0.78f, 0.62f); }
+            else if (moodTime == 4) { fog = new Color(0.26f, 0.24f, 0.28f); sunCol = new Color(0.80f, 0.80f, 0.84f); }
+            else if (moodTime == 0) { fog = new Color(0.26f, 0.18f, 0.30f); sunCol = new Color(1f, 0.86f, 0.80f); }
         }
         else if (gen.mapTheme == GenData.THEME_MEDIEVAL)
         {
@@ -405,6 +417,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             elev = 48f; sunCol = new Color(0.62f, 0.72f, 1f); intensity = 0.16f;
             sky = sky * 0.22f + new Color(0.03f, 0.05f, 0.12f); eq = eq * 0.18f + new Color(0.02f, 0.03f, 0.07f); gr = gr * 0.15f + new Color(0.02f, 0.02f, 0.04f);
             fog = new Color(0.04f, 0.06f, 0.12f); fogStart = 25f; fogEnd = 110f;
+            // a space base at night was too dark to read props against the ground (review 8)
+            if (gen.mapTheme == GenData.THEME_SPACE) { sky += new Color(0.06f, 0.05f, 0.10f); eq += new Color(0.05f, 0.04f, 0.08f); gr += new Color(0.04f, 0.03f, 0.04f); }
         }
         // the sky (the procedural skybox the scene builder set): its tint, ground and brightness follow the mood
         Material skyMat = RenderSettings.skybox;
@@ -412,9 +426,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
         {
             Color skyTint = new Color(0.5f, 0.5f, 0.5f), skyGround = fog * 0.92f;   // below the horizon: the haze, so the land's far edge melts into it
             float exposure = 1.2f, thickness = 1f;
-            if (moodTime == 0) { skyTint = new Color(0.62f, 0.48f, 0.52f); thickness = 1.3f; exposure = 1.1f; }   // dawn: pinker
+            if (moodTime == 0) { skyTint = new Color(0.60f, 0.50f, 0.54f); thickness = 1.15f; exposure = 1.1f; }   // dawn: pinker, a softer band at the horizon
             else if (moodTime == 3) { skyTint = new Color(0.62f, 0.42f, 0.38f); thickness = 1.6f; exposure = 1.0f; }   // dusk
-            else if (moodTime == 4) { skyTint = new Color(0.48f, 0.49f, 0.50f); thickness = 2.2f; exposure = 0.9f; }   // overcast: hazy, grey
+            else if (moodTime == 4) { skyTint = new Color(0.50f, 0.50f, 0.52f); thickness = 1.0f; exposure = 0.85f; }   // overcast: grey (a thick atmosphere turned its horizon orange: review 4)
             else if (moodTime == 5) { skyTint = new Color(0.25f, 0.30f, 0.50f); thickness = 0.6f; exposure = 0.12f; }   // night
             if (gen.mapTheme == GenData.THEME_SPACE) { skyTint = Color.Lerp(skyTint, new Color(0.70f, 0.38f, 0.30f), 0.6f); thickness *= 0.5f; exposure *= 0.75f; }
             skyMat.SetColor("_SkyTint", skyTint);
@@ -427,7 +441,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Color zenith = new Color(skyTint.r * 0.75f, skyTint.g * 0.9f, skyTint.b * 1.25f);
             sky = HueOf(zenith, sky);
             eq = HueOf(Color.Lerp(fog, zenith, 0.3f), eq);
+            // winter: snow under a blue sky light read as an ice planet (review 4): the shade nearly neutral
+            if (moodSeason == 3) { sky = Color.Lerp(sky, HueOf(new Color(1f, 0.98f, 0.95f), sky), 0.7f); eq = Color.Lerp(eq, HueOf(new Color(1f, 0.98f, 0.95f), eq), 0.6f); }
         }
+        moodSun = sunCol; moodFog = fog;
         if (sun != null)
         {
             sun.transform.rotation = Quaternion.Euler(elev, azim, 0f);
@@ -630,6 +647,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         else if (gen.season == 2 || theme != GenData.THEME_NONE) moodSeason = 0;
         else moodSeason = (int)UModB(Mix(gen.seed ^ 0x2002u), 2u);
         InitPalette(gen.seed);
+        fenceTint = new Color(0, 0, 0, 0); defTint = null; defTintDone = null;   // a new map, a new palette
         InitSchemes();
         InitParts();
         ApplyMood();
@@ -710,6 +728,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 {
                     Fixtures();
                     Stairs();
+                    Landmark();
                     wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls");
                     Canopies();
                     PitchedRoofs();
@@ -743,6 +762,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     Color32 CellColour(int i, int ix, int iz)
     {
+        if (theme == GenData.THEME_NONE && LaneAt(ix, iz))
+        {
+            bool edge = !LaneAt(ix - 1, iz) || !LaneAt(ix + 1, iz) || !LaneAt(ix, iz - 1) || !LaneAt(ix, iz + 1);
+            return edge ? C(138, 116, 88) : Vary(C(160, 138, 104), ix / 2, iz / 2, 2);   // review 10: the checker was busy
+        }
         if (theme != GenData.THEME_NONE && LaneAt(ix, iz))
         {
             if (theme == GenData.THEME_MEDIEVAL) return Vary(C(146, 116, 82), ix, iz, 9);
@@ -830,7 +854,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         lv = Vector3.zero;
         float m = 260f, w = siteW * CELL, h = siteH * CELL;   // out past the hills round the map (SkyDressing)
-        Color32 land = theme == GenData.THEME_SPACE ? C(140, 80, 62) : C(palGrass.r * 85 / 100, palGrass.g * 88 / 100, palGrass.b * 90 / 100);   // a red planet beyond a space base's fence
+        Color32 land = theme == GenData.THEME_SPACE ? C(140, 80, 62) : palGrass;   // the grass itself, so the map's edge does not show as a square (review 2)   // a red planet beyond a space base's fence
         // round the map, then under it a row of cells at a time, open over a basement's stair
         GroundPiece(-m, 0f, -m, h + m, land, -1f); GroundPiece(w, w + m, -m, h + m, land, -1f);
         GroundPiece(0f, w, -m, 0f, land, -1f); GroundPiece(0f, w, h, h + m, land, -1f);
@@ -858,8 +882,33 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 GroundPiece(x0, hx0, hz0, hz1, land, -0.015f); GroundPiece(hx1, x1, hz0, hz1, land, -0.015f);
             }
         }
+        Track(land);
         groundFilter.sharedMesh = ToMesh(B_GROUND, "Ground");
         cellColour = null;
+    }
+
+    // the lane carries on past the release as a track into the country, fading into the grass (review 2: a way in)
+    void Track(Color32 land)
+    {
+        if (theme == GenData.THEME_SPACE) return;
+        int d = (gen.releaseDir + 2) & 3;   // out of the map
+        float cx = (gen.releaseX + 0.5f) * CELL, cz = (gen.releaseZ + 0.5f) * CELL;
+        Vector3 o = new Vector3(DX[d], 0f, DZ[d]), side = new Vector3(DZ[d], 0f, -DX[d]);
+        Color32 dirt = theme == GenData.THEME_MEDIEVAL ? C(146, 116, 82) : C(158, 134, 100);
+        Vector3 start = new Vector3(cx, -0.02f, cz) + o * (CELL * 0.5f);
+        int n = 14;
+        for (int k = 0; k < n; k++)
+        {
+            float a0 = k * 5f, a1 = (k + 1) * 5f;
+            // the track wanders a little and narrows
+            float w0 = 1.6f - k * 0.05f, w1 = 1.6f - (k + 1) * 0.05f;
+            float s0 = Mathf.Sin(k * 0.7f + Rand01(9001u) * 6f) * 1.2f * k / n, s1 = Mathf.Sin((k + 1) * 0.7f + Rand01(9001u) * 6f) * 1.2f * (k + 1) / n;
+            Color32 c0 = Blend(dirt, land, k * 100 / n), c1 = Blend(dirt, land, (k + 1) * 100 / n);
+            Vector3 p0 = start + o * a0 + side * (s0 - w0), p1 = start + o * a0 + side * (s0 + w0), p2 = start + o * a1 + side * (s1 + w1), p3 = start + o * a1 + side * (s1 - w1);
+            Vector3 nrm = Vector3.Cross(p1 - p0, p3 - p0).y >= 0 ? Vector3.up : Vector3.down;
+            if (nrm.y > 0) Quad4(B_GROUND, p0, p1, p2, p3, Vector3.up, c0, c0, c1, c1);
+            else Quad4(B_GROUND, p3, p2, p1, p0, Vector3.up, c1, c1, c0, c0);
+        }
     }
 
     void GroundPiece(float x0, float x1, float z0, float z1, Color32 col, float bottom)
@@ -883,7 +932,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (l == 0) continue;
             int b = instBaseB[i];
             float lh = LevelHeight(iz[b]);
-            instOff[i] = new Vector3(-dx[i] * CELL, l > 0 ? lh : -(lh + 0.02f), -dz[i] * CELL);
+            instOff[i] = new Vector3(-dx[i] * CELL, l > 0 ? lh + 0.01f : -(lh + 0.02f), -dz[i] * CELL);   // an upper floor 1 cm over the slab below (they flickered: review 1)
             if (l > 0) instHasUpper[b] = true;
         }
         nStairsB = gen.nStairs; stairLowB = gen.stairLow; stairHighB = gen.stairHigh; stairRunB = gen.stairRun; stairSideB = gen.stairSide;
@@ -1131,7 +1180,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         int zoneA = cellA >= 0 ? cellZone[cellA] : GenData.Z_NONE, zoneB = cellB >= 0 ? cellZone[cellB] : GenData.Z_NONE;
         float ex = cx * CELL, ez = cz * CELL;
         lv = CellOff(cellA >= 0 ? cellA : cellB);   // an upper floor's or a basement's walls where they belong
-        if (type == GenData.E_FENCE) { Fence(horizontal, ex, ez); return; }
+        if (type == GenData.E_FENCE) { Boundary(horizontal, ex, ez, cellA, cellB); return; }
         float hA = zoneWallMm[zoneA] / 1000f, hB = zoneWallMm[zoneB] / 1000f;
         float h = Mathf.Max(hA, hB);
         int styleA = StyleAt(cellA), styleB = StyleAt(cellB);
@@ -1191,7 +1240,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Trim(horizontal, ex, ez, d0 - 0.06f, d0 + e, 0f, dh - e, frame);
             Trim(horizontal, ex, ez, d1 - e, d1 + 0.06f, 0f, dh - e, frame);
             Trim(horizontal, ex, ez, d0 - 0.06f, d1 + 0.06f, dh - e, dh + 0.06f, frame);
-            if (IsBuilding(zoneA) != IsBuilding(zoneB)) Porch(horizontal, ex, ez, d1 + 0.3f, dh, IsBuilding(zoneA) ? 1f : -1f);
+            if (IsBuilding(zoneA) != IsBuilding(zoneB))
+            {
+                float sd = IsBuilding(zoneA) ? 1f : -1f;
+                Porch(horizontal, ex, ez, d1 + 0.3f, dh, sd);
+                Awning(horizontal, ex, ez, d0, d1, dh, sd, IsBuilding(zoneA) ? cellA : cellB);
+            }
         }
         else if (type == GenData.E_WINDOW)
         {
@@ -1273,7 +1327,21 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // outside): a medieval village's half-timbering, a space base's panel seams and dark skirting
     void ThemeTrim(bool horizontal, float ex, float ez, int cellA, int cellB, float h)
     {
-        if (theme == GenData.THEME_NONE) return;
+        if (theme == GenData.THEME_NONE)
+        {
+            // an ordinary room: a skirting board and a thin cornice (review 7), on each indoor face
+            for (int side = 0; side < 2; side++)
+            {
+                int toward = side == 0 ? cellB : cellA;
+                if (toward < 0 || !IsBuilding(cellZone[toward])) continue;
+                float sgn = side == 0 ? 1f : -1f, face = WALL_HALF * sgn;
+                Color32 wc = WallColourAt(toward);
+                Color32 skirt = wc.r + wc.g + wc.b > 600 ? palWoodB : C(242, 240, 234);
+                Panel(horizontal, ex, ez, 0.0f, CELL, 0.0f, 0.12f, face, face + 0.018f * sgn, skirt);
+                Panel(horizontal, ex, ez, 0.0f, CELL, h - 0.09f, h, face, face + 0.03f * sgn, C(246, 244, 238));
+            }
+            return;
+        }
         for (int side = 0; side < 2; side++)
         {
             int toward = side == 0 ? cellB : cellA, other = side == 0 ? cellA : cellB;
@@ -1326,6 +1394,70 @@ public class MapBuilderUdon : UdonSharpBehaviour
         else Box(B_WALLS, new Vector3(ex + lo, y0, ez + a0), new Vector3(ex + hi, y1, ez + a1), col, FACE_ALL & ~(outPlus ? FACE_XN : FACE_XP));
     }
 
+    // Review 9: every lane was a fence corridor. A plot's side to the lane is chosen per plot: a shop, a diner or a
+    // garage opens onto it (no fence), a house now and then too; otherwise a fence, a hedge or a low wall (stone in a
+    // medieval village). Between plots: a fence or a hedge. The map's edge keeps its fence; a space base its rails.
+    void Boundary(bool horizontal, float ex, float ez, int cellA, int cellB)
+    {
+        if (theme == GenData.THEME_SPACE || cellA < 0 || cellB < 0) { Fence(horizontal, ex, ez); return; }
+        int[] cp = gen.cellPlot;
+        int pa = cp[cellA], pb = cp[cellB];
+        bool laneA = IsLaneCell(cellA % W, cellA / W), laneB = IsLaneCell(cellB % W, cellB / W);
+        int plot = laneA ? pb : (laneB ? pa : (pa >= 0 ? pa : pb));
+        if (plot < 0 || (pa < 0 && pb < 0)) { Fence(horizontal, ex, ez); return; }   // the wood, the release
+        int pz = gen.plotZone[plot];
+        uint hsh = Mix(gen.seed ^ U32(plot * 977 + 41));
+        int kind;   // 0 fence, 1 hedge, 2 low wall, 3 open
+        if (laneA || laneB)
+        {
+            if (pz == GenData.Z_SHOP || pz == GenData.Z_DINER || pz == GenData.Z_GARAGE || pz == GenData.Z_FAIR) kind = 3;
+            else kind = (int)UModB(hsh, 4u);
+            if (theme == GenData.THEME_MEDIEVAL && kind == 0) kind = 2;
+        }
+        else kind = (hsh & 8u) == 0u ? 0 : 1;
+        if (kind == 3) return;   // open: no fence, no collider
+        if (kind == 0) { Fence(horizontal, ex, ez); return; }
+        if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.12f), new Vector3(ex + CELL + 0.1f, 6f, ez + 0.12f));
+        else Collider(new Vector3(ex - 0.12f, 0, ez - 0.1f), new Vector3(ex + 0.12f, 6f, ez + CELL + 0.1f));
+        if (kind == 1 && decorPrefabs != null && DECOR_HEDGE < decorPrefabs.Length && decorPrefabs[DECOR_HEDGE] != null)
+        {
+            for (int q = 0; q < 2; q++)
+            {
+                float a = CELL * (0.25f + 0.5f * q);
+                GameObject h = PlaceDecor(DECOR_HEDGE, horizontal ? new Vector3(ex + a, 0f, ez) : new Vector3(ex, 0f, ez + a), horizontal ? 0f : 90f);
+                if (h != null)
+                {
+                    Collider[] cs = h.GetComponentsInChildren<Collider>(true);
+                    for (int i = 0; i < cs.Length; i++) cs[i].enabled = false;
+                    TintHedge(h);
+                }
+            }
+            return;
+        }
+        // a low wall
+        Color32 wc = theme == GenData.THEME_MEDIEVAL ? Vary(C(146, 142, 132), (int)ex, (int)ez, 8) : Vary(C(158, 96, 78), (int)ex, (int)ez, 6);
+        Color32 cap = theme == GenData.THEME_MEDIEVAL ? C(124, 120, 112) : C(196, 190, 180);
+        if (horizontal)
+        {
+            Box(B_WALLS, new Vector3(ex - 0.12f, 0f, ez - 0.13f), new Vector3(ex + CELL + 0.12f, 0.62f, ez + 0.13f), wc, FACE_ALL & ~FACE_YN);
+            Box(B_WALLS, new Vector3(ex - 0.15f, 0.62f, ez - 0.16f), new Vector3(ex + CELL + 0.15f, 0.7f, ez + 0.16f), cap, FACE_ALL);
+        }
+        else
+        {
+            Box(B_WALLS, new Vector3(ex - 0.13f, 0f, ez - 0.12f), new Vector3(ex + 0.13f, 0.62f, ez + CELL + 0.12f), wc, FACE_ALL & ~FACE_YN);
+            Box(B_WALLS, new Vector3(ex - 0.16f, 0.62f, ez - 0.15f), new Vector3(ex + 0.16f, 0.7f, ez + CELL + 0.15f), cap, FACE_ALL);
+        }
+    }
+
+    // a hedge in the map's greens
+    void TintHedge(GameObject h)
+    {
+        Color avg = AverageGreen(h);
+        if (avg.a <= 0f) return;
+        Color32 want = Blend(palGrass, C(54, 112, 58), 50);
+        Tint(h, new Color(Mathf.Clamp(want.r / 255f / Mathf.Max(0.05f, avg.r), 0.3f, 1.6f), Mathf.Clamp(want.g / 255f / Mathf.Max(0.05f, avg.g), 0.3f, 1.6f), Mathf.Clamp(want.b / 255f / Mathf.Max(0.05f, avg.b), 0.3f, 1.6f), 1f));
+    }
+
     void Fence(bool horizontal, float ex, float ez)
     {
         GameObject go = Instantiate(theme == GenData.THEME_SPACE && railPrefab != null ? railPrefab : fencePrefab);
@@ -1334,11 +1466,90 @@ public class MapBuilderUdon : UdonSharpBehaviour
         t.position = horizontal ? new Vector3(ex + CELL / 2, 0, ez) : new Vector3(ex, 0, ez + CELL / 2);
         t.rotation = Quaternion.Euler(0, horizontal ? 0 : 90, 0);
         t.localScale = new Vector3((CELL + 0.1f) / fenceModelSize.x, 1.1f / fenceModelSize.y, 0.16f / fenceModelSize.z);
+        if (theme != GenData.THEME_SPACE) Tint(go, FenceTint());
         if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.08f), new Vector3(ex + CELL + 0.1f, 6f, ez + 0.08f));
         else Collider(new Vector3(ex - 0.08f, 0, ez - 0.1f), new Vector3(ex + 0.08f, 6f, ez + CELL + 0.1f));
     }
 
     bool Bld(int x, int z) { return InGrid(x, z) && IsBuilding(cellZone[z * W + x]); }
+
+    // ------------------------------------------------------------------ the palette on models (review 5)
+    // Broadleaf trees and plants came cyan and fences salmon from their models, whatever the map's palette. A tint
+    // (PropLit's _Color) carries a model's foliage to the map's greens and the fence to its wood. Every client, and
+    // a hider's own prop (PHSlot), take the same tint, so a disguise matches what it hides among.
+    Color[] defTint;
+    bool[] defTintDone;
+    MaterialPropertyBlock tintBlock;
+    Color fenceTint = new Color(0, 0, 0, 0);
+
+    void Tint(GameObject go, Color c)
+    {
+        if (tintBlock == null) tintBlock = new MaterialPropertyBlock();
+        tintBlock.SetColor("_Color", c);
+        MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
+        for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(tintBlock);
+    }
+
+    // the average of a model's vertex colours that pass the test (green-ish: g over r), 0 alpha when none
+    Color AverageGreen(GameObject go)
+    {
+        MeshFilter[] fs = go.GetComponentsInChildren<MeshFilter>(true);
+        float r = 0, g = 0, b = 0; int n = 0;
+        for (int f = 0; f < fs.Length; f++)
+        {
+            Mesh m = fs[f].sharedMesh;
+            if (m == null) continue;
+            Color32[] cs = m.colors32;
+            for (int i = 0; i < cs.Length; i++)
+            {
+                if (cs[i].g < cs[i].r + 20) continue;
+                r += cs[i].r; g += cs[i].g; b += cs[i].b; n++;
+            }
+        }
+        if (n == 0) return new Color(0, 0, 0, 0);
+        return new Color(r / n / 255f, g / n / 255f, b / n / 255f, 1f);
+    }
+
+    public void TintProp(GameObject go, int def)
+    {
+        if (go == null || def < 0) return;
+        if (theme == GenData.THEME_SPACE || moodSeason == 2) return;   // the twins and autumn trees keep theirs
+        if (defTint == null || defTint.Length != propPrefabs.Length) { defTint = new Color[propPrefabs.Length]; defTintDone = new bool[propPrefabs.Length]; }
+        if (!defTintDone[def])
+        {
+            defTintDone[def] = true;
+            Color avg = propPrefabs[def] != null ? AverageGreen(propPrefabs[def]) : new Color(0, 0, 0, 0);
+            Color t = new Color(0, 0, 0, 0);
+            // only the cyan greens: blue close to green
+            if (avg.a > 0f && avg.b > avg.g * 0.72f)
+            {
+                Color32 want = Blend(palGrass, C(54, 112, 58), 45);   // the map's green, darker and fuller than its grass
+                t = new Color(Mathf.Clamp(want.r / 255f / Mathf.Max(0.05f, avg.r), 0.3f, 1.6f), Mathf.Clamp(want.g / 255f / Mathf.Max(0.05f, avg.g), 0.3f, 1.6f),
+                              Mathf.Clamp(want.b / 255f / Mathf.Max(0.05f, avg.b), 0.3f, 1.6f), 1f);
+            }
+            defTint[def] = t;
+        }
+        if (defTint[def].a > 0f) Tint(go, defTint[def]);
+    }
+
+    // the fence in the map's wood (dark weathered timber in a medieval village)
+    Color FenceTint()
+    {
+        if (fenceTint.a > 0f) return fenceTint;
+        if (fencePrefab == null) return Color.white;
+        MeshFilter[] fs = fencePrefab.GetComponentsInChildren<MeshFilter>(true);
+        float r = 0, g = 0, b = 0; int n = 0;
+        for (int f = 0; f < fs.Length; f++)
+        {
+            if (fs[f].sharedMesh == null) continue;
+            Color32[] cs = fs[f].sharedMesh.colors32;
+            for (int i = 0; i < cs.Length; i++) { r += cs[i].r; g += cs[i].g; b += cs[i].b; n++; }
+        }
+        if (n == 0) { fenceTint = Color.white; return fenceTint; }
+        Color32 want = theme == GenData.THEME_MEDIEVAL ? C(112, 86, 62) : palWoodB;
+        fenceTint = new Color(Mathf.Clamp(want.r / Mathf.Max(1f, r / n), 0.2f, 1.6f), Mathf.Clamp(want.g / Mathf.Max(1f, g / n), 0.2f, 1.6f), Mathf.Clamp(want.b / Mathf.Max(1f, b / n), 0.2f, 1.6f), 1f);
+        return fenceTint;
+    }
 
     // ------------------------------------------------------------------ gas station canopies
     // A flat canopy 4.2 m up over each forecourt (MapGen's R_PUMPS rooms): white, a red fascia, a post near each
@@ -1421,9 +1632,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
             lv = instOff[inst];
             if (theme == GenData.THEME_SPACE) RoofModules(inst);
             else if (theme == GenData.THEME_MEDIEVAL && (cellZone[c] == GenData.Z_HOUSE || cellZone[c] == GenData.Z_CABIN)) Chimney(inst, cellZone[c]);
+            else if (theme == GenData.THEME_NONE && cellZone[c] == GenData.Z_HOUSE && (Mix(gen.seed ^ U32(instBaseB[inst] * 71 + 5)) & 1u) == 0u) Chimney(inst, cellZone[c]);   // review 3
         }
         lv = Vector3.zero;
         SkyDressing();
+        Outskirts();
         if (theme == GenData.THEME_SPACE) SpacePlain();
         else if (theme == GenData.THEME_MEDIEVAL) MedievalSquare();
     }
@@ -1469,13 +1682,22 @@ public class MapBuilderUdon : UdonSharpBehaviour
         // clouds (none on a space base), high over and around the map
         if (!space)
         {
-            if (clouds == null) clouds = new Transform[12];
-            for (int k = 0; k < 12; k++)
+            if (clouds == null || clouds.Length < 22) clouds = new Transform[22];
+            // the clouds take the mood's light and haze (review 4: they went purple against a warm sky)
+            Color cloud = Color.Lerp(Color.Lerp(Color.white, moodSun, 0.35f), moodFog, 0.25f);
+            MaterialPropertyBlock cmpb = new MaterialPropertyBlock();
+            cmpb.SetColor("_Color", cloud);
+            for (int k = 0; k < 22; k++)
             {
-                float a = Rand01(U32(k + 6001)) * Mathf.PI * 2f, rr = Rand01(U32(k + 6101)) * (r0 + 20f);
-                Vector3 p = skyCentre + new Vector3(Mathf.Cos(a) * rr, 55f + Rand01(U32(k + 6201)) * 25f, Mathf.Sin(a) * rr);
-                GameObject c = PlaceSky(skyPrefabs[k % 3 == 0 ? SKY_CLOUD_BIG : SKY_CLOUD_SMALL], p, Rand01(U32(k + 6301)) * 360f, 1.6f + Rand01(U32(k + 6401)) * 1.4f);
-                if (c != null) clouds[nClouds++] = c.transform;
+                // the first twelve high over the map, the rest low over the hills where players look
+                bool low = k >= 12;
+                float a = Rand01(U32(k + 6001)) * Mathf.PI * 2f, rr = low ? r0 - 10f + Rand01(U32(k + 6101)) * 40f : Rand01(U32(k + 6101)) * (r0 + 20f);
+                Vector3 p = skyCentre + new Vector3(Mathf.Cos(a) * rr, (low ? 26f : 55f) + Rand01(U32(k + 6201)) * (low ? 12f : 25f), Mathf.Sin(a) * rr);
+                GameObject c = PlaceSky(skyPrefabs[k % 3 == 0 ? SKY_CLOUD_BIG : SKY_CLOUD_SMALL], p, Rand01(U32(k + 6301)) * 360f, (low ? 2.2f : 1.6f) + Rand01(U32(k + 6401)) * 1.4f);
+                if (c == null) continue;
+                clouds[nClouds++] = c.transform;
+                MeshRenderer[] rs = c.GetComponentsInChildren<MeshRenderer>();
+                for (int q = 0; q < rs.Length; q++) rs[q].SetPropertyBlock(cmpb);
             }
         }
         // at night the stars and the moon; over a space base its planet, day and night
@@ -1483,8 +1705,15 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (night && starDomePrefab != null) PlaceSky(starDomePrefab, skyCentre, Rand01(7001u) * 360f, 0.85f);
         if ((night || space) && moonPrefab != null)
         {
-            Vector3 dir = new Vector3(0.45f, space ? 0.32f : 0.55f, 0.75f).normalized;
+            Vector3 dir = new Vector3(0.45f, space ? (moodTime == 1 ? 0.55f : (moodTime == 3 || moodTime == 0 ? 0.16f : 0.32f)) : 0.55f, 0.75f).normalized;   // the planet rides higher at noon
             GameObject moon = PlaceSky(moonPrefab, skyCentre + dir * 280f, 0f, space ? 48f : 16f);
+            if (moon != null && space)
+            {
+                // review 10: the sphere read as a lumpy blob; a flat disc with bands suits the style
+                MeshFilter mf = moon.GetComponent<MeshFilter>();
+                if (mf != null) mf.sharedMesh = PlanetDisc();
+                moon.transform.rotation = Quaternion.LookRotation(-dir, Vector3.up);
+            }
             if (moon != null)
             {
                 MeshRenderer mr = moon.GetComponent<MeshRenderer>();
@@ -1492,6 +1721,179 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 mpb.SetColor("_Color", space ? new Color(0.55f, 0.66f, 0.85f) : new Color(0.92f, 0.93f, 0.86f));
                 mr.SetPropertyBlock(mpb);
             }
+        }
+    }
+
+    // The country round the map (review 2: the town sat on an empty plain): clumps of trees, bushes and boulders 5 to
+    // 30 m beyond the fence, hay in a medieval village's fields, and a nearer, lower ring of hills at about 40 m.
+    // Not props: no colliders, never disguises.
+    GameObject PlaceScenery(string id, Vector3 p, float yaw, float scale)
+    {
+        int def = DefIndex(id);
+        if (def < 0 || def >= propPrefabs.Length || propPrefabs[def] == null || fixtureRoot == null) return null;
+        GameObject go = Instantiate(propPrefabs[def]);
+        Transform t = go.transform;
+        t.SetParent(fixtureRoot, false);
+        t.position = p; t.rotation = Quaternion.Euler(0f, yaw, 0f); t.localScale = t.localScale * scale;
+        Collider[] cs = go.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cs.Length; i++) cs[i].enabled = false;
+        TintProp(go, def);
+        return go;
+    }
+
+    void Outskirts()
+    {
+        if (theme == GenData.THEME_SPACE) return;   // the plain has its craters and rocks (SpacePlain)
+        float w = siteW * CELL, h = siteH * CELL;
+        int rd = (gen.releaseDir + 2) & 3;
+        float tx = (gen.releaseX + 0.5f) * CELL, tz = (gen.releaseZ + 0.5f) * CELL;
+        string[] trees = { "n_treeOak", "n_treeDefault", "n_treeFat", "n_treePineTall", "n_treePineRound" };
+        string[] low = { "n_bushLarge", "n_bush", "n_rockLarge", "n_rockLargeB", "n_bushDetailed" };
+        bool medieval = theme == GenData.THEME_MEDIEVAL;
+        int clumps = Mathf.RoundToInt((w + h) * 2f / 11f);
+        for (int k = 0; k < clumps; k++)
+        {
+            float along = Rand01(U32(k * 7 + 8101)), out1 = 5f + 25f * Rand01(U32(k * 7 + 8102)) * Rand01(U32(k * 7 + 8103)) + 2f;
+            int edge = (int)(Rand01(U32(k * 7 + 8104)) * 3.999f);
+            Vector3 c;
+            if (edge == 0) c = new Vector3(-out1, 0f, along * (h + 20f) - 10f);
+            else if (edge == 1) c = new Vector3(w + out1, 0f, along * (h + 20f) - 10f);
+            else if (edge == 2) c = new Vector3(along * (w + 20f) - 10f, 0f, -out1);
+            else c = new Vector3(along * (w + 20f) - 10f, 0f, h + out1);
+            // keep the track clear
+            Vector3 rel = c - new Vector3(tx, 0f, tz);
+            float alongT = rel.x * DX[rd] + rel.z * DZ[rd], acrossT = Mathf.Abs(rel.x * DZ[rd] - rel.z * DX[rd]);
+            if (alongT > 0f && acrossT < 7f) continue;
+            int kind = (int)(Rand01(U32(k * 7 + 8105)) * 10f);
+            if (medieval && kind >= 8)
+            {
+                // a field of hay
+                for (int q = 0; q < 3; q++)
+                    PlaceScenery(q == 0 ? "g_hayBundled" : "g_hay", c + new Vector3(Rand01(U32(k * 31 + q)) * 6f - 3f, 0f, Rand01(U32(k * 37 + q)) * 6f - 3f), Rand01(U32(k * 41 + q)) * 360f, 1.6f);
+                continue;
+            }
+            int n = kind < 6 ? 2 + (int)(Rand01(U32(k * 7 + 8106)) * 3f) : 1;
+            for (int q = 0; q < n; q++)
+            {
+                Vector3 p = c + new Vector3(Rand01(U32(k * 13 + q * 3 + 1)) * 7f - 3.5f, 0f, Rand01(U32(k * 13 + q * 3 + 2)) * 7f - 3.5f);
+                float yaw = Rand01(U32(k * 13 + q * 3 + 3)) * 360f;
+                if (kind < 6) PlaceScenery(trees[(k + q) % trees.Length], p, yaw, 1.1f + Rand01(U32(k * 17 + q)) * 0.6f);
+                else PlaceScenery(low[(k + q) % low.Length], p, yaw, 1.4f + Rand01(U32(k * 19 + q)) * 0.8f);
+            }
+        }
+        // the nearer hills
+        if (skyPrefabs == null || skyPrefabs.Length < 9) return;
+        float r1 = Mathf.Max(w, h) * 0.5f + 42f;
+        for (int k = 0; k < 10; k++)
+        {
+            float a = (k + Rand01(U32(k + 8301)) * 0.5f) / 10f * Mathf.PI * 2f;
+            Vector3 p = skyCentre + new Vector3(Mathf.Cos(a) * r1, -3.2f, Mathf.Sin(a) * r1);   // sunk: their cliffs read as floating plateaus this close
+            Vector3 rel = p - new Vector3(tx, 0f, tz);
+            if (rel.x * DX[rd] + rel.z * DZ[rd] > 0f && Mathf.Abs(rel.x * DZ[rd] - rel.z * DX[rd]) < 14f) continue;   // the track runs out between them
+            PlaceSky(skyPrefabs[k % 2 == 0 ? SKY_HILL_A : SKY_HILL_B], p, Rand01(U32(k + 8401)) * 360f, 1.0f + Rand01(U32(k + 8501)) * 0.5f);
+        }
+    }
+
+    Mesh PlanetDisc()
+    {
+        int rows = 24;
+        Vector3[] v = new Vector3[rows * 4]; Vector3[] n = new Vector3[rows * 4]; Color32[] c = new Color32[rows * 4]; int[] t = new int[rows * 6];
+        for (int i = 0; i < rows; i++)
+        {
+            float y0 = -0.5f + i / (float)rows, y1 = y0 + 1f / rows;
+            float w0 = Mathf.Sqrt(Mathf.Max(0f, 0.25f - y0 * y0)), w1 = Mathf.Sqrt(Mathf.Max(0f, 0.25f - y1 * y1));
+            bool band = i == 9 || i == 10 || i == 15;
+            Color32 col = band ? new Color32(200, 196, 214, 255) : (i < 12 ? new Color32(255, 255, 255, 255) : new Color32(236, 240, 250, 255));
+            int k = i * 4;
+            v[k] = new Vector3(-w0, y0, 0f); v[k + 1] = new Vector3(-w1, y1, 0f); v[k + 2] = new Vector3(w1, y1, 0f); v[k + 3] = new Vector3(w0, y0, 0f);
+            for (int q = 0; q < 4; q++) { n[k + q] = Vector3.back; c[k + q] = col; }
+            int j = i * 6;
+            t[j] = k; t[j + 1] = k + 1; t[j + 2] = k + 2; t[j + 3] = k; t[j + 4] = k + 2; t[j + 5] = k + 3;
+        }
+        Mesh m = new Mesh();
+        m.vertices = v; m.normals = n; m.colors32 = c; m.triangles = t;
+        m.RecalculateBounds();
+        return m;
+    }
+
+    // ---- review 3: one landmark per map, beyond the far end of the lane and taller than any roof, so every lane has
+    // something on its skyline: a water tower on an ordinary map, a windmill in a medieval village, a mast on a space base
+    void Landmark()
+    {
+        float w = siteW * CELL, h = siteH * CELL;
+        int fd = gen.releaseDir;   // into the map: the far side is that way
+        Vector3 c = new Vector3(w * 0.5f, 0f, h * 0.5f) + new Vector3(DX[fd] * (w * 0.5f + 16f), 0f, DZ[fd] * (h * 0.5f + 16f));
+        c.x += (Rand01(9101u) - 0.5f) * Mathf.Min(w, 20f) * (DX[fd] == 0 ? 1f : 0f);
+        c.z += (Rand01(9102u) - 0.5f) * Mathf.Min(h, 20f) * (DZ[fd] == 0 ? 1f : 0f);
+        lv = Vector3.zero;
+        if (theme == GenData.THEME_SPACE)
+        {
+            Color32 m = C(150, 156, 166), o = C(224, 122, 40);
+            Prism(c, 1.2f, 0.7f, 0f, 3f, 8, C(110, 116, 128));
+            Prism(c, 0.35f, 0.18f, 3f, 24f, 6, m);
+            for (int k = 1; k <= 3; k++) Prism(c, 0.9f - k * 0.15f, 0.9f - k * 0.15f, 3f + k * 5f, 3.4f + k * 5f, 8, o);
+            Box(B_WALLS, c + new Vector3(-0.25f, 24f, -0.25f), c + new Vector3(0.25f, 24.5f, 0.25f), new Color32(255, 80, 60, 0), FACE_ALL);   // a red beacon, glowing
+            PlaceDecor(DECOR_DISH, c + new Vector3(0f, 17f, 0f), Rand01(9103u) * 360f);
+            return;
+        }
+        if (theme == GenData.THEME_MEDIEVAL)
+        {
+            // a windmill: a tapered stone tower, a conical cap, four sails turned to the map
+            Color32 st = Vary(C(170, 164, 150), 3, 7, 6);
+            Prism(c, 3.0f, 2.2f, 0f, 11f, 10, st);
+            Cone(c, 2.6f, 11f, 14.5f, 10, C(120, 84, 58));
+            Vector3 toMap = new Vector3(-DX[fd], 0f, -DZ[fd]);
+            Vector3 hub = c + toMap * 2.7f + Vector3.up * 11.5f, right = new Vector3(toMap.z, 0f, -toMap.x);
+            float spin = Rand01(9104u) * 90f;
+            for (int k = 0; k < 4; k++)
+            {
+                float a = (spin + k * 90f) * Mathf.Deg2Rad;
+                Vector3 dirS = right * Mathf.Cos(a) + Vector3.up * Mathf.Sin(a), nrm = Vector3.Cross(dirS, toMap).normalized;
+                Vector3 p0 = hub + dirS * 0.6f - nrm * 0.05f, p1 = hub + dirS * 0.6f + nrm * 0.75f, p2 = hub + dirS * 7.5f + nrm * 0.75f, p3 = hub + dirS * 7.5f - nrm * 0.05f;
+                WQuad(p0, p1, p2, p3, C(226, 216, 196));
+                WQuad(hub - nrm * 0.12f, hub + nrm * 0.12f, hub + dirS * 7.6f + nrm * 0.12f, hub + dirS * 7.6f - nrm * 0.12f, C(96, 70, 48));
+            }
+            return;
+        }
+        // a water tower: four legs and braces, a round tank, a pointed cap
+        Color32 leg = C(120, 124, 132), tank = Blend(palTrim, C(200, 204, 210), 40);
+        for (int k = 0; k < 4; k++)
+        {
+            float lx = (k & 1) == 0 ? -1.8f : 1.8f, lz = (k & 2) == 0 ? -1.8f : 1.8f;
+            Box(B_WALLS, c + new Vector3(lx - 0.15f, 0f, lz - 0.15f), c + new Vector3(lx + 0.15f, 13f, lz + 0.15f), leg, FACE_ALL & ~FACE_YN);
+        }
+        for (int y = 4; y <= 10; y += 6)
+        {
+            Box(B_WALLS, c + new Vector3(-1.8f, y, -1.85f), c + new Vector3(1.8f, y + 0.15f, -1.75f), leg, FACE_ALL);
+            Box(B_WALLS, c + new Vector3(-1.8f, y, 1.75f), c + new Vector3(1.8f, y + 0.15f, 1.85f), leg, FACE_ALL);
+            Box(B_WALLS, c + new Vector3(-1.85f, y, -1.8f), c + new Vector3(-1.75f, y + 0.15f, 1.8f), leg, FACE_ALL);
+            Box(B_WALLS, c + new Vector3(1.75f, y, -1.8f), c + new Vector3(1.85f, y + 0.15f, 1.8f), leg, FACE_ALL);
+        }
+        Prism(c, 3.0f, 3.0f, 13f, 17.5f, 12, tank);
+        Prism(c, 3.1f, 3.1f, 14.9f, 15.2f, 12, palTrim);
+        Cone(c, 3.2f, 17.5f, 19.5f, 12, C(88, 92, 100));
+    }
+
+    // a closed prism of `sides` faces from radius r0 at y0 to r1 at y1 round c, both sides drawn, top capped
+    void Prism(Vector3 c, float r0, float r1, float y0, float y1, int sides, Color32 col)
+    {
+        for (int k = 0; k < sides; k++)
+        {
+            float a0 = k * Mathf.PI * 2f / sides, a1 = (k + 1) * Mathf.PI * 2f / sides;
+            Vector3 d0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0)), d1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+            WQuad(c + d0 * r0 + Vector3.up * y0, c + d0 * r1 + Vector3.up * y1, c + d1 * r1 + Vector3.up * y1, c + d1 * r0 + Vector3.up * y0, col);
+            WQuad(c + Vector3.up * y1, c + d0 * r1 + Vector3.up * y1, c + d1 * r1 + Vector3.up * y1, c + Vector3.up * y1 + (d0 + d1) * 0.001f, col);
+        }
+    }
+
+    void Cone(Vector3 c, float r, float y0, float y1, int sides, Color32 col)
+    {
+        for (int k = 0; k < sides; k++)
+        {
+            float a0 = k * Mathf.PI * 2f / sides, a1 = (k + 1) * Mathf.PI * 2f / sides;
+            Vector3 d0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0)), d1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+            Vector3 apex = c + Vector3.up * y1;
+            WQuad(c + d0 * r + Vector3.up * y0, apex + d0 * 0.01f, apex + d1 * 0.01f, c + d1 * r + Vector3.up * y0, col);
         }
     }
 
@@ -1555,11 +1957,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
         float bx0 = instMinX[inst] * CELL, bx1 = (instMaxX[inst] + 1) * CELL, bz0 = instMinZ[inst] * CELL, bz1 = (instMaxZ[inst] + 1) * CELL;
         bool alongX = (bx1 - bx0) >= (bz1 - bz0);
         float t = zoneWallMm[zone] / 1000f + 0.14f;
-        float half = (alongX ? bz1 - bz0 : bx1 - bx0) * 0.5f, rise = Mathf.Min(half, 3.6f);
+        float half = (alongX ? bz1 - bz0 : bx1 - bx0) * 0.5f, rise = theme == GenData.THEME_MEDIEVAL ? Mathf.Min(half, 3.6f) : Mathf.Min(half * PITCH, MAX_RISE);
         float cx = alongX ? bx0 + 1.2f : (bx0 + bx1) * 0.5f + 0.6f, cz = alongX ? (bz0 + bz1) * 0.5f + 0.6f : bz0 + 1.2f;
         int cc = (int)(cz / CELL) * W + (int)(cx / CELL);
         if (cc < 0 || cc >= W * H || cellInst[cc] != inst) return;
-        Box(B_ROOFS, new Vector3(cx - 0.35f, t, cz - 0.35f), new Vector3(cx + 0.35f, t + rise + 0.9f, cz + 0.35f), C(128, 122, 114), FACE_ALL & ~FACE_YN);
+        Box(B_ROOFS, new Vector3(cx - 0.35f, t, cz - 0.35f), new Vector3(cx + 0.35f, t + rise + 0.9f, cz + 0.35f), theme == GenData.THEME_NONE ? C(150, 88, 72) : C(128, 122, 114), FACE_ALL & ~FACE_YN);
         Box(B_ROOFS, new Vector3(cx - 0.42f, t + rise + 0.9f, cz - 0.42f), new Vector3(cx + 0.42f, t + rise + 1.05f, cz + 0.42f), C(100, 96, 90), FACE_ALL);
     }
 
@@ -1605,6 +2007,24 @@ public class MapBuilderUdon : UdonSharpBehaviour
         string[] ids = gen.defId;
         for (int i = 0; i < ids.Length; i++) if (ids[i] == id) return i;
         return -1;
+    }
+
+    // a small roof over an outside door (review 3: long walls with nothing on them): 0.7 m deep, brackets under it
+    void Awning(bool horizontal, float ex, float ez, float d0, float d1, float dh, float side, int cell)
+    {
+        Color32 col = theme == GenData.THEME_SPACE ? C(84, 90, 102) : (theme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : RoofColour(cellZone[cell], StyleAt(cell)));
+        Color32 br = theme == GenData.THEME_SPACE ? C(224, 122, 40) : (theme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : palTrim);
+        float n0 = WALL_HALF + facadeDepth, n1 = n0 + 0.75f, y0 = dh + 0.18f, y1 = dh + 0.26f, a0 = d0 - 0.3f, a1 = d1 + 0.3f;
+        AwBox(horizontal, ex, ez, a0, a1, n0, n1, y0, y1, side, col);
+        AwBox(horizontal, ex, ez, a0, a0 + 0.06f, n0, n1 - 0.05f, y0 - 0.3f, y0, side, br);
+        AwBox(horizontal, ex, ez, a1 - 0.06f, a1, n0, n1 - 0.05f, y0 - 0.3f, y0, side, br);
+    }
+
+    void AwBox(bool horizontal, float ex, float ez, float a0, float a1, float n0, float n1, float y0, float y1, float side, Color32 col)
+    {
+        float m0 = side > 0 ? n0 : -n1, m1 = side > 0 ? n1 : -n0;
+        if (horizontal) Box(B_WALLS, new Vector3(ex + a0, y0, ez + m0), new Vector3(ex + a1, y1, ez + m1), col, FACE_ALL);
+        else Box(B_WALLS, new Vector3(ex + m0, y0, ez + a0), new Vector3(ex + m1, y1, ez + a1), col, FACE_ALL);
     }
 
     // a lantern on the outside wall beside a door: `a` metres along the edge, `side` +1/-1 the outside's direction
@@ -1661,7 +2081,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (!place) continue;
             float h = zoneWallMm[cellZone[c]] / 1000f;
             float cx = (c % W + 0.5f) * CELL, cz = (c / W + 0.5f) * CELL;
-            if (PlaceFixture(0, new Vector3(cx, h, cz), 0f, LK_CEILING)) continue;
+            if (theme != GenData.THEME_SPACE && PlaceFixture(0, new Vector3(cx, h, cz), 0f, LK_CEILING)) continue;   // a space base: the flat panel below (review 8)
             Box(B_ROOFS, new Vector3(cx - 0.28f, h - 0.05f, cz - 0.28f), new Vector3(cx + 0.28f, h, cz + 0.28f), rim, FACE_ALL & ~FACE_YP);
             Box(B_ROOFS, new Vector3(cx - 0.21f, h - 0.09f, cz - 0.21f), new Vector3(cx + 0.21f, h - 0.05f, cz + 0.21f), glow, FACE_ALL & ~FACE_YP);
             AddLight(new Vector3(cx, h - 0.25f, cz), LK_CEILING, null);
@@ -1790,20 +2210,36 @@ public class MapBuilderUdon : UdonSharpBehaviour
                     }
                 if (best == 0) break;
                 for (int dz = 0; dz < rd; dz++) for (int dx = 0; dx < rw; dx++) done[(rz + dz) * bw + rx + dx] = true;
-                GableRoof((x0 + rx) * CELL - WALL_HALF, (x0 + rx + rw) * CELL + WALL_HALF, (z0 + rz) * CELL - WALL_HALF, (z0 + rz + rd) * CELL + WALL_HALF, t, roof, wall);
+                GableRoof((x0 + rx) * CELL - WALL_HALF, (x0 + rx + rw) * CELL + WALL_HALF, (z0 + rz) * CELL - WALL_HALF, (z0 + rz + rd) * CELL + WALL_HALF, t, roof, wall,
+                          (Mix(gen.seed ^ U32(inst * 313 + guard)) & 1u) == 1u);
             }
         }
         lv = Vector3.zero;
     }
 
-    void GableRoof(float bx0, float bx1, float bz0, float bz1, float t, Color32 roof, Color32 wall)
+    void GableRoof(float bx0, float bx1, float bz0, float bz1, float t, Color32 roof, Color32 wall, bool flip)
     {
-        bool alongX = (bx1 - bx0) >= (bz1 - bz0);
+        float lx = bx1 - bx0, lz = bz1 - bz0;
+        bool alongX = lx >= lz;
+        if (flip && Mathf.Max(lx, lz) < Mathf.Min(lx, lz) * 1.5f) alongX = !alongX;   // a squarish block: the ridge either way (review 3)
         float a0 = alongX ? bx0 : bz0, a1 = alongX ? bx1 : bz1, c0 = alongX ? bz0 : bx0, c1 = alongX ? bz1 : bx1;
         float mid = (c0 + c1) * 0.5f, top = RoofY(mid, c0, c1, t);
-        // the two slopes
-        QuadBoth(RP(alongX, a0, t, c0), RP(alongX, a0, top, mid), RP(alongX, a1, top, mid), RP(alongX, a1, t, c0), roof);
-        QuadBoth(RP(alongX, a0, top, mid), RP(alongX, a0, t, c1), RP(alongX, a1, t, c1), RP(alongX, a1, top, mid), roof);
+        // eaves (review 3: the roofs ended flush with the walls): the slopes run on 0.35 m past the walls, and past the
+        // gable ends; a fascia board along the eaves and barge boards up the gables, in the trim colour
+        float ov = 0.35f, k = (top - t) / Mathf.Max(0.01f, (c1 - c0) * 0.5f), ye = t - ov * k;
+        float A0 = a0 - ov * 0.8f, A1 = a1 + ov * 0.8f, C0 = c0 - ov, C1 = c1 + ov;
+        QuadBoth(RP(alongX, A0, ye, C0), RP(alongX, A0, top, mid), RP(alongX, A1, top, mid), RP(alongX, A1, ye, C0), roof);
+        QuadBoth(RP(alongX, A0, top, mid), RP(alongX, A0, ye, C1), RP(alongX, A1, ye, C1), RP(alongX, A1, top, mid), roof);
+        Color32 fascia = theme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : palTrim;
+        float fd = 0.16f;
+        QuadBoth(RP(alongX, A0, ye - fd, C0), RP(alongX, A0, ye, C0), RP(alongX, A1, ye, C0), RP(alongX, A1, ye - fd, C0), fascia);
+        QuadBoth(RP(alongX, A0, ye - fd, C1), RP(alongX, A0, ye, C1), RP(alongX, A1, ye, C1), RP(alongX, A1, ye - fd, C1), fascia);
+        for (int e = 0; e < 2; e++)
+        {
+            float A = e == 0 ? A0 : A1;
+            QuadBoth(RP(alongX, A, ye - fd, C0), RP(alongX, A, ye, C0), RP(alongX, A, top, mid), RP(alongX, A, top - fd, mid), fascia);
+            QuadBoth(RP(alongX, A, top - fd, mid), RP(alongX, A, top, mid), RP(alongX, A, ye, C1), RP(alongX, A, ye - fd, C1), fascia);
+        }
         // the gable ends
         QuadBoth(RP(alongX, a0, t, c0), RP(alongX, a0, top, mid), RP(alongX, a0, top, mid), RP(alongX, a0, t, c1), wall);
         QuadBoth(RP(alongX, a1, t, c0), RP(alongX, a1, top, mid), RP(alongX, a1, top, mid), RP(alongX, a1, t, c1), wall);
@@ -1891,7 +2327,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             float h = zoneWallMm[zone] / 1000f, t = h + 0.14f;
             bool bw = Bld(x - 1, z), be = Bld(x + 1, z), bs = Bld(x, z - 1), bn2 = Bld(x, z + 1);
             float x0 = x * CELL - (bw ? 0f : WALL_HALF), x1 = (x + 1) * CELL + (be ? 0f : WALL_HALF);
-            Color32 rc = RoofColour(zone, Style(ci)), ceiling = C(236, 234, 226);
+            // the ceiling by theme (review 7): pale grey panels on a space base, warm plaster in a village, off-white
+            Color32 rc = RoofColour(zone, Style(ci)), ceiling = theme == GenData.THEME_SPACE ? C(206, 212, 220) : (theme == GenData.THEME_MEDIEVAL ? C(224, 210, 184) : C(244, 242, 236));
             // the slab over the room: the roof, or the floor of the level above, open over a stair
             float hx0 = 0f, hx1 = 0f, hz0 = 0f, hz1 = 0f;
             int sb = StairBelow(c);
@@ -1938,6 +2375,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         t.position = new Vector3(emitX[e], emitY[e], emitZ[e]) / 1000f + InnerOff(iz * IW + ix);   // upstairs or in a basement: where it belongs
         t.rotation = Quaternion.Euler(0, emitYaw[e], 0);
         objects[e] = go;
+        TintProp(go, emitDef[e]);
         int def = emitDef[e];
         for (int i = 0; i < lampDefs.Length; i++)
         {

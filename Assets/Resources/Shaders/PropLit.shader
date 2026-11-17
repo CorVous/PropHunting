@@ -78,8 +78,10 @@ Shader "PropHunt/Lit"
                 float3 n = UnityObjectToWorldNormal(v.normal);
                 float d = dot(n, _WorldSpaceLightPos0.xyz);
                 float ndl = max(0, d) * 0.8 + (d * 0.5 + 0.5) * 0.2;
-                float up = n.y * 0.5 + 0.5;
-                float3 amb = lerp(unity_AmbientGround.rgb, unity_AmbientSky.rgb, up);
+                // three-colour ambient: the sky from above, the horizon from the sides, the ground below; a face turned
+                // down (a ceiling) takes half the horizon, so ceilings are not the ground's brown (review 7)
+                float3 amb = n.y >= 0 ? lerp(unity_AmbientEquator.rgb, unity_AmbientSky.rgb, n.y)
+                                      : lerp(unity_AmbientEquator.rgb, unity_AmbientGround.rgb, -n.y * 0.5);
                 float3 albedo = v.color.rgb;
                 #ifndef UNITY_COLORSPACE_GAMMA
                 albedo = GammaToLinearSpace(albedo);
@@ -158,7 +160,7 @@ Shader "PropHunt/Lit"
                     // the spot sun over the map, handing back to the base sun at the spot's edge
                     float2 o = abs(i.worldPos.xz - _UdonPHSunArea.xy) - _UdonPHSunArea.zw;
                     float r = max(o.x, o.y);   // metres past the map's edge
-                    c = i.ambient + Toon(lerp(spot, i.sun, smoothstep(0.5, 6.0, r)), i.albedo) + lamps;   // the base sun from 6 m past the fence
+                    c = i.ambient + Toon(lerp(spot, i.sun, smoothstep(0.5, 10.0, r)), i.albedo) + lamps;   // the base sun from 10 m past the fence, feathered (review 2)
                 }
                 else c = i.ambient + Toon(i.sun, i.albedo) + lamps;   // before the spot is baked: the base sun, the lamps on top
                 c = lerp(c, i.albedo * 1.4, i.emit);

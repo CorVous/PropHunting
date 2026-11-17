@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 19;   // 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 20;   // 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -20,7 +20,8 @@ public static partial class GenData
     // Layout 10 (generator 15): bigger plans, smaller gardens and wood, buildings at the edge, three more site shapes.
     // Layout 11 (generator 18): upper floors and basements, joined by stairs (Cor).
     // Layout 12 (generator 19): fewer of them, a basement under an upper floor only now and then.
-    public const int LAYOUT_VERSION = 12;
+    // Layout 13 (generator 20): an upper floor's bathroom in its smallest room, big rooms living rooms or playrooms.
+    public const int LAYOUT_VERSION = 13;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell

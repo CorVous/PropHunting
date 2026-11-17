@@ -229,6 +229,7 @@ public class PHSlot : UdonSharpBehaviour
             if (want >= 0 && game.builder.propPrefabs != null && want < game.builder.propPrefabs.Length && game.builder.propPrefabs[want] != null)
             {
                 proxy = Instantiate(game.builder.propPrefabs[want]);
+                game.builder.TintProp(proxy, want);   // the map's foliage colour, as the props it hides among
                 proxy.transform.SetParent(proxyRoot, true);
                 proxy.transform.position = propPos;
                 proxy.name = "Hider" + index;

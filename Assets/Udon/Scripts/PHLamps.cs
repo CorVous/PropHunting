@@ -109,7 +109,10 @@ public class PHLamps : UdonSharpBehaviour
             int kind = builder.lightKind[p];
             float scale = kind == MapBuilderUdon.LK_STREET ? 1.7f : (kind == MapBuilderUdon.LK_LAMP ? 0.7f : 1f);
             float size = kind == MapBuilderUdon.LK_STREET ? sourceSize * 1.9f : (kind == MapBuilderUdon.LK_LAMP ? sourceSize * 0.75f : sourceSize);
-            l.transform.position = w[p];
+            Vector3 at = w[p];
+            // a ceiling light hangs its point lower with a wider source, so it lights the walls, not a blob on the ceiling (review 8)
+            if (kind == MapBuilderUdon.LK_CEILING) { at.y -= 0.35f; size *= 1.3f; }
+            l.transform.position = at;
             l.gameObject.SetActive(true);
             l.SetPointLight();
             l.SetLightSourceSize(size);

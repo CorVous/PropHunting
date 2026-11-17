@@ -53,7 +53,7 @@ public class PHSun : UdonSharpBehaviour
         MapGenUdon gen = builder.gen;
         float w = builder.SiteWidth(), h = builder.SiteDepth();   // the map without its upper floors and basements, laid out beside it in the generator
         Vector3 centre = new Vector3(w * 0.5f, 0f, h * 0.5f);
-        float radius = Mathf.Sqrt(w * w + h * h) * 0.5f + margin;
+        float radius = Mathf.Sqrt(w * w + h * h) * 0.5f + Mathf.Max(margin, 15f);   // covers PropLit's 10 m fade out to the corners
         float height = radius / Mathf.Tan(coneDeg * 0.5f * Mathf.Deg2Rad);
 
         // the casters: walls, roofs (shown for the bake) and fences
