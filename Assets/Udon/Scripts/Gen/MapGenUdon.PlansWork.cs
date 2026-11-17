@@ -114,6 +114,9 @@ public partial class MapGenUdon
                 }
             }
         }
+        // revision 12: the tool wall beside the workbench corner, now and then
+        uint[] r18 = SR(18);
+        if (RngChance(r18, 400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_toolwall"), WM_ANY, 0, 0, WIN_NEVER, 0, r18) >= 0) Keep(first, false); }
         uint[] r4 = SR(4);
         if (RngChance(r4, 700) && Fit(3)) DrumRow(Fit(5) ? RngBetween(r4, 3, 5) : 3, r4);
         // (d) rows of goods beside the racks and at the walls

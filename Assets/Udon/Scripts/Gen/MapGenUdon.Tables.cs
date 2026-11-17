@@ -6,8 +6,19 @@ public partial class MapGenUdon
 {
     [UnityEngine.HideInInspector] public int[] Data;   // GenPlans
     [UnityEngine.HideInInspector] public int[] DensityPercent;   // GenData
+    [UnityEngine.HideInInspector] public int[] PlotPoolWeight;   // GenData
+    [UnityEngine.HideInInspector] public int[] PlotPoolZone;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeBarnCellsMax;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeBarnCellsMin;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeCabinCellsMax;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeCabinCellsMin;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeChapelCellsMax;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeChapelCellsMin;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeDinerCellsMax;   // GenData
-    [UnityEngine.HideInInspector] public int[] SizeExtraHouse;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeFairCellsMax;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeFairCellsMin;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeGarageCellsMax;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeGarageCellsMin;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeGrid;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeGroundCells;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeHouseBack;   // GenData
@@ -17,14 +28,20 @@ public partial class MapGenUdon
     [UnityEngine.HideInInspector] public int[] SizeHouseFront;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeHouseFront2;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeLeaks;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeParkAlong;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeParkDeep;   // GenData
     [UnityEngine.HideInInspector] public string[] SizePlots;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeShopCellsMax;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeShopCellsMin;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeSideYard;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeWarehouseBack2;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeWarehouseCellsMax;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeWarehouseCellsMin;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeWarehouseFront;   // GenData
     [UnityEngine.HideInInspector] public int[] SizeWoodMin;   // GenData
+    [UnityEngine.HideInInspector] public int[] SizeZooDeep;   // GenData
     [UnityEngine.HideInInspector] public int[] Start;   // GenPlans
+    [UnityEngine.HideInInspector] public int[][] ThemeKinds;   // GenData
     [UnityEngine.HideInInspector] public int[] defAbsurd;   // GenData
     [UnityEngine.HideInInspector] public int[] defAnchor;   // GenData
     [UnityEngine.HideInInspector] public int[] defBeside;   // GenData
@@ -36,11 +53,14 @@ public partial class MapGenUdon
     [UnityEngine.HideInInspector] public int[] defFlags;   // GenData
     [UnityEngine.HideInInspector] public int[] defGroupCount;   // GenData
     [UnityEngine.HideInInspector] public int[] defGroupStart;   // GenData
+    [UnityEngine.HideInInspector] public string[] defId;   // GenData
     [UnityEngine.HideInInspector] public int[] defJitPos;   // GenData
     [UnityEngine.HideInInspector] public int[] defJitYaw;   // GenData
     [UnityEngine.HideInInspector] public int[] defKind;   // GenData
     [UnityEngine.HideInInspector] public int[] defLeakWeight;   // GenData
+    [UnityEngine.HideInInspector] public int[] defMapTheme;   // GenData
     [UnityEngine.HideInInspector] public int[] defRoomCap;   // GenData
+    [UnityEngine.HideInInspector] public int[] defSeason;   // GenData
     [UnityEngine.HideInInspector] public int[] defSizeClass;   // GenData
     [UnityEngine.HideInInspector] public int[] defSlotCount;   // GenData
     [UnityEngine.HideInInspector] public int[] defSlotStart;   // GenData
@@ -50,7 +70,9 @@ public partial class MapGenUdon
     [UnityEngine.HideInInspector] public int[] defSy;   // GenData
     [UnityEngine.HideInInspector] public int[] defSz;   // GenData
     [UnityEngine.HideInInspector] public int[] defTags;   // GenData
+    [UnityEngine.HideInInspector] public int[] defThemeTwin;   // GenData
     [UnityEngine.HideInInspector] public int[] defThemes;   // GenData
+    [UnityEngine.HideInInspector] public int[] defTwin;   // GenData
     [UnityEngine.HideInInspector] public int[] defW;   // GenData
     [UnityEngine.HideInInspector] public int[] entryDef;   // GenData
     [UnityEngine.HideInInspector] public int[] entryGrp;   // GenData

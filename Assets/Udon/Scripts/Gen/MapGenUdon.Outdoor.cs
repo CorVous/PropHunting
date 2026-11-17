@@ -213,7 +213,7 @@ public partial class MapGenUdon
             walkNarrow = k >= 8;   // first with the full walkway width, then passable is enough
             uint[] r = SR(200 + pass * 24 + k);
             int first = nEmit, how = k % 4;
-            if (type == GenData.R_YARD || type == GenData.R_PUMPS)
+            if (type == GenData.R_YARD)
             {
                 // a yard fills up with what a yard holds: goods in rows at the fence and the wall, a pallet
                 string[] rows = { "crates", "barrels", "boxes", "sacks" };
@@ -664,54 +664,6 @@ public partial class MapGenUdon
     // A warehouse's loading yard or a diner's service yard (G32): paved. The goods wait against the building and
     // the fence near the loading or service door: pallets, then rows of crates, boxes, barrels, sacks, fuel; the
     // hand truck and the dumpster (or a bin) by the door. The way from the door to the gates stays open.
-    // ============================================================================================ FORECOURT
-    // A gas station's forecourt (Cor: more kinds of plot): one or two pump islands across the middle, a car at a
-    // pump now and then, tyres stacked at the fence, fuel cans and barrels, a bin. The builder puts the canopy
-    // over it.
-    void PlanPumps()
-    {
-        int room = pRoom;
-        FrontMarkers(30);
-        int s = roomCellStart[room], n = roomCellCount[room];
-        for (int k = s; k < s + n; k++) tags[roomCells[k]] |= GenData.T_COVERED;
-        int mx = RoomMidX(room), mz = RoomMidZ(room);
-        uint[] r = SR(1);
-        int islands = 1 + (RngChance(r, 600) ? 1 : 0);
-        int pump = -1;
-        for (int i = 0; i < islands; i++)
-        {
-            uint[] ri = SR(2 + i);
-            int first = nEmit;
-            int p = CentrePiece(Dn("gen_fuelPump"), RngRange(ri, 2) * 90, true, 2, 1, i == 0 ? WM_NEAR : WM_FAR, mx, mz, 0, i == 0 ? EF_MANDATORY : 0, ri);
-            if (p >= 0 && Keep(first, i == 0) && pump < 0) pump = p;
-        }
-        uint[] rc = SR(5);
-        if (RngChance(rc, 700) && Fit(2))
-        {
-            int first = nEmit;
-            int tx = pump >= 0 ? emitX[pump] : mx, tz = pump >= 0 ? emitZ[pump] : mz;
-            if (CentrePiece(Dn("gen_car"), RngRange(rc, 4) * 90, true, 1, 1, WM_NEAR, tx, tz, 0, 0, rc) >= 0) Keep(first, false);
-        }
-        uint[] rt = SR(6);
-        for (int i = 0; i < 2 && Fit(1); i++)
-        {
-            int first = nEmit;
-            if (RngChance(rt, i == 0 ? 900 : 450) && WallPlace(Dn("gen_tireStack"), WM_ANY, 0, 0, WIN_ANY, 0, rt) >= 0) Keep(first, false);
-        }
-        uint[] rb = SR(7);
-        if (RngChance(rb, 650) && Fit(2))
-        {
-            int first = nEmit;
-            if (GroupAt(FindGrp("fuel"), GenData.A_OUT_EDGE, RngBetween(rb, 2, 3), WM_ANY, 0, 0, 0, rb)) Keep(first, false);
-        }
-        uint[] rs = SR(8);
-        if (RngChance(rs, 600) && Fit(1))
-        {
-            int first = nEmit;
-            if (WallPlace(Dn("k_trashcan"), WM_ANY, 0, 0, WIN_ANY, 0, rs) >= 0) Keep(first, false);
-        }
-    }
-
     void PlanYard()
     {
         int room = pRoom, dx, dz;

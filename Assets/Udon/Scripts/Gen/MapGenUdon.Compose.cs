@@ -42,8 +42,8 @@ public partial class MapGenUdon
     }
 
     // a piece the room cannot do without found no place
-    public int[] statTypeMandFail = new int[64];
-    void MandFail(int n) { statMandatoryFail += n; statTypeMandFail[roomType[pRoom] & 63] += n; }
+    [System.NonSerialized] public int[] statTypeMandFail = new int[128];
+    void MandFail(int n) { statMandatoryFail += n; statTypeMandFail[roomType[pRoom] & 127] += n; }
 
     // def lookup by id, remembered (in the VRChat world the ids are resolved when the tables are baked)
     string[] dnId = new string[400];
@@ -52,10 +52,24 @@ public partial class MapGenUdon
 
     int Dn(string id)
     {
-        for (int i = 0; i < dnN; i++) if (dnId[i] == id) return dnDef[i];
+        for (int i = 0; i < dnN; i++) if (dnId[i] == id) return TwinIn(pRoom, dnDef[i]);
         int d = FindDef(id);
         if (dnN < dnId.Length) { dnId[dnN] = id; dnDef[dnN] = d; dnN++; }
-        return d;
+        return TwinIn(pRoom, d);
+    }
+
+    // revision 11: a house is furnished from the Kenney family or, two in five, from KayKit (GenData.BuildTwins). The
+    // plans name the Kenney pieces; in a KayKit house Dn and the slots give the twin instead.
+    public bool KayHouse(int inst)
+    {
+        return inst >= 0 && mapTheme == GenData.THEME_NONE && instZone[inst] == GenData.Z_HOUSE && UMod(Hash32(seed, U32(inst), 7717, 11, 0), 1000u) < 400;
+    }
+
+    int TwinIn(int room, int d)
+    {
+        if (d >= 0 && mapTheme != GenData.THEME_NONE) { int t = defThemeTwin[d * 3 + mapTheme]; return t >= 0 ? t : d; }   // a themed map (revision 12)
+        if (d < 0 || room < 0 || defTwin[d] < 0 || !KayHouse(roomInst[room])) return d;
+        return defTwin[d];
     }
 
     // one of two or three ids by weight

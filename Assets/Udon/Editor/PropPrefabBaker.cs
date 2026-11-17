@@ -27,6 +27,7 @@ public static class PropPrefabBaker
     {
         GenData.Build();
         Directory.CreateDirectory(OUT + "/Props");
+        Directory.CreateDirectory(OUT + "/Fixtures");
         AssetDatabase.Refresh();
         LoadModels();
 
@@ -55,8 +56,30 @@ public static class PropPrefabBaker
         var fencePrefab = PrefabUtility.SaveAsPrefabAsset(fence, OUT + "/Fence.prefab");
         UnityEngine.Object.DestroyImmediate(fence);
 
+        // a space base's fence (more-places): the "rail" model, fitted inside the plank fence's bounds so the builder
+        // stretches it the same way
+        GameObject railPrefab = null;
+        int rm = Array.IndexOf(GenModels.Name, "rail");
+        if (rm >= 0)
+        {
+            var rail = new GameObject("rail");
+            var inner = new GameObject("mesh");
+            inner.transform.SetParent(rail.transform, false);
+            Bounds fb = bounds[fm], rb = bounds[rm];
+            Vector3 s = new Vector3(fb.size.x / Mathf.Max(1e-4f, rb.size.x), fb.size.y / Mathf.Max(1e-4f, rb.size.y), fb.size.z / Mathf.Max(1e-4f, rb.size.z));
+            inner.transform.localScale = s;
+            inner.transform.localPosition = fb.center - Vector3.Scale(rb.center, s);
+            inner.AddComponent<MeshFilter>().sharedMesh = mesh[rm];
+            inner.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            railPrefab = PrefabUtility.SaveAsPrefabAsset(rail, OUT + "/Rail.prefab");
+            UnityEngine.Object.DestroyImmediate(rail);
+        }
+
         AssetDatabase.SaveAssets();
-        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm]);
+        // the light fixtures (fixtures.bytes, Tools/make_fixtures.py): ceiling, wall, street x ordinary, space, medieval
+        var fixtures = BakeFixtures(mat);
+        AssetDatabase.SaveAssets();
+        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures);
         Debug.Log("[prophunt] baked " + mesh.Length + " meshes and " + prefabs.Length + " prop prefabs");
     }
 
@@ -103,6 +126,60 @@ public static class PropPrefabBaker
     }
 
     // ------------------------------------------------------------------ the blob (as ModelLibrary.Load)
+    static readonly string[] FixtureNames = {
+        "fx_ceiling_modern", "fx_ceiling_space", "fx_ceiling_medieval",
+        "fx_wall_modern", "fx_wall_space", "fx_wall_medieval",
+        "fx_street_modern", "fx_street_space", "fx_street_medieval" };
+
+    static GameObject[] BakeFixtures(Material mat)
+    {
+        var result = new GameObject[FixtureNames.Length];
+        var asset = Resources.Load<TextAsset>("PropHunt/fixtures");
+        if (asset == null) { Debug.LogWarning("[prophunt] fixtures.bytes is missing: fixtures are drawn from boxes"); return result; }
+        byte[] b = asset.bytes;
+        int p = 4, n = BitConverter.ToInt32(b, p); p += 4;
+        string meshPath = OUT + "/Fixtures.asset";
+        AssetDatabase.DeleteAsset(meshPath);
+        Mesh first = null;
+        for (int m = 0; m < n; m++)
+        {
+            int nameLen = b[p++];
+            string name = System.Text.Encoding.UTF8.GetString(b, p, nameLen); p += nameLen;
+            int parLen = b[p++]; p += parLen;
+            Vector3 light = V(b, p); p += 12;
+            Vector3 mn = V(b, p); p += 12;
+            Vector3 mx = V(b, p); p += 12;
+            int nv = BitConverter.ToInt32(b, p); p += 4;
+            int ni = BitConverter.ToInt32(b, p); p += 4;
+            var verts = new Vector3[nv]; var norms = new Vector3[nv]; var cols = new Color32[nv];
+            for (int i = 0; i < nv; i++)
+            {
+                verts[i] = V(b, p);
+                norms[i] = new Vector3((sbyte)b[p + 12] / 127f, (sbyte)b[p + 13] / 127f, (sbyte)b[p + 14] / 127f);
+                cols[i] = new Color32(b[p + 15], b[p + 16], b[p + 17], 255);
+                p += 19;
+            }
+            var tris = new int[ni];
+            for (int i = 0; i < ni; i++) { tris[i] = BitConverter.ToUInt16(b, p); p += 2; }
+            var me = new Mesh { name = name };
+            me.vertices = verts; me.normals = norms; me.colors32 = cols; me.triangles = tris;
+            me.RecalculateBounds();
+            if (first == null) { first = me; AssetDatabase.CreateAsset(me, meshPath); } else AssetDatabase.AddObjectToAsset(me, first);
+
+            var go = new GameObject(name);
+            go.AddComponent<MeshFilter>().sharedMesh = me;
+            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            var lp = new GameObject("LightPoint");
+            lp.transform.SetParent(go.transform, false);
+            lp.transform.localPosition = light;
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, OUT + "/Fixtures/" + name + ".prefab");
+            UnityEngine.Object.DestroyImmediate(go);
+            int k = Array.IndexOf(FixtureNames, name);
+            if (k >= 0) result[k] = prefab;
+        }
+        return result;
+    }
+
     static void LoadModels()
     {
         var asset = Resources.Load<TextAsset>("PropHunt/models");

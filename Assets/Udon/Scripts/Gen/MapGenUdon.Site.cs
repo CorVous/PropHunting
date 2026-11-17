@@ -22,11 +22,11 @@ public partial class MapGenUdon
     const int CV = 64, CO = 32;
     int[] cvZone, cvInst, cvRoom, cvPlace, cvPlot;
 
-    public int[] siteType = new int[160 * 26];    // per instance and room letter: the room type
-    public int[] sitePlace = new int[160 * 26];   // ... and where the room lies (PL_*)
+    [System.NonSerialized] public int[] siteType = new int[160 * 26];    // per instance and room letter: the room type
+    [System.NonSerialized] public int[] sitePlace = new int[160 * 26];   // ... and where the room lies (PL_*)
     public int[] cellPlot;                        // per outer cell: its plot, -1 for the lane, the wood and the release
-    public int[] roomPlace = new int[400];        // per room: PL_*
-    public int[] roomPlot = new int[400];         // per room: its plot or -1
+    [System.NonSerialized] public int[] roomPlace = new int[400];        // per room: PL_*
+    [System.NonSerialized] public int[] roomPlot = new int[400];         // per room: its plot or -1
 
     // doors and open edges, canonical cell and direction while laying out, world after the turn
     const int SD_DOOR = 0, SD_OPEN = 1, SD_FRONT = 2, SD_BACK = 3;
@@ -35,7 +35,7 @@ public partial class MapGenUdon
 
     // plots
     public int nPlots;
-    public int[] plotZone = new int[16], plotPlan = new int[16], plotSide = new int[16], plotInstB = new int[16], plotInstY = new int[16];
+    [System.NonSerialized] public int[] plotZone = new int[16], plotPlan = new int[16], plotSide = new int[16], plotInstB = new int[16], plotInstY = new int[16];
     int[] plotY0 = new int[16], plotAlong = new int[16], plotDepth = new int[16], plotSet = new int[16], plotSL = new int[16], plotSR = new int[16];
     int[] plotBack = new int[16], plotMir = new int[16];
     int laneEnd, siteInstLane, siteInstWood;
@@ -68,6 +68,12 @@ public partial class MapGenUdon
         int lo, hi;
         if (zone == GenData.Z_HOUSE) { lo = SizeHouseCellsMin[size]; hi = SizeHouseCellsMax[size]; }
         else if (zone == GenData.Z_WAREHOUSE) { lo = SizeWarehouseCellsMin[size]; hi = SizeWarehouseCellsMax[size]; }
+        else if (zone == GenData.Z_SHOP) { lo = SizeShopCellsMin[size]; hi = SizeShopCellsMax[size]; }
+        else if (zone == GenData.Z_GARAGE) { lo = SizeGarageCellsMin[size]; hi = SizeGarageCellsMax[size]; }
+        else if (zone == GenData.Z_BARN) { lo = SizeBarnCellsMin[size]; hi = SizeBarnCellsMax[size]; }
+        else if (zone == GenData.Z_CABIN) { lo = SizeCabinCellsMin[size]; hi = SizeCabinCellsMax[size]; }
+        else if (zone == GenData.Z_FAIR) { lo = SizeFairCellsMin[size]; hi = SizeFairCellsMax[size]; }
+        else if (zone == GenData.Z_CHAPEL) { lo = SizeChapelCellsMin[size]; hi = SizeChapelCellsMax[size]; }
         else { lo = 6; hi = SizeDinerCellsMax[size]; }
         int n = 0;
         for (int p = 0; p < GenPlans.Count; p++)
@@ -128,7 +134,7 @@ public partial class MapGenUdon
     public int forceShape = -1;
     int nLane, laneEnd0;
     int[] laneOX = new int[3], laneOY = new int[3], laneRot = new int[3], laneLen = new int[3];
-    public int[] plotSeg = new int[16];
+    [System.NonSerialized] public int[] plotSeg = new int[16];
 
     // a canonical cell (lane along +y at x = CO from y = 0) of segment s on the canvas: turned laneRot[s] quarter
     // turns clockwise about the segment's origin
@@ -212,36 +218,29 @@ public partial class MapGenUdon
         siteType[rel * 26] = GenData.R_RELEASE;
         Put(CO, 0, GenData.Z_RELEASE, rel, 0, PL_NONE, -1);
 
-        // (1) the plots of the map's size, commercial ones near the road's start more often than not
+        // (1) the plots of the map's size (layout 4: a mix drawn per map, never two of one kind but houses), the
+        // commercial ones near the road's start more often than not, a farm at the far end, towards the wood
         string prog = SizePlots[size];
         int[] kinds = new int[16];
         int nk = 0;
         for (int i = 0; i < prog.Length; i++)
         {
             char ch = prog[i];
-            int z = ch == 'H' ? GenData.Z_HOUSE : (ch == 'D' ? GenData.Z_DINER : (ch == 'W' ? GenData.Z_WAREHOUSE : -1));
-            if (z < 0)
-            {
-                int roll = RngRange(rng, 1000);
-                z = size == 0 ? (roll < 500 ? GenData.Z_HOUSE : (roll < 750 ? GenData.Z_DINER : GenData.Z_WAREHOUSE)) : (roll < 500 ? GenData.Z_DINER : GenData.Z_WAREHOUSE);
-            }
+            int z = GenData.Z_HOUSE;
+            if (ch != 'H' && !(ch == '*' && RngChance(rng, GenData.PLOT_ANY_HOUSE))) z = DrawPlotKind(kinds, nk, rng);
             kinds[nk++] = z;
         }
-        if (RngChance(rng, SizeExtraHouse[size])) kinds[nk++] = GenData.Z_HOUSE;
-        // open plots (Cor: more kinds of plot): a park or an empty lot, now and then a second one on big maps
-        int opens = RngChance(rng, size == 0 ? 250 : 450) ? 1 : 0;
-        if (size >= 2 && opens == 1 && RngChance(rng, 200)) opens = 2;
-        for (int q = 0; q < opens && nk < 15; q++) { int roll = RngRange(rng, 100); kinds[nk++] = roll < 40 ? KIND_PARK : (roll < 70 ? KIND_LOT : KIND_GAS); }
         Shuffle(kinds, nk, rng);
-        if (RngChance(rng, 600))
+        bool comFirst = RngChance(rng, 600);
         {
-            // shops at the road's start: the commercial plots first, in their shuffled order
+            // shops at the road's start, houses, then the farm and the park towards the wood
             int w = 0;
-            for (int pass = 0; pass < 2; pass++)
+            for (int pass = 0; pass < 3; pass++)
                 for (int i = 0; i < nk; i++)
                 {
-                    bool com = kinds[i] != GenData.Z_HOUSE;
-                    if (com == (pass == 0)) cand[w++] = kinds[i];
+                    int z = kinds[i];
+                    int rank = (z == GenData.Z_BARN || z == GenData.Z_PARK || z == GenData.Z_ZOO || z == GenData.Z_CABIN || z == GenData.Z_CHAPEL) ? 2 : (z != GenData.Z_HOUSE && comFirst ? 0 : 1);
+                    if (rank == pass) cand[w++] = z;
                 }
             for (int i = 0; i < nk; i++) kinds[i] = cand[i];
         }
@@ -296,13 +295,12 @@ public partial class MapGenUdon
             }
             int k = nPlots;
             plotSeg[k] = seg;
-            bool open = kinds[i] == KIND_PARK || kinds[i] == KIND_LOT || kinds[i] == KIND_GAS;
-            int p = open ? -1 : PickPlan(kinds[i], rng);
-            if (p < 0 && !open) continue;
-            plotKind[k] = kinds[i] == KIND_PARK ? 1 : (kinds[i] == KIND_LOT ? 2 : (kinds[i] == KIND_GAS ? 3 : 0));
+            bool park = kinds[i] == GenData.Z_PARK || kinds[i] == GenData.Z_ZOO;   // no building (revision 12: the zoo too)
+            int p = park ? -1 : PickPlan(kinds[i], rng);
+            if (p < 0 && !park) continue;
             // evolution step 3: one plot's building takes another plan of its kind (the main draw stays as it was,
             // so the other plots keep theirs)
-            if (!open && evo >= 3 && i == (int)(Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk)
+            if (!park && evo >= 3 && i == (int)(Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk)
             {
                 uint[] alt = Rng(ST_LAYOUT, 7, 3);
                 for (int tries = 0; tries < 8; tries++)
@@ -312,26 +310,34 @@ public partial class MapGenUdon
                 }
             }
             nPlots++;
-            plotZone[k] = open ? GenData.Z_LAWN : kinds[i]; plotPlan[k] = p; plotMir[k] = RngChance(rng, 500) ? 1 : 0;
+            plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = RngChance(rng, 500) ? 1 : 0;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (RngChance(rng, 500) ? -1 : 1));
             if (siteShape == SHAPE_CUL && seg == 1) side = -1;   // the cul-de-sac's plot lies across the lane's end
             plotSide[k] = side;
-            int w = open ? 3 + RngRange(rng, 2) : PlW(p), d = open ? 2 + RngRange(rng, 2) : PlD(p);
-            if (kinds[i] == KIND_GAS) { w = 4; d = 3; }   // a forecourt two rows deep and a yard behind it
+            // a park has no building: its plot is the whole of it, as if a building of its size stood on it
+            int w = park ? SizeParkAlong[size] : PlW(p), d = park ? SizeParkDeep[size] : PlD(p);
+            if (kinds[i] == GenData.Z_ZOO) { w = 3; d = SizeZooDeep[size]; }
             plotBodyD[k] = d;
             // front garden 1 cell (2 now and then on L and XL), back garden 1 or 2 cells deep (2 or 3 on L and XL)
             if (kinds[i] == GenData.Z_HOUSE) { plotSet[k] = SizeHouseFront[size] + (SizeHouseFront2[size] > 0 && RngChance(rng, SizeHouseFront2[size]) ? 1 : 0); plotBack[k] = SizeHouseBack[size] + (RngChance(rng, SizeHouseBackExtra[size]) ? 1 : 0); }
-            else if (kinds[i] == GenData.Z_DINER) { plotSet[k] = 1; plotBack[k] = 1; }
-            else if (open) { plotSet[k] = 0; plotBack[k] = 0; }
+            else if (kinds[i] == GenData.Z_DINER || kinds[i] == GenData.Z_SHOP || kinds[i] == GenData.Z_GARAGE) { plotSet[k] = 1; plotBack[k] = 1; }
+            else if (kinds[i] == GenData.Z_FAIR) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; }   // the midway, the rides behind
+            else if (kinds[i] == GenData.Z_CHAPEL) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; } // the churchyard, the graveyard behind
+            else if (kinds[i] == GenData.Z_BARN) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; }   // the farmyard, the field behind
+            else if (kinds[i] == GenData.Z_CABIN) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; }  // the porch, the campground behind
+            else if (park) { plotSet[k] = 0; plotBack[k] = 0; }
             else { plotSet[k] = SizeWarehouseFront[size]; plotBack[k] = SizeWarehouseBack2[size] > 0 && RngChance(rng, SizeWarehouseBack2[size]) ? 2 : 1; }
-            plotSL[k] = RngChance(rng, SizeSideYard[size]) ? 1 : 0; plotSR[k] = RngChance(rng, SizeSideYard[size]) ? 1 : 0;
+            plotSL[k] = park ? 0 : (RngChance(rng, SizeSideYard[size]) ? 1 : 0); plotSR[k] = park ? 0 : (RngChance(rng, SizeSideYard[size]) ? 1 : 0);
+            // a farm's paddock lies beside the barn
+            if ((kinds[i] == GenData.Z_BARN || kinds[i] == GenData.Z_CABIN || kinds[i] == GenData.Z_FAIR || kinds[i] == GenData.Z_CHAPEL) && plotSL[k] + plotSR[k] == 0) { if (RngChance(rng, 500)) plotSL[k] = 1; else plotSR[k] = 1; }   // the paddock, the wood yard
             // a back door in a side wall opens onto this plot's own side yard
-            int bd = open ? 0 : PlBack(p) & 3;
+            int bd = park ? 0 : PlBack(p) & 3;
             if (bd == 1 || bd == 3) { if ((bd == 1) != (plotMir[k] != 0)) plotSR[k] = 1; else plotSL[k] = 1; }
             // a building never touches the map's edge or its neighbour's building (report 16, T3, T12)
             int off = side < 0 ? offL : offR, prev = side < 0 ? lastL : lastR;
             if (off == 1 || (side < 0 ? touchL : touchR) || (seg > 0 && prev < 0)) plotSL[k] = 1;
-            if (prev >= 0)
+            if (park) plotSL[k] = 0;
+            if (prev >= 0 && !park)
             {
                 // nor stands beside the open end of a shallower neighbour: this plot's side yard, or a deeper garden
                 // beside the neighbour's building
@@ -339,6 +345,8 @@ public partial class MapGenUdon
                 int prevEnd = plotSet[prev] + plotBodyD[prev];
                 if (plotSR[prev] == 0 && plotSet[k] + d + plotBack[k] < prevEnd) plotBack[k] = prevEnd - plotSet[k] - d;
             }
+            // revision 10: from M up a farm's paddock is two cells wide (on the side that has the side yard)
+            if (kinds[i] == GenData.Z_BARN && size >= 1) { if (plotSR[k] >= 1) plotSR[k] = 2; else plotSL[k] = 2; }
             plotY0[k] = off;
             plotAlong[k] = w + plotSL[k] + plotSR[k];
             plotDepth[k] = plotSet[k] + d + plotBack[k];
@@ -402,13 +410,98 @@ public partial class MapGenUdon
         return PlaceSite(rng);
     }
 
+    // one of the plot kinds that are not houses, by weight, not one the map has already
+    int DrawPlotKind(int[] kinds, int nk, uint[] rng)
+    {
+        int total = 0;
+        for (int i = 0; i < PlotPoolZone.Length; i++) if (KindAllowed(kinds, nk, PlotPoolZone[i])) total += PlotPoolWeight[i];
+        int roll = RngRange(rng, total > 0 ? total : 1);
+        for (int i = 0; i < PlotPoolZone.Length; i++)
+        {
+            if (!KindAllowed(kinds, nk, PlotPoolZone[i])) continue;
+            if (roll < PlotPoolWeight[i]) return PlotPoolZone[i];
+            roll -= PlotPoolWeight[i];
+        }
+        return GenData.Z_HOUSE;
+    }
+
+    bool Has(int[] a, int n, int v) { for (int i = 0; i < n; i++) if (a[i] == v) return true; return false; }
+
+    // a kind the map has not drawn yet and its theme allows (revision 12)
+    bool KindAllowed(int[] kinds, int nk, int z)
+    {
+        if (Has(kinds, nk, z)) return false;
+        if (mapTheme == GenData.THEME_NONE) return true;
+        int[] ok = ThemeKinds[mapTheme];
+        for (int i = 0; i < ok.Length; i++) if (ok[i] == z) return true;
+        return false;
+    }
+
     void StampPlot(int k, uint[] rng)
     {
         int p = plotPlan[k], zone = plotZone[k];
-        if (p < 0) { StampOpenPlot(k); return; }
+        if (p < 0 && zone == GenData.Z_ZOO)
+        {
+            // revision 12, the zoo: the plaza along the lane and the keepers' walk up the middle are one outdoor
+            // instance (TypeYard types them); every other cell is an enclosure, an instance of its own, so a fence
+            // stands round it, with a gate onto the walk. One of them is the keepers' yard.
+            plotInstB[k] = -1;
+            int zi = NewInst(GenData.Z_LAWN);
+            plotInstY[k] = zi;
+            int[] enc = { GenData.R_ENC_FARM, GenData.R_ENC_SAVANNA, GenData.R_ENC_ARCTIC, GenData.R_ENC_WOODS, GenData.R_ENC_JUNGLE, GenData.R_AVIARY };
+            Shuffle(enc, enc.Length, rng);
+            // the enclosure columns either side of the walk; a side yard the site added (the last plot's, towards the
+            // wood) is more of the walk
+            int walkU = plotSL[k] + 1;
+            int slots = 2 * (plotDepth[k] - 1), keeper = RngRange(rng, slots), ne = 0, slot = 0;
+            for (int u = 0; u < plotAlong[k]; u++)
+                for (int v = 0; v < plotDepth[k]; v++)
+                {
+                    int x, y;
+                    PlotXY(k, u, v, out x, out y);
+                    if (v == 0 || u == walkU || u < walkU - 1 || u > walkU + 1) { Put(x, y, GenData.Z_LAWN, zi, -1, v == 0 ? PL_FRONT : PL_BACK, k); continue; }
+                    int ei = NewInst(GenData.Z_LAWN);
+                    Put(x, y, GenData.Z_LAWN, ei, 0, PL_BACK, k);
+                    siteType[ei * 26] = slot++ == keeper && slots >= 4 ? GenData.R_KEEPER : enc[ne++ % enc.Length]; sitePlace[ei * 26] = PL_BACK;
+                    // the gate onto the walk
+                    int wx, wy;
+                    PlotXY(k, walkU, v, out wx, out wy);
+                    for (int dd = 0; dd < 4; dd++) if (x + DX[dd] == wx && y + DZ[dd] == wy) Sd(x, y, dd, SD_OPEN);
+                }
+            TypeYard(k, rng);
+            return;
+        }
+        if (p < 0)
+        {
+            // a park: no building, every cell of the plot is the park (TypeYard)
+            plotInstB[k] = -1;
+            int pi = NewInst(GenData.Z_LAWN);
+            plotInstY[k] = pi;
+            for (int u = 0; u < plotAlong[k]; u++)
+                for (int v = 0; v < plotDepth[k]; v++)
+                {
+                    int x, y;
+                    PlotXY(k, u, v, out x, out y);
+                    Put(x, y, GenData.Z_LAWN, pi, -1, v == 0 ? PL_FRONT : PL_BACK, k);
+                }
+            TypeYard(k, rng);
+            return;
+        }
         int bi = NewInst(zone), yi = NewInst(GenData.Z_LAWN);
         plotInstB[k] = bi; plotInstY[k] = yi;
         for (int r = 0; r < PlRooms(p); r++) { siteType[bi * 26 + r] = PlRole(p, r); sitePlace[bi * 26 + r] = PL_BUILDING; }
+        if (zone == GenData.Z_HOUSE)
+        {
+            // revision 11: a kids' room is a kids' room, a playroom or a teen's room; a second bedroom is now and then
+            // a teen's room or the box room (the first bedroom stays, so a house always has one)
+            int beds = 0;
+            for (int r = 0; r < PlRooms(p); r++)
+            {
+                int t = PlRole(p, r), roll = RngRange(rng, 1000);
+                if (t == GenData.R_KIDS) siteType[bi * 26 + r] = roll < 350 ? GenData.R_KIDS : (roll < 700 ? GenData.R_PLAYROOM : GenData.R_TEEN);
+                else if (t == GenData.R_BEDROOM && beds++ > 0) siteType[bi * 26 + r] = roll < 220 ? GenData.R_TEEN : (roll < 440 ? GenData.R_BOXROOM : GenData.R_BEDROOM);
+            }
+        }
         int w = PlW(p), d = PlD(p);
         for (int u = 0; u < plotAlong[k]; u++)
             for (int v = 0; v < plotDepth[k]; v++)
@@ -429,37 +522,7 @@ public partial class MapGenUdon
         TypeYard(k, rng);
     }
 
-    // a park or an empty lot: no building, only outdoor rooms. A park: a paved plaza in the middle, flower beds
-    // along the back fence (when it is deep enough), lawn the rest. An empty lot: a lawn verge to the lane and a
-    // yard behind it (the yard's crates, barrels and sheds, left to themselves).
-    public int[] plotKind = new int[16];        // 0 a building, 1 a park, 2 an empty lot, 3 a gas station
-    int[] plotBodyD = new int[16];
-    public const int KIND_PARK = 100, KIND_LOT = 101, KIND_GAS = 102;
-
-    void StampOpenPlot(int k)
-    {
-        plotInstB[k] = -1;
-        int yi = NewInst(GenData.Z_LAWN);
-        plotInstY[k] = yi;
-        int[] type = cand;
-        for (int u = 0; u < plotAlong[k]; u++)
-            for (int v = 0; v < plotDepth[k]; v++)
-            {
-                int x, y;
-                PlotXY(k, u, v, out x, out y);
-                Put(x, y, GenData.Z_LAWN, yi, -1, v == 0 ? PL_FRONT : PL_BACK, k);
-                int t;
-                if (plotKind[k] == 1)
-                {
-                    bool plaza = u == plotAlong[k] / 2 && v == plotDepth[k] / 2;
-                    t = plaza ? GenData.R_PATIO : ((v == plotDepth[k] - 1 && plotDepth[k] >= 3) ? GenData.R_GARDEN : GenData.R_LAWN_OPEN);
-                }
-                else if (plotKind[k] == 3) t = v < plotDepth[k] - 1 ? GenData.R_PUMPS : GenData.R_YARD;
-                else t = v == 0 ? GenData.R_LAWN_OPEN : GenData.R_YARD;
-                type[u * 16 + v] = t;
-            }
-        LetterRooms(k, yi, type);
-    }
+    int[] plotBodyD = new int[16];   // the depth of each plot's body (its building, or all of a park)
 
     void PlanDoor(int k, int code, int kind)
     {
@@ -499,6 +562,10 @@ public partial class MapGenUdon
         int bx, by, bdir;
         DoorOutside(k, SD_BACK, out bx, out by, out bdir);
         int[] type = cand;   // per plot cell, scratch (u * 16 + v)
+        // a park (revision 10): its lawn along the lane; behind it, side by side in a shuffled order, a skate corner, a
+        // pond and a cafe terrace: one column each, two for the first (and the second) when the park is 4 (5) wide
+        int[] feat = { GenData.R_PLAYGROUND, GenData.R_POND, GenData.R_TERRACE };
+        if (zone == GenData.Z_PARK) Shuffle(feat, 3, rng);
         for (int u = 0; u < plotAlong[k]; u++)
             for (int v = 0; v < plotDepth[k]; v++)
             {
@@ -516,6 +583,17 @@ public partial class MapGenUdon
                         else t = GenData.R_LAWN_OPEN;
                     }
                     else if (zone == GenData.Z_DINER) t = pl == PL_FRONT ? GenData.R_PATIO : ((atBack || pl == PL_BACK) ? GenData.R_YARD : GenData.R_LAWN_OPEN);
+                    else if (zone == GenData.Z_SHOP || zone == GenData.Z_GARAGE) t = pl == PL_FRONT ? GenData.R_FORECOURT : ((atBack || pl == PL_BACK) ? GenData.R_YARD : GenData.R_LAWN_OPEN);
+                    else if (zone == GenData.Z_BARN) t = pl == PL_FRONT ? GenData.R_FARMYARD : (pl == PL_SIDE ? GenData.R_PADDOCK : GenData.R_FIELD);
+                    else if (zone == GenData.Z_CABIN) t = pl == PL_FRONT ? GenData.R_PORCH : (pl == PL_SIDE ? GenData.R_WOODYARD : GenData.R_CAMPSITE);
+                    else if (zone == GenData.Z_ZOO) t = v == 0 ? GenData.R_ZOO_PLAZA : GenData.R_ZOO_WALK;
+                    else if (zone == GenData.Z_FAIR) t = pl == PL_FRONT ? GenData.R_MIDWAY : GenData.R_RIDES;
+                    else if (zone == GenData.Z_CHAPEL) t = pl == PL_FRONT ? GenData.R_CHURCHYARD : GenData.R_GRAVEYARD;
+                    else if (zone == GenData.Z_PARK)
+                    {
+                        int a = plotAlong[k], f = a <= 3 ? u : (a == 4 ? (u < 2 ? 0 : u - 1) : (u < 4 ? u / 2 : 2));
+                        t = v == 0 ? GenData.R_PARK : feat[f < 3 ? f : 2];
+                    }
                     else t = pl == PL_FRONT ? GenData.R_LAWN_OPEN : GenData.R_YARD;
                 }
                 type[u * 16 + v] = t;
@@ -776,7 +854,7 @@ public partial class MapGenUdon
             {
                 int x, y;
                 PlotXY(k, u, plotDepth[k] - 1, out x, out y);
-                if (CvZone(x + DX[back], y + DZ[back]) == GenData.Z_FOREST && cvZone[y * CV + x] == GenData.Z_LAWN) cand[n++] = y * CV + x;
+                if (CvZone(x + DX[back], y + DZ[back]) == GenData.Z_FOREST && cvZone[y * CV + x] == GenData.Z_LAWN && cvInst[y * CV + x] == plotInstY[k]) cand[n++] = y * CV + x;
             }
             if (n > 0) { int c = cand[RngRange(rng, n)]; Sd(c % CV, c / CV, back, SD_OPEN); }
         }
@@ -892,6 +970,13 @@ public partial class MapGenUdon
             if (!IsBuilding(za)) continue;
             int x = c % W, z = c / W, rt = roomType[cellRoom[c]];
             int chance = za == GenData.Z_WAREHOUSE ? (rt == GenData.R_WH_OFFICE ? 700 : 220) : (rt == GenData.R_BATH || rt == GenData.R_HALL ? 350 : (rt == GenData.R_DINER_STORE ? 150 : 650));
+            // revision 9: a shop's windows on its floor; a garage bay's walls carry its roller door, not windows
+            if (rt == GenData.R_SHOP_FLOOR) chance = 850;
+            else if (rt == GenData.R_GARAGE_BAY) chance = 0;
+            else if (rt == GenData.R_STOCKROOM || rt == GenData.R_PARTS || rt == GenData.R_FEED_STORE) chance = 150;
+            else if (rt == GenData.R_FARM_WORK) chance = 450;
+            else if (rt == GenData.R_PANTRY || rt == GenData.R_BOXROOM) chance = 150;   // revision 11
+            else if (rt == GenData.R_BARN) chance = 250;
             for (int d = 0; d < 4; d++)
             {
                 if (EdgeType(x, z, d) != GenData.E_WALL || IsBuilding(ZoneAt(x + DX[d], z + DZ[d]))) continue;
@@ -902,7 +987,8 @@ public partial class MapGenUdon
         {
             int rt = roomType[r];
             bool habitable = rt == GenData.R_LIVING || rt == GenData.R_DINING || rt == GenData.R_KITCHEN || rt == GenData.R_BEDROOM || rt == GenData.R_OFFICE
-                || rt == GenData.R_KIDS || rt == GenData.R_DINER_DINING || rt == GenData.R_WH_OFFICE;
+                || rt == GenData.R_KIDS || rt == GenData.R_DINER_DINING || rt == GenData.R_WH_OFFICE || rt == GenData.R_SHOP_FLOOR || rt == GenData.R_BACK_OFFICE
+                || rt == GenData.R_TEEN || rt == GenData.R_PLAYROOM;
             if (!habitable) continue;
             int wall = -1, seen = 0;
             bool has = false;

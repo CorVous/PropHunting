@@ -9,14 +9,18 @@
 //       to the lane without crossing a fence or a building
 //   T5  every house has a living room, a kitchen, a bedroom and a bathroom
 //   T6  doors inside a house only join rooms that may connect; a private room (bedroom, bathroom, office, kids'
-//       room) has one door, to the hall or the living room
+//       room, and since revision 11 the teen room, playroom and box room) has one door, to the hall or the living
+//       room; a pantry has one door, to the kitchen
 //   T7  no outside door into a private room
 //   T8  every outer cell can be reached from the hunter release
 //   T9  a house's back door opens onto its patio
 //   T10 the wood is one piece and touches no building
 //   T11 every garden bed lies along a fence
 //   T12 a diner's front door is in its dining room and its kitchen is not on the forecourt; a warehouse's front
-//       door is in its office and its loading dock has a door of its own to the outside
+//       door is in its office and its loading dock has a door of its own to the outside; a shop's front door is in
+//       its shop floor and its stock room has the service door; a garage's front door is in its office and its
+//       bay's front wall faces the forecourt (the roller door); a barn's front door is in the barn (revision 9); a
+//       cabin's front door is in its main room (revision 12)
 //   T13 every room is one piece
 public partial class MapGenUdon
 {
@@ -26,7 +30,11 @@ public partial class MapGenUdon
 
     int[] stMark;
 
-    bool Private(int rt) { return rt == GenData.R_BEDROOM || rt == GenData.R_BATH || rt == GenData.R_OFFICE || rt == GenData.R_KIDS; }
+    bool Private(int rt)
+    {
+        return rt == GenData.R_BEDROOM || rt == GenData.R_BATH || rt == GenData.R_OFFICE || rt == GenData.R_KIDS
+            || rt == GenData.R_TEEN || rt == GenData.R_PLAYROOM || rt == GenData.R_BOXROOM;   // revision 11
+    }
     bool PublicRoom(int rt) { return rt == GenData.R_HALL || rt == GenData.R_LIVING || rt == GenData.R_DINING || rt == GenData.R_KITCHEN; }
 
     bool ValidateSite()
@@ -65,7 +73,7 @@ public partial class MapGenUdon
         for (int k = 0; k < nPlots; k++)
         {
             int bi = plotInstB[k], zone = plotZone[k];
-            if (bi < 0) continue;   // a park or an empty lot: no building to test
+            if (bi < 0) continue;   // a park: no building
             bool hasL = false, hasK = false, hasB = false, hasT = false, hasH = false;
             for (int r = 0; r < nRooms; r++)
             {
@@ -75,7 +83,7 @@ public partial class MapGenUdon
             }
             if (zone == GenData.Z_HOUSE && !(hasL && hasK && hasB && hasT)) fail |= 1 << 4;
             int frontRoom = -1, frontCell = -1;
-            bool patio = false, dockDoor = false, kitchenOnFront = false;
+            bool patio = false, dockDoor = false, kitchenOnFront = false, stockDoor = false, bayFront = false;
             for (int c = 0; c < W * H; c++)
             {
                 if (cellInst[c] != bi) continue;
@@ -87,6 +95,7 @@ public partial class MapGenUdon
                     int n = nz * W + nx, et = EdgeType(x, z, d);
                     int nt = cellZone[n] == GenData.Z_NONE ? 0 : roomType[cellRoom[n]];
                     if (zone == GenData.Z_DINER && rt == GenData.R_DINER_KITCHEN && nt == GenData.R_PATIO && cellInst[n] == plotInstY[k]) kitchenOnFront = true;
+                    if (rt == GenData.R_GARAGE_BAY && nt == GenData.R_FORECOURT && et == GenData.E_WALL && cellInst[n] == plotInstY[k]) bayFront = true;
                     if (et != GenData.E_DOOR) continue;
                     if (cellInst[n] == bi)
                     {
@@ -95,15 +104,17 @@ public partial class MapGenUdon
                         {
                             bool ok = (PublicRoom(rt) && PublicRoom(nt))
                                 || (Private(rt) && (nt == GenData.R_HALL || nt == GenData.R_LIVING))
-                                || (Private(nt) && (rt == GenData.R_HALL || rt == GenData.R_LIVING));
+                                || (Private(nt) && (rt == GenData.R_HALL || rt == GenData.R_LIVING))
+                                || (rt == GenData.R_PANTRY && nt == GenData.R_KITCHEN) || (nt == GenData.R_PANTRY && rt == GenData.R_KITCHEN);
                             if (!ok) fail |= 1 << 5;
                         }
                         continue;
                     }
                     // an outside door
-                    if (zone == GenData.Z_HOUSE && Private(rt)) fail |= 1 << 6;
+                    if (zone == GenData.Z_HOUSE && (Private(rt) || rt == GenData.R_PANTRY)) fail |= 1 << 6;
                     if (cellPlot[n] == k && nt == GenData.R_PATIO) patio = true;
                     if (rt == GenData.R_LOADING) dockDoor = true;
+                    if (rt == GenData.R_STOCKROOM) stockDoor = true;
                 }
             }
             // the plan's front door, where the site put it
@@ -120,9 +131,15 @@ public partial class MapGenUdon
                 if (!patio) fail |= 1 << 8;
                 // T6: one door for every private room
                 for (int r = 0; r < nRooms; r++)
-                    if (roomInst[r] == bi && Private(roomType[r]) && InteriorDoors(r) != 1) fail |= 1 << 5;
+                    if (roomInst[r] == bi && (Private(roomType[r]) || roomType[r] == GenData.R_PANTRY) && InteriorDoors(r) != 1) fail |= 1 << 5;
             }
             else if (zone == GenData.Z_DINER) { if (frt != GenData.R_DINER_DINING || kitchenOnFront) fail |= 1 << 11; }
+            else if (zone == GenData.Z_SHOP) { if (frt != GenData.R_SHOP_FLOOR || !stockDoor) fail |= 1 << 11; }
+            else if (zone == GenData.Z_GARAGE) { if (frt != GenData.R_BACK_OFFICE || !bayFront) fail |= 1 << 11; }
+            else if (zone == GenData.Z_BARN) { if (frt != GenData.R_BARN) fail |= 1 << 11; }
+            else if (zone == GenData.Z_CABIN) { if (frt != GenData.R_CABIN_MAIN) fail |= 1 << 11; }
+            else if (zone == GenData.Z_FAIR) { if (frt != GenData.R_ARCADE) fail |= 1 << 11; }
+            else if (zone == GenData.Z_CHAPEL) { if (frt != GenData.R_NAVE) fail |= 1 << 11; }
             else if (frt != GenData.R_WH_OFFICE || !dockDoor) fail |= 1 << 11;
         }
         // T8: everything reachable from the release

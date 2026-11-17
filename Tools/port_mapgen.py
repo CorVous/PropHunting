@@ -81,6 +81,8 @@ def convert(text, fields, used):
     text = re.sub(r"\bGenRng\.Mix\(", "Mix(", text)
     text = re.sub(r"\bnew\s+GenRng\(", "RngNew(", text)
     text = re.sub(r"\bGenRng\b", "uint[]", text)
+    # a call straight on a new stream: Rng(a, b, c).Range(n) -> RngRange(Rng(a, b, c), n)
+    text = re.sub(r"\b(Rng\([^()]*\))\.(Range|Between|Chance)\(", lambda m: "Rng" + m.group(2) + "(" + m.group(1) + ", ", text)
     for n in rng_names:
         text = re.sub(r"\bref\s+" + n + r"\b", n, text)
         text = re.sub(r"\b" + n + r"\.(Range|Between|Chance|NextU)\(\s*", lambda m: "Rng" + m.group(1) + "(" + n + (", " if m.group(1) != "NextU" else ""), text)
@@ -104,10 +106,13 @@ def convert(text, fields, used):
     text = re.sub(r"\breadonly\s+", "", text)
 
     # Udon has no remainder for uint: UMod (MapGenUdon.Rng.cs)
-    text = re.sub(r"(Hash32\([^;]*?\)) % (\d+u)", r"UMod(\1, \2)", text)
+    text = re.sub(r"(Hash32\([^;]*?\)) % (\d+)u?\b", r"UMod(\1, \2u)", text)
 
     # Udon's int -> uint cast is checked (it throws for a negative int); U32 keeps the bits as C# does
     text = u32_casts(text)
+
+    # working arrays sized in the code: never from the scene (an old scene keeps the size it was saved with)
+    text = re.sub(r"^(\s*)public (\w+\[\] \w+ = new )", r"\1[System.NonSerialized] public \2", text, flags=re.M)
 
     # reference equality on strings
     text = text.replace("(object)dnId[i] == (object)id", "dnId[i] == id")
@@ -165,6 +170,25 @@ def main():
         name = CLS + ("." + part if part else "") + ".cs"   # MapGenUdon.cs carries the class (Unity needs the name)
         open(os.path.join(DST, name), "w", encoding="utf8", newline="\n").write(HEADER.format(src=f) + out)
         print("wrote", name)
+
+    # GenData's lookups over constants (IsBuilding, RoomTheme), copied so they follow the prototype's room and zone lists
+    gd = open(os.path.join(SRC, "GenData.cs"), encoding="utf8").read()
+    fns = []
+    for name in ("IsBuilding", "RoomTheme"):
+        m = re.search(r"^    public static (\w+) " + name + r"\(int (\w+)\)", gd, re.M)
+        i = m.start()
+        line_end = gd.index("\n", i)
+        if gd.count("{", i, line_end) == gd.count("}", i, line_end) and "{" in gd[i:line_end]:
+            body = gd[i:line_end]                 # a one-liner
+        else:
+            j = gd.index("\n    }\n", i)         # a block, up to its closing brace
+            body = gd[i:j + 6]
+        body = body.replace("public static ", "")
+        body = re.sub(r"\b((?:Z|R|TH)_\w+)\b", r"GenData.\1", body)
+        fns.append(body.rstrip())
+    open(os.path.join(DST, CLS + ".DataFns.cs"), "w", encoding="utf8", newline="\n").write(
+        HEADER.format(src="GenData.cs (IsBuilding, RoomTheme)") + "public partial class " + CLS + "\n{\n" + "\n\n".join(fns) + "\n}\n")
+    print("wrote", CLS + ".DataFns.cs")
 
     # the tables: instance fields, baked in the editor
     lines = [HEADER.format(src="GenData.cs, GenModels.cs, GenPlans.cs"),

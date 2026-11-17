@@ -34,6 +34,10 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
 
     // ---- inputs ----
     public uint seed;
+    public int season;   // revision 9: 0 summer, 1 autumn, 2 deep summer green: the broadleaf trees of the whole map
+    public int holiday;  // revision 12: 0 none, 1 winter, 2 Halloween: the map's seasonal decorations (one map in five)
+    public int mapTheme; // revision 12: GenData.THEME_*: a space base or a medieval village now and then
+    public int ForceTheme = -1;   // the console diagnostics only: every map of this theme (-1: drawn)
     public int size;
     public int density;          // index into DensityPercent (0 = Normal); scales the prop ranges, not the layout
     public int attempt;          // seed re-rolls after a failed validation (deterministic)
@@ -42,27 +46,27 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     public int W, H;
     public int[] cellInst, cellZone, cellRoom;
     public int nInst;
-    public int[] instZone = new int[160];   // per instance (a building, a plot's outdoor cells, the lane, the wood, the release): its zone
+    [System.NonSerialized] public int[] instZone = new int[160];   // per instance (a building, a plot's outdoor cells, the lane, the wood, the release): its zone
     public int releaseX, releaseZ, releaseDir;   // release cell and the direction of its exit
     public int[] edgeH, edgeV, edgeHOff, edgeVOff;
 
     // ---- rooms ----
     public int nRooms;
-    public int[] roomZone = new int[400], roomType = new int[400], roomInst = new int[400], roomOuterCells = new int[400];
-    public int[] roomX0 = new int[400], roomZ0 = new int[400], roomX1 = new int[400], roomZ1 = new int[400];
-    public int[] roomCellStart = new int[400], roomCellCount = new int[400];
+    [System.NonSerialized] public int[] roomZone = new int[400], roomType = new int[400], roomInst = new int[400], roomOuterCells = new int[400];
+    [System.NonSerialized] public int[] roomX0 = new int[400], roomZ0 = new int[400], roomX1 = new int[400], roomZ1 = new int[400];
+    [System.NonSerialized] public int[] roomCellStart = new int[400], roomCellCount = new int[400];
     public int[] roomCells;      // inner cell indices grouped by room
-    public int[] roomDoorStart = new int[400], roomDoorCount = new int[400];
-    public int[] roomFloorMin = new int[400];    // outdoor areas (G29): the fewest floor props the area may end with
-    public int[] roomDoors = new int[3200];      // inner cell just inside each door, 8 per room
-    public int[] roomDoorDir = new int[3200];    // the side of that cell the doorway is on (0 N, 1 E, 2 S, 3 W)
-    public bool[] roomDoorExt = new bool[3200];  // the doorway leads outdoors (or, for an outdoor room, into a building)
-    public int[] roomLeaks = new int[400];
+    [System.NonSerialized] public int[] roomDoorStart = new int[400], roomDoorCount = new int[400];
+    [System.NonSerialized] public int[] roomFloorMin = new int[400];    // outdoor areas (G29): the fewest floor props the area may end with
+    [System.NonSerialized] public int[] roomDoors = new int[3200];      // inner cell just inside each door, 8 per room
+    [System.NonSerialized] public int[] roomDoorDir = new int[3200];    // the side of that cell the doorway is on (0 N, 1 E, 2 S, 3 W)
+    [System.NonSerialized] public bool[] roomDoorExt = new bool[3200];  // the doorway leads outdoors (or, for an outdoor room, into a building)
+    [System.NonSerialized] public int[] roomLeaks = new int[400];
     // prop counts per room (G24): what stands on the floor, what sits on, in or under furniture, trees; and the
     // room's rolled floor target, its floor maximum and its on-furniture cap at the map's density
-    public int[] roomFloor = new int[400], roomTop = new int[400], roomTrees = new int[400];
-    public int[] roomFloorTarget = new int[400], roomFloorMax = new int[400], roomTopCap = new int[400], roomTopFactor = new int[400];
-    public int[] roomCoverMax = new int[400];   // floor cells of the room that props and trees may block
+    [System.NonSerialized] public int[] roomFloor = new int[400], roomTop = new int[400], roomTrees = new int[400];
+    [System.NonSerialized] public int[] roomFloorTarget = new int[400], roomFloorMax = new int[400], roomTopCap = new int[400], roomTopFactor = new int[400];
+    [System.NonSerialized] public int[] roomCoverMax = new int[400];   // floor cells of the room that props and trees may block
 
     // ---- inner grid ----
     public int IW, IH;
@@ -78,27 +82,27 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     // ---- emit list: one entry per generated object; the index is the object's identity ----
     public const int MAX_EMIT = 8000;
     public int nEmit;
-    public int[] emitDef = new int[MAX_EMIT], emitX = new int[MAX_EMIT], emitY = new int[MAX_EMIT], emitZ = new int[MAX_EMIT];
-    public int[] emitYaw = new int[MAX_EMIT], emitParent = new int[MAX_EMIT], emitRoom = new int[MAX_EMIT], emitFlags = new int[MAX_EMIT];
-    public int[] emitRX = new int[MAX_EMIT], emitRZ = new int[MAX_EMIT], emitRW = new int[MAX_EMIT], emitRD = new int[MAX_EMIT];
-    public int[] emitRot = new int[MAX_EMIT], emitDepth = new int[MAX_EMIT], emitSlot = new int[MAX_EMIT];
-    public int[] emitGroup = new int[MAX_EMIT];   // prop group: the emit index of the group's first member, -1 = not in a group
-    public int[] emitGrp = new int[MAX_EMIT];     // which prop group (grpId index), -1 = none
-    public int[] emitSet = new int[MAX_EMIT];     // composition set: the emit index of the anchor whose cells this object may share, -1 = none
-    public int[] emitHost = new int[MAX_EMIT];    // what the object was placed against: an emit index, or H_WALL, H_FREE, H_NATURE, H_GROUND
+    [System.NonSerialized] public int[] emitDef = new int[MAX_EMIT], emitX = new int[MAX_EMIT], emitY = new int[MAX_EMIT], emitZ = new int[MAX_EMIT];
+    [System.NonSerialized] public int[] emitYaw = new int[MAX_EMIT], emitParent = new int[MAX_EMIT], emitRoom = new int[MAX_EMIT], emitFlags = new int[MAX_EMIT];
+    [System.NonSerialized] public int[] emitRX = new int[MAX_EMIT], emitRZ = new int[MAX_EMIT], emitRW = new int[MAX_EMIT], emitRD = new int[MAX_EMIT];
+    [System.NonSerialized] public int[] emitRot = new int[MAX_EMIT], emitDepth = new int[MAX_EMIT], emitSlot = new int[MAX_EMIT];
+    [System.NonSerialized] public int[] emitGroup = new int[MAX_EMIT];   // prop group: the emit index of the group's first member, -1 = not in a group
+    [System.NonSerialized] public int[] emitGrp = new int[MAX_EMIT];     // which prop group (grpId index), -1 = none
+    [System.NonSerialized] public int[] emitSet = new int[MAX_EMIT];     // composition set: the emit index of the anchor whose cells this object may share, -1 = none
+    [System.NonSerialized] public int[] emitHost = new int[MAX_EMIT];    // what the object was placed against: an emit index, or H_WALL, H_FREE, H_NATURE, H_GROUND
 
     // free slots and hiding sockets left by the slot pass
     public int nFree;
-    public int[] freeHost = new int[6000], freeSlot = new int[6000];
+    [System.NonSerialized] public int[] freeHost = new int[6000], freeSlot = new int[6000];
     public int nSockets;
-    public int[] socketHost = new int[2000], socketSlot = new int[2000];
+    [System.NonSerialized] public int[] socketHost = new int[2000], socketSlot = new int[2000];
 
     // ---- results ----
     public bool[] menu;          // per def: a possible disguise on this map (every disguisable type the map holds)
     public int[] defCopies;
     public int menuCount;
     public int nSpawns;
-    public int[] spawnCell = new int[64];
+    [System.NonSerialized] public int[] spawnCell = new int[64];
     public uint mapHash;
     public bool done, failed;
     public string failReason = "";
@@ -106,9 +110,9 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     // ---- statistics ----
     public int statProps, statScenery, statDecor, statSlotItems, statLeakPlausible, statLeakComedic, statLoose;
     public int statRepairs, statGroundCells, statSteps, statMandatoryFail, statGroups, statFloor, statTop, statWalkRejects;
-    public int[] statZoneCells = new int[8], statZoneRooms = new int[8], statZoneFloor = new int[8], statZoneTop = new int[8];
+    [System.NonSerialized] public int[] statZoneCells = new int[16], statZoneRooms = new int[16], statZoneFloor = new int[16], statZoneTop = new int[16];
     // per room type (index = GenData.R_*): rooms, floor cells, floor props, props on furniture
-    public int[] statTypeRooms = new int[64], statTypeCells = new int[64], statTypeFloor = new int[64], statTypeTop = new int[64];
+    [System.NonSerialized] public int[] statTypeRooms = new int[128], statTypeCells = new int[128], statTypeFloor = new int[128], statTypeTop = new int[128];   // revision 12: 128 room types (was 64)
 
     // ---- stepping ----
     int stage, cursor;
@@ -153,6 +157,15 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         stage = 0; cursor = 0; progressPermille = 0; statSteps = 0;
         Alloc(SizeGrid[size], SizeGrid[size]);
         menu = new bool[nDefs]; defCopies = new int[nDefs];
+        int roll = RngRange(Rng(ST_SCENERY, 9, 9), 1000);
+        season = roll < 550 ? 0 : (roll < 800 ? 1 : 2);
+        int hroll = RngRange(Rng(ST_SCENERY, 9, 10), 1000);
+        holiday = hroll < 110 ? 1 : (hroll < 200 ? 2 : 0);
+        if (holiday == 2) season = 1;   // Halloween comes in the autumn
+        int troll = RngRange(Rng(ST_SCENERY, 9, 11), 1000);
+        mapTheme = troll < GenData.THEME_SPACE_PERMILLE ? GenData.THEME_SPACE : (troll < GenData.THEME_SPACE_PERMILLE + GenData.THEME_MEDIEVAL_PERMILLE ? GenData.THEME_MEDIEVAL : GenData.THEME_NONE);
+        if (ForceTheme >= 0) mapTheme = ForceTheme;
+        if (mapTheme != GenData.THEME_NONE) { holiday = 0; if (mapTheme == GenData.THEME_SPACE) season = 0; }
     }
 
     // the grids for a map of w x h outer cells (the site decides its box: LayoutSite)
@@ -189,7 +202,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         switch (stage)
         {
             case 0:
-                for (int i = 0; i < 64; i++) statTypeMandFail[i] = 0;
+                for (int i = 0; i < statTypeMandFail.Length; i++) statTypeMandFail[i] = 0;
                 statRepairs = 0; statMandatoryFail = 0; statGroups = 0; statWalkRejects = 0; statLeakComedic = 0; statLeakPlausible = 0; statLoose = 0;
                 if (!Layout()) { Retry("layout"); break; }
                 stage = 1; progressPermille = 80;

@@ -136,7 +136,7 @@ public partial class MapGenUdon
         int room = pRoom, area = AreaM2(room);
         uint[] r = SR(1);
         int tvDef = Dn("k_tvCabinet");
-        int sofaDef = Pick(r, "k_sofa", 6, "q_couch", 4);
+        int sofaDef = Pick(r, "k_sofa", 5, "q_couch", 4, "k_designSofa", 3);
         int dx, dz;
         MainDoor(room, out dx, out dz);
         // (b) the focal point: the TV cabinet centred on a wall without a window, the sofa facing it
@@ -187,7 +187,7 @@ public partial class MapGenUdon
             }
             uint[] r4 = SR(4);
             int chairs = area >= 26 ? RngBetween(r4, 1, 2) : RngBetween(r4, 0, 1);
-            int chairDef = Pick(r4, "q_armchair", 5, "k_loungeChair", 4);
+            int chairDef = RngChance(r4, 350) ? Pick(r4, "k_designChair", 5, "k_recliner", 4) : Pick(r4, "q_armchair", 5, "k_loungeChair", 4);
             int side0 = RngChance(r4, 500) ? 1 : -1;
             // at right angles to the sofa, facing the table; where the room is narrow the chair moves back beside the
             // sofa's end, so a metre stays free in front of the screen (K1)
