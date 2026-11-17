@@ -38,6 +38,7 @@
 		"com.unity.modules.video": "1.0.0",
 		"com.unity.modules.vr": "1.0.0",
 		"com.unity.modules.wind": "1.0.0",
-		"com.unity.modules.xr": "1.0.0"
+		"com.unity.modules.xr": "1.0.0",
+		"red.sim.lightvolumes": "https://github.com/REDSIM/VRCLightVolumes.git?path=/Packages/red.sim.lightvolumes#v.3.0.0-dev.20"
 	}
 }
