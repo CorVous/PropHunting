@@ -34,20 +34,20 @@ public partial class MapGenUdon
         if (up)
             switch (zone)
             {
-                case GenData.Z_HOUSE: return mapTheme == GenData.THEME_MEDIEVAL ? 700 : 550;
-                case GenData.Z_DINER: return 350;
-                case GenData.Z_SHOP: return 400;
-                case GenData.Z_GARAGE: return 200;
-                case GenData.Z_WAREHOUSE: return 250;
-                case GenData.Z_CABIN: return 350;
-                case GenData.Z_BARN: return 300;
+                case GenData.Z_HOUSE: return mapTheme == GenData.THEME_MEDIEVAL ? 450 : 350;
+                case GenData.Z_DINER: return 250;
+                case GenData.Z_SHOP: return 300;
+                case GenData.Z_GARAGE: return 150;
+                case GenData.Z_WAREHOUSE: return 150;
+                case GenData.Z_CABIN: return 250;
+                case GenData.Z_BARN: return 200;
                 default: return 0;
             }
         switch (zone)
         {
-            case GenData.Z_HOUSE: return 350;
-            case GenData.Z_WAREHOUSE: return 350;
-            case GenData.Z_DINER: return 300;
+            case GenData.Z_HOUSE: return 220;
+            case GenData.Z_WAREHOUSE: return 250;
+            case GenData.Z_DINER: return 200;
             default: return 0;
         }
     }
@@ -101,7 +101,8 @@ public partial class MapGenUdon
             if (cells < 2) continue;
             int zone = plotZone[k];
             bool up = nLvl < cap && RngChance(rng, LevelChance(zone, true));
-            bool down = nLvl + (up ? 1 : 0) < cap && RngChance(rng, LevelChance(zone, false));
+            // Cor: varied, not every building with both: a building with an upper floor gets a basement too only now and then
+            bool down = nLvl + (up ? 1 : 0) < cap && RngChance(rng, LevelChance(zone, false) * (up ? 3 : 10) / 10);
             if (up) { lvlPlot[nLvl] = k; lvlUp[nLvl] = 1; nLvl++; }
             if (down) { lvlPlot[nLvl] = k; lvlUp[nLvl] = 0; nLvl++; }
         }

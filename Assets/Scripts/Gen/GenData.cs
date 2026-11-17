@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 18;   // 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 19;   // 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -19,7 +19,8 @@ public static partial class GenData
     // Layout 9 (generator 14): main's site shapes (bend, T, cul-de-sac) with these plots; main's open plots dropped.
     // Layout 10 (generator 15): bigger plans, smaller gardens and wood, buildings at the edge, three more site shapes.
     // Layout 11 (generator 18): upper floors and basements, joined by stairs (Cor).
-    public const int LAYOUT_VERSION = 11;
+    // Layout 12 (generator 19): fewer of them, a basement under an upper floor only now and then.
+    public const int LAYOUT_VERSION = 12;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell
@@ -76,7 +77,7 @@ public static partial class GenData
     public static readonly int[] SizeWarehouseFront = { 0, 0, 0, 0 };
     public static readonly int[] SizeWarehouseBack2 = { 0, 0, 0, 0 };
     public static readonly int[] SizeSideYard = { 0, 0, 0, 0 };
-    public static readonly int[] SizeLevelsMax = { 1, 2, 3, 4 };      // generator 18: upper floors and basements per map at most
+    public static readonly int[] SizeLevelsMax = { 1, 2, 2, 3 };      // generator 18: upper floors and basements per map at most
     public static readonly int[] SizeLeaks = { 8, 11, 15, 18 };          // wrong-category spawns (04 section 4.3.5)
     public static readonly int[] SizePlayers = { 8, 16, 24, 32 };
     public const int LEAK_COMEDIC_PERMILLE = 300;                        // D10
