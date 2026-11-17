@@ -36,7 +36,7 @@ public class PHScorePad : UdonSharpBehaviour
     void Empty()
     {
         title.text = "NO ROUNDS YET"; title.color = idleColour;
-        reason.text = "Stand on PLAY and wait for the host";
+        reason.text = "";
         shareRoot.SetActive(false); winHiders.SetActive(false); winHunters.SetActive(false); columns.SetActive(false);
     }
 

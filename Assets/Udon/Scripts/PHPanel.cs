@@ -32,6 +32,12 @@ public class PHPanel : UdonSharpBehaviour
     public TextMeshProUGUI rollCaption;
     public GameObject veil;              // "Round in progress..."
     public RectTransform veilHourglass;
+    // the host bar: who hosts, and the buttons to hand the panel over (PHGame's hostLocked / UnlockHost / LockHost /
+    // ClaimHost, called by name)
+    public TextMeshProUGUI hostName, hostState;
+    public RectTransform[] hostButton;     // 0 unlock/lock (the host's), 1 claim (everyone else's)
+    public Image[] hostButtonImage;
+    public TextMeshProUGUI[] hostButtonText;
     public Transform spinner;           // the ceiling spinner's arrow: spins when a round starts
 
     public AudioSource sfx;
@@ -44,7 +50,7 @@ public class PHPanel : UdonSharpBehaviour
     int seenPhase = -1; float spinStart = -10f; float spinFrom;
     int seenSize = -99, seenDensity = -1, seenRound = -1, seenTaunt = -1;
     float nextRefresh;
-    int wobble = -2; float wobbleStart;
+    int wobble = -99; float wobbleStart;
     float diceStart = -10f;
 
     // queued sounds (sequences: crate drops, ticks, bells)
@@ -85,6 +91,25 @@ public class PHPanel : UdonSharpBehaviour
         diceStart = Time.time;
         Queue(select, 0f, 1.3f); Queue(select, 0.18f, 1.1f); Queue(jingle, 0.52f, 1f);
         game.StartRound();
+    }
+
+    bool HostLocked
+    {
+        get { object o = game.GetProgramVariable("hostLocked"); return o == null || (bool)o; }
+    }
+
+    public void UnlockPress()
+    {
+        if (!Host) { Deny(-2); return; }
+        Queue(select, 0f, 1f);
+        game.SendCustomEvent(HostLocked ? "UnlockHost" : "LockHost");
+    }
+
+    public void ClaimPress()
+    {
+        if (Host || HostLocked) { Deny(-3); return; }
+        Queue(jingle, 0f, 1.25f);
+        game.SendCustomEvent("ClaimHost");
     }
 
     void Deny(int i)
@@ -149,11 +174,11 @@ public class PHPanel : UdonSharpBehaviour
         if (now >= nextRefresh) { nextRefresh = now + 0.25f; Refresh(); }
 
         // little animations: a refused press wobbles, START spins the die, the veil's hourglass turns
-        if (wobble != -2)
+        if (wobble != -99)
         {
             float t = (now - wobbleStart) / 0.38f;
-            RectTransform r = wobble < 0 ? dice : tileRect[wobble];
-            if (t >= 1f) { r.localRotation = Quaternion.identity; wobble = -2; }
+            RectTransform r = wobble == -1 ? dice : wobble < -1 ? hostButton[-2 - wobble] : tileRect[wobble];
+            if (t >= 1f) { r.localRotation = Quaternion.identity; wobble = -99; }
             else r.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 18f) * 7f * (1f - t));
         }
         float dt = (now - diceStart) / 0.7f;
@@ -223,6 +248,16 @@ public class PHPanel : UdonSharpBehaviour
         bool go = CanStart;
         diceImage.color = go ? Color.white : new Color(0.55f, 0.55f, 0.55f, 0.6f);
         rollCaption.color = go ? new Color(0.13f, 0.34f, 0.25f) : new Color(0.6f, 0.54f, 0.41f);
+        if (hostName != null)
+        {
+            VRCPlayerApi owner = Networking.GetOwner(game.gameObject);
+            hostName.text = Utilities.IsValid(owner) ? owner.displayName : "";
+            bool locked = HostLocked, host = Host;
+            hostState.text = locked ? "locked" : "open: anyone can claim";
+            hostButtonText[0].text = locked ? "UNLOCK HOST" : "LOCK HOST";
+            Color c0 = hostButtonImage[0].color; c0.a = host ? 1f : 0.35f; hostButtonImage[0].color = c0;
+            Color c1 = hostButtonImage[1].color; c1.a = !host && !locked ? 1f : 0.35f; hostButtonImage[1].color = c1;
+        }
         bool lockOn = game.phase != PHGame.PH_LOBBY;
         if (veil.activeSelf != lockOn) veil.SetActive(lockOn);
     }

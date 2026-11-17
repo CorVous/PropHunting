@@ -117,13 +117,13 @@ public static class LobbyBuilder
     }
 
     // ------------------------------------------------------------------ the host panel
-    // 1200 x 440 canvas units at 7.5 mm: 9 x 3.3 m. Mock-up coordinates are top-left based; P() converts.
-    const float PW = 1200f, PH = 440f;
+    // 1200 x 500 canvas units at 6 mm: 7.2 x 3 m. Mock-up coordinates are top-left based; P() converts.
+    const float PW = 1200f, PH = 500f;   // the board is the top 440; the host bar is under it
     static Vector2 P(float x, float y) { return new Vector2(x - PW / 2, PH / 2 - y); }
 
     public static PHPanel BuildPanel(Transform lobby, PHGame game, Vector3 localPos)
     {
-        var cv = Canvas(lobby, "HostPanel", localPos, Quaternion.identity, new Vector2(PW, PH), 0.0075f, true);
+        var cv = Canvas(lobby, "HostPanel", localPos, Quaternion.identity, new Vector2(PW, PH), 0.006f, true);
         var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
 
         Img(cv, "BoardShadow", P(600, 226), new Vector2(1168, 408), sRound, C("173d2c"), 1.6f);
@@ -197,12 +197,34 @@ public static class LobbyBuilder
         panel.meepleHunt = Icon("meeple_hunt"); panel.meepleHide = Icon("meeple_hide");
 
         // the lock during a round: dims the board, blocks the buttons
-        var veil = Img(cv, "Veil", Vector2.zero, new Vector2(PW, PH), null, new Color(0.06f, 0.06f, 0.09f, 0.62f));
+        var veil = Img(cv, "Veil", P(600, 220), new Vector2(PW, 440), null, new Color(0.06f, 0.06f, 0.09f, 0.62f));
         veil.raycastTarget = true;
         var hg = Img(veil.transform, "Hourglass", new Vector2(-190, 0), new Vector2(86, 86), Icon("hourglass"), Color.white);
         Txt(veil.transform, "Text", new Vector2(70, 0), new Vector2(420, 50), "Round in progress...", rocket, 32, Color.white, TextAlignmentOptions.Left);
         panel.veil = veil.gameObject; panel.veilHourglass = hg.rectTransform;
         veil.gameObject.SetActive(false);
+
+        // the host bar: who hosts, and Unlock / Claim (the host can always be handed over, even during a round)
+        Img(cv, "HostBar", P(600, 470), new Vector2(1168, 48), sRound, C("173d2c"), 3f);
+        Img(cv, "HostIcon", P(46, 468), new Vector2(40, 40), Icon("meeple_hunt"), Color.white);
+        Txt(cv, "HostLabel", P(110, 470), new Vector2(80, 26), "HOST", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
+        panel.hostName = Txt(cv, "HostName", P(330, 470), new Vector2(360, 34), "", null, 24, Color.white, TextAlignmentOptions.Left);
+        panel.hostName.fontStyle = FontStyles.Bold;
+        panel.hostState = Txt(cv, "HostState", P(640, 470), new Vector2(260, 26), "locked", future, 13, C("c9d8c9"), TextAlignmentOptions.Left);
+        panel.hostButton = new RectTransform[2]; panel.hostButtonImage = new Image[2]; panel.hostButtonText = new TextMeshProUGUI[2];
+        string[] hb = { "UNLOCK HOST", "CLAIM HOST" };
+        var hostTiles = new PHPanelTile[2];
+        for (int k = 0; k < 2; k++)
+        {
+            var bimg = Img(cv, "HostButton " + hb[k], P(880 + k * 200, 470), new Vector2(186, 38), sRound, new Color(1f, 1f, 1f, 0.01f), 4f);
+            bimg.raycastTarget = true;
+            var bt = bimg.gameObject.AddComponent<Button>();
+            var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = bimg;
+            var face = Img(bimg.transform, "Face", Vector2.zero, new Vector2(186, 38), sRound, k == 0 ? C("f2c45a") : C("9bd18a"), 4f);
+            panel.hostButtonText[k] = Txt(bimg.transform, "Text", Vector2.zero, new Vector2(180, 30), hb[k], future, 15, C("1e190f"), TextAlignmentOptions.Center);
+            panel.hostButton[k] = bimg.rectTransform; panel.hostButtonImage[k] = face;
+            hostTiles[k] = AddTile(bimg.gameObject, bt, -2 - k);
+        }
 
         // sounds, for everyone near the panel
         var src = cv.gameObject.AddComponent<AudioSource>();
@@ -214,6 +236,7 @@ public static class LobbyBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(panel);
         foreach (var tl in tiles) { tl.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(tl); }
         diceTile.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(diceTile);
+        foreach (var ht in hostTiles) { ht.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(ht); }
         return panel;
     }
 

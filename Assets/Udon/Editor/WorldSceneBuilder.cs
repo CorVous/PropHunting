@@ -177,7 +177,7 @@ public static class WorldSceneBuilder
         // the host panel on the north wall, above the zone (G50, G51): every setting and START, the "Board Game"
         // design (LobbyBuilder). Everyone can read it; only the host's presses count (PHPanel and PHGame check).
         // A world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR.
-        LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 1.4f + 1.65f, RoomD / 2 - 0.12f));
+        LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 0.9f + 1.5f, RoomD / 2 - 0.12f));   // 7.2 x 3 m, bottom 0.9 m up
         // the last round's results, a score pad on the west wall
         LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
         local.panelUiText = null; local.resultsText = null;
