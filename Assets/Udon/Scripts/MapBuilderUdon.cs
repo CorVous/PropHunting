@@ -1007,7 +1007,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         // the handrail (sloped with the stair), and the collider in steps where the rail climbs
         if (alongB && Mathf.Abs(y1 - y0) > 0.01f)
         {
-            float ra0 = am - 0.035f, ra1 = am + 0.035f, h0 = y0 + 0.92f, h1 = y1 + 0.92f;
+            float ra0 = am - 0.035f, ra1 = am + 0.035f, h0 = y0 + 0.9f, h1 = y1 + 0.9f;   // level with the flat rails it meets
             Vector3 p0 = SP(ra0, b0, h0), p1 = SP(ra1, b0, h0), p2 = SP(ra1, b1, h1), p3 = SP(ra0, b1, h1);
             Vector3 up = new Vector3(0f, 0.06f, 0f);
             Beam(p0, p1, p2, p3, up, col);
