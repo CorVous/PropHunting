@@ -50,6 +50,12 @@ public static class WorldSceneBuilder
         RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear;
         RenderSettings.fogColor = new Color(0.56f, 0.76f, 0.93f);
         RenderSettings.fogStartDistance = 45f; RenderSettings.fogEndDistance = 160f;
+        // a procedural sky the map's mood tints (MapBuilderUdon.ApplyMood: dawn, dusk, night, a space base's sky)
+        var skyPath = "Assets/Udon/Generated/Sky.mat";
+        var skyMat = AssetDatabase.LoadAssetAtPath<Material>(skyPath);
+        if (skyMat == null) { skyMat = new Material(Shader.Find("Skybox/Procedural")); AssetDatabase.CreateAsset(skyMat, skyPath); }
+        RenderSettings.skybox = skyMat;
+        RenderSettings.sun = sun;
 
         // ---- lobby
         var lobby = new GameObject("Lobby");

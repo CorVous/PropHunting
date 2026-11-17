@@ -98,7 +98,7 @@ public class PHLamps : UdonSharpBehaviour
         }
         // the mood: how much the lamps matter against the daylight
         int mood = builder.moodTime;
-        float k = mood == 3 ? 1.0f : (mood == 4 ? 0.8f : (mood == 0 ? 0.6f : 0.4f));
+        float k = mood == 5 ? 1.4f : (mood == 3 ? 1.0f : (mood == 4 ? 0.8f : (mood == 0 ? 0.6f : 0.4f)));   // 5: night
         Color col = builder.gen.mapTheme == GenData.THEME_SPACE ? new Color(0.80f, 0.90f, 1f) : new Color(1f, 0.84f, 0.62f);
         for (int s = 0; s < count; s++)
         {

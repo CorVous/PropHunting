@@ -174,7 +174,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // (summer, spring, autumn, winter) for the ground. PHSun bakes the shadows from the sun after the build, so
     // it follows. The lobby shares the sun.
     [HideInInspector] public int moodTime, moodSeason;
-    public readonly string[] moodTimeName = { "Morning", "Noon", "Afternoon", "Evening", "Overcast" };
+    public readonly string[] moodTimeName = { "Morning", "Noon", "Afternoon", "Evening", "Overcast", "Night" };
     public readonly string[] moodSeasonName = { "Summer", "Spring", "Autumn", "Winter" };
 
     // ---- light points (Cor: fixtures ready for VRC Light Volumes). Every fixture the builder draws (ceiling lights,
@@ -370,6 +370,29 @@ public class MapBuilderUdon : UdonSharpBehaviour
             sunCol = Color.Lerp(sunCol, new Color(1f, 0.84f, 0.60f), 0.5f);
             sky = Color.Lerp(sky, new Color(0.74f, 0.66f, 0.52f), 0.35f);
         }
+        // night (Cor): the sun is the moon, high and faint and blue; a dark sky; the lamps do the work (PHLamps)
+        if (moodTime == 5)
+        {
+            elev = 48f; sunCol = new Color(0.62f, 0.72f, 1f); intensity = 0.16f;
+            sky = sky * 0.22f + new Color(0.03f, 0.05f, 0.12f); eq = eq * 0.18f + new Color(0.02f, 0.03f, 0.07f); gr = gr * 0.15f + new Color(0.02f, 0.02f, 0.04f);
+            fog = new Color(0.04f, 0.06f, 0.12f); fogStart = 25f; fogEnd = 110f;
+        }
+        // the sky (the procedural skybox the scene builder set): its tint, ground and brightness follow the mood
+        Material skyMat = RenderSettings.skybox;
+        if (skyMat != null)
+        {
+            Color skyTint = new Color(0.5f, 0.5f, 0.5f), skyGround = new Color(0.37f, 0.35f, 0.34f);
+            float exposure = 1.2f, thickness = 1f;
+            if (moodTime == 0) { skyTint = new Color(0.62f, 0.48f, 0.52f); thickness = 1.3f; exposure = 1.1f; }   // dawn: pinker
+            else if (moodTime == 3) { skyTint = new Color(0.62f, 0.42f, 0.38f); thickness = 1.6f; exposure = 1.0f; }   // dusk
+            else if (moodTime == 4) { skyTint = new Color(0.48f, 0.49f, 0.50f); thickness = 2.2f; exposure = 0.9f; }   // overcast: hazy, grey
+            else if (moodTime == 5) { skyTint = new Color(0.25f, 0.30f, 0.50f); thickness = 0.6f; exposure = 0.12f; skyGround = new Color(0.03f, 0.04f, 0.07f); }   // night
+            if (gen.mapTheme == GenData.THEME_SPACE) { skyTint = Color.Lerp(skyTint, new Color(0.70f, 0.38f, 0.30f), 0.6f); thickness *= 0.5f; exposure *= 0.75f; skyGround = new Color(0.22f, 0.12f, 0.10f); }
+            skyMat.SetColor("_SkyTint", skyTint);
+            skyMat.SetColor("_GroundColor", skyGround);
+            skyMat.SetFloat("_Exposure", exposure);
+            skyMat.SetFloat("_AtmosphereThickness", thickness);
+        }
         if (sun != null)
         {
             sun.transform.rotation = Quaternion.Euler(elev, azim, 0f);
@@ -558,7 +581,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (watch == null) watch = new System.Diagnostics.Stopwatch();
         Clear();
         W = gen.W; H = gen.H; IW = gen.IW; IH = gen.IH;
-        moodTime = (int)UModB(Mix(gen.seed ^ 0x2001u), 5u);
+        moodTime = (int)UModB(Mix(gen.seed ^ 0x2001u), 6u);   // 5: night (Cor), drawn like the others
         // the ground's season follows the generator's (its trees and decorations): autumn trees, winter decorations
         // and deep-summer green come from it; an ordinary summer map is summer or spring
         theme = gen.mapTheme;
