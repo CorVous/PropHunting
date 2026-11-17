@@ -87,7 +87,7 @@ public partial class MapGenUdon
     {
         int room = pRoom;
         bool building = IsBuilding(roomZone[room]);
-        string[] pool = RoomThemeOf(room) == GenData.THEME_SPACE ? (building ? SpaceIn : SpaceOut) : (building ? MedievalIn : MedievalOut);
+        string[] pool = mapTheme == GenData.THEME_SPACE ? (building ? SpaceIn : SpaceOut) : (building ? MedievalIn : MedievalOut);
         int saved = roomFloorTarget[room];
         int most = !building && AreaM2(room) >= 24 ? 3 : 2;   // a large outdoor area takes one more
         roomFloorTarget[room] = roomFloor[room] + most;

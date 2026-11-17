@@ -105,14 +105,12 @@ public static partial class GenData
     // revision 12, the whole-map themes (G58): now and then a seed's map is a space base or a medieval village. The
     // same generator lays it out; every prop is replaced by its theme twin (BuildThemeTwins), the buildings, the
     // ground, the fences and the sky take the theme's colours, and only the kinds of plot that suit it are drawn.
-    // generator 16 (Cor's prototype): the mixed map, each plot ordinary, a space base or medieval (MapGen.plotTheme)
-    public const int THEME_NONE = 0, THEME_SPACE = 1, THEME_MEDIEVAL = 2, THEME_MIXED = 3;
-    public static readonly string[] ThemeName = { "", "Space base", "Medieval village", "Mixed" };
-    public const int THEME_SPACE_PERMILLE = 333, THEME_MEDIEVAL_PERMILLE = 333, THEME_MIXED_PERMILLE = 0;   // generator 17, Cor: three distinct themes, a third each; the mixed map stays in the code, off
+    public const int THEME_NONE = 0, THEME_SPACE = 1, THEME_MEDIEVAL = 2;
+    public static readonly string[] ThemeName = { "", "Space base", "Medieval village" };
+    public const int THEME_SPACE_PERMILLE = 333, THEME_MEDIEVAL_PERMILLE = 333;   // generator 17, Cor: three distinct themes, a third each (a mixed map was tried in 16 and removed)
     public static readonly int[][] ThemeKinds = { null,
         new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE },   // space: mess hall, cargo bay, supply depot, rover garage (revision 13: the park held back, G58: 54 models per place against 59)
-        new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_BARN, Z_PARK, Z_CABIN, Z_CHAPEL },     // medieval: tavern, granary, market, farm, green, woodcutter's hut, chapel
-        null };   // mixed: every kind (each plot then takes a theme that suits it)
+        new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_BARN, Z_PARK, Z_CABIN, Z_CHAPEL } };     // medieval: tavern, granary, market, farm, green, woodcutter's hut, chapel
     public const int Z_ZOO = 11, Z_CABIN = 12, Z_FAIR = 13, Z_CHAPEL = 14;   // revision 12: a zoo (no main building, like the park), a log cabin, a funfair, a chapel
     public static readonly string[] ZoneName = { "-", "House", "Warehouse", "Diner", "Lawn", "Forest", "Hunter release", "Shop", "Garage", "Farm", "Park", "Zoo", "Cabin", "Funfair", "Chapel" };
     public static readonly int[] ZoneWallMm = { 0, 2600, 2800, 2800, 0, 0, 0, 2800, 3000, 3400, 0, 0, 2700, 3200, 3800 };   // KayKit buildings at the reduced height (Z4 option R); a barn is taller

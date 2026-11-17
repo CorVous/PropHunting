@@ -163,8 +163,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         holiday = hroll < 110 ? 1 : (hroll < 200 ? 2 : 0);
         if (holiday == 2) season = 1;   // Halloween comes in the autumn
         int troll = RngRange(Rng(ST_SCENERY, 9, 11), 1000);
-        mapTheme = troll < GenData.THEME_SPACE_PERMILLE ? GenData.THEME_SPACE : (troll < GenData.THEME_SPACE_PERMILLE + GenData.THEME_MEDIEVAL_PERMILLE ? GenData.THEME_MEDIEVAL
-            : (troll < GenData.THEME_SPACE_PERMILLE + GenData.THEME_MEDIEVAL_PERMILLE + GenData.THEME_MIXED_PERMILLE ? GenData.THEME_MIXED : GenData.THEME_NONE));
+        mapTheme = troll < GenData.THEME_SPACE_PERMILLE ? GenData.THEME_SPACE : (troll < GenData.THEME_SPACE_PERMILLE + GenData.THEME_MEDIEVAL_PERMILLE ? GenData.THEME_MEDIEVAL : GenData.THEME_NONE);
         if (ForceTheme >= 0) mapTheme = ForceTheme;
         if (mapTheme != GenData.THEME_NONE) { holiday = 0; if (mapTheme == GenData.THEME_SPACE) season = 0; }
     }
