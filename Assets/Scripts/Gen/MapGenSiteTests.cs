@@ -3,7 +3,7 @@
 // attempt of the seed). The plan library is built to pass them; the tests catch what the site does with it.
 //   T1  a building's footprint is a rectangle, an L or a T: at most 8 outline corners, no hole, no notch, no pinch
 //   T2  no two buildings share an edge
-//   T3  no building stands on the map's edge
+//   T3  no building stands on the map's edge (off since the bigger plans: Cor's option a, MapGen.EdgeOK)
 //   T4  a house's front door is in its entrance room (the hall, else the living room), and a path leads from it
 //       to the lane without crossing a fence or a building
 //   T5  every house has a living room, a kitchen, a bedroom and a bathroom
@@ -63,7 +63,7 @@ public partial class MapGen
                 {
                     int nx = cc % W + DX[dd], nz = cc / W + DZ[dd];
                     int zn = ZoneAt(nx, nz);
-                    if (zn == GenData.Z_NONE) fail |= 1 << 2;
+                    if (zn == GenData.Z_NONE && !EdgeOK) fail |= 1 << 2;
                     else if (GenData.IsBuilding(zn) && cellInst[nz * W + nx] != inst) fail |= 1 << 1;
                 }
             }

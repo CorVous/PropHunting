@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 14;   // 14: more-places (revision 13) with main's site shapes, evolution and garage pumps
+    public const int GEN_VERSION = 15;   // 15: bigger plans (Tools/make_plans.py), less outside, buildings at the map's edge, the crossroads, the village square and the U, themes a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -17,7 +17,8 @@ public static partial class GenData
     // Layout 7 (generator 12): two more kinds of plot: the zoo (plaza, walk, fenced enclosures with gates) and the log cabin.
     // Layout 8 (generator 13): a space-base or medieval-village map draws only the kinds of plot its theme allows.
     // Layout 9 (generator 14): main's site shapes (bend, T, cul-de-sac) with these plots; main's open plots dropped.
-    public const int LAYOUT_VERSION = 9;
+    // Layout 10 (generator 15): bigger plans, smaller gardens and wood, buildings at the edge, three more site shapes.
+    public const int LAYOUT_VERSION = 10;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell
@@ -32,8 +33,8 @@ public static partial class GenData
     // sizes give the plots, the ground cells the wood tops the map up to, and the wood's own minimum. Layout 1 (the
     // zone pieces) filled a fixed square of SizeGrid cells to 28, 52, 85 and 108 ground cells.
     public static readonly int[] SizeGrid = { 7, 9, 12, 14 };            // layout 1: bounding box, outer cells per side
-    public static readonly int[] SizeGroundCells = { 36, 70, 115, 150 }; // ground cells the wood tops the map up to (layout 1: 28, 52, 85, 108; layout 2: 46, 80, 124, 164)
-    public static readonly int[] SizeWoodMin = { 6, 8, 16, 20 };        // the wood is never smaller than this (layout 2: 6, 10, 16, 22)
+    public static readonly int[] SizeGroundCells = { 0, 0, 0, 0 }; // ground cells the wood tops the map up to (layout 1: 28, 52, 85, 108; layout 2: 46, 80, 124, 164)
+    public static readonly int[] SizeWoodMin = { 3, 3, 4, 5 };        // the wood is never smaller than this (layout 2: 6, 10, 16, 22)
     // Plots per map (G36 counts: 2, 3, 4, 5). Layout 4 (revision 9): H a house, * any kind of plot (a house more
     // often than not), + any plot that is not a house, never two of one kind on a map: a diner, a warehouse, a shop, a
     // garage, a farm or a park, by the weights below. Layout 2 and 3: "H+", "HH+", "HHDW", "HHHDW" (+ a diner or a
@@ -43,37 +44,37 @@ public static partial class GenData
     public static readonly int[] PlotPoolWeight = { 10, 9, 12, 10, 8, 9, 8, 8, 8, 7 };
     public const int PLOT_ANY_HOUSE = 350;                                // per mille: "*" is a house
     // cells of the new kinds' plans by size (least, most); a park's plot in outer cells along the lane and deep
-    public static readonly int[] SizeShopCellsMin = { 4, 4, 4, 5 }, SizeShopCellsMax = { 5, 6, 7, 7 };
-    public static readonly int[] SizeGarageCellsMin = { 4, 4, 5, 5 }, SizeGarageCellsMax = { 5, 6, 6, 8 };
+    public static readonly int[] SizeShopCellsMin = { 4, 4, 4, 5 }, SizeShopCellsMax = { 9, 11, 13, 13 };
+    public static readonly int[] SizeGarageCellsMin = { 4, 4, 5, 5 }, SizeGarageCellsMax = { 10, 12, 14, 16 };
     // revision 10: barns of 3 cells or more (room for the farm workshop), parks larger (a lawn and feature areas)
-    public static readonly int[] SizeBarnCellsMin = { 3, 3, 4, 4 }, SizeBarnCellsMax = { 4, 5, 6, 6 };   // revision 9: 2, 2, 3, 4 and 3, 4, 6, 6
+    public static readonly int[] SizeBarnCellsMin = { 3, 3, 4, 4 }, SizeBarnCellsMax = { 8, 10, 12, 12 };   // revision 9: 2, 2, 3, 4 and 3, 4, 6, 6
     public static readonly int[] SizeParkAlong = { 3, 4, 4, 5 }, SizeParkDeep = { 3, 3, 3, 3 };          // revision 9: 2, 2, 3, 3 and 2, 3, 3, 3
     // revision 12: the zoo is three cells along the lane (enclosures, the keepers' walk, enclosures) and 3 or 4 deep;
     // the log cabin's plans by size
     public static readonly int[] SizeZooDeep = { 3, 3, 4, 4 };
-    public static readonly int[] SizeCabinCellsMin = { 2, 2, 3, 3 }, SizeCabinCellsMax = { 3, 4, 4, 4 };
-    public static readonly int[] SizeFairCellsMin = { 4, 4, 5, 5 }, SizeFairCellsMax = { 5, 6, 7, 7 };
-    public static readonly int[] SizeChapelCellsMin = { 3, 3, 3, 4 }, SizeChapelCellsMax = { 3, 4, 4, 6 };
+    public static readonly int[] SizeCabinCellsMin = { 2, 2, 3, 3 }, SizeCabinCellsMax = { 6, 8, 10, 10 };
+    public static readonly int[] SizeFairCellsMin = { 4, 4, 5, 5 }, SizeFairCellsMax = { 10, 12, 15, 15 };
+    public static readonly int[] SizeChapelCellsMin = { 3, 3, 3, 4 }, SizeChapelCellsMax = { 8, 10, 12, 12 };
     public static readonly int[] SizeExtraHouse = { 0, 0, 0, 0 };        // chance (per mille) of one more house plot (layout 2: 0, 300, 400, 500)
     // the plans a plot may take, by their cells: houses, warehouses, diners (the least and the most)
-    public static readonly int[] SizeHouseCellsMin = { 5, 5, 5, 6 };
-    public static readonly int[] SizeHouseCellsMax = { 6, 8, 9, 10 };
+    public static readonly int[] SizeHouseCellsMin = { 5, 6, 6, 7 };
+    public static readonly int[] SizeHouseCellsMax = { 14, 18, 22, 24 };
     public static readonly int[] SizeWarehouseCellsMin = { 6, 6, 8, 8 };
-    public static readonly int[] SizeWarehouseCellsMax = { 6, 6, 12, 10 };
-    public static readonly int[] SizeDinerCellsMax = { 6, 6, 8, 8 };
+    public static readonly int[] SizeWarehouseCellsMax = { 12, 14, 16, 16 };
+    public static readonly int[] SizeDinerCellsMax = { 10, 12, 14, 16 };
     // a house plot's gardens in cells: the front garden (and the chance of one more row), the back garden (and the
     // chance of one more row); a warehouse's forecourt and its chance of a yard two deep at the back; the chance of
     // a side yard. G36 "B" brought the maps down to about 40 to 60% above layout 1: at S the house's front door and
     // the warehouse's office door open straight onto the lane (report 16, 4.1: "S: 0 allowed"), no extra house plot,
     // smaller commercial plans at M and XL, a back garden one row deeper less often. Layout 2: front { 1, 1, 1, 1 }
     // and one more row 25% at L and XL, back extra { 300, 300, 350, 350 }, warehouse front 1 at every size.
-    public static readonly int[] SizeHouseFront = { 0, 1, 1, 1 };
+    public static readonly int[] SizeHouseFront = { 0, 0, 0, 0 };
     public static readonly int[] SizeHouseFront2 = { 0, 0, 0, 0 };
-    public static readonly int[] SizeHouseBack = { 1, 1, 2, 2 };
-    public static readonly int[] SizeHouseBackExtra = { 0, 0, 200, 200 };
-    public static readonly int[] SizeWarehouseFront = { 0, 1, 1, 1 };
-    public static readonly int[] SizeWarehouseBack2 = { 0, 0, 500, 500 };
-    public static readonly int[] SizeSideYard = { 250, 250, 250, 250 };
+    public static readonly int[] SizeHouseBack = { 1, 1, 1, 1 };
+    public static readonly int[] SizeHouseBackExtra = { 0, 0, 0, 0 };
+    public static readonly int[] SizeWarehouseFront = { 0, 0, 0, 0 };
+    public static readonly int[] SizeWarehouseBack2 = { 0, 0, 0, 0 };
+    public static readonly int[] SizeSideYard = { 0, 0, 0, 0 };
     public static readonly int[] SizeLeaks = { 8, 11, 15, 18 };          // wrong-category spawns (04 section 4.3.5)
     public static readonly int[] SizePlayers = { 8, 16, 24, 32 };
     public const int LEAK_COMEDIC_PERMILLE = 300;                        // D10
@@ -106,7 +107,7 @@ public static partial class GenData
     // ground, the fences and the sky take the theme's colours, and only the kinds of plot that suit it are drawn.
     public const int THEME_NONE = 0, THEME_SPACE = 1, THEME_MEDIEVAL = 2;
     public static readonly string[] ThemeName = { "", "Space base", "Medieval village" };
-    public const int THEME_SPACE_PERMILLE = 70, THEME_MEDIEVAL_PERMILLE = 70;   // generator 13 (0 in 12)
+    public const int THEME_SPACE_PERMILLE = 333, THEME_MEDIEVAL_PERMILLE = 333;   // Cor: a third each (generator 15)   // generator 13 (0 in 12)
     public static readonly int[][] ThemeKinds = { null,
         new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE },   // space: mess hall, cargo bay, supply depot, rover garage (revision 13: the park held back, G58: 54 models per place against 59)
         new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_BARN, Z_PARK, Z_CABIN, Z_CHAPEL } };     // medieval: tavern, granary, market, farm, green, woodcutter's hut, chapel

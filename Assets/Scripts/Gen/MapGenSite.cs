@@ -73,7 +73,7 @@ public partial class MapGen
         else if (zone == GenData.Z_CABIN) { lo = GenData.SizeCabinCellsMin[size]; hi = GenData.SizeCabinCellsMax[size]; }
         else if (zone == GenData.Z_FAIR) { lo = GenData.SizeFairCellsMin[size]; hi = GenData.SizeFairCellsMax[size]; }
         else if (zone == GenData.Z_CHAPEL) { lo = GenData.SizeChapelCellsMin[size]; hi = GenData.SizeChapelCellsMax[size]; }
-        else { lo = 6; hi = GenData.SizeDinerCellsMax[size]; }
+        else { hi = GenData.SizeDinerCellsMax[size]; lo = 6; }   // more inside (Cor): the bigger diners
         int n = 0;
         for (int p = 0; p < GenPlans.Count; p++)
         {
@@ -81,7 +81,12 @@ public partial class MapGen
             int c = PlCellCount(p);
             if (c >= lo && c <= hi) cand[n++] = p;
         }
-        return n == 0 ? -1 : cand[rng.Range(n)];
+        if (n == 0) return -1;
+        // a mix of small and big buildings (Cor): a size drawn evenly from the range, then a plan of that size or
+        // the nearest one there is
+        int target = lo + rng.Range(hi - lo + 1), best = int.MaxValue, m = 0;
+        for (int i = 0; i < n; i++) { int dd = PlCellCount(cand[i]) - target; if (dd < 0) dd = -dd; if (dd < best) { best = dd; m = 0; } if (dd == best) cand[m++] = cand[i]; }
+        return cand[rng.Range(m)];
     }
 
     // ---- the canvas ---------------------------------------------------------------------------------------------
@@ -129,10 +134,14 @@ public partial class MapGen
 
     // ---- site shapes and lane segments
     public const int SHAPE_STRAIGHT = 0, SHAPE_BEND = 1, SHAPE_T = 2, SHAPE_CUL = 3;
+    // Cor: more kinds of layout than one lane: a crossroads (four arms), a village square (a T whose junction is a
+    // three by three square), and a U (the lane turns twice and comes back: the second lane runs behind the
+    // first lane's plots, a back lane)
+    public const int SHAPE_CROSS = 4, SHAPE_SQUARE = 5, SHAPE_U = 6;
     public int siteShape;
     public int forceShape = -1;
     int nLane, laneEnd0;
-    int[] laneOX = new int[3], laneOY = new int[3], laneRot = new int[3], laneLen = new int[3];
+    int[] laneOX = new int[4], laneOY = new int[4], laneRot = new int[4], laneLen = new int[4];
     public int[] plotSeg = new int[16];
 
     // a canonical cell (lane along +y at x = CO from y = 0) of segment s on the canvas: turned laneRot[s] quarter
@@ -170,6 +179,22 @@ public partial class MapGen
         if (ry < laneOY[s]) offR = inner + 1;
     }
 
+    // how far past the crossing (along the first lane) the plots of the side arms reach
+    void CrossFar(ref int far)
+    {
+        for (int q = 0; q < nPlots; q++)
+        {
+            if (plotSeg[q] < 1 || plotSeg[q] > 2) continue;
+            for (int u = 0; u < plotAlong[q]; u++)
+                for (int v = 0; v < plotDepth[q]; v++)
+                {
+                    int x, y;
+                    PlotXY(q, u, v, out x, out y);
+                    if (y - laneEnd0 > far) far = y - laneEnd0;
+                }
+        }
+    }
+
     // every cell of the plot on the canvas and free
     bool PlotFits(int k)
     {
@@ -195,9 +220,14 @@ public partial class MapGen
     }
 
     // a plan cell (x along its front, y back from it) as plot-local u and v
+    // buildings may stand on the map's edge (Cor, option a: more inside); PS: plan cells drawn PS x PS (the doubled-
+    // rooms option, not taken: 1)
+    public const bool EdgeOK = true;
+    public const int PS = 1;
+
     void PlanUV(int k, int px, int py, out int u, out int v)
     {
-        int w = PlW(plotPlan[k]);
+        int w = PlW(plotPlan[k]) * PS;
         u = plotSL[k] + (plotMir[k] != 0 ? w - 1 - px : px);
         v = plotSet[k] + py;
     }
@@ -249,9 +279,12 @@ public partial class MapGen
         // plots of a segment are laid out in the canonical frame and turned onto the canvas (Canon).
         siteShape = SHAPE_STRAIGHT;
         int shapeRoll = rng.Range(100);
-        if (nk >= 3 && shapeRoll < 22) siteShape = SHAPE_T;
-        else if (nk >= 2 && shapeRoll < 55) siteShape = SHAPE_BEND;
-        else if (nk >= 2 && shapeRoll < 75) siteShape = SHAPE_CUL;
+        if (nk >= 4 && shapeRoll < 14) siteShape = SHAPE_CROSS;
+        else if (nk >= 3 && shapeRoll < 28) siteShape = SHAPE_SQUARE;
+        else if (nk >= 4 && shapeRoll < 42) siteShape = SHAPE_U;
+        else if (nk >= 3 && shapeRoll < 56) siteShape = SHAPE_T;
+        else if (nk >= 2 && shapeRoll < 74) siteShape = SHAPE_BEND;
+        else if (nk >= 2 && shapeRoll < 88) siteShape = SHAPE_CUL;
         if (forceShape >= 0) siteShape = forceShape;   // test aid
         int bendDir = rng.Chance(500) ? 1 : 3;
         // which plots go on which segment
@@ -259,6 +292,11 @@ public partial class MapGen
         if (siteShape == SHAPE_BEND) n0 = (nk + 1) / 2;
         else if (siteShape == SHAPE_T) n0 = nk - 2 * ((nk - 1) / 2) > 0 ? nk - 2 * ((nk - 1) / 2) : 1;
         else if (siteShape == SHAPE_CUL) n0 = nk - 1;
+        else if (siteShape == SHAPE_SQUARE) n0 = nk - 2 * ((nk - 1) / 2) > 0 ? nk - 2 * ((nk - 1) / 2) : 1;
+        else if (siteShape == SHAPE_U) n0 = nk - (nk / 3 > 1 ? nk / 3 : 1);   // the back lane: a third of the plots, on one side
+        else if (siteShape == SHAPE_CROSS) n0 = nk - 3 * ((nk - 1) / 3) > 0 ? nk - 3 * ((nk - 1) / 3) : 1;
+        int perArm = siteShape == SHAPE_CROSS ? (nk - n0) / 3 : 0;
+        int crossFar = 0;   // the crossroads: how deep the side arms' plots reach past the crossing
         nLane = 1; laneOX[0] = CO; laneOY[0] = 0; laneRot[0] = 0;
         int offL = 1, offR = 1;
         bool touchL = false, touchR = false;
@@ -279,17 +317,43 @@ public partial class MapGen
                 }
                 seg = 1;
                 if (siteShape == SHAPE_CUL) { laneRot[1] = 1; laneOX[1] = CO; laneOY[1] = laneEnd0; }
-                else { laneRot[1] = siteShape == SHAPE_T ? 1 : bendDir; laneOX[1] = CO; laneOY[1] = laneEnd0; }
-                nLane = 2;
-                StartSegment(1, dmax0L, dmax0R, out offL, out offR);
+                else if (siteShape == SHAPE_SQUARE) { laneRot[1] = 1; laneOX[1] = CO; laneOY[1] = laneEnd0 + 1; }
+                else if (siteShape == SHAPE_U)
+                {
+                    // the connector runs along the first lane's end behind its right-hand plots; the back lane
+                    // comes down beside them, its plots on its far side
+                    int gap = dmax0R + 1;
+                    laneRot[1] = 1; laneOX[1] = CO; laneOY[1] = laneEnd0; laneLen[1] = gap + 1;
+                    laneRot[2] = 2; laneOX[2] = CO + gap; laneOY[2] = laneEnd0;
+                    seg = 2;
+                }
+                else { laneRot[1] = siteShape == SHAPE_T || siteShape == SHAPE_CROSS ? 1 : bendDir; laneOX[1] = CO; laneOY[1] = laneEnd0; }
+                nLane = seg + 1;
+                if (siteShape == SHAPE_U) { offL = 1; offR = 1; }
+                else StartSegment(1, dmax0L, dmax0R, out offL, out offR);
+                // the square: the side arms start past the square on its far side
+                if (siteShape == SHAPE_SQUARE) { if (offL == 1) offL = 2; if (offR == 1) offR = 2; }
                 touchL = false; touchR = false; lastL = -1; lastR = -1;
             }
-            if (siteShape == SHAPE_T && seg == 1 && i == n0 + (nk - n0) / 2)
+            if ((siteShape == SHAPE_T || siteShape == SHAPE_SQUARE) && seg == 1 && i == n0 + (nk - n0) / 2
+                || siteShape == SHAPE_CROSS && seg == 1 && i == n0 + perArm)
             {
                 FinishSegment(1, offL, offR, lastL, lastR);
+                CrossFar(ref crossFar);
                 seg = 2; nLane = 3;
-                laneRot[2] = 3; laneOX[2] = CO; laneOY[2] = laneEnd0;
+                laneRot[2] = 3; laneOX[2] = CO; laneOY[2] = laneOY[1];
                 StartSegment(2, dmax0L, dmax0R, out offL, out offR);
+                if (siteShape == SHAPE_SQUARE) { if (offL == 1) offL = 2; if (offR == 1) offR = 2; }
+                touchL = false; touchR = false; lastL = -1; lastR = -1;
+            }
+            if (siteShape == SHAPE_CROSS && seg == 2 && i == n0 + 2 * perArm)
+            {
+                // the crossroads' fourth arm runs straight on, past the side arms' plots
+                FinishSegment(2, offL, offR, lastL, lastR);
+                CrossFar(ref crossFar);
+                seg = 3; nLane = 4;
+                laneRot[3] = 0; laneOX[3] = CO; laneOY[3] = laneEnd0;
+                offL = crossFar + 1; offR = crossFar + 1;
                 touchL = false; touchR = false; lastL = -1; lastR = -1;
             }
             int k = nPlots;
@@ -312,18 +376,19 @@ public partial class MapGen
             plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = rng.Chance(500) ? 1 : 0;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (rng.Chance(500) ? -1 : 1));
             if (siteShape == SHAPE_CUL && seg == 1) side = -1;   // the cul-de-sac's plot lies across the lane's end
+            if (siteShape == SHAPE_U && seg == 2) side = -1;     // the back lane's plots stand on its far side
             plotSide[k] = side;
             // a park has no building: its plot is the whole of it, as if a building of its size stood on it
-            int w = park ? GenData.SizeParkAlong[size] : PlW(p), d = park ? GenData.SizeParkDeep[size] : PlD(p);
+            int w = park ? GenData.SizeParkAlong[size] : PlW(p) * PS, d = park ? GenData.SizeParkDeep[size] : PlD(p) * PS;
             if (kinds[i] == GenData.Z_ZOO) { w = 3; d = GenData.SizeZooDeep[size]; }
             plotBodyD[k] = d;
             // front garden 1 cell (2 now and then on L and XL), back garden 1 or 2 cells deep (2 or 3 on L and XL)
             if (kinds[i] == GenData.Z_HOUSE) { plotSet[k] = GenData.SizeHouseFront[size] + (GenData.SizeHouseFront2[size] > 0 && rng.Chance(GenData.SizeHouseFront2[size]) ? 1 : 0); plotBack[k] = GenData.SizeHouseBack[size] + (rng.Chance(GenData.SizeHouseBackExtra[size]) ? 1 : 0); }
             else if (kinds[i] == GenData.Z_DINER || kinds[i] == GenData.Z_SHOP || kinds[i] == GenData.Z_GARAGE) { plotSet[k] = 1; plotBack[k] = 1; }
-            else if (kinds[i] == GenData.Z_FAIR) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; }   // the midway, the rides behind
-            else if (kinds[i] == GenData.Z_CHAPEL) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; } // the churchyard, the graveyard behind
-            else if (kinds[i] == GenData.Z_BARN) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; }   // the farmyard, the field behind
-            else if (kinds[i] == GenData.Z_CABIN) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; }  // the porch, the campground behind
+            else if (kinds[i] == GenData.Z_FAIR) { plotSet[k] = 1; plotBack[k] = 1; }   // the midway, the rides behind
+            else if (kinds[i] == GenData.Z_CHAPEL) { plotSet[k] = 1; plotBack[k] = 1; } // the churchyard, the graveyard behind
+            else if (kinds[i] == GenData.Z_BARN) { plotSet[k] = 1; plotBack[k] = 1; }   // the farmyard, the field behind
+            else if (kinds[i] == GenData.Z_CABIN) { plotSet[k] = 1; plotBack[k] = 1; }  // the porch, the campground behind
             else if (park) { plotSet[k] = 0; plotBack[k] = 0; }
             else { plotSet[k] = GenData.SizeWarehouseFront[size]; plotBack[k] = GenData.SizeWarehouseBack2[size] > 0 && rng.Chance(GenData.SizeWarehouseBack2[size]) ? 2 : 1; }
             plotSL[k] = park ? 0 : (rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0); plotSR[k] = park ? 0 : (rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0);
@@ -334,7 +399,7 @@ public partial class MapGen
             if (bd == 1 || bd == 3) { if ((bd == 1) != (plotMir[k] != 0)) plotSR[k] = 1; else plotSL[k] = 1; }
             // a building never touches the map's edge or its neighbour's building (report 16, T3, T12)
             int off = side < 0 ? offL : offR, prev = side < 0 ? lastL : lastR;
-            if (off == 1 || (side < 0 ? touchL : touchR) || (seg > 0 && prev < 0)) plotSL[k] = 1;
+            if ((off == 1 && !EdgeOK) || (side < 0 ? touchL : touchR) || (seg > 0 && prev < 0)) plotSL[k] = 1;
             if (park) plotSL[k] = 0;
             if (prev >= 0 && !park)
             {
@@ -393,9 +458,17 @@ public partial class MapGen
             {
                 int x, yy;
                 Canon(s, CO, y, out x, out yy);
-                if (!Free(x, yy)) return false;
+                if (!Free(x, yy)) { if (CvZone(x, yy) == GenData.Z_LAWN && cvInst[yy * CV + x] == siteInstLane) continue; return false; }
                 Put(x, yy, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
             }
+        // the village square: three by three around the junction
+        if (siteShape == SHAPE_SQUARE)
+            for (int y = laneEnd0; y <= laneEnd0 + 2; y++)
+                for (int x = CO - 1; x <= CO + 1; x++)
+                {
+                    if (Free(x, y)) Put(x, y, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+                    else if (!(CvZone(x, y) == GenData.Z_LAWN && cvInst[y * CV + x] == siteInstLane)) return false;
+                }
         Sd(CO, 0, 0, SD_OPEN);
 
         // (4) the wood
@@ -501,7 +574,7 @@ public partial class MapGen
                 else if (t == GenData.R_BEDROOM && beds++ > 0) siteType[bi * 26 + r] = roll < 220 ? GenData.R_TEEN : (roll < 440 ? GenData.R_BOXROOM : GenData.R_BEDROOM);
             }
         }
-        int w = PlW(p), d = PlD(p);
+        int w = PlW(p) * PS, d = PlD(p) * PS;
         for (int u = 0; u < plotAlong[k]; u++)
             for (int v = 0; v < plotDepth[k]; v++)
             {
@@ -509,7 +582,7 @@ public partial class MapGen
                 PlotXY(k, u, v, out x, out y);
                 int px = u - plotSL[k], py = v - plotSet[k];
                 if (plotMir[k] != 0) px = w - 1 - px;
-                int room = (px >= 0 && px < w && py >= 0 && py < d) ? PlCell(p, px, py) : -1;
+                int room = (px >= 0 && px < w && py >= 0 && py < d) ? PlCell(p, px / PS, py / PS) : -1;
                 if (room >= 0) { Put(x, y, zone, bi, room, PL_BUILDING, k); continue; }
                 int place = v < plotSet[k] ? PL_FRONT : (v >= plotSet[k] + d ? PL_BACK : ((u < plotSL[k] || u >= plotSL[k] + w) ? PL_SIDE : PL_BACK));
                 Put(x, y, GenData.Z_LAWN, yi, -1, place, k);
@@ -528,7 +601,9 @@ public partial class MapGen
         int p = plotPlan[k], w = PlW(p);
         int cell = code >> 2, dir = code & 3;
         int u, v, x, y;
-        PlanUV(k, cell % w, cell / w, out u, out v);
+        int cx = cell % w, cy = cell / w, sx = cx * PS, sy = cy * PS, j = PS / 2;
+        if (dir == 0) { sx += j; sy += PS - 1; } else if (dir == 1) { sx += PS - 1; sy += j; } else if (dir == 2) sx += j; else sy += j;
+        PlanUV(k, sx, sy, out u, out v);
         PlotXY(k, u, v, out x, out y);
         Sd(x, y, PlotDir(k, dir), kind);
     }
