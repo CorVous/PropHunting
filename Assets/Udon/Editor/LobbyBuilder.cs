@@ -715,7 +715,7 @@ public static class LobbyBuilder
         if (m == null) { m = new Material(LitShader()); AssetDatabase.CreateAsset(m, path); }
         m.shader = LitShader();
         m.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "Models/" + pack + "/" + tex + ".png");
-        m.SetFloat("_Glossiness", 0.15f);
+        Matte(m, 0f);
         EditorUtility.SetDirty(m);
         return m;
     }
@@ -764,13 +764,23 @@ public static class LobbyBuilder
     // when the package is missing
     static Shader LitShader() { var s = Shader.Find("Light Volume Samples/Light Volume PBR"); return s != null ? s : Shader.Find("Standard"); }
 
+    // matte (Cor: walls are not shiny unless they are metal): no specular highlights, no reflections
+    public static void Matte(Material m, float smoothness)
+    {
+        m.SetFloat("_Glossiness", smoothness);
+        m.SetFloat("_Metallic", 0f);
+        m.SetFloat("_Speculars", 0f); m.DisableKeyword("_SPECULARS_ON");
+        m.SetFloat("_SpecularHighlights", 0f); m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+        m.SetFloat("_GlossyReflections", 0f); m.EnableKeyword("_GLOSSYREFLECTIONS_OFF");
+    }
+
     public static Material Mat(string name, Color c)
     {
         string path = "Assets/Udon/Generated/" + name + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (m == null) { m = new Material(LitShader()); AssetDatabase.CreateAsset(m, path); }
         m.shader = LitShader();
-        m.color = c; m.SetFloat("_Glossiness", 0.1f);
+        m.color = c; Matte(m, 0f);
         EditorUtility.SetDirty(m);
         return m;
     }

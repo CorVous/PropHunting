@@ -35,6 +35,17 @@ FIXTURES = [
     ("fx_street_modern",    "kenney-city-kit-roads/light-curved",     "street",  4.80, 180),
     ("fx_street_space",     "space-base-bits/lights",                 "street",  3.60, 0),
     ("fx_street_medieval",  "holiday-bits/lantern",                   "street",  3.40, 0),
+    # the sky's scenery (Cor: fill the sky): hills and mountains round the map, clouds, a space base's rocky ridge.
+    # They stand on their origin like a street lamp; the size is their height
+    ("sky_hill_a",          "kaykit-medieval-hexagon/hills_A_trees",  "street",  9.0, 0),
+    ("sky_hill_b",          "kaykit-medieval-hexagon/hills_B_trees",  "street",  9.0, 0),
+    ("sky_mount_a",         "kaykit-medieval-hexagon/mountain_A_grass_trees", "street", 30.0, 0),
+    ("sky_mount_b",         "kaykit-medieval-hexagon/mountain_B_grass", "street", 26.0, 0),
+    ("sky_mount_c",         "kaykit-medieval-hexagon/mountain_C",     "street", 22.0, 0),
+    ("sky_cloud_big",       "kaykit-medieval-hexagon/cloud_big",      "street",  7.0, 0),
+    ("sky_cloud_small",     "kaykit-medieval-hexagon/cloud_small",    "street",  5.0, 0),
+    ("sky_rock_a",          "kenney-space-kit/rock_largeA",           "street", 16.0, 0),
+    ("sky_rock_b",          "kenney-space-kit/rock_largeB",           "street", 14.0, 0),
 ]
 
 
@@ -203,6 +214,9 @@ def main():
     models = []
     for name, model, kind, size, turn in FIXTURES:
         tris, mn, mx, light = place(load_obj(folder, model), kind, size, turn)
+        if name.startswith("sky_"):
+            # scenery never glows (a bright cloud is not a bulb)
+            tris = [[(p, n, c[:3] + (255,)) for p, n, c in tri] for tri in tris]
         models.append((name, tris, mn, mx, light))
         print("%-20s %5d tris  size %.2f x %.2f x %.2f  light %s" % (name, len(tris), mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2], tuple(round(x, 2) for x in light)))
     write(models)

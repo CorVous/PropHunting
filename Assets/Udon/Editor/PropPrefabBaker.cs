@@ -80,8 +80,9 @@ public static class PropPrefabBaker
         var fixtures = BakeFixtures(mat);
         var decor = BakeDecor(mat);
         BakeParts();
+        BakeSkyExtras();
         AssetDatabase.SaveAssets();
-        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor, partMesh, partOpening, partBody);
+        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor, partMesh, partOpening, partBody, skyPrefabs, starDome, moonPrefab);
         Debug.Log("[prophunt] baked " + mesh.Length + " meshes and " + prefabs.Length + " prop prefabs");
     }
 
@@ -217,9 +218,53 @@ public static class PropPrefabBaker
         "fx_wall_modern", "fx_wall_space", "fx_wall_medieval",
         "fx_street_modern", "fx_street_space", "fx_street_medieval" };
 
+    // the sky's scenery (MapBuilderUdon.SKY_*, same order), from fixtures.bytes; and the star dome and the moon
+    static readonly string[] SkyNames = { "sky_hill_a", "sky_hill_b", "sky_mount_a", "sky_mount_b", "sky_mount_c", "sky_cloud_big", "sky_cloud_small", "sky_rock_a", "sky_rock_b" };
+    static GameObject[] skyPrefabs;
+    static GameObject starDome, moonPrefab;
+
+    static void BakeSkyExtras()
+    {
+        var sky = AssetDatabase.LoadAssetAtPath<Material>(OUT + "/SkyUnlit.mat");
+        if (sky == null) { sky = new Material(Shader.Find("PropHunt/SkyUnlit")) { enableInstancing = true }; AssetDatabase.CreateAsset(sky, OUT + "/SkyUnlit.mat"); }
+        // the stars: 700 small quads on the upper half of a 340 m sphere, facing in, a few tinted
+        var rnd = new System.Random(17);
+        var v = new System.Collections.Generic.List<Vector3>(); var c = new System.Collections.Generic.List<Color32>();
+        var n = new System.Collections.Generic.List<Vector3>(); var t = new System.Collections.Generic.List<int>();
+        for (int i = 0; i < 700; i++)
+        {
+            float az = (float)(rnd.NextDouble() * Math.PI * 2), el = (float)Math.Asin(rnd.NextDouble() * 0.95 + 0.04);
+            Vector3 dir = new Vector3(Mathf.Cos(el) * Mathf.Cos(az), Mathf.Sin(el), Mathf.Cos(el) * Mathf.Sin(az));
+            Vector3 p = dir * 340f, right = Vector3.Cross(dir, Vector3.up).normalized, up = Vector3.Cross(right, dir).normalized;
+            float s = 0.5f + (float)rnd.NextDouble() * (rnd.NextDouble() < 0.08 ? 1.6f : 0.7f);
+            byte b = (byte)(170 + rnd.Next(85));
+            Color32 col = rnd.NextDouble() < 0.15 ? new Color32(b, (byte)(b * 0.85f), (byte)(b * 0.7f), 255) : (rnd.NextDouble() < 0.15 ? new Color32((byte)(b * 0.8f), (byte)(b * 0.88f), b, 255) : new Color32(b, b, b, 255));
+            int st = v.Count;
+            v.Add(p - right * s - up * s); v.Add(p + right * s - up * s); v.Add(p + right * s + up * s); v.Add(p - right * s + up * s);
+            for (int k = 0; k < 4; k++) { c.Add(col); n.Add(-dir); }
+            t.Add(st); t.Add(st + 2); t.Add(st + 1); t.Add(st); t.Add(st + 3); t.Add(st + 2);
+        }
+        var starMesh = new Mesh { name = "Stars" };
+        starMesh.SetVertices(v); starMesh.SetColors(c); starMesh.SetNormals(n); starMesh.SetTriangles(t, 0);
+        starMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 700f);
+        AssetDatabase.AddObjectToAsset(starMesh, AssetDatabase.LoadAssetAtPath<Mesh>(OUT + "/Fixtures.asset"));
+        var go = new GameObject("StarDome");
+        go.AddComponent<MeshFilter>().sharedMesh = starMesh;
+        var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = sky; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        starDome = PrefabUtility.SaveAsPrefabAsset(go, OUT + "/Fixtures/StarDome.prefab");
+        UnityEngine.Object.DestroyImmediate(go);
+        // the moon or a space base's planet: Unity's sphere, white (the builder tints and scales it)
+        var moon = new GameObject("Moon");
+        moon.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
+        var mr2 = moon.AddComponent<MeshRenderer>(); mr2.sharedMaterial = sky; mr2.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        moonPrefab = PrefabUtility.SaveAsPrefabAsset(moon, OUT + "/Fixtures/Moon.prefab");
+        UnityEngine.Object.DestroyImmediate(moon);
+    }
+
     static GameObject[] BakeFixtures(Material mat)   // (byte 18 of a vertex: its alpha; 0 glows, Tools/make_fixtures.py)
     {
         var result = new GameObject[FixtureNames.Length];
+        skyPrefabs = new GameObject[SkyNames.Length];
         var asset = Resources.Load<TextAsset>("PropHunt/fixtures");
         if (asset == null) { Debug.LogWarning("[prophunt] fixtures.bytes is missing: fixtures are drawn from boxes"); return result; }
         byte[] b = asset.bytes;
@@ -262,6 +307,8 @@ public static class PropPrefabBaker
             UnityEngine.Object.DestroyImmediate(go);
             int k = Array.IndexOf(FixtureNames, name);
             if (k >= 0) result[k] = prefab;
+            int sk = Array.IndexOf(SkyNames, name);
+            if (sk >= 0) skyPrefabs[sk] = prefab;
         }
         return result;
     }

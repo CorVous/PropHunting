@@ -464,7 +464,7 @@ public static class WorldSceneBuilder
         var lit = Shader.Find("Light Volume Samples/Light Volume PBR");
         if (m == null) { m = new Material(lit != null ? lit : Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
         if (lit != null) m.shader = lit;
-        m.color = c; m.SetFloat("_Glossiness", 0.1f);
+        m.color = c; LobbyBuilder.Matte(m, 0f);
         EditorUtility.SetDirty(m);
         return m;
     }

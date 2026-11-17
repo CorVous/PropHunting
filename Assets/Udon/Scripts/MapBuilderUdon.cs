@@ -26,6 +26,14 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // wall; partOpening is each window's or door's hole (x0, y0, x1, y1, normalised), partBody the colour the builder
     // repaints with the building's own
     public Mesh[] partMeshes;
+    // the sky (Cor: fill the sky): hills and mountains round the map (rocky ridges on a space base), drifting clouds, the
+    // stars and the moon at night, a planet over a space base (PropPrefabBaker.SkyNames, same order)
+    public GameObject[] skyPrefabs;
+    public GameObject starDomePrefab, moonPrefab;
+    const int SKY_HILL_A = 0, SKY_HILL_B = 1, SKY_MOUNT_A = 2, SKY_MOUNT_B = 3, SKY_MOUNT_C = 4, SKY_CLOUD_BIG = 5, SKY_CLOUD_SMALL = 6, SKY_ROCK_A = 7, SKY_ROCK_B = 8;
+    Transform[] clouds;
+    int nClouds;
+    Vector3 skyCentre;
     public Vector4[] partOpening;
     public Color[] partBody;
     Vector3[][] pv, pn;
@@ -381,13 +389,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
         Material skyMat = RenderSettings.skybox;
         if (skyMat != null)
         {
-            Color skyTint = new Color(0.5f, 0.5f, 0.5f), skyGround = new Color(0.37f, 0.35f, 0.34f);
+            Color skyTint = new Color(0.5f, 0.5f, 0.5f), skyGround = fog * 0.92f;   // below the horizon: the haze, so the land's far edge melts into it
             float exposure = 1.2f, thickness = 1f;
             if (moodTime == 0) { skyTint = new Color(0.62f, 0.48f, 0.52f); thickness = 1.3f; exposure = 1.1f; }   // dawn: pinker
             else if (moodTime == 3) { skyTint = new Color(0.62f, 0.42f, 0.38f); thickness = 1.6f; exposure = 1.0f; }   // dusk
             else if (moodTime == 4) { skyTint = new Color(0.48f, 0.49f, 0.50f); thickness = 2.2f; exposure = 0.9f; }   // overcast: hazy, grey
-            else if (moodTime == 5) { skyTint = new Color(0.25f, 0.30f, 0.50f); thickness = 0.6f; exposure = 0.12f; skyGround = new Color(0.03f, 0.04f, 0.07f); }   // night
-            if (gen.mapTheme == GenData.THEME_SPACE) { skyTint = Color.Lerp(skyTint, new Color(0.70f, 0.38f, 0.30f), 0.6f); thickness *= 0.5f; exposure *= 0.75f; skyGround = new Color(0.22f, 0.12f, 0.10f); }
+            else if (moodTime == 5) { skyTint = new Color(0.25f, 0.30f, 0.50f); thickness = 0.6f; exposure = 0.12f; }   // night
+            if (gen.mapTheme == GenData.THEME_SPACE) { skyTint = Color.Lerp(skyTint, new Color(0.70f, 0.38f, 0.30f), 0.6f); thickness *= 0.5f; exposure *= 0.75f; }
             skyMat.SetColor("_SkyTint", skyTint);
             skyMat.SetColor("_GroundColor", skyGround);
             skyMat.SetFloat("_Exposure", exposure);
@@ -616,6 +624,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         objects = null;
         if (fenceRoot != null)
             for (int i = fenceRoot.childCount - 1; i >= 0; i--) Destroy(fenceRoot.GetChild(i).gameObject);
+        nClouds = 0;
         if (fixtureRoot != null)
             for (int i = fixtureRoot.childCount - 1; i >= 0; i--) Destroy(fixtureRoot.GetChild(i).gameObject);
         if (groundFilter != null) groundFilter.sharedMesh = null;
@@ -627,6 +636,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void Update()
     {
+        if (built && nClouds > 0)
+        {
+            // the clouds drift round the map, one turn in about twenty minutes
+            Quaternion q = Quaternion.Euler(0f, Time.deltaTime * 0.3f, 0f);
+            for (int i = 0; i < nClouds; i++)
+            {
+                if (clouds[i] == null) continue;
+                clouds[i].position = skyCentre + q * (clouds[i].position - skyCentre);
+            }
+        }
         if (!busy) return;
         watch.Reset(); watch.Start();
         bool finished = false;
@@ -772,7 +791,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void FinishGround()
     {
-        float m = 60f, w = W * CELL, h = H * CELL;
+        float m = 260f, w = W * CELL, h = H * CELL;   // out past the hills round the map (SkyDressing)
         Quad(B_GROUND, new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, theme == GenData.THEME_SPACE ? C(140, 80, 62) : C(palGrass.r * 85 / 100, palGrass.g * 88 / 100, palGrass.b * 90 / 100));   // a red planet beyond a space base's fence
         groundFilter.sharedMesh = ToMesh(B_GROUND, "Ground");
         Collider(new Vector3(-m, -1f, -m), new Vector3(w + m, 0f, h + m));
@@ -1140,8 +1159,76 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (theme == GenData.THEME_SPACE) RoofModules(inst);
             else if (theme == GenData.THEME_MEDIEVAL && (cellZone[c] == GenData.Z_HOUSE || cellZone[c] == GenData.Z_CABIN)) Chimney(inst, cellZone[c]);
         }
+        SkyDressing();
         if (theme == GenData.THEME_SPACE) SpacePlain();
         else if (theme == GenData.THEME_MEDIEVAL) MedievalSquare();
+    }
+
+    GameObject PlaceSky(GameObject prefab, Vector3 p, float yaw, float scale)
+    {
+        if (prefab == null || fixtureRoot == null) return null;
+        GameObject go = Instantiate(prefab);
+        Transform tr = go.transform;
+        tr.SetParent(fixtureRoot, false);
+        tr.position = p;
+        tr.rotation = Quaternion.Euler(0f, yaw, 0f);
+        tr.localScale = new Vector3(scale, scale, scale);
+        return go;
+    }
+
+    void SkyDressing()
+    {
+        nClouds = 0;
+        if (skyPrefabs == null || skyPrefabs.Length < 9) return;
+        float w = W * CELL, h = H * CELL;
+        skyCentre = new Vector3(w * 0.5f, 0f, h * 0.5f);
+        float r0 = Mathf.Max(w, h) * 0.5f + 75f;
+        bool space = theme == GenData.THEME_SPACE;
+        // the ring: hills nearer, mountains behind them (a space base: big rocks)
+        int ring = 16;
+        for (int k = 0; k < ring; k++)
+        {
+            float a = (k + Rand01(U32(k + 5001)) * 0.6f) / ring * Mathf.PI * 2f;
+            float rr = r0 + Rand01(U32(k + 5101)) * 18f;
+            Vector3 p = skyCentre + new Vector3(Mathf.Cos(a) * rr, -0.5f, Mathf.Sin(a) * rr);
+            int kind = space ? (k % 2 == 0 ? SKY_ROCK_A : SKY_ROCK_B) : (k % 2 == 0 ? SKY_HILL_A : SKY_HILL_B);
+            PlaceSky(skyPrefabs[kind], p, Rand01(U32(k + 5201)) * 360f, space ? 1.3f + Rand01(U32(k + 5301)) * 0.6f : 2.2f + Rand01(U32(k + 5301)) * 1.2f);
+            if (k % 2 == 0)
+            {
+                float a2 = a + Mathf.PI / ring;
+                float r2 = rr + 40f + Rand01(U32(k + 5401)) * 25f;
+                Vector3 p2 = skyCentre + new Vector3(Mathf.Cos(a2) * r2, -1f, Mathf.Sin(a2) * r2);
+                int m = space ? SKY_ROCK_A : SKY_MOUNT_A + (k / 2) % 3;
+                PlaceSky(skyPrefabs[m], p2, Rand01(U32(k + 5501)) * 360f, space ? 2.6f : 1.6f + Rand01(U32(k + 5601)) * 0.8f);
+            }
+        }
+        // clouds (none on a space base), high over and around the map
+        if (!space)
+        {
+            if (clouds == null) clouds = new Transform[12];
+            for (int k = 0; k < 12; k++)
+            {
+                float a = Rand01(U32(k + 6001)) * Mathf.PI * 2f, rr = Rand01(U32(k + 6101)) * (r0 + 20f);
+                Vector3 p = skyCentre + new Vector3(Mathf.Cos(a) * rr, 55f + Rand01(U32(k + 6201)) * 25f, Mathf.Sin(a) * rr);
+                GameObject c = PlaceSky(skyPrefabs[k % 3 == 0 ? SKY_CLOUD_BIG : SKY_CLOUD_SMALL], p, Rand01(U32(k + 6301)) * 360f, 1.6f + Rand01(U32(k + 6401)) * 1.4f);
+                if (c != null) clouds[nClouds++] = c.transform;
+            }
+        }
+        // at night the stars and the moon; over a space base its planet, day and night
+        bool night = moodTime == 5;
+        if (night && starDomePrefab != null) PlaceSky(starDomePrefab, skyCentre, Rand01(7001u) * 360f, 0.85f);
+        if ((night || space) && moonPrefab != null)
+        {
+            Vector3 dir = new Vector3(0.45f, space ? 0.32f : 0.55f, 0.75f).normalized;
+            GameObject moon = PlaceSky(moonPrefab, skyCentre + dir * 280f, 0f, space ? 48f : 16f);
+            if (moon != null)
+            {
+                MeshRenderer mr = moon.GetComponent<MeshRenderer>();
+                MaterialPropertyBlock mpb = new MaterialPropertyBlock();
+                mpb.SetColor("_Color", space ? new Color(0.55f, 0.66f, 0.85f) : new Color(0.92f, 0.93f, 0.86f));
+                mr.SetPropertyBlock(mpb);
+            }
+        }
     }
 
     // roof modules: one to three per building, on cells of its own roof
