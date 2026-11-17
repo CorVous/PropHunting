@@ -35,6 +35,9 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public int mapSize, mapDensity;
     [UdonSynced] public int[] slotPlayer = new int[32];   // player id per slot, 0 = free
     [UdonSynced] public int[] slotRole = new int[32];     // ROLE_* for this round
+    // the host is whoever owns this object (the instance master to begin with). Locked, only the host keeps
+    // it; unlocked, anyone may claim it (the host panel's Unlock host / Claim host)
+    [UdonSynced] public bool hostLocked = true;
     [UdonSynced] public bool hidersWin;
     [UdonSynced] public string endReason = "";
 
@@ -119,8 +122,31 @@ public class PHGame : UdonSharpBehaviour
 
     public override void OnOwnershipTransferred(VRCPlayerApi player)
     {
-        // a new host: tidy the slot table, and carry on with the round's clock
-        if (IsHost) { AssignSlots(); RequestSerialization(); }
+        // a new host: tidy the slot table, lock the host again, and carry on with the round's clock
+        if (IsHost) { hostLocked = true; AssignSlots(); RequestSerialization(); }
+    }
+
+    // ------------------------------------------------------------------ who hosts
+    public void UnlockHost() { if (!IsHost) return; hostLocked = false; RequestSerialization(); }
+    public void LockHost() { if (!IsHost) return; hostLocked = true; RequestSerialization(); }
+
+    // anyone, while the host is unlocked: take over the game (OnOwnershipTransferred locks it again)
+    public void ClaimHost()
+    {
+        if (IsHost || hostLocked) return;
+        Networking.SetOwner(Networking.LocalPlayer, gameObject);
+    }
+
+    // a claim is only granted while unlocked (the master leaving still hands the game on: VRChat does that)
+    public override bool OnOwnershipRequest(VRCPlayerApi requester, VRCPlayerApi newOwner)
+    {
+        return !hostLocked;
+    }
+
+    public string HostName()
+    {
+        VRCPlayerApi h = Networking.GetOwner(gameObject);
+        return Utilities.IsValid(h) ? h.displayName : "";
     }
 
     // ------------------------------------------------------------------ the host's settings

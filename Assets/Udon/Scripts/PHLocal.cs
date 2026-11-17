@@ -83,10 +83,10 @@ public class PHLocal : UdonSharpBehaviour
                 sound.Play("ready", 0.8f);
                 if (role == PHGame.ROLE_HUNTER)
                 {
+                    // hunters wait in the lobby while the hiders hide (Cor); the hunt brings them to the release
                     SetPropLayer(LAYER_PROPS_WALKTHROUGH);
-                    me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
-                    SetFrozen(true);
-                    Say("You hunt. Wait at the release while the hiders hide.", 6f);
+                    SetFrozen(false);
+                    Say("You hunt. Wait in the lobby while the hiders hide.", 6f);
                 }
                 else if (role == PHGame.ROLE_HIDER)
                 {
@@ -113,7 +113,12 @@ public class PHLocal : UdonSharpBehaviour
             case PHGame.PH_HUNT:
                 sound.Play("go", 0.8f);
                 sound.Play("jingles_PIZZI07", 0.5f);
-                if (role == PHGame.ROLE_HUNTER) { SetFrozen(false); Say("Hunt! Find the props that are hiders.", 3f); }
+                if (role == PHGame.ROLE_HUNTER)
+                {
+                    me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+                    SetFrozen(false);
+                    Say("Hunt! Find the props that are hiders.", 3f);
+                }
                 else if (role == PHGame.ROLE_HIDER)
                 {
                     Say("The hunters are released!", 3f);
@@ -187,6 +192,9 @@ public class PHLocal : UdonSharpBehaviour
     }
 
     public void Reseat() { PHSlot s = Me(); if (s != null) s.Reseat(); }
+
+    // VRChat's defaults, jumping included: a world without the VRCWorld prefab's settings script has jumping off
+    void Start() { SetFrozen(false); }
 
     void SetFrozen(bool frozen)
     {
