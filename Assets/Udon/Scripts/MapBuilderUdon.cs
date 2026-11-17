@@ -189,10 +189,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
         Color fog = new Color(0.56f, 0.76f, 0.93f);
         float fogStart = 45f, fogEnd = 160f;
         float azim = 38f + (int)UModB(Mix(gen.seed ^ 0x2003u), 60u) - 30f;
-        if (moodTime == 0) { elev = 22f; sunCol = new Color(1f, 0.86f, 0.70f); intensity = 0.9f; sky = new Color(0.66f, 0.66f, 0.74f); fog = new Color(0.78f, 0.80f, 0.86f); fogStart = 30f; fogEnd = 120f; azim -= 90f; }
+        if (moodTime == 0) { elev = 22f; sunCol = new Color(1f, 0.86f, 0.70f); intensity = 0.9f; sky = new Color(0.66f, 0.66f, 0.74f); fog = new Color(0.78f, 0.80f, 0.86f); fogStart = 45f; fogEnd = 160f; azim -= 90f; }
         else if (moodTime == 1) { elev = 72f; sunCol = new Color(1f, 0.99f, 0.95f); intensity = 1.1f; sky = new Color(0.66f, 0.72f, 0.80f); fog = new Color(0.60f, 0.78f, 0.95f); fogStart = 60f; fogEnd = 200f; }
-        else if (moodTime == 3) { elev = 14f; sunCol = new Color(1f, 0.66f, 0.42f); intensity = 0.85f; sky = new Color(0.52f, 0.46f, 0.60f); eq = new Color(0.58f, 0.46f, 0.44f); gr = new Color(0.40f, 0.34f, 0.34f); fog = new Color(0.86f, 0.62f, 0.52f); fogStart = 35f; fogEnd = 130f; azim += 120f; }
-        else if (moodTime == 4) { elev = 60f; sunCol = new Color(0.82f, 0.84f, 0.88f); intensity = 0.55f; sky = new Color(0.66f, 0.68f, 0.70f); eq = new Color(0.60f, 0.61f, 0.62f); gr = new Color(0.52f, 0.52f, 0.52f); fog = new Color(0.70f, 0.72f, 0.74f); fogStart = 20f; fogEnd = 90f; }
+        else if (moodTime == 3) { elev = 14f; sunCol = new Color(1f, 0.66f, 0.42f); intensity = 0.85f; sky = new Color(0.52f, 0.46f, 0.60f); eq = new Color(0.58f, 0.46f, 0.44f); gr = new Color(0.40f, 0.34f, 0.34f); fog = new Color(0.80f, 0.66f, 0.62f); fogStart = 50f; fogEnd = 170f; azim += 120f; }
+        else if (moodTime == 4) { elev = 60f; sunCol = new Color(0.82f, 0.84f, 0.88f); intensity = 0.55f; sky = new Color(0.66f, 0.68f, 0.70f); eq = new Color(0.60f, 0.61f, 0.62f); gr = new Color(0.52f, 0.52f, 0.52f); fog = new Color(0.70f, 0.72f, 0.74f); fogStart = 30f; fogEnd = 120f; }
         if (moodSeason == 3) { fog = Color.Lerp(fog, new Color(0.88f, 0.90f, 0.94f), 0.5f); gr = Color.Lerp(gr, new Color(0.80f, 0.82f, 0.86f), 0.6f); }
         if (sun != null)
         {

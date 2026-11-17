@@ -40,6 +40,7 @@ public class PHHiderBody : UdonSharpBehaviour
     float liftT;
 
     float moveV, moveH, look;
+    float lastFaceYaw;
     bool jumpPressed;
     RaycastHit hit;
 
@@ -104,16 +105,18 @@ public class PHHiderBody : UdonSharpBehaviour
         jumpPressed = false;
         if (frozen) { v = 0f; h = 0f; jump = false; }
 
-        // Only inputs move and turn the prop, never the head or the playspace (Cor): the VR right stick or the
-        // desktop mouse turns the station (and the seated player's view with it), and the move input goes along
-        // the station's facing.
-        if (!frozen)
-        {
-            if (vr) { if (Mathf.Abs(look) > 0.1f) stationYaw += look * 120f * dt; }
-            else stationYaw += Input.GetAxisRaw("Mouse X") * 2.2f;
-        }
+        // Moving always goes where the player looks. The prop turns only by input (Cor): in VR the right stick turns
+        // it (and the station, with the seated player's view), never head turning or playspace movement; on desktop
+        // the mouse is the input that turns the view (VRChat turns a seated player's head with it), so there the
+        // prop faces where the view looks. The station is not turned on desktop (that turned the view twice).
+        Vector3 hf = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation * Vector3.forward;
+        hf.y = 0f;
+        float headYaw = hf.sqrMagnitude > 1e-4f ? Mathf.Atan2(hf.x, hf.z) * Mathf.Rad2Deg : stationYaw;
+        if (vr && !frozen && Mathf.Abs(look) > 0.1f) stationYaw += look * 120f * dt;
         stationYaw = Mathf.Repeat(stationYaw, 360f);
-        Quaternion facing = Quaternion.Euler(0f, stationYaw, 0f);
+        lastFaceYaw = vr ? stationYaw : headYaw;
+        float faceYaw = headYaw;
+        Quaternion facing = Quaternion.Euler(0f, faceYaw, 0f);
         Vector3 fwd = facing * Vector3.forward;
         Vector3 right = facing * Vector3.right;
         Vector3 wish = fwd * v + right * h;
@@ -122,7 +125,7 @@ public class PHHiderBody : UdonSharpBehaviour
         wish *= speed * (run ? 1f : DESKTOP_WALK);
 
         // the prop faces the way the hider has turned, in 15 degree steps, where it fits
-        if (!ghost && !frozen) TryYaw(Mathf.Round(stationYaw / 15f) * 15f);
+        if (!ghost && !frozen) TryYaw(Mathf.Round(lastFaceYaw / 15f) * 15f);
 
         float left = dt;
         while (left > 1e-5f)
