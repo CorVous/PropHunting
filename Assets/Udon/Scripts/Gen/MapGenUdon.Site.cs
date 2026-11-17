@@ -231,7 +231,7 @@ public partial class MapGenUdon
         // open plots (Cor: more kinds of plot): a park or an empty lot, now and then a second one on big maps
         int opens = RngChance(rng, size == 0 ? 250 : 450) ? 1 : 0;
         if (size >= 2 && opens == 1 && RngChance(rng, 200)) opens = 2;
-        for (int q = 0; q < opens && nk < 15; q++) kinds[nk++] = RngChance(rng, 550) ? KIND_PARK : KIND_LOT;
+        for (int q = 0; q < opens && nk < 15; q++) { int roll = RngRange(rng, 100); kinds[nk++] = roll < 40 ? KIND_PARK : (roll < 70 ? KIND_LOT : KIND_GAS); }
         Shuffle(kinds, nk, rng);
         if (RngChance(rng, 600))
         {
@@ -296,10 +296,10 @@ public partial class MapGenUdon
             }
             int k = nPlots;
             plotSeg[k] = seg;
-            bool open = kinds[i] == KIND_PARK || kinds[i] == KIND_LOT;
+            bool open = kinds[i] == KIND_PARK || kinds[i] == KIND_LOT || kinds[i] == KIND_GAS;
             int p = open ? -1 : PickPlan(kinds[i], rng);
             if (p < 0 && !open) continue;
-            plotKind[k] = kinds[i] == KIND_PARK ? 1 : (kinds[i] == KIND_LOT ? 2 : 0);
+            plotKind[k] = kinds[i] == KIND_PARK ? 1 : (kinds[i] == KIND_LOT ? 2 : (kinds[i] == KIND_GAS ? 3 : 0));
             // evolution step 3: one plot's building takes another plan of its kind (the main draw stays as it was,
             // so the other plots keep theirs)
             if (!open && evo >= 3 && i == (int)(Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk)
@@ -317,6 +317,7 @@ public partial class MapGenUdon
             if (siteShape == SHAPE_CUL && seg == 1) side = -1;   // the cul-de-sac's plot lies across the lane's end
             plotSide[k] = side;
             int w = open ? 3 + RngRange(rng, 2) : PlW(p), d = open ? 2 + RngRange(rng, 2) : PlD(p);
+            if (kinds[i] == KIND_GAS) { w = 4; d = 3; }   // a forecourt two rows deep and a yard behind it
             plotBodyD[k] = d;
             // front garden 1 cell (2 now and then on L and XL), back garden 1 or 2 cells deep (2 or 3 on L and XL)
             if (kinds[i] == GenData.Z_HOUSE) { plotSet[k] = SizeHouseFront[size] + (SizeHouseFront2[size] > 0 && RngChance(rng, SizeHouseFront2[size]) ? 1 : 0); plotBack[k] = SizeHouseBack[size] + (RngChance(rng, SizeHouseBackExtra[size]) ? 1 : 0); }
@@ -431,9 +432,9 @@ public partial class MapGenUdon
     // a park or an empty lot: no building, only outdoor rooms. A park: a paved plaza in the middle, flower beds
     // along the back fence (when it is deep enough), lawn the rest. An empty lot: a lawn verge to the lane and a
     // yard behind it (the yard's crates, barrels and sheds, left to themselves).
-    public int[] plotKind = new int[16];        // 0 a building, 1 a park, 2 an empty lot
+    public int[] plotKind = new int[16];        // 0 a building, 1 a park, 2 an empty lot, 3 a gas station
     int[] plotBodyD = new int[16];
-    public const int KIND_PARK = 100, KIND_LOT = 101;
+    public const int KIND_PARK = 100, KIND_LOT = 101, KIND_GAS = 102;
 
     void StampOpenPlot(int k)
     {
@@ -453,6 +454,7 @@ public partial class MapGenUdon
                     bool plaza = u == plotAlong[k] / 2 && v == plotDepth[k] / 2;
                     t = plaza ? GenData.R_PATIO : ((v == plotDepth[k] - 1 && plotDepth[k] >= 3) ? GenData.R_GARDEN : GenData.R_LAWN_OPEN);
                 }
+                else if (plotKind[k] == 3) t = v < plotDepth[k] - 1 ? GenData.R_PUMPS : GenData.R_YARD;
                 else t = v == 0 ? GenData.R_LAWN_OPEN : GenData.R_YARD;
                 type[u * 16 + v] = t;
             }

@@ -53,7 +53,7 @@ public partial class MapGenUdon
             case GenData.R_OFFICE: case GenData.R_WH_OFFICE: return GenData.TH_OFFICE;
             case GenData.R_KIDS: return GenData.TH_KIDS;
             case GenData.R_HALL: return GenData.TH_HALL;
-            case GenData.R_STORAGE: case GenData.R_LOADING: case GenData.R_YARD: return GenData.TH_STORE;
+            case GenData.R_STORAGE: case GenData.R_LOADING: case GenData.R_YARD: case GenData.R_PUMPS: return GenData.TH_STORE;
             case GenData.R_DINER_DINING: return GenData.TH_DINER;
             case GenData.R_DINER_KITCHEN: return GenData.TH_PRO_KITCHEN;
             case GenData.R_DINER_STORE: return GenData.TH_PANTRY;

@@ -526,6 +526,7 @@ public partial class MapGen
             case GenData.R_FOREST_CLEARING: PlanForest(true); break;
             case GenData.R_LANE: PlanLane(); break;
             case GenData.R_YARD: PlanYard(); break;
+            case GenData.R_PUMPS: PlanPumps(); break;
         }
         if (roomFloorMin[room] > 0) FillToMinimum();
         // what sits on, in and under the furniture, thinned evenly to the room's cap

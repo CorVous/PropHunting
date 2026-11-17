@@ -111,8 +111,10 @@ public static class PropPrefabBaker
         if (b[0] != 'P' || b[1] != 'H' || b[2] != 'M' || b[3] != '1') throw new Exception("models.bytes: bad header");
         int p = 4;
         int n = BitConverter.ToInt32(b, p); p += 4;
-        if (n != GenModels.Name.Length) throw new Exception("models.bytes does not match GenModels.cs");
-        mesh = new Mesh[n]; bounds = new Bounds[n]; pivot = new Vector3[n]; parent = new int[n];
+        // models after the blob's are made here from boxes (GenModels lists them last: the gas station's)
+        int total = GenModels.Name.Length;
+        if (n > total) throw new Exception("models.bytes does not match GenModels.cs");
+        mesh = new Mesh[total]; bounds = new Bounds[total]; pivot = new Vector3[total]; parent = new int[total];
         var parName = new string[n];
         for (int m = 0; m < n; m++)
         {
@@ -144,6 +146,91 @@ public static class PropPrefabBaker
             mesh[m] = me; bounds[m] = bd;
         }
         for (int m = 0; m < n; m++) parent[m] = parName[m].Length == 0 ? -1 : Array.IndexOf(GenModels.Name, parName[m]);
+        for (int m = n; m < total; m++)
+        {
+            mesh[m] = MakeModel(GenModels.Name[m]);
+            bounds[m] = mesh[m].bounds;
+            pivot[m] = Vector3.zero; parent[m] = -1;
+        }
+    }
+
+    // ------------------------------------------------------------------ generated models (vertex colours, base at y 0)
+    static System.Collections.Generic.List<Vector3> gv, gn;
+    static System.Collections.Generic.List<Color32> gc;
+    static System.Collections.Generic.List<int> gt;
+
+    static void GQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 n, Color32 col)
+    {
+        int s = gv.Count;
+        gv.Add(a); gv.Add(b); gv.Add(c); gv.Add(d);
+        for (int i = 0; i < 4; i++) { gn.Add(n); gc.Add(col); }
+        gt.Add(s); gt.Add(s + 1); gt.Add(s + 2); gt.Add(s); gt.Add(s + 2); gt.Add(s + 3);
+    }
+
+    // an axis-aligned box from min to max (metres)
+    static void GBox(Vector3 mn, Vector3 mx, Color32 col)
+    {
+        float x0 = mn.x, y0 = mn.y, z0 = mn.z, x1 = mx.x, y1 = mx.y, z1 = mx.z;
+        GQuad(new Vector3(x0, y0, z1), new Vector3(x1, y0, z1), new Vector3(x1, y1, z1), new Vector3(x0, y1, z1), Vector3.forward, col);
+        GQuad(new Vector3(x1, y0, z0), new Vector3(x0, y0, z0), new Vector3(x0, y1, z0), new Vector3(x1, y1, z0), Vector3.back, col);
+        GQuad(new Vector3(x0, y1, z0), new Vector3(x0, y1, z1), new Vector3(x1, y1, z1), new Vector3(x1, y1, z0), Vector3.up, col);
+        GQuad(new Vector3(x0, y0, z1), new Vector3(x0, y0, z0), new Vector3(x1, y0, z0), new Vector3(x1, y0, z1), Vector3.down, col);
+        GQuad(new Vector3(x1, y0, z1), new Vector3(x1, y0, z0), new Vector3(x1, y1, z0), new Vector3(x1, y1, z1), Vector3.right, col);
+        GQuad(new Vector3(x0, y0, z0), new Vector3(x0, y0, z1), new Vector3(x0, y1, z1), new Vector3(x0, y1, z0), Vector3.left, col);
+    }
+
+    static Color32 Col(int r, int g, int b) { return new Color32((byte)r, (byte)g, (byte)b, 255); }
+
+    static Mesh MakeModel(string name)
+    {
+        gv = new System.Collections.Generic.List<Vector3>(); gn = new System.Collections.Generic.List<Vector3>();
+        gc = new System.Collections.Generic.List<Color32>(); gt = new System.Collections.Generic.List<int>();
+        if (name == "gen_fuelPump")
+        {
+            // 0.6 x 1.7 x 0.4: a plinth, a red body with a white head, a dark screen, a hose and nozzle on the side
+            GBox(new Vector3(-0.30f, 0f, -0.20f), new Vector3(0.30f, 0.12f, 0.20f), Col(150, 150, 150));
+            GBox(new Vector3(-0.26f, 0.12f, -0.16f), new Vector3(0.26f, 1.25f, 0.16f), Col(200, 56, 48));
+            GBox(new Vector3(-0.28f, 1.25f, -0.18f), new Vector3(0.28f, 1.70f, 0.18f), Col(236, 236, 232));
+            GBox(new Vector3(-0.16f, 1.34f, -0.185f), new Vector3(0.16f, 1.58f, -0.18f), Col(40, 44, 52));
+            GBox(new Vector3(-0.12f, 0.70f, -0.165f), new Vector3(0.12f, 0.90f, -0.16f), Col(230, 200, 60));
+            GBox(new Vector3(0.26f, 0.55f, -0.04f), new Vector3(0.30f, 1.10f, 0.04f), Col(30, 30, 34));
+            GBox(new Vector3(0.26f, 1.02f, -0.06f), new Vector3(0.36f, 1.12f, 0.06f), Col(30, 30, 34));
+        }
+        else if (name == "gen_car")
+        {
+            // 1.8 x 1.4 x 4.0: wheels, a body, a cabin with glass, lights
+            Color32 paint = Col(60, 110, 170), glass = Col(150, 190, 210), tyre = Col(28, 28, 30), trim = Col(210, 210, 214);
+            for (int i = 0; i < 4; i++)
+            {
+                float x = (i & 1) == 0 ? -0.90f : 0.62f, z = (i & 2) == 0 ? -1.45f : 0.95f;
+                GBox(new Vector3(x, 0f, z), new Vector3(x + 0.28f, 0.62f, z + 0.62f), tyre);
+            }
+            GBox(new Vector3(-0.88f, 0.28f, -1.98f), new Vector3(0.88f, 0.86f, 1.98f), paint);
+            GBox(new Vector3(-0.80f, 0.86f, -0.95f), new Vector3(0.80f, 1.40f, 0.85f), paint);
+            GBox(new Vector3(-0.81f, 0.92f, -0.90f), new Vector3(0.81f, 1.32f, 0.80f), glass);
+            GBox(new Vector3(-0.75f, 0.94f, 0.80f), new Vector3(0.75f, 1.30f, 0.86f), glass);
+            GBox(new Vector3(-0.75f, 0.94f, -0.96f), new Vector3(0.75f, 1.30f, -0.90f), glass);
+            GBox(new Vector3(-0.70f, 0.58f, 1.98f), new Vector3(-0.40f, 0.72f, 2.00f), Col(250, 240, 200));
+            GBox(new Vector3(0.40f, 0.58f, 1.98f), new Vector3(0.70f, 0.72f, 2.00f), Col(250, 240, 200));
+            GBox(new Vector3(-0.70f, 0.58f, -2.00f), new Vector3(-0.40f, 0.72f, -1.98f), Col(200, 40, 40));
+            GBox(new Vector3(0.40f, 0.58f, -2.00f), new Vector3(0.70f, 0.72f, -1.98f), Col(200, 40, 40));
+            GBox(new Vector3(-0.90f, 0.30f, -2.00f), new Vector3(0.90f, 0.42f, 2.00f), trim);
+        }
+        else if (name == "gen_tireStack")
+        {
+            // 0.65 x 0.8 x 0.65: four tyres, each two crossed boxes, slightly off-centre
+            for (int i = 0; i < 4; i++)
+            {
+                float y0 = i * 0.2f, o = (i % 2 == 0 ? 0.01f : -0.01f);
+                GBox(new Vector3(-0.32f + o, y0, -0.22f), new Vector3(0.32f + o, y0 + 0.19f, 0.22f), Col(32, 32, 34));
+                GBox(new Vector3(-0.22f + o, y0, -0.32f), new Vector3(0.22f + o, y0 + 0.19f, 0.32f), Col(32, 32, 34));
+                GBox(new Vector3(-0.12f + o, y0 + 0.19f, -0.12f), new Vector3(0.12f + o, y0 + 0.191f, 0.12f), Col(70, 70, 74));
+            }
+        }
+        var m = new Mesh { name = name };
+        m.SetVertices(gv); m.SetNormals(gn); m.SetColors(gc); m.SetTriangles(gt, 0);
+        m.RecalculateBounds();
+        return m;
     }
 
     static Vector3 V(byte[] b, int p) { return new Vector3(BitConverter.ToSingle(b, p), BitConverter.ToSingle(b, p + 4), BitConverter.ToSingle(b, p + 8)); }

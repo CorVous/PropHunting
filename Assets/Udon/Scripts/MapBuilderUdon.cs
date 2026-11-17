@@ -341,6 +341,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 else
                 {
                     wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls");
+                    Canopies();
                     roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs");
                     collisionCollider.sharedMesh = ToMesh(B_COLL, "ArchCollision");
                     stage = 3; cursor = 0; phase = "Placing props";
@@ -572,6 +573,37 @@ public class MapBuilderUdon : UdonSharpBehaviour
     }
 
     bool Bld(int x, int z) { return InGrid(x, z) && IsBuilding(cellZone[z * W + x]); }
+
+    // ------------------------------------------------------------------ gas station canopies
+    // A flat canopy 4.2 m up over each forecourt (MapGen's R_PUMPS rooms): white, a red fascia, a post near each
+    // corner (with a collider). Drawn with the roofs, so the reveal lifts it off as well.
+    void Canopies()
+    {
+        int nr = gen.nRooms;
+        for (int r = 0; r < nr; r++)
+        {
+            if (roomType[r] != GenData.R_PUMPS) continue;
+            int x0 = 9999, z0 = 9999, x1 = -1, z1 = -1;
+            for (int c = 0; c < W * H; c++)
+            {
+                if (cellRoom[c] != r) continue;
+                int x = c % W, z = c / W;
+                if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;
+            }
+            if (x1 < 0) continue;
+            float ax = x0 * CELL + 0.3f, bx = (x1 + 1) * CELL - 0.3f, az = z0 * CELL + 0.3f, bz = (z1 + 1) * CELL - 0.3f;
+            Color32 white = C(238, 238, 234), red = C(200, 56, 48), post = C(170, 172, 176);
+            Box3(B_ROOFS, new Vector3(ax, 4.2f, az), new Vector3(bx, 4.32f, bz), white, white, white, FACE_ALL);
+            Box(B_ROOFS, new Vector3(ax - 0.02f, 4.32f, az - 0.02f), new Vector3(bx + 0.02f, 4.62f, bz + 0.02f), red, FACE_ALL & ~FACE_YN);
+            for (int k = 0; k < 4; k++)
+            {
+                float px = (k & 1) == 0 ? ax + 0.9f : bx - 0.9f, pz = (k & 2) == 0 ? az + 0.9f : bz - 0.9f;
+                Vector3 mn = new Vector3(px - 0.14f, 0f, pz - 0.14f), mx = new Vector3(px + 0.14f, 4.2f, pz + 0.14f);
+                Box(B_ROOFS, mn, mx, post, FACE_ALL & ~FACE_YN);
+                Collider(mn, mx);
+            }
+        }
+    }
 
     // ------------------------------------------------------------------ pitched roofs
     // One gable over each house's bounding box, its ridge along the box's long side, 30 degrees. Each roof cell
