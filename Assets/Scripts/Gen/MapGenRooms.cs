@@ -38,7 +38,7 @@ public partial class MapGen
     void BuildRooms()
     {
         nRooms = 0;
-        for (int i = 0; i < 8; i++) { statZoneCells[i] = 0; statZoneRooms[i] = 0; }
+        for (int i = 0; i < statZoneCells.Length; i++) { statZoneCells[i] = 0; statZoneRooms[i] = 0; }
         int[] map = new int[26];
         for (int inst = 0; inst < nInst; inst++)
         {

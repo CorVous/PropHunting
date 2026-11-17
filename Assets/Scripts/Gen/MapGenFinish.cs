@@ -231,7 +231,7 @@ public partial class MapGen
         // counts for the statistics and the tuning overlay (G24): floor and on-furniture props per room type and zone
         statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0; statGroups = 0; statLoose = 0;
         for (int i = 0; i < 64; i++) { statTypeRooms[i] = 0; statTypeCells[i] = 0; statTypeFloor[i] = 0; statTypeTop[i] = 0; }
-        for (int i = 0; i < 8; i++) { statZoneFloor[i] = 0; statZoneTop[i] = 0; }
+        for (int i = 0; i < statZoneFloor.Length; i++) { statZoneFloor[i] = 0; statZoneTop[i] = 0; }
         for (int r = 0; r < nRooms; r++)
         {
             int t = roomType[r] & 63;
@@ -487,6 +487,9 @@ public partial class MapGen
         if (zone == GenData.Z_RELEASE) return GR_RELEASE;
         if (roomType[room] == GenData.R_LANE) return GR_TRACK;    // the lane is a track (G32)
         if (roomType[room] == GenData.R_YARD) return GR_PAVING;   // a yard is paved
+        if (roomType[room] == GenData.R_FORECOURT) return GR_PAVING;   // so is a forecourt (revision 9)
+        if (roomType[room] == GenData.R_FARMYARD) return GR_TRACK;     // a farmyard is trodden earth
+        if (roomType[room] == GenData.R_PARK && (t & GenData.T_PATH) != 0) return GR_TRACK;   // a park's gravel paths
         if ((t & GenData.T_EARTH) != 0) return GR_TRACK;                 // trodden earth around a fire
         if (zone == GenData.Z_FOREST) return (t & GenData.T_PATH) != 0 ? GR_TRACK : GR_FOREST;
         if ((t & GenData.T_COVERED) != 0) return GR_PAVING;

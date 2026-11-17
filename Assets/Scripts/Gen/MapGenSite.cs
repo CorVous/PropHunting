@@ -67,6 +67,9 @@ public partial class MapGen
         int lo, hi;
         if (zone == GenData.Z_HOUSE) { lo = GenData.SizeHouseCellsMin[size]; hi = GenData.SizeHouseCellsMax[size]; }
         else if (zone == GenData.Z_WAREHOUSE) { lo = GenData.SizeWarehouseCellsMin[size]; hi = GenData.SizeWarehouseCellsMax[size]; }
+        else if (zone == GenData.Z_SHOP) { lo = GenData.SizeShopCellsMin[size]; hi = GenData.SizeShopCellsMax[size]; }
+        else if (zone == GenData.Z_GARAGE) { lo = GenData.SizeGarageCellsMin[size]; hi = GenData.SizeGarageCellsMax[size]; }
+        else if (zone == GenData.Z_BARN) { lo = GenData.SizeBarnCellsMin[size]; hi = GenData.SizeBarnCellsMax[size]; }
         else { lo = 6; hi = GenData.SizeDinerCellsMax[size]; }
         int n = 0;
         for (int p = 0; p < GenPlans.Count; p++)
@@ -142,32 +145,29 @@ public partial class MapGen
         siteType[rel * 26] = GenData.R_RELEASE;
         Put(CO, 0, GenData.Z_RELEASE, rel, 0, PL_NONE, -1);
 
-        // (1) the plots of the map's size, commercial ones near the road's start more often than not
+        // (1) the plots of the map's size (layout 4: a mix drawn per map, never two of one kind but houses), the
+        // commercial ones near the road's start more often than not, a farm at the far end, towards the wood
         string prog = GenData.SizePlots[size];
         int[] kinds = new int[16];
         int nk = 0;
         for (int i = 0; i < prog.Length; i++)
         {
             char ch = prog[i];
-            int z = ch == 'H' ? GenData.Z_HOUSE : (ch == 'D' ? GenData.Z_DINER : (ch == 'W' ? GenData.Z_WAREHOUSE : -1));
-            if (z < 0)
-            {
-                int roll = rng.Range(1000);
-                z = size == 0 ? (roll < 500 ? GenData.Z_HOUSE : (roll < 750 ? GenData.Z_DINER : GenData.Z_WAREHOUSE)) : (roll < 500 ? GenData.Z_DINER : GenData.Z_WAREHOUSE);
-            }
+            int z = GenData.Z_HOUSE;
+            if (ch != 'H' && !(ch == '*' && rng.Chance(GenData.PLOT_ANY_HOUSE))) z = DrawPlotKind(kinds, nk, ref rng);
             kinds[nk++] = z;
         }
-        if (rng.Chance(GenData.SizeExtraHouse[size])) kinds[nk++] = GenData.Z_HOUSE;
         Shuffle(kinds, nk, ref rng);
-        if (rng.Chance(600))
+        bool comFirst = rng.Chance(600);
         {
-            // shops at the road's start: the commercial plots first, in their shuffled order
+            // shops at the road's start, houses, then the farm and the park towards the wood
             int w = 0;
-            for (int pass = 0; pass < 2; pass++)
+            for (int pass = 0; pass < 3; pass++)
                 for (int i = 0; i < nk; i++)
                 {
-                    bool com = kinds[i] != GenData.Z_HOUSE;
-                    if (com == (pass == 0)) cand[w++] = kinds[i];
+                    int z = kinds[i];
+                    int rank = (z == GenData.Z_BARN || z == GenData.Z_PARK) ? 2 : (z != GenData.Z_HOUSE && comFirst ? 0 : 1);
+                    if (rank == pass) cand[w++] = z;
                 }
             for (int i = 0; i < nk; i++) kinds[i] = cand[i];
         }
@@ -179,30 +179,37 @@ public partial class MapGen
         for (int i = 0; i < nk; i++)
         {
             int k = nPlots;
-            int p = PickPlan(kinds[i], ref rng);
-            if (p < 0) continue;
+            bool park = kinds[i] == GenData.Z_PARK;
+            int p = park ? -1 : PickPlan(kinds[i], ref rng);
+            if (p < 0 && !park) continue;
             nPlots++;
             plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = rng.Chance(500) ? 1 : 0;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (rng.Chance(500) ? -1 : 1));
             plotSide[k] = side;
-            int w = PlW(p), d = PlD(p);
+            // a park has no building: its plot is the whole of it, as if a building of its size stood on it
+            int w = park ? GenData.SizeParkAlong[size] : PlW(p), d = park ? GenData.SizeParkDeep[size] : PlD(p);
             // front garden 1 cell (2 now and then on L and XL), back garden 1 or 2 cells deep (2 or 3 on L and XL)
             if (kinds[i] == GenData.Z_HOUSE) { plotSet[k] = GenData.SizeHouseFront[size] + (GenData.SizeHouseFront2[size] > 0 && rng.Chance(GenData.SizeHouseFront2[size]) ? 1 : 0); plotBack[k] = GenData.SizeHouseBack[size] + (rng.Chance(GenData.SizeHouseBackExtra[size]) ? 1 : 0); }
-            else if (kinds[i] == GenData.Z_DINER) { plotSet[k] = 1; plotBack[k] = 1; }
+            else if (kinds[i] == GenData.Z_DINER || kinds[i] == GenData.Z_SHOP || kinds[i] == GenData.Z_GARAGE) { plotSet[k] = 1; plotBack[k] = 1; }
+            else if (kinds[i] == GenData.Z_BARN) { plotSet[k] = 1; plotBack[k] = size == 0 ? 1 : 2; }   // the farmyard, the field behind
+            else if (park) { plotSet[k] = 0; plotBack[k] = 0; }
             else { plotSet[k] = GenData.SizeWarehouseFront[size]; plotBack[k] = GenData.SizeWarehouseBack2[size] > 0 && rng.Chance(GenData.SizeWarehouseBack2[size]) ? 2 : 1; }
-            plotSL[k] = rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0; plotSR[k] = rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0;
+            plotSL[k] = park ? 0 : (rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0); plotSR[k] = park ? 0 : (rng.Chance(GenData.SizeSideYard[size]) ? 1 : 0);
+            // a farm's paddock lies beside the barn
+            if (kinds[i] == GenData.Z_BARN && plotSL[k] + plotSR[k] == 0) { if (rng.Chance(500)) plotSL[k] = 1; else plotSR[k] = 1; }
             // a back door in a side wall opens onto this plot's own side yard
-            int bd = PlBack(p) & 3;
+            int bd = park ? 0 : PlBack(p) & 3;
             if (bd == 1 || bd == 3) { if ((bd == 1) != (plotMir[k] != 0)) plotSR[k] = 1; else plotSL[k] = 1; }
             // a building never touches the map's edge or its neighbour's building (report 16, T3, T12)
             int off = side < 0 ? offL : offR, prev = side < 0 ? lastL : lastR;
             if (off == 1 || (side < 0 ? touchL : touchR)) plotSL[k] = 1;
-            if (prev >= 0)
+            if (park) plotSL[k] = 0;
+            if (prev >= 0 && !park)
             {
                 // nor stands beside the open end of a shallower neighbour: this plot's side yard, or a deeper garden
                 // beside the neighbour's building
                 if (plotSL[k] == 0 && plotDepth[prev] < plotSet[k] + d) plotSL[k] = 1;
-                int prevEnd = plotSet[prev] + PlD(plotPlan[prev]);
+                int prevEnd = plotSet[prev] + (plotPlan[prev] >= 0 ? PlD(plotPlan[prev]) : 0);
                 if (plotSR[prev] == 0 && plotSet[k] + d + plotBack[k] < prevEnd) plotBack[k] = prevEnd - plotSet[k] - d;
             }
             plotY0[k] = off;
@@ -235,9 +242,42 @@ public partial class MapGen
         return PlaceSite(ref rng);
     }
 
+    // one of the plot kinds that are not houses, by weight, not one the map has already
+    int DrawPlotKind(int[] kinds, int nk, ref GenRng rng)
+    {
+        int total = 0;
+        for (int i = 0; i < GenData.PlotPoolZone.Length; i++) if (!Has(kinds, nk, GenData.PlotPoolZone[i])) total += GenData.PlotPoolWeight[i];
+        int roll = rng.Range(total > 0 ? total : 1);
+        for (int i = 0; i < GenData.PlotPoolZone.Length; i++)
+        {
+            if (Has(kinds, nk, GenData.PlotPoolZone[i])) continue;
+            if (roll < GenData.PlotPoolWeight[i]) return GenData.PlotPoolZone[i];
+            roll -= GenData.PlotPoolWeight[i];
+        }
+        return GenData.Z_HOUSE;
+    }
+
+    static bool Has(int[] a, int n, int v) { for (int i = 0; i < n; i++) if (a[i] == v) return true; return false; }
+
     void StampPlot(int k, ref GenRng rng)
     {
         int p = plotPlan[k], zone = plotZone[k];
+        if (p < 0)
+        {
+            // a park: no building, every cell of the plot is the park (TypeYard)
+            plotInstB[k] = -1;
+            int pi = NewInst(GenData.Z_LAWN);
+            plotInstY[k] = pi;
+            for (int u = 0; u < plotAlong[k]; u++)
+                for (int v = 0; v < plotDepth[k]; v++)
+                {
+                    int x, y;
+                    PlotXY(k, u, v, out x, out y);
+                    Put(x, y, GenData.Z_LAWN, pi, -1, v == 0 ? PL_FRONT : PL_BACK, k);
+                }
+            TypeYard(k, ref rng);
+            return;
+        }
         int bi = NewInst(zone), yi = NewInst(GenData.Z_LAWN);
         plotInstB[k] = bi; plotInstY[k] = yi;
         for (int r = 0; r < PlRooms(p); r++) { siteType[bi * 26 + r] = PlRole(p, r); sitePlace[bi * 26 + r] = PL_BUILDING; }
@@ -316,6 +356,9 @@ public partial class MapGen
                         else t = GenData.R_LAWN_OPEN;
                     }
                     else if (zone == GenData.Z_DINER) t = pl == PL_FRONT ? GenData.R_PATIO : ((atBack || pl == PL_BACK) ? GenData.R_YARD : GenData.R_LAWN_OPEN);
+                    else if (zone == GenData.Z_SHOP || zone == GenData.Z_GARAGE) t = pl == PL_FRONT ? GenData.R_FORECOURT : ((atBack || pl == PL_BACK) ? GenData.R_YARD : GenData.R_LAWN_OPEN);
+                    else if (zone == GenData.Z_BARN) t = pl == PL_FRONT ? GenData.R_FARMYARD : (pl == PL_SIDE ? GenData.R_PADDOCK : GenData.R_FIELD);
+                    else if (zone == GenData.Z_PARK) t = GenData.R_PARK;
                     else t = pl == PL_FRONT ? GenData.R_LAWN_OPEN : GenData.R_YARD;
                 }
                 type[u * 16 + v] = t;
@@ -645,6 +688,11 @@ public partial class MapGen
             if (!GenData.IsBuilding(za)) continue;
             int x = c % W, z = c / W, rt = roomType[cellRoom[c]];
             int chance = za == GenData.Z_WAREHOUSE ? (rt == GenData.R_WH_OFFICE ? 700 : 220) : (rt == GenData.R_BATH || rt == GenData.R_HALL ? 350 : (rt == GenData.R_DINER_STORE ? 150 : 650));
+            // revision 9: a shop's windows on its floor; a garage bay's walls carry its roller door, not windows
+            if (rt == GenData.R_SHOP_FLOOR) chance = 850;
+            else if (rt == GenData.R_GARAGE_BAY) chance = 0;
+            else if (rt == GenData.R_STOCKROOM || rt == GenData.R_PARTS || rt == GenData.R_FEED_STORE) chance = 150;
+            else if (rt == GenData.R_BARN) chance = 250;
             for (int d = 0; d < 4; d++)
             {
                 if (EdgeType(x, z, d) != GenData.E_WALL || GenData.IsBuilding(ZoneAt(x + DX[d], z + DZ[d]))) continue;
@@ -655,7 +703,7 @@ public partial class MapGen
         {
             int rt = roomType[r];
             bool habitable = rt == GenData.R_LIVING || rt == GenData.R_DINING || rt == GenData.R_KITCHEN || rt == GenData.R_BEDROOM || rt == GenData.R_OFFICE
-                || rt == GenData.R_KIDS || rt == GenData.R_DINER_DINING || rt == GenData.R_WH_OFFICE;
+                || rt == GenData.R_KIDS || rt == GenData.R_DINER_DINING || rt == GenData.R_WH_OFFICE || rt == GenData.R_SHOP_FLOOR || rt == GenData.R_BACK_OFFICE;
             if (!habitable) continue;
             int wall = -1, seen = 0;
             bool has = false;

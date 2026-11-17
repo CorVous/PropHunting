@@ -53,28 +53,76 @@ public class MapBuilder
             case GenData.R_DINER_DINING: return C(246, 236, 216);
             case GenData.R_DINER_KITCHEN: return C(226, 232, 232);
             case GenData.R_DINER_STORE: return C(206, 204, 198);
+            // revision 9
+            case GenData.R_SHOP_FLOOR: return C(240, 240, 232);
+            case GenData.R_STOCKROOM: case GenData.R_PARTS: return C(196, 198, 200);
+            case GenData.R_BACK_OFFICE: return C(222, 214, 200);
+            case GenData.R_GARAGE_BAY: return C(178, 182, 186);
+            case GenData.R_BARN: case GenData.R_FEED_STORE: return C(176, 132, 92);
         }
         return C(220, 220, 220);
     }
 
-    static Color32 ExteriorColour(int zone)
+    // ---- revision 9: a colour scheme per building, so two houses (and their bedrooms) do not look alike. The
+    // scheme comes from the seed and the building's instance, so a seed always looks the same. Interior walls are
+    // tinted, wooden floors and the outside walls and roof take one of four looks per kind of building.
+    int Style(int inst) { return inst < 0 ? 0 : (int)(GenRng.Hash32(gen.seed, (uint)inst, 9091, 0, 0) & 3); }
+    int StyleAt(int cell) { return cell >= 0 && GenData.IsBuilding(gen.cellZone[cell]) ? Style(gen.cellInst[cell]) : 0; }
+
+    static readonly int[] TintR = { 0, 10, -14, 4 }, TintG = { 0, -6, 2, 8 }, TintB = { 0, -14, 10, -10 };
+    static Color32 Tint(Color32 c, int style) { return C(Mathf.Clamp(c.r + TintR[style], 0, 255), Mathf.Clamp(c.g + TintG[style], 0, 255), Mathf.Clamp(c.b + TintB[style], 0, 255)); }
+
+    Color32 WallColourAt(int cell) { return Tint(WallColour(gen.roomType[gen.cellRoom[cell]]), StyleAt(cell)); }
+
+    static readonly Color32[] HouseOut = { C(232, 212, 180), C(196, 214, 222), C(204, 216, 186), C(184, 112, 90) };
+    static readonly Color32[] HouseRoof = { C(172, 94, 80), C(92, 100, 112), C(84, 104, 92), C(122, 90, 70) };
+    static readonly Color32[] ShopOut = { C(240, 222, 150), C(140, 196, 190), C(236, 236, 228), C(200, 160, 196) };
+    static readonly Color32[] GarageOut = { C(150, 160, 170), C(176, 104, 84), C(196, 190, 170), C(120, 136, 120) };
+    static readonly Color32[] BarnOut = { C(170, 60, 50), C(150, 108, 72), C(186, 82, 58), C(132, 92, 64) };
+
+    static Color32 ExteriorColour(int zone, int style)
     {
-        return zone == GenData.Z_HOUSE ? C(232, 212, 180) : (zone == GenData.Z_DINER ? C(214, 92, 80) : C(122, 142, 160));
+        switch (zone)
+        {
+            case GenData.Z_HOUSE: return HouseOut[style];
+            case GenData.Z_DINER: return C(214, 92, 80);
+            case GenData.Z_SHOP: return ShopOut[style];
+            case GenData.Z_GARAGE: return GarageOut[style];
+            case GenData.Z_BARN: return BarnOut[style];
+        }
+        return C(122, 142, 160);
     }
 
-    static Color32 RoofColour(int zone)
+    static Color32 RoofColour(int zone, int style)
     {
-        return zone == GenData.Z_HOUSE ? C(172, 94, 80) : (zone == GenData.Z_DINER ? C(232, 230, 222) : C(100, 106, 116));
+        switch (zone)
+        {
+            case GenData.Z_HOUSE: return HouseRoof[style];
+            case GenData.Z_DINER: return C(232, 230, 222);
+            case GenData.Z_SHOP: return C(84, 88, 96);
+            case GenData.Z_GARAGE: return C(110, 116, 124);
+            case GenData.Z_BARN: return (style & 1) == 0 ? C(78, 82, 90) : C(112, 86, 66);
+        }
+        return C(100, 106, 116);
     }
 
-    Color32 FloorColour(int roomType, int ix, int iz)
+    static readonly Color32[] PlankA = { C(198, 154, 106), C(150, 104, 70), C(214, 190, 150), C(170, 160, 150) };
+    static readonly Color32[] PlankB = { C(188, 144, 98), C(140, 96, 64), C(204, 178, 140), C(160, 150, 140) };
+
+    Color32 FloorColour(int roomType, int ix, int iz, int style = 0)
     {
         switch (roomType)
         {
             case GenData.R_LIVING: case GenData.R_BEDROOM: case GenData.R_OFFICE: case GenData.R_DINING: case GenData.R_KIDS: case GenData.R_HALL:
-            case GenData.R_WH_OFFICE:
-                // wood planks: strips two cells wide, alternating shade
-                return Vary((((iz / 2) & 1) == 0) ? C(198, 154, 106) : C(188, 144, 98), ix / 4, iz / 2, 4);
+            case GenData.R_WH_OFFICE: case GenData.R_BACK_OFFICE: case GenData.R_FEED_STORE:
+                // wood planks: strips two cells wide, alternating shade; four kinds of wood (the building's scheme)
+                return Vary((((iz / 2) & 1) == 0) ? PlankA[style] : PlankB[style], ix / 4, iz / 2, 4);
+            case GenData.R_SHOP_FLOOR:
+                return (((ix + iz) & 1) == 0) ? C(232, 232, 226) : C(196, 204, 208);
+            case GenData.R_STOCKROOM: case GenData.R_PARTS: case GenData.R_GARAGE_BAY:
+                return Vary(C(150, 152, 156), ix, iz, 7);
+            case GenData.R_BARN:
+                return Vary(C(184, 156, 104), ix, iz, 10);
             case GenData.R_KITCHEN: case GenData.R_DINER_KITCHEN:
                 return (((ix + iz) & 1) == 0) ? C(226, 226, 218) : C(204, 210, 212);
             case GenData.R_BATH:
@@ -202,7 +250,7 @@ public class MapBuilder
             case MapGen.GR_PAVING: return (((ix / 2 + iz / 2) & 1) == 0) ? C(196, 190, 178) : C(182, 176, 166);
             case MapGen.GR_TRACK: return Vary(C(158, 134, 100), ix, iz, 6);
         }
-        return FloorColour(gen.roomType[gen.innerRoom[i]], ix, iz);
+        return FloorColour(gen.roomType[gen.innerRoom[i]], ix, iz, StyleAt(ix / GenData.INNER_PER_CELL + iz / GenData.INNER_PER_CELL * gen.W));
     }
 
     bool Blends(int i)
@@ -345,9 +393,9 @@ public class MapBuilder
         if (gen.InGrid(cx, cz))
         {
             int c = cz * gen.W + cx;
-            if (GenData.IsBuilding(gen.cellZone[c])) return WallColour(gen.roomType[gen.cellRoom[c]]);
+            if (GenData.IsBuilding(gen.cellZone[c])) return WallColourAt(c);
         }
-        return ExteriorColour(buildingZone);
+        return ExteriorColour(buildingZone, capStyle);
     }
 
     // trim around an opening: sticks out 2 cm on both faces
@@ -358,6 +406,58 @@ public class MapBuilder
         float t = WALL_HALF + 0.02f;
         if (horizontal) walls.Box(new Vector3(ex + a0, y0, ez - t), new Vector3(ex + a1, y1, ez + t), col, faces);
         else walls.Box(new Vector3(ex - t, y0, ez + a0), new Vector3(ex + t, y1, ez + a1), col, faces);
+    }
+
+    int capStyle;   // the scheme of the building whose wall Edge is drawing (CapColour's outside colour)
+
+    // Revision 9: the big doors drawn on an outside wall: a garage bay's roller door on its wall to the forecourt,
+    // a barn's double doors on its wall to the farmyard. Drawn on the outside face, standing 3 cm proud of it (no
+    // face in the wall's plane, G40); the people's door is the plan's own door beside it.
+    void BigDoor(bool horizontal, float ex, float ez, int cellA, int cellB)
+    {
+        for (int side = 0; side < 2; side++)
+        {
+            int inC = side == 0 ? cellA : cellB, outC = side == 0 ? cellB : cellA;
+            if (inC < 0 || outC < 0 || !GenData.IsBuilding(gen.cellZone[inC]) || GenData.IsBuilding(gen.cellZone[outC])) continue;
+            int rt = gen.roomType[gen.cellRoom[inC]], ot = gen.roomType[gen.cellRoom[outC]];
+            bool roller = rt == GenData.R_GARAGE_BAY && ot == GenData.R_FORECOURT, barn = rt == GenData.R_BARN && ot == GenData.R_FARMYARD;
+            if (!roller && !barn) continue;
+            // the outside face: side A (low) is south or west of the edge, so its outside is +, side B's is -
+            float s = side == 0 ? 1f : -1f, face = WALL_HALF * s, t = 0.03f * s;
+            float a0 = 0.45f, a1 = CELL - 0.45f, top = roller ? 2.6f : 2.9f;
+            Color32 panel = roller ? C(206, 210, 214) : C(150, 54, 44), rib = roller ? C(170, 176, 182) : C(236, 230, 214);
+            Panel(horizontal, ex, ez, a0, a1, 0f, top, face, face + t, panel);
+            if (roller)
+            {
+                // the slats: a rib every 25 cm, standing 1 cm proud of the door
+                for (float y = 0.3f; y < top - 0.05f; y += 0.25f) Panel(horizontal, ex, ez, a0, a1, y, y + 0.04f, face + t, face + t + 0.01f * s, rib);
+            }
+            else
+            {
+                // two leaves: a frame round each and a rail across, in white
+                float mid = (a0 + a1) / 2;
+                float[] xs = { a0, mid - 0.04f, mid + 0.04f, a1 - 0.08f };
+                // the uprights stop at the rails (no two strips overlap in one plane, G40)
+                for (int k = 0; k < xs.Length; k++)
+                {
+                    Panel(horizontal, ex, ez, xs[k], xs[k] + 0.08f, 0.08f, top / 2 - 0.05f, face + t, face + t + 0.015f * s, rib);
+                    Panel(horizontal, ex, ez, xs[k], xs[k] + 0.08f, top / 2 + 0.05f, top - 0.08f, face + t, face + t + 0.015f * s, rib);
+                }
+                Panel(horizontal, ex, ez, a0, a1, top - 0.08f, top, face + t, face + t + 0.015f * s, rib);
+                Panel(horizontal, ex, ez, a0, a1, 0f, 0.08f, face + t, face + t + 0.015f * s, rib);
+                Panel(horizontal, ex, ez, a0, a1, top / 2 - 0.05f, top / 2 + 0.05f, face + t, face + t + 0.015f * s, rib);
+            }
+        }
+    }
+
+    // a flat box on a wall's face: from a0 to a1 along the edge, y0 to y1, and from n0 to n1 off the wall line (no
+    // face toward the wall: it lies on the wall or on the panel under it)
+    void Panel(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, float n0, float n1, Color32 col)
+    {
+        float lo = Mathf.Min(n0, n1), hi = Mathf.Max(n0, n1);
+        bool outPlus = n1 > n0;
+        if (horizontal) walls.Box(new Vector3(ex + a0, y0, ez + lo), new Vector3(ex + a1, y1, ez + hi), col, MeshBuf.FACE_ALL & ~(outPlus ? MeshBuf.FACE_ZN : MeshBuf.FACE_ZP));
+        else walls.Box(new Vector3(ex + lo, y0, ez + a0), new Vector3(ex + hi, y1, ez + a1), col, MeshBuf.FACE_ALL & ~(outPlus ? MeshBuf.FACE_XN : MeshBuf.FACE_XP));
     }
 
     void Edge(bool horizontal, int cx, int cz, int type, int off, int cellA, int cellB)
@@ -372,8 +472,10 @@ public class MapBuilder
         }
         float hA = GenData.ZoneWallMm[zoneA] / 1000f, hB = GenData.ZoneWallMm[zoneB] / 1000f;
         float h = Mathf.Max(hA, hB);
-        Color32 colA = GenData.IsBuilding(zoneA) ? WallColour(gen.roomType[gen.cellRoom[cellA]]) : ExteriorColour(zoneB);
-        Color32 colB = GenData.IsBuilding(zoneB) ? WallColour(gen.roomType[gen.cellRoom[cellB]]) : ExteriorColour(zoneA);
+        int styleA = StyleAt(cellA), styleB = StyleAt(cellB);
+        Color32 colA = GenData.IsBuilding(zoneA) ? WallColourAt(cellA) : ExteriorColour(zoneB, styleB);
+        Color32 colB = GenData.IsBuilding(zoneB) ? WallColourAt(cellB) : ExteriorColour(zoneA, styleA);
+        capStyle = GenData.IsBuilding(zoneA) ? styleA : styleB;
         // the ends: how far past the cell corners this wall runs (it owns the corner square or stops at its edge),
         // and the colours of the end faces that can be seen (alpha 0: none)
         int vx = cx, vz = cz, bz = GenData.IsBuilding(zoneA) ? zoneA : zoneB;
@@ -399,6 +501,7 @@ public class MapBuilder
         if (type == GenData.E_WALL)
         {
             WallPiece(horizontal, ex, ez, lo, hi, 0f, h, colA, colB, true, loA, loB, hiA, hiB);
+            BigDoor(horizontal, ex, ez, cellA, cellB);
         }
         else if (type == GenData.E_DOOR)
         {
@@ -483,7 +586,7 @@ public class MapBuilder
             float h = GenData.ZoneWallMm[zone] / 1000f, t = h + 0.14f;
             bool bw = Bld(x - 1, z), be = Bld(x + 1, z), bs = Bld(x, z - 1), bn = Bld(x, z + 1);
             float x0 = x * CELL - (bw ? 0f : WALL_HALF), x1 = (x + 1) * CELL + (be ? 0f : WALL_HALF);
-            Color32 rc = RoofColour(zone);
+            Color32 rc = RoofColour(zone, Style(gen.cellInst[c]));
             roofs.Box(new Vector3(x0, h, z * CELL), new Vector3(x1, t, (z + 1) * CELL), rc, rc, Ceiling);
             for (int side = -1; side <= 1; side += 2)
             {

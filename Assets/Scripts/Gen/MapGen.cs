@@ -32,6 +32,7 @@ public partial class MapGen
 
     // ---- inputs ----
     public uint seed;
+    public int season;   // revision 9: 0 summer, 1 autumn, 2 deep summer green: the broadleaf trees of the whole map
     public int size;
     public int density;          // index into GenData.DensityPercent (0 = Normal); scales the prop ranges, not the layout
     public int attempt;          // seed re-rolls after a failed validation (deterministic)
@@ -104,7 +105,7 @@ public partial class MapGen
     // ---- statistics ----
     public int statProps, statScenery, statDecor, statSlotItems, statLeakPlausible, statLeakComedic, statLoose;
     public int statRepairs, statGroundCells, statSteps, statMandatoryFail, statGroups, statFloor, statTop, statWalkRejects;
-    public int[] statZoneCells = new int[8], statZoneRooms = new int[8], statZoneFloor = new int[8], statZoneTop = new int[8];
+    public int[] statZoneCells = new int[16], statZoneRooms = new int[16], statZoneFloor = new int[16], statZoneTop = new int[16];
     // per room type (index = GenData.R_*): rooms, floor cells, floor props, props on furniture
     public int[] statTypeRooms = new int[64], statTypeCells = new int[64], statTypeFloor = new int[64], statTypeTop = new int[64];
 
@@ -144,6 +145,8 @@ public partial class MapGen
         stage = 0; cursor = 0; progressPermille = 0; statSteps = 0;
         Alloc(GenData.SizeGrid[size], GenData.SizeGrid[size]);
         menu = new bool[GenData.nDefs]; defCopies = new int[GenData.nDefs];
+        int roll = Rng(ST_SCENERY, 9, 9).Range(1000);
+        season = roll < 550 ? 0 : (roll < 800 ? 1 : 2);
     }
 
     // the grids for a map of w x h outer cells (the site decides its box: LayoutSite)
