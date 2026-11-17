@@ -416,21 +416,21 @@ public static class LobbyBuilder
         // the walls: a cream band with a dashed rule along the top, and the name over the spawn
         var band = Mat("LobbyWallBand", C("f3e7c9"));
         var rule = Mat("LobbyWallRule", C("c9a46a"));
-        Slab(root, "BandN", L(roomW / 2, 0.02f, wallH - 0.35f), new Vector3(roomW, 0.7f, 0.04f), band);
-        Slab(root, "BandS", L(roomW / 2, roomD - 0.02f, wallH - 0.35f), new Vector3(roomW, 0.7f, 0.04f), band);
-        Slab(root, "BandE", L(roomW - 0.02f, roomD / 2, wallH - 0.35f), new Vector3(0.04f, 0.7f, roomD), band);
-        Slab(root, "BandW", L(0.02f, roomD / 2, wallH - 0.35f), new Vector3(0.04f, 0.7f, roomD), band);
+        Slab(root, "BandN", L(roomW / 2, 0.02f, wallH - 0.75f), new Vector3(roomW, 0.7f, 0.04f), band);
+        Slab(root, "BandS", L(roomW / 2, roomD - 0.02f, wallH - 0.75f), new Vector3(roomW, 0.7f, 0.04f), band);
+        Slab(root, "BandE", L(roomW - 0.02f, roomD / 2, wallH - 0.75f), new Vector3(0.04f, 0.7f, roomD), band);
+        Slab(root, "BandW", L(0.02f, roomD / 2, wallH - 0.75f), new Vector3(0.04f, 0.7f, roomD), band);
         for (float x = 0.4f; x < roomW; x += 1.2f)
         {
-            Slab(root, "Rule", L(x, 0.05f, wallH - 0.38f), new Vector3(0.7f, 0.12f, 0.02f), rule);
-            Slab(root, "Rule", L(x, roomD - 0.05f, wallH - 0.38f), new Vector3(0.7f, 0.12f, 0.02f), rule);
+            Slab(root, "Rule", L(x, 0.05f, wallH - 0.78f), new Vector3(0.7f, 0.12f, 0.02f), rule);
+            Slab(root, "Rule", L(x, roomD - 0.05f, wallH - 0.78f), new Vector3(0.7f, 0.12f, 0.02f), rule);
         }
         for (float y = 0.4f; y < roomD; y += 1.2f)
         {
-            Slab(root, "Rule", L(0.05f, y, wallH - 0.38f), new Vector3(0.02f, 0.12f, 0.7f), rule);
-            Slab(root, "Rule", L(roomW - 0.05f, y, wallH - 0.38f), new Vector3(0.02f, 0.12f, 0.7f), rule);
+            Slab(root, "Rule", L(0.05f, y, wallH - 0.78f), new Vector3(0.02f, 0.12f, 0.7f), rule);
+            Slab(root, "Rule", L(roomW - 0.05f, y, wallH - 0.78f), new Vector3(0.02f, 0.12f, 0.7f), rule);
         }
-        var name = WorldText(root, "Name", L(roomW / 2, roomD - 0.03f, 4.6f), Quaternion.Euler(0f, 180f, 0f), "PROPHUNT", 26f, C("f6d773"), new Vector2(20f, 2.2f));
+        var name = WorldText(root, "Name", L(roomW / 2, roomD - 0.03f, 4.3f), Quaternion.Euler(0f, 180f, 0f), "PROPHUNT", 26f, C("f6d773"), new Vector2(20f, 2.2f));
         name.characterSpacing = 6f;
 
         // the prop shelf on the east wall
@@ -486,11 +486,11 @@ public static class LobbyBuilder
         // the lid's rim, a felt band with gold dashes, just under the lid
         var felt = Glow("LobbyLidRim", C("8c2a2a"));
         var gold = Glow("LobbySpinnerHub", C("e2b24a"));
-        float y = wallH - 0.2f;
-        Slab(root, "RimN", new Vector3(0, y, roomD / 2 - 0.3f), new Vector3(roomW, 0.4f, 0.6f), felt);
-        Slab(root, "RimS", new Vector3(0, y, -roomD / 2 + 0.3f), new Vector3(roomW, 0.4f, 0.6f), felt);
-        Slab(root, "RimE", new Vector3(roomW / 2 - 0.3f, y, 0), new Vector3(0.6f, 0.4f, roomD), felt);
-        Slab(root, "RimW", new Vector3(-roomW / 2 + 0.3f, y, 0), new Vector3(0.6f, 0.4f, roomD), felt);
+        float y = wallH - 0.12f;   // a slim rim above the walls' dashed band
+        Slab(root, "RimN", new Vector3(0, y, roomD / 2 - 0.175f), new Vector3(roomW, 0.24f, 0.35f), felt);
+        Slab(root, "RimS", new Vector3(0, y, -roomD / 2 + 0.175f), new Vector3(roomW, 0.24f, 0.35f), felt);
+        Slab(root, "RimE", new Vector3(roomW / 2 - 0.175f, y, 0), new Vector3(0.35f, 0.24f, roomD), felt);
+        Slab(root, "RimW", new Vector3(-roomW / 2 + 0.175f, y, 0), new Vector3(0.35f, 0.24f, roomD), felt);
 
         // the spinner: an outer felt ring, a cream ring, four coloured quarters, a gold hub and a red arrow
         float sy = wallH - 0.01f;
