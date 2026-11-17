@@ -18,6 +18,15 @@ public class MapBuilderUdon : UdonSharpBehaviour
     public MeshFilter groundFilter, wallsFilter, roofsFilter;
     public MeshCollider collisionCollider;
     public float budgetMs = 6f;
+    public Light sun;                       // the scene's directional light: the map's mood turns and tints it
+
+    // ---- the map's mood (Cor: maps should not all look alike), from its seed like the palette: a time of day
+    // (morning, noon, afternoon, evening, overcast) for the sun, the ambient light and the fog, and a season
+    // (summer, spring, autumn, winter) for the ground. PHSun bakes the shadows from the sun after the build, so
+    // it follows. The lobby shares the sun.
+    [HideInInspector] public int moodTime, moodSeason;
+    public readonly string[] moodTimeName = { "Morning", "Noon", "Afternoon", "Evening", "Overcast" };
+    public readonly string[] moodSeasonName = { "Summer", "Spring", "Autumn", "Winter" };
 
     [HideInInspector] public GameObject[] objects;   // by emit index
     [HideInInspector] public bool built, failed, busy;
@@ -159,6 +168,44 @@ public class MapBuilderUdon : UdonSharpBehaviour
         palGrass = Pick(grasses, Mix(seed ^ 0x100Au));
         palForest = C(palGrass.r * 76 / 100, palGrass.g * 81 / 100, palGrass.b * 86 / 100);
         palSoil = C(138 + (palGrass.r - 116) / 3, 104, 74);
+        // the season on the ground
+        if (moodSeason == 1) { palGrass = Blend(palGrass, C(110, 186, 92), 50); palForest = Blend(palForest, C(84, 150, 80), 50); }
+        else if (moodSeason == 2) { palGrass = Blend(palGrass, C(176, 146, 72), 60); palForest = Blend(palForest, C(150, 104, 60), 55); palSoil = Blend(palSoil, C(120, 86, 60), 40); }
+        else if (moodSeason == 3) { palGrass = Blend(palGrass, C(228, 232, 238), 80); palForest = Blend(palForest, C(214, 220, 228), 70); palSoil = Blend(palSoil, C(200, 200, 206), 60); }
+    }
+
+    // a % b for uint (Udon has no uint remainder)
+    uint UModB(uint a, uint b) { return a - (a / b) * b; }
+
+    Color32 Blend(Color32 a, Color32 b, int pct)
+    {
+        return C(a.r + (b.r - a.r) * pct / 100, a.g + (b.g - a.g) * pct / 100, a.b + (b.b - a.b) * pct / 100);
+    }
+
+    void ApplyMood()
+    {
+        float elev = 52f, intensity = 1f;
+        Color sunCol = new Color(1f, 0.96f, 0.88f), sky = new Color(0.62f, 0.66f, 0.72f), eq = new Color(0.52f, 0.53f, 0.54f), gr = new Color(0.50f, 0.48f, 0.45f);
+        Color fog = new Color(0.56f, 0.76f, 0.93f);
+        float fogStart = 45f, fogEnd = 160f;
+        float azim = 38f + (int)UModB(Mix(gen.seed ^ 0x2003u), 60u) - 30f;
+        if (moodTime == 0) { elev = 22f; sunCol = new Color(1f, 0.86f, 0.70f); intensity = 0.9f; sky = new Color(0.66f, 0.66f, 0.74f); fog = new Color(0.78f, 0.80f, 0.86f); fogStart = 30f; fogEnd = 120f; azim -= 90f; }
+        else if (moodTime == 1) { elev = 72f; sunCol = new Color(1f, 0.99f, 0.95f); intensity = 1.1f; sky = new Color(0.66f, 0.72f, 0.80f); fog = new Color(0.60f, 0.78f, 0.95f); fogStart = 60f; fogEnd = 200f; }
+        else if (moodTime == 3) { elev = 14f; sunCol = new Color(1f, 0.66f, 0.42f); intensity = 0.85f; sky = new Color(0.52f, 0.46f, 0.60f); eq = new Color(0.58f, 0.46f, 0.44f); gr = new Color(0.40f, 0.34f, 0.34f); fog = new Color(0.86f, 0.62f, 0.52f); fogStart = 35f; fogEnd = 130f; azim += 120f; }
+        else if (moodTime == 4) { elev = 60f; sunCol = new Color(0.82f, 0.84f, 0.88f); intensity = 0.55f; sky = new Color(0.66f, 0.68f, 0.70f); eq = new Color(0.60f, 0.61f, 0.62f); gr = new Color(0.52f, 0.52f, 0.52f); fog = new Color(0.70f, 0.72f, 0.74f); fogStart = 20f; fogEnd = 90f; }
+        if (moodSeason == 3) { fog = Color.Lerp(fog, new Color(0.88f, 0.90f, 0.94f), 0.5f); gr = Color.Lerp(gr, new Color(0.80f, 0.82f, 0.86f), 0.6f); }
+        if (sun != null)
+        {
+            sun.transform.rotation = Quaternion.Euler(elev, azim, 0f);
+            sun.color = sunCol;
+            sun.intensity = intensity;
+        }
+        RenderSettings.ambientSkyColor = sky;
+        RenderSettings.ambientEquatorColor = eq;
+        RenderSettings.ambientGroundColor = gr;
+        RenderSettings.fogColor = fog;
+        RenderSettings.fogStartDistance = fogStart;
+        RenderSettings.fogEndDistance = fogEnd;
     }
 
     Color32 Tinted(Color32 c) { return C(c.r * palWallTint.r / 255, c.g * palWallTint.g / 255, c.b * palWallTint.b / 255); }
@@ -232,7 +279,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (watch == null) watch = new System.Diagnostics.Stopwatch();
         Clear();
         W = gen.W; H = gen.H; IW = gen.IW; IH = gen.IH;
+        moodTime = (int)UModB(Mix(gen.seed ^ 0x2001u), 5u);
+        moodSeason = (int)UModB(Mix(gen.seed ^ 0x2002u), 4u);
         InitPalette(gen.seed);
+        ApplyMood();
         ListBuildings();
         cellZone = gen.cellZone; cellRoom = gen.cellRoom; roomType = gen.roomType; tags = gen.tags; innerRoom = gen.innerRoom;
         emitDef = gen.emitDef; emitX = gen.emitX; emitY = gen.emitY; emitZ = gen.emitZ; emitYaw = gen.emitYaw;

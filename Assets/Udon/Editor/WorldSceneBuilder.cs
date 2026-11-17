@@ -111,6 +111,8 @@ public static class WorldSceneBuilder
         local.sound = BuildAudio(gameGo.transform);
         local.hud = null; local.hudRoot = null;   // no head-locked text (Cor): PHView shows the little there is
         game.local = local;
+        builder.sun = sun;   // the map's mood turns and tints it (MapBuilderUdon.ApplyMood)
+        UdonSharpEditorUtility.CopyProxyToUdon(builder);
         LightingBuilder.Build(world.transform, builder, sun);   // the map's sun shadows (Light Volumes spot, PHSun)
         var seedTool = gameGo.AddUdonSharpComponent<PHSeed>();
         UdonSharpEditorUtility.CopyProxyToUdon(seedTool);
