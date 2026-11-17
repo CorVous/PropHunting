@@ -28,6 +28,18 @@ public class MapBuilderUdon : UdonSharpBehaviour
     public readonly string[] moodTimeName = { "Morning", "Noon", "Afternoon", "Evening", "Overcast" };
     public readonly string[] moodSeasonName = { "Summer", "Spring", "Autumn", "Winter" };
 
+    // ---- light points (Cor: fixtures ready for VRC Light Volumes). Every fixture the builder draws (ceiling lights,
+    // porch lights by outside doors, street lamps along the lane, panels under gas station canopies) and every lamp
+    // prop adds a point here: lightPos is a world position, or, when lightFollow is set (a lamp prop, which can be
+    // knocked over), an offset in that prop's own space. Nothing lights up yet: a Light Volumes pass reads this list.
+    public const int LK_CEILING = 0, LK_PORCH = 1, LK_STREET = 2, LK_CANOPY = 3, LK_LAMP = 4;
+    [HideInInspector] public Vector3[] lightPos;
+    [HideInInspector] public int[] lightKind;
+    [HideInInspector] public Transform[] lightFollow;
+    [HideInInspector] public int nLights;
+    int[] lampDefs;
+    Color32 glow;
+
     [HideInInspector] public GameObject[] objects;   // by emit index
     [HideInInspector] public bool built, failed, busy;
     [HideInInspector] public float progress;
@@ -288,6 +300,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
         emitDef = gen.emitDef; emitX = gen.emitX; emitY = gen.emitY; emitZ = gen.emitZ; emitYaw = gen.emitYaw;
         defFlags = gen.defFlags; zoneWallMm = gen.ZoneWallMm; groundKind = gen.ground;
         objects = new GameObject[gen.nEmit];
+        lightPos = new Vector3[64]; lightKind = new int[64]; lightFollow = new Transform[64]; nLights = 0;
+        glow = C(255, 240, 196);
+        if (lampDefs == null) lampDefs = new int[] { DefIndex("k_lampFloor"), DefIndex("k_lampTable"), DefIndex("q_lampStanding"), DefIndex("q_lampTable") };
         BufInit(B_GROUND, IW * IH + 8);
         BufInit(B_WALLS, W * H * 40 + 64);
         BufInit(B_ROOFS, W * H * 20 + 64);
@@ -340,6 +355,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 if (cursor < W * H) { CellWalls(cursor); cursor++; progress = 0.2f + 0.2f * cursor / (W * H); }
                 else
                 {
+                    Fixtures();
                     wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls");
                     Canopies();
                     roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs");
@@ -541,6 +557,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Trim(horizontal, ex, ez, d0 - 0.06f, d0 + e, 0f, dh - e, frame);
             Trim(horizontal, ex, ez, d1 - e, d1 + 0.06f, 0f, dh - e, frame);
             Trim(horizontal, ex, ez, d0 - 0.06f, d1 + 0.06f, dh - e, dh + 0.06f, frame);
+            if (IsBuilding(zoneA) != IsBuilding(zoneB)) Porch(horizontal, ex, ez, d1 + 0.3f, dh, IsBuilding(zoneA) ? 1f : -1f);
         }
         else if (type == GenData.E_WINDOW)
         {
@@ -602,6 +619,129 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Box(B_ROOFS, mn, mx, post, FACE_ALL & ~FACE_YN);
                 Collider(mn, mx);
             }
+            // a light panel under every other cell of the forecourt
+            for (int c = 0; c < W * H; c++)
+            {
+                if (cellRoom[c] != r) continue;
+                int x = c % W, z = c / W;
+                if (((x - x0) + (z - z0)) % 2 != 0) continue;
+                float cx = (x + 0.5f) * CELL, cz = (z + 0.5f) * CELL;
+                Box(B_ROOFS, new Vector3(cx - 0.6f, 4.16f, cz - 0.18f), new Vector3(cx + 0.6f, 4.2f, cz + 0.18f), glow, FACE_ALL & ~FACE_YP);
+                AddLight(new Vector3(cx, 4.05f, cz), LK_CANOPY, null);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ light fixtures (see lightPos)
+    void AddLight(Vector3 p, int kind, Transform follow)
+    {
+        if (nLights == lightPos.Length)
+        {
+            int n = nLights * 2;
+            Vector3[] p2 = new Vector3[n]; int[] k2 = new int[n]; Transform[] f2 = new Transform[n];
+            System.Array.Copy(lightPos, p2, nLights); System.Array.Copy(lightKind, k2, nLights); System.Array.Copy(lightFollow, f2, nLights);
+            lightPos = p2; lightKind = k2; lightFollow = f2;
+        }
+        lightPos[nLights] = p; lightKind[nLights] = kind; lightFollow[nLights] = follow;
+        nLights++;
+    }
+
+    int DefIndex(string id)
+    {
+        string[] ids = gen.defId;
+        for (int i = 0; i < ids.Length; i++) if (ids[i] == id) return i;
+        return -1;
+    }
+
+    // a lantern on the outside wall beside a door: `a` metres along the edge, `side` +1/-1 the outside's direction
+    void Porch(bool horizontal, float ex, float ez, float a, float doorTop, float side)
+    {
+        if (a > CELL - 0.2f) return;
+        float y0 = doorTop - 0.25f, y1 = doorTop + 0.15f;
+        float n0 = WALL_HALF, n1 = WALL_HALF + 0.05f, g1 = WALL_HALF + 0.2f;
+        Color32 plate = C(46, 46, 50);
+        if (horizontal)
+        {
+            float z0 = side > 0 ? ez + n0 : ez - n1, z1 = side > 0 ? ez + n1 : ez - n0;
+            float q0 = side > 0 ? ez + n1 : ez - g1, q1 = side > 0 ? ez + g1 : ez - n1;
+            Box(B_WALLS, new Vector3(ex + a - 0.1f, y0 - 0.04f, z0), new Vector3(ex + a + 0.1f, y1 + 0.04f, z1), plate, FACE_ALL);
+            Box(B_WALLS, new Vector3(ex + a - 0.08f, y0, q0), new Vector3(ex + a + 0.08f, y1, q1), glow, FACE_ALL);
+            AddLight(new Vector3(ex + a, (y0 + y1) * 0.5f, ez + side * (WALL_HALF + 0.35f)), LK_PORCH, null);
+        }
+        else
+        {
+            float x0 = side > 0 ? ex + n0 : ex - n1, x1 = side > 0 ? ex + n1 : ex - n0;
+            float q0 = side > 0 ? ex + n1 : ex - g1, q1 = side > 0 ? ex + g1 : ex - n1;
+            Box(B_WALLS, new Vector3(x0, y0 - 0.04f, ez + a - 0.1f), new Vector3(x1, y1 + 0.04f, ez + a + 0.1f), plate, FACE_ALL);
+            Box(B_WALLS, new Vector3(q0, y0, ez + a - 0.08f), new Vector3(q1, y1, ez + a + 0.08f), glow, FACE_ALL);
+            AddLight(new Vector3(ex + side * (WALL_HALF + 0.35f), (y0 + y1) * 0.5f, ez + a), LK_PORCH, null);
+        }
+    }
+
+    // ceiling lights (one to four per room, spread over its cells) and street lamps along the lane
+    void Fixtures()
+    {
+        int nr = gen.nRooms;
+        int[] count = new int[nr], seen = new int[nr];
+        for (int c = 0; c < W * H; c++)
+        {
+            int r = cellRoom[c];
+            if (r >= 0 && r < nr && IsBuilding(cellZone[c])) count[r]++;
+        }
+        Color32 rim = C(226, 226, 220);
+        for (int c = 0; c < W * H; c++)
+        {
+            int r = cellRoom[c];
+            if (r < 0 || r >= nr || !IsBuilding(cellZone[c])) continue;
+            int n = count[r], k = Mathf.Clamp((n + 3) / 5, 1, 4), i = seen[r];
+            seen[r] = i + 1;
+            // the middle cell of each of k equal runs of the room's cells
+            bool place = false;
+            for (int j = 0; j < k; j++) if (i == ((2 * j + 1) * n) / (2 * k)) place = true;
+            if (!place) continue;
+            float h = zoneWallMm[cellZone[c]] / 1000f;
+            float cx = (c % W + 0.5f) * CELL, cz = (c / W + 0.5f) * CELL;
+            Box(B_ROOFS, new Vector3(cx - 0.28f, h - 0.05f, cz - 0.28f), new Vector3(cx + 0.28f, h, cz + 0.28f), rim, FACE_ALL & ~FACE_YP);
+            Box(B_ROOFS, new Vector3(cx - 0.21f, h - 0.09f, cz - 0.21f), new Vector3(cx + 0.21f, h - 0.05f, cz + 0.21f), glow, FACE_ALL & ~FACE_YP);
+            AddLight(new Vector3(cx, h - 0.25f, cz), LK_CEILING, null);
+        }
+
+        // street lamps: walk the lane cells, one lamp unless another stands within two cells, on a side that
+        // borders something other than lane
+        int[] sx = new int[W * H], sz = new int[W * H];
+        int ns = 0;
+        Color32 pole = C(62, 64, 68);
+        for (int c = 0; c < W * H; c++)
+        {
+            int r = cellRoom[c];
+            if (r < 0 || r >= nr || roomType[r] != GenData.R_LANE) continue;
+            int x = c % W, z = c / W;
+            bool near = false;
+            for (int q = 0; q < ns; q++) if (Mathf.Abs(sx[q] - x) <= 2 && Mathf.Abs(sz[q] - z) <= 2) { near = true; break; }
+            if (near) continue;
+            int side = -1;
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = x + DX[d], nz = z + DZ[d];
+                if (!InGrid(nx, nz)) { side = d; break; }
+                int rn = cellRoom[nz * W + nx];
+                if (rn < 0 || rn >= nr || roomType[rn] != GenData.R_LANE) { side = d; break; }
+            }
+            if (side < 0) continue;
+            float cx = (x + 0.5f) * CELL, cz = (z + 0.5f) * CELL;
+            float dx = DX[side], dz = DZ[side];
+            float px = cx + dx * (CELL * 0.5f - 0.35f), pz = cz + dz * (CELL * 0.5f - 0.35f);
+            Vector3 mn = new Vector3(px - 0.07f, 0f, pz - 0.07f), mx = new Vector3(px + 0.07f, 4.5f, pz + 0.07f);
+            Box(B_WALLS, mn, mx, pole, FACE_ALL & ~FACE_YN);
+            Collider(mn, mx);
+            Box(B_WALLS, new Vector3(px - 0.12f, 0f, pz - 0.12f), new Vector3(px + 0.12f, 0.3f, pz + 0.12f), pole, FACE_ALL & ~FACE_YN);
+            // the arm reaches over the lane; the head hangs at its end with its glass underneath
+            float hx = px - dx * 1.0f, hz = pz - dz * 1.0f;
+            Box(B_WALLS, new Vector3(Mathf.Min(px, hx) - 0.04f, 4.42f, Mathf.Min(pz, hz) - 0.04f), new Vector3(Mathf.Max(px, hx) + 0.04f, 4.5f, Mathf.Max(pz, hz) + 0.04f), pole, FACE_ALL);
+            Box(B_WALLS, new Vector3(hx - 0.2f, 4.3f, hz - 0.2f), new Vector3(hx + 0.2f, 4.44f, hz + 0.2f), pole, FACE_ALL);
+            Box(B_WALLS, new Vector3(hx - 0.16f, 4.27f, hz - 0.16f), new Vector3(hx + 0.16f, 4.3f, hz + 0.16f), glow, FACE_ALL & ~FACE_YP);
+            AddLight(new Vector3(hx, 4.1f, hz), LK_STREET, null);
+            sx[ns] = x; sz[ns] = z; ns++;
         }
     }
 
@@ -750,6 +890,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
         t.position = new Vector3(emitX[e], emitY[e], emitZ[e]) / 1000f;
         t.rotation = Quaternion.Euler(0, emitYaw[e], 0);
         objects[e] = go;
+        int def = emitDef[e];
+        for (int i = 0; i < lampDefs.Length; i++)
+        {
+            if (def < 0 || lampDefs[i] != def) continue;
+            MeshRenderer mr = go.GetComponentInChildren<MeshRenderer>();
+            float top = mr != null ? mr.bounds.max.y - t.position.y : 1f;
+            // in the prop's own (scaled) space, so the point follows a knock
+            AddLight(new Vector3(0f, top * 0.85f / Mathf.Max(0.01f, t.lossyScale.y), 0f), LK_LAMP, t);
+            break;
+        }
     }
 
     // ------------------------------------------------------------------ helpers for the game
