@@ -27,7 +27,10 @@ public class MapBuilder
 
     // ---- colours (sRGB) ----
     static Color32 C(int r, int g, int b) { return new Color32((byte)r, (byte)g, (byte)b, 255); }
-    static readonly Color32 Frame = C(122, 88, 62), WindowFrame = C(238, 238, 232), Ceiling = C(236, 234, 226);
+    static readonly Color32 Ceiling = C(236, 234, 226);
+    // door and window trims; revision 13: dark timber in a medieval village, gunmetal on a space base
+    Color32 Frame { get { return gen.mapTheme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : (gen.mapTheme == GenData.THEME_SPACE ? C(84, 90, 102) : C(122, 88, 62)); } }
+    Color32 WindowFrame { get { return gen.mapTheme == GenData.THEME_MEDIEVAL ? C(84, 58, 38) : (gen.mapTheme == GenData.THEME_SPACE ? C(84, 90, 102) : C(238, 238, 232)); } }
 
     static Color32 Vary(Color32 c, int ix, int iz, int amount)
     {
@@ -159,8 +162,14 @@ public class MapBuilder
     {
         // revision 12: a space base's floors are deck plates, a medieval village's kitchens and halls stone flags
         if (gen.mapTheme == GenData.THEME_SPACE) return (((ix / 2 + iz / 2) & 1) == 0) ? C(132, 138, 148) : C(120, 126, 136);
-        if (gen.mapTheme == GenData.THEME_MEDIEVAL && (roomType == GenData.R_KITCHEN || roomType == GenData.R_HALL || roomType == GenData.R_DINER_KITCHEN || roomType == GenData.R_PANTRY))
-            return Vary((((ix / 2 + iz / 2) & 1) == 0) ? C(160, 154, 142) : C(146, 140, 130), ix / 2, iz / 2, 5);
+        if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+        {
+            // stone flags where there is water, fire or traffic; dark boards in every other room
+            if (roomType == GenData.R_KITCHEN || roomType == GenData.R_HALL || roomType == GenData.R_DINER_KITCHEN || roomType == GenData.R_PANTRY || roomType == GenData.R_BATH
+                || roomType == GenData.R_NAVE || roomType == GenData.R_VESTRY || roomType == GenData.R_STORAGE || roomType == GenData.R_LOADING || roomType == GenData.R_DINER_STORE)
+                return Vary((((ix / 2 + iz / 2) & 1) == 0) ? C(160, 154, 142) : C(146, 140, 130), ix / 2, iz / 2, 5);
+            return Vary(((ix & 1) == 0) ? C(118, 84, 56) : C(108, 76, 50), ix, iz / 3, 4);
+        }
         switch (roomType)
         {
             case GenData.R_LIVING: case GenData.R_BEDROOM: case GenData.R_OFFICE: case GenData.R_DINING: case GenData.R_KIDS: case GenData.R_HALL:
@@ -380,7 +389,7 @@ public class MapBuilder
     {
         // the land outside the fence, a little lower so it never fights with the floors
         float m = 60f, w = gen.W * CELL, h = gen.H * CELL;
-        ground.Quad(new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, C(98, 150, 78));
+        ground.Quad(new Vector3(-m, -0.03f, -m), new Vector3(-m, -0.03f, h + m), new Vector3(w + m, -0.03f, h + m), new Vector3(w + m, -0.03f, -m), Vector3.up, gen.mapTheme == GenData.THEME_SPACE ? C(176, 110, 82) : C(98, 150, 78));   // revision 13: a red planet beyond a space base's fence
         ground.ToObject("Ground", archRoot, ModelLibrary.lit);
         rendererCount++;
         var col = new GameObject("GroundCollider");
@@ -542,6 +551,51 @@ public class MapBuilder
         }
     }
 
+    // Revision 13, the map themes' wall finish on a plain wall, on every face that is a room's inside or a building's
+    // outside (not the log cabin's, which has its logs): a medieval village's half-timbering (corner posts, a sill
+    // rail, a mid rail and the head beam, 3 cm proud, each kept 4 mm from the next so no two share a face), a space
+    // base's panel seams and dark skirting.
+    void ThemeTrim(bool horizontal, float ex, float ez, int cellA, int cellB, float h)
+    {
+        if (gen.mapTheme == GenData.THEME_NONE) return;
+        for (int side = 0; side < 2; side++)
+        {
+            int toward = side == 0 ? cellB : cellA, other = side == 0 ? cellA : cellB;
+            bool tb = toward >= 0 && GenData.IsBuilding(gen.cellZone[toward]), ob = other >= 0 && GenData.IsBuilding(gen.cellZone[other]);
+            if (!tb && !ob) continue;
+            if (!tb && gen.cellZone[other] == GenData.Z_CABIN) continue;
+            // the face that carries a barn's doors or a garage's roller door has them instead (BigDoor)
+            if (!tb && toward >= 0 && other >= 0)
+            {
+                int rt = gen.roomType[gen.cellRoom[other]], ot = gen.roomType[gen.cellRoom[toward]];
+                if ((rt == GenData.R_GARAGE_BAY && ot == GenData.R_FORECOURT) || (rt == GenData.R_BARN && ot == GenData.R_FARMYARD)) continue;
+            }
+            float sgn = side == 0 ? 1f : -1f, face = WALL_HALF * sgn, e = 0.004f;
+            if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+            {
+                Color32 t = C(84, 58, 38);
+                // 17 cm from the cell's ends: at an inside corner the other wall's timber stands 13 cm out, and the rails'
+                // tops would share a plane with it
+                float d = face + 0.03f * sgn, a0 = 0.17f, a1 = CELL - 0.17f, post = 0.16f;
+                Panel(horizontal, ex, ez, a0, a1, 0.02f, 0.18f, face, d, t);                       // sill rail
+                Panel(horizontal, ex, ez, a0, a1, h - 0.26f, h - 0.1f, face, d, t);                // head beam
+                Panel(horizontal, ex, ez, a0, a0 + post, 0.18f + e, h - 0.26f - e, face, d, t);    // corner posts
+                Panel(horizontal, ex, ez, a1 - post, a1, 0.18f + e, h - 0.26f - e, face, d, t);
+                Panel(horizontal, ex, ez, CELL / 2 - post / 2, CELL / 2 + post / 2, 0.18f + e, h - 0.26f - e, face, d, t);   // middle post
+                float my = h * 0.48f;
+                Panel(horizontal, ex, ez, a0 + post + e, CELL / 2 - post / 2 - e, my, my + 0.12f, face, d, t);              // mid rails
+                Panel(horizontal, ex, ez, CELL / 2 + post / 2 + e, a1 - post - e, my, my + 0.12f, face, d, t);
+            }
+            else
+            {
+                Color32 seam = C(150, 158, 170), skirt = C(70, 76, 88);
+                float d = face + 0.012f * sgn;
+                Panel(horizontal, ex, ez, 0.12f, CELL - 0.12f, 0.02f, 0.14f, face, face + 0.02f * sgn, skirt);
+                for (int k = 1; k < 4; k++) Panel(horizontal, ex, ez, k - 0.015f, k + 0.015f, 0.14f + e, h - 0.06f, face, d, seam);
+            }
+        }
+    }
+
     // a flat box on a wall's face: from a0 to a1 along the edge, y0 to y1, and from n0 to n1 off the wall line (no
     // face toward the wall: it lies on the wall or on the panel under it)
     void Panel(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, float n0, float n1, Color32 col)
@@ -595,6 +649,7 @@ public class MapBuilder
             WallPiece(horizontal, ex, ez, lo, hi, 0f, h, colA, colB, true, loA, loB, hiA, hiB);
             BigDoor(horizontal, ex, ez, cellA, cellB);
             LogCourses(horizontal, ex, ez, cellA, cellB, h);
+            ThemeTrim(horizontal, ex, ez, cellA, cellB, h);
         }
         else if (type == GenData.E_DOOR)
         {
@@ -622,6 +677,13 @@ public class MapBuilder
             Trim(horizontal, ex, ez, w0 - 0.05f, w0 + e, sill + e, head - e, WindowFrame);
             Trim(horizontal, ex, ez, w1 - e, w1 + 0.05f, sill + e, head - e, WindowFrame);
             Trim(horizontal, ex, ez, (w0 + w1) / 2 - 0.02f, (w0 + w1) / 2 + 0.02f, sill + e, head - e, WindowFrame);
+            if (gen.mapTheme == GenData.THEME_MEDIEVAL)
+            {
+                // leaded lights: a transom either side of the mullion, kept clear of it and of the frame
+                float m = (w0 + w1) / 2, ty = (sill + head) / 2;
+                Trim(horizontal, ex, ez, w0 + 2 * e, m - 0.02f - e, ty - 0.015f, ty + 0.015f, WindowFrame);
+                Trim(horizontal, ex, ez, m + 0.02f + e, w1 - 2 * e, ty - 0.015f, ty + 0.015f, WindowFrame);
+            }
             // a window is a wall for movement and for darts (04 section 4.1.1): one collider for the whole edge
             if (horizontal) Collider(new Vector3(ex + lo, 0, ez - WALL_HALF), new Vector3(ex + hi, h, ez + WALL_HALF), "WindowWall");
             else Collider(new Vector3(ex - WALL_HALF, 0, ez + lo), new Vector3(ex + WALL_HALF, h, ez + hi), "WindowWall");

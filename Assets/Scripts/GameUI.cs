@@ -529,6 +529,7 @@ public class GameUI : MonoBehaviour
         string text = "<b>Debug</b>  " + g.fps.ToString("0") + " fps   " + Screen.width + " x " + Screen.height
             + "\nMap hash " + gen.mapHash.ToString("X8") + "   generated in " + g.map.genMs.ToString("0") + " ms, built in " + g.map.buildMs.ToString("0") + " ms, over " + g.genFrames + " frames (" + g.map.wallMs.ToString("0") + " ms)"
             + "\nCells " + gen.statGroundCells + ": " + ZoneCells(gen)
+            + (gen.mapTheme != GenData.THEME_NONE ? "\nTheme: " + GenData.ThemeName[gen.mapTheme] : "") + (gen.holiday != 0 ? "\nDecorations: " + (gen.holiday == 1 ? "winter" : "Halloween") : "")
             + "\nEmits " + gen.nEmit + ": props " + gen.statProps + " (" + gen.statFloor + " floor, " + gen.statTop + " furniture), prop groups " + gen.statGroups + ", loose remainder " + gen.statLoose + ", leaks " + gen.statLeakPlausible + " plausible + " + gen.statLeakComedic + " comedic"
             + "\nHiding sockets " + gen.nSockets + ", seed re-rolls " + gen.attempt + ", repairs " + gen.statRepairs + ", renderers " + g.map.rendererCount + ", colliders " + g.map.colliderCount
             + "\nPlayer " + p.body.pos.x.ToString("0.00") + ", " + p.body.pos.y.ToString("0.00") + ", " + p.body.pos.z.ToString("0.00") + "  eye " + p.eye.ToString("0.00") + (p.body.grounded ? "  grounded" : "  in the air")

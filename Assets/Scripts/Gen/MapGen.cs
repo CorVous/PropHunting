@@ -35,6 +35,7 @@ public partial class MapGen
     public int season;   // revision 9: 0 summer, 1 autumn, 2 deep summer green: the broadleaf trees of the whole map
     public int holiday;  // revision 12: 0 none, 1 winter, 2 Halloween: the map's seasonal decorations (one map in five)
     public int mapTheme; // revision 12: GenData.THEME_*: a space base or a medieval village now and then
+    public static int ForceTheme = -1;   // the console diagnostics only: every map of this theme (-1: drawn)
     public int size;
     public int density;          // index into GenData.DensityPercent (0 = Normal); scales the prop ranges, not the layout
     public int attempt;          // seed re-rolls after a failed validation (deterministic)
@@ -154,6 +155,7 @@ public partial class MapGen
         if (holiday == 2) season = 1;   // Halloween comes in the autumn
         int troll = Rng(ST_SCENERY, 9, 11).Range(1000);
         mapTheme = troll < GenData.THEME_SPACE_PERMILLE ? GenData.THEME_SPACE : (troll < GenData.THEME_SPACE_PERMILLE + GenData.THEME_MEDIEVAL_PERMILLE ? GenData.THEME_MEDIEVAL : GenData.THEME_NONE);
+        if (ForceTheme >= 0) mapTheme = ForceTheme;
         if (mapTheme != GenData.THEME_NONE) { holiday = 0; if (mapTheme == GenData.THEME_SPACE) season = 0; }
     }
 

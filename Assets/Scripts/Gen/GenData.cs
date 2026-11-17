@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 12;
+    public const int GEN_VERSION = 13;
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -15,7 +15,8 @@ public static partial class GenData
     // Layout 5 (generator 10): barns with a farm workshop, a two-cell paddock, parks with a skate corner, a pond and a cafe terrace.
     // Layout 6 (generator 11): house plans with a pantry or a box room; kids' rooms and second bedrooms drawn as playroom, teen room or box room.
     // Layout 7 (generator 12): two more kinds of plot: the zoo (plaza, walk, fenced enclosures with gates) and the log cabin.
-    public const int LAYOUT_VERSION = 7;
+    // Layout 8 (generator 13): a space-base or medieval-village map draws only the kinds of plot its theme allows.
+    public const int LAYOUT_VERSION = 8;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell
@@ -104,9 +105,9 @@ public static partial class GenData
     // ground, the fences and the sky take the theme's colours, and only the kinds of plot that suit it are drawn.
     public const int THEME_NONE = 0, THEME_SPACE = 1, THEME_MEDIEVAL = 2;
     public static readonly string[] ThemeName = { "", "Space base", "Medieval village" };
-    public const int THEME_SPACE_PERMILLE = 0, THEME_MEDIEVAL_PERMILLE = 0;   // off in generator 12 (published without the themes); on in 13
+    public const int THEME_SPACE_PERMILLE = 70, THEME_MEDIEVAL_PERMILLE = 70;   // generator 13 (0 in 12)
     public static readonly int[][] ThemeKinds = { null,
-        new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE, Z_PARK },                       // space: mess hall, cargo bay, supply depot, rover garage, dome garden
+        new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE },   // space: mess hall, cargo bay, supply depot, rover garage (revision 13: the park held back, G58: 54 models per place against 59)
         new[] { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_BARN, Z_PARK, Z_CABIN, Z_CHAPEL } };     // medieval: tavern, granary, market, farm, green, woodcutter's hut, chapel
     public const int Z_ZOO = 11, Z_CABIN = 12, Z_FAIR = 13, Z_CHAPEL = 14;   // revision 12: a zoo (no main building, like the park), a log cabin, a funfair, a chapel
     public static readonly string[] ZoneName = { "-", "House", "Warehouse", "Diner", "Lawn", "Forest", "Hunter release", "Shop", "Garage", "Farm", "Park", "Zoo", "Cabin", "Funfair", "Chapel" };
@@ -1383,7 +1384,7 @@ public static partial class GenData
     static void TTwin(int theme, string a, string b) { defThemeTwin[FindDef(a) * 3 + theme] = FindDef(b); }
 
     // the theme twins: filled in GenThemes.cs (one table per theme)
-    static void BuildThemeTwins() { BuildSpaceTwins(); BuildMedievalTwins(); }
+    static void BuildThemeTwins() { BuildSpaceTwins(); BuildMedievalTwins(); ThemeCaps(); }
 
     static void BuildTwins()
     {

@@ -29,7 +29,8 @@ public static partial class GenData
         defJitPos[d] = defJitPos[b]; defJitYaw[d] = defJitYaw[b]; defLeakWeight[d] = defLeakWeight[b];
         defCollider[d] = defCollider[b]; defKind[d] = defKind[b]; defBeside[d] = defBeside[b]; defRoomCap[d] = defRoomCap[b];
         defSlotWeight[d] = defSlotWeight[b];
-        if ((defFlags[b] & FL_SCENERY) != 0) { defW[d] = defW[b]; defD[d] = defD[b]; defCanopyY[d] = defSy[d] * 45 / 100; }
+        // a tree's twin (a boulder, a crystal spire) is solid to its top: its own footprint, nothing stands under it
+        if ((defFlags[b] & FL_SCENERY) != 0) { defCanopyY[d] = defSy[d]; defCollider[d] = C_BOX; }
         likeBase[d] = b + 1;
         CopySlots(b, d);
         return d;
@@ -251,11 +252,32 @@ public static partial class GenData
         Like("n_rockSmall", "sp_crater", "crater", 900);
         Like("k_bedside", "sp_bedsideB", "rocket_sidesA", 550);
         Like("n_bush", "sp_fins", "rocket_finsB", 800);
+        Like("n_flowerRed", "sp_craterL", "craterLarge", 600);
+        Like("k_table", "sp_tableInset", "table-inset", 2000);
+        Like("n_bush", "sp_skipRocks", "skip-rocks", 1300);
+        Like("n_column", "sp_rocketB", "rocket_baseB", 1000);
+        Like("n_column", "sp_rocketSides", "rocket_sidesB", 1000);
+        Like("n_column", "sp_rocketTop", "rocket_topA", 1100);
+        Like("n_tentClosed", "sp_landerBase", "lander_base", 1500);
+        Like("n_obelisk", "sp_turbineTall", "windturbine_tall", 1000);
+        Like("f_hedge", "sp_barrier", "structure-barrier", 1500);
+        // the Space Kit's monorail cars, vent stacks and gate frames; Space Base Bits' cargo roof modules and low frame
+        string[] mono = { "sp_monoBox", "monorail_trainBox", "sp_monoCargo", "monorail_trainCargo", "sp_monoFlat", "monorail_trainFlat", "sp_monoPass", "monorail_trainPassenger",
+            "sp_monoFront", "monorail_trainFront", "sp_monoEnd", "monorail_trainEnd" };
+        for (int k = 0; k < mono.Length; k += 2) Like("c_van", mono[k], mono[k + 1], 2600);
+        Like("n_obelisk", "sp_vent", "chimney", 1000);
+        Like("n_obelisk", "sp_ventB", "chimney_detailed", 1000);
+        Like("n_statueBlock", "sp_gate", "gate_simple", 2000);
+        Like("n_statueBlock", "sp_gateB", "gate_complex", 2000);
+        Like("gen_shed", "sp_podB", "roofmodule_cargo_B", 1300);
+        Like("gen_shed", "sp_podC", "roofmodule_cargo_C", 1300);
+        Like("n_statueBlock", "sp_frameLow", "structure_low", 1100);
 
         // more medieval pieces (as above)
         Like("k_sofa", "md_trestle", "stall", 2400);
         Like("k_bookcase", "md_trunkLarge", "trunk_large_B", 700);
         Like("k_bookcase", "md_boxStacked", "box_stacked", 450);
+        Like("w_palletLoaded", "md_boxStackedP", "box_stacked", 450);
         Like("q_cabinet", "md_chestGold", "chest_gold", 500);
         Like("k_bedside", "md_trunkMed", "trunk_medium_C", 700);
         Like("k_sideTable", "md_tableDecoB", "table_small_decorated_B", 600);
@@ -270,6 +292,30 @@ public static partial class GenData
         Like("n_treeFat", "md_treeRound", "tree-high-round", 1800);
         Like("n_rockSmall", "md_rockSmall", "rock-small", 600);
         Like("k_bar", "md_tableBare", "table_long", 600);
+        Like("k_tvCabinet", "md_trunkLargeC", "trunk_large_C", 700);
+        Like("k_tableCoffee", "md_tableBroken", "table_medium_broken", 600);
+        Like("k_bar", "md_tableLongBroken", "table_long_broken", 550);
+        Like("gen_toolwall", "md_swordGold", "sword_shield_gold", 600);
+        // the Medieval Hexagon's village things (KayKit, at about x3: its pieces are made for a hex tile)
+        Like("w_boxA", "md_crateA", "crate_A_big", 2800);
+        Like("w_boxA", "md_crateB", "crate_B_big", 2800);
+        Like("k_boxClosed", "md_crateSmall", "crate_A_small", 3000);
+        Like("s_boxLarge", "md_crateLongA", "crate_long_A", 2600);
+        Like("s_boxLarge", "md_crateLongC", "crate_long_C", 2600);
+        Like("s_boxLarge", "md_crateOpen", "crate_open", 2600);
+        Like("w_fuelBarrel", "md_oakBarrel", "hexagon_barrel", 3000);
+        Like("k_boxClosed", "md_arrows", "bucket_arrows", 3000);
+        Like("gen_toolwall", "md_ladder", "ladder", 2600);
+        Like("w_palletLoaded", "md_lumber", "resource_lumber", 2600);
+        Like("s_boxLarge", "md_stone", "resource_stone", 2600);
+        Like("n_statueBlock", "md_target", "target", 3000);
+        Like("gen_toolwall", "md_weaponRack", "weaponrack", 3000);
+        Like("n_obelisk", "md_flag", "flag_red", 3500);
+        Like("n_tentClosed", "md_tent", "hexagon_tent", 3000);
+        Like("k_lampFloor", "md_torchWall", "torch_mounted", 1200);
+        Like("gen_toolwall", "md_bannerThin", "banner_thin_red", 500);
+        Like("gen_toolwall", "md_bannerShield", "banner_shield_red", 450);
+        Like("k_bookcase", "md_trunkMedA", "trunk_medium_A", 900);
         Like("sk_halfPipe", "md_barrierHalf", "barrier_half", 500);
         Like("sk_halfPipe", "md_barrierColumn", "barrier_column", 500);
         Like("sk_halfPipe", "md_barrierCorner", "barrier_corner", 500);
@@ -340,9 +386,11 @@ public static partial class GenData
             "n_bushTriangle", "sp_fins",
             "r_crate", "=r_crate", "r_crateTomatoes", "=r_crateTomatoes", "r_crateCheese", "=r_crateCheese", "r_crateLettuce", "=r_crateLettuce", "r_crateCarrots", "=r_crateCarrots",
             "r_cratePotatoes", "=r_cratePotatoes", "r_crateOnions", "=r_crateOnions", "r_crateBuns", "=r_crateBuns", "r_crateHam", "=r_crateHam",
-            "s_box", "=s_box", "s_boxOpen", "=s_boxOpen",
-            "n_flowerYellowB", "sp_meteorHalf", "n_rockSmallC", "sp_crater", "k_bedside", "sp_bedsideB", "q_bedside", "sp_bedsideB", "q_cabinetSmallDeco", "sp_lockerWide",
+            "n_flowerYellowB", "sp_craterL", "n_rockSmallC", "sp_crater", "r_table", "sp_tableInset", "n_bushSmall", "sp_skipRocks",
+            // the KayKit warehouse barrels are industrial drums: they stay, and the other barrels become them
+            "w_barrel", "=w_barrel", "w_barrelB", "=w_barrelB", "w_barrelC", "=w_barrelC", "s_barrel", "=w_barrel", "dg_barrel", "=w_barrelB", "s_barrelOpen", "=w_barrelC", "k_bedside", "sp_bedsideB", "q_bedside", "sp_bedsideB", "q_cabinetSmallDeco", "sp_lockerWide",
             "n_mushroomRed", "sp_stone", "n_mushroomRedTall", "sp_stone", "n_mushroomTan", "sp_stone", "n_mushroomTanTall", "sp_stone", "n_mushroomGroup", "sp_stones", "n_mushroomTanGroup", "sp_stones");
+        FallbackTwins(S);
     }
 
     static void BuildMedievalTwins()
@@ -382,7 +430,7 @@ public static partial class GenData
             "n_treePineTall", "md_pine", "n_treePineRound", "md_pineCrooked", "n_rockLarge", "md_rock", "n_rockTall", "md_rockWide");
         // one twin per base where the packs allow (overrides the shared ones above)
         Twins(M, "q_couch", "md_trestle", "k_designSofa", "md_trestle", "k_benchCushion", "md_trestle", "k_bookcaseClosed", "md_trunkLarge", "k_bookcaseWide", "md_boxStacked",
-            "w_palletLoaded", "md_boxStacked", "q_cabinet", "md_chestGold", "k_tvCabinet", "md_chestGold", "k_bedsideDrawer", "md_trunkMed", "q_bedside", "md_trunkMed",
+            "w_palletLoaded", "md_boxStackedP", "q_cabinet", "md_chestGold", "k_tvCabinet", "md_chestGold", "k_bedsideDrawer", "md_trunkMed", "q_bedside", "md_trunkMed",
             "q_sideTable", "md_tableDecoB", "q_tableLow", "md_tableMedDeco", "w_boxC", "md_trunkSmallB", "s_box", "md_trunkSmallB",
             "w_barrel", "=dg_barrel", "w_barrelB", "md_barrelLarge", "w_barrelC", "md_barrelStack", "c_cone", "md_torchStand", "gen_mailbox", "md_banner", "n_sign", "md_bannerGreen",
             "gen_toolwall", "md_swordWall", "ma_vending", "md_coinsM", "n_treeFat", "md_treeRound", "n_rockSmallC", "md_rockSmall",
@@ -390,16 +438,129 @@ public static partial class GenData
             "k_radio", "md_candleMelted", "mb_console", "md_coinsS", "mb_headphonesA", "=dg_bottleA", "mb_headphonesC", "md_plateFood", "mb_camera", "md_coinsS",
             "k_screen", "md_keys", "k_tvVintage", "md_candleThin", "mb_bottle", "md_bottleBig");
         // the KayKit wooden chairs and armchairs suit a village as they are; the modern Kenney seats become them
-        Twins(M, "q_chairWood", "=q_chairWood", "q_chair", "=q_chair", "r_chair", "=r_chair", "q_armchair", "=q_armchair", "hb_armchairRed", "=hb_armchairRed",
-            "hb_armchairBlue", "=hb_armchairBlue", "k_loungeChair", "=q_armchair", "k_designChair", "=hb_armchairRed", "k_recliner", "=hb_armchairBlue",
-            "k_chairCushion", "=q_chairWood", "q_chairB", "=r_chair", "mb_gamerChairA", "md_stool", "mb_gamerChairB", "md_stool",
-            "k_trashcan", "=s_barrelOpen", "k_toilet", "=s_barrel", "k_bathSink", "=s_bucket", "k_bar", "md_tableBare", "r_table", "md_tableBare",
-            "w_barrel", "=w_barrel", "w_fuelBarrelB", "md_drum", "w_fuelBarrelC", "md_drum", "w_barrelB", "=w_barrelB", "w_barrelC", "=w_barrelC",
-            "k_counterDrawer", "md_counter", "w_boxB", "=w_boxB", "k_tvCabinet", "md_shelfCandles", "k_bookcase", "md_trunkLarge", "k_bookcaseClosed", "md_shelves",
+        Twins(M, "q_chairWood", "=q_chairWood", "q_chair", "=q_chairWood", "r_chair", "md_chairSlot", "q_armchair", "md_chair", "hb_armchairRed", "md_chair",
+            "hb_armchairBlue", "md_chair", "k_loungeChair", "md_chair", "k_designChair", "md_chair", "k_recliner", "md_chair",
+            "k_chairCushion", "=q_chairWood", "q_chairB", "md_chairSlot", "mb_gamerChairA", "md_stool", "mb_gamerChairB", "md_stool",
+            "k_trashcan", "=m_bucketWood", "k_toilet", "=s_barrel", "k_bathSink", "=s_bucket", "k_bar", "md_tableBare", "r_table", "md_tableBare",
+            // the Prototype Bits drums are plastic and steel: the village's are oak
+            "w_barrel", "=dg_barrel", "w_fuelBarrelB", "md_drum", "w_fuelBarrelC", "md_drum", "w_barrelB", "md_barrelLarge", "w_barrelC", "md_barrelStack",
+            "k_counterDrawer", "md_counter", "k_tvCabinet", "md_shelfCandles", "k_bookcase", "md_trunkLarge", "k_bookcaseClosed", "md_shelves",
             "ck_bench", "md_settle", "sk_benches", "md_trestle", "ck_info", "md_tableDecoB", "ck_drinks", "=dg_keg", "sk_railLow", "md_barrierHalf", "sk_halfPipeLow", "md_barrierColumn",
             "sk_halfPipe", "md_barrierCorner", "hk_lantern", "md_torchStand", "gk_lightpost", "=gk_lightpost", "ck_toilets", "md_boxStacked", "sk_grind", "md_boxLarge", "sk_box", "=dg_boxL",
             "ms_shelfEnd", "md_tableMedDeco", "k_boxOpen", "=s_boxOpen", "w_boxA", "=s_box", "ms_handTruck", "=f_cart", "ms_cart", "=m_wheelbarrow", "k_trashcan", "=m_bucketWood",
-            "w_boxC", "md_trunkSmallB");
+            "w_boxC", "=dg_trunkS", "q_cabinetSmallDeco", "=dg_trunkL", "k_tvCabinet", "md_trunkLargeC", "k_trashcan", "=m_bucketWood", "k_bathSink", "=t_bucketMetal",
+            "k_designSofa", "=hk_bench", "k_benchCushion", "=hk_benchShort", "k_bench", "=hk_bench", "w_boxB", "md_box", "k_speaker", "=gk_urnRound", "k_laptop", "md_plateFood", "r_table", "md_tableLong");
+        FallbackTwins(M);
+    }
+
+    // ================================================================================== what belongs to a theme
+    // Revision 13: a themed map must look like its theme, not only have its furniture swapped. Every prop with no
+    // twin is checked: a medieval village has nothing from the modern packs (the Furniture Kit, cars, shop and arcade
+    // fittings, plastic drums, fizzy drinks), a space base nothing of wood, stone or the wild (nature, survival,
+    // fantasy town, dungeon, graveyard, oil lanterns, logs). Such a prop takes a fallback twin of the theme of about
+    // its size, placed the same way (a thing in a slot, a floor piece, an outdoor piece, a tree), spread over the
+    // theme's pieces so the variety stays.
+    static readonly string[] ModernPacks = { "kenney-furniture-kit", "kenney-car-kit", "kenney-mini-shop", "kenney-mini-arcade", "kenney-coaster-kit", "kenney-mini-skate",
+        "kenney-toy-car-kit", "mixed-bag-1", "mixed-bag-2", "prototype-bits", "furniture-bits", "restaurant-bits", "generated", "kenney-space-kit", "kenney-space-station-kit", "space-base-bits" };
+    static readonly string[] MedievalKeeps = { "q_chairWood", "q_stoolWood", "q_bookSingle", "q_books", "q_frame", "q_frameMedium", "q_frameLA", "q_frameLB", "q_pillow", "q_pillowB",
+        "r_jar", "r_jarB", "r_jarC", "r_jarD", "r_pot", "r_pan", "r_bowl", "r_plate", "r_cuttingboard", "r_dinner", "r_burger",
+        "gen_coop", "gen_trough", "gen_shed", "gen_wardrobe", "gen_broom", "gen_laundryBasket", "gen_towels", "gen_mop", "gen_shoes", "gen_wateringCan",
+        "mb_frameA", "mb_frameB", "mb_frameC", "mb_mirror", "mb_sled", "mb_mimic", "mb_pickles", "cb_woodstove", "k_books", "k_doormat", "k_coatRack", "k_rug", "k_rugLong", "k_pillow" };
+    static readonly string[] MedievalDrops = { "f_sodaCan", "f_pizzaBox", "f_ketchup", "fk_soda", "fk_fries", "fk_hotdog", "fk_candy", "fk_popsicle", "fk_iceCream", "fk_iceCup",
+        "fk_sundae", "fk_cornDog", "fk_coffee", "fk_donutS", "f_donut", "hb_football", "hb_basketball", "w_jerrycan", "w_jerrycanB", "w_jerrycanC", "condiments", "c_cone" };
+    static readonly string[] OldPacks = { "kenney-nature-kit", "kenney-survival-kit", "kenney-fantasy-town-kit", "kaykit-dungeon-pack", "kenney-graveyard-kit", "halloween-bits",
+        "kenney-holiday-kit", "kaykit-medieval-hexagon" };
+    static readonly string[] SpaceKeeps = { "n_potSmall", "n_planter", "n_cropCarrot", "n_cropMelon", "n_cropPumpkin", "n_cropTurnip", "n_lettuce", "n_lettuceYoung", "n_corn",
+        "n_cornYoung", "n_wheat", "n_wheatYoung", "n_bamboo", "m_sack", "s_bucket", "s_hammer", "s_shovel", "s_hoe", "s_pickaxe", "s_axe", "s_bottle", "s_bottleLarge",
+        "n_lily", "n_lilySmall", "n_grass", "n_grassLarge" };
+    static readonly string[] SpaceDrops = { "g_lantern", "g_rope", "g_ropeB", "g_anvil", "g_grindstone", "w_logA", "w_logB", "w_logs", "w_planks", "hk_lanternSmall", "f_wheel", "f_cart", "f_cartHigh" };
+
+    static bool In(string[] a, string v) { for (int i = 0; i < a.Length; i++) if (a[i] == v) return true; return false; }
+
+    public static bool Belongs(int d, int theme)
+    {
+        string pack = GenModels.Pack[defModel[d]], id = defId[d];
+        if (defMapTheme[d] == theme) return true;
+        if ((defFlags[d] & FL_FLAT) != 0) return true;   // rugs and mats lie under things: any age has them
+        if (theme == THEME_MEDIEVAL)
+        {
+            if (In(MedievalKeeps, id) || id.StartsWith("r_crate")) return true;
+            return !In(MedievalDrops, id) && !In(ModernPacks, pack);
+        }
+        if (In(SpaceKeeps, id)) return true;
+        return !In(SpaceDrops, id) && !In(OldPacks, pack);
+    }
+
+    // fallback pools: in a slot, small, medium and large floor pieces, small and large outdoor pieces, trees; the theme's
+    // own pieces and the pieces that belong to it anyway (a village's oak barrels, carts and stalls; a base's drums,
+    // ingots and tyres)
+    static readonly string[][] MedFall = {
+        new[] { "md_candle", "md_bottleLab", "md_bottleBig", "md_candleMelted", "md_coinsS", "md_plateFood", "md_plateStack", "md_keys", "md_candleThin", "dg_bottleA", "dg_bottleB", "md_book" },
+        new[] { "md_barrelSmall", "md_trunkSmallB", "md_drum", "dg_boxS", "dg_trunkS", "md_coinsM", "md_bedTrunk", "s_barrel", "s_box", "m_sack", "m_bucketWood", "t_bucketMetal", "gk_urnRound", "gk_urnSquare", "s_chest",
+            "md_crateA", "md_crateB", "md_crateSmall", "md_oakBarrel", "md_arrows" },
+        new[] { "md_barrelLarge", "md_trunkMed", "md_trunkLarge", "dg_chest", "md_chestGold", "md_kegDeco", "md_box", "md_trunkLargeC", "md_tableBroken", "md_swordGold",
+            "g_anvil", "g_grindstone", "s_workbench", "f_wheel", "f_stallBench", "dg_keg", "dg_trunkL", "md_crateLongA", "md_crateLongC", "md_crateOpen", "md_stone", "md_trunkMedA", "md_weaponRack" },
+        new[] { "md_cratesStack", "md_boxStackedP", "md_crates", "md_tableBare", "md_barrelStack", "md_tableLongBroken", "f_cart", "f_stallGreen", "g_hay", "md_lumber" },
+        new[] { "md_drum", "md_rockSmall", "md_torchStand", "md_barrierHalf", "s_barrel", "m_bucketWater", "m_sack", "gk_urnRound", "s_logSmall", "f_stallStool", "md_target", "md_flag",
+            "md_oakBarrel", "md_crateOpen", "md_arrows" },
+        new[] { "md_barrelLarge", "md_crates", "md_banner", "md_bannerGreen", "f_cart", "f_cartHigh", "f_stallRed", "g_hayBundled", "n_logStack", "md_well", "md_barrier", "md_lumber",
+            "md_tent", "md_stone" },
+        new[] { "md_pine", "md_pineCrooked", "md_treeRound" } };
+    static readonly string[][] SpaceFall = {
+        new[] { "sp_screen", "sp_terminal", "sp_display", "sp_displayWide" },
+        new[] { "sp_canB", "sp_canC", "sp_canD", "sp_cargoA", "sp_cargoB", "sp_cargoAPacked", "sp_cargoBPacked", "sp_bedsideB", "sp_speaker", "w_cog", "w_nugget", "w_goldBars", "w_jerrycan" },
+        new[] { "sp_fuelA", "sp_fuelB", "sp_tank", "sp_relay", "sp_barrelsRail", "sp_cargoStack", "sp_crateFlat", "sp_locker", "w_barrel", "w_barrelB", "w_barrelC", "w_ironStack", "c_tire" },
+        new[] { "sp_cargoStackB", "sp_lockerTall", "sp_server", "sp_cargoStack", "sp_containerOpen", "w_palletLoaded", "gen_dumpster" },
+        new[] { "sp_crater", "sp_meteor", "sp_meteorD", "sp_meteorHalf", "sp_pebble", "sp_pebbleB", "sp_canD", "sp_fuelA", "sp_stones", "sp_bones", "sp_heater", "sp_fins", "sp_screeB", "w_barrelB", "c_tire" },
+        new[] { "sp_skipRocks", "sp_supportsLow", "sp_solar", "sp_dishSmall", "sp_dishLarge", "sp_turret", "sp_turretDouble", "sp_rocketBase", "sp_rocketB", "sp_rocketSides",
+            "sp_rocketTop", "sp_drill", "sp_pad", "sp_lander", "sp_landerB", "sp_landerBase", "sp_turbine", "sp_turbineTall", "sp_rockA", "sp_rockB", "sp_solarRoof", "sp_lightPost", "sp_barrier",
+            "sp_monoBox", "sp_monoCargo", "sp_monoFlat", "sp_monoPass", "sp_monoFront", "sp_monoEnd", "sp_vent", "sp_ventB", "sp_gate", "sp_gateB", "sp_podB", "sp_podC", "sp_frameLow" },
+        new[] { "sp_spireA", "sp_spireB", "sp_boulderA", "sp_boulderB" } };
+
+    static void FallbackTwins(int theme)
+    {
+        string[][] pools = theme == THEME_SPACE ? SpaceFall : MedFall;
+        // how many kinds already stand as each piece on such a map (as their twin, or as themselves): each fallback
+        // goes to the least used piece of its pool, so the kinds that give way spread over the pool
+        var used = new int[nDefs];
+        for (int d = 0; d < nDefs; d++)
+        {
+            int t = defThemeTwin[d * 3 + theme];
+            if (t >= 0) used[t]++;
+            else if (defMapTheme[d] == 0 && Belongs(d, theme)) used[d]++;
+        }
+        for (int d = 0; d < nDefs; d++)
+        {
+            if (defMapTheme[d] != 0 || defThemeTwin[d * 3 + theme] >= 0 || (defFlags[d] & FL_DECOR) != 0 || Belongs(d, theme)) continue;
+            int longest = defSx[d] > defSz[d] ? defSx[d] : defSz[d];
+            bool outdoor = (defFlags[d] & FL_LEAK_IN) == 0 || defAnchor[d] == A_OUT_OPEN || defAnchor[d] == A_OUT_EDGE || defAnchor[d] == A_SOFT;
+            int k = (defFlags[d] & FL_SCENERY) != 0 ? 6 : (defAnchor[d] == A_SLOT_ONLY ? 0 : (outdoor ? (longest < 1000 ? 4 : 5) : (longest < 700 ? 1 : (longest < 1500 ? 2 : 3))));
+            string[] pool = pools[k];
+            // a loose thing may not stand alone in the open: only a loose base takes a loose twin
+            bool loose = (defFlags[d] & FL_LOOSE) != 0;
+            int i0 = (int)((uint)(d * 7919 + theme * 31) % (uint)pool.Length), pick = -1;
+            for (int i = 0; i < pool.Length; i++)
+            {
+                int t = FindDef(pool[(i0 + i) % pool.Length]);
+                if (!loose && (defFlags[t] & FL_LOOSE) != 0) continue;
+                if (pick < 0 || used[t] < used[pick]) pick = t;
+            }
+            if (pick >= 0) { defThemeTwin[d * 3 + theme] = pick; used[pick]++; }
+        }
+    }
+
+    // a theme piece that stands in for several kinds of thing may stand in a room as often as they together may (at
+    // most 6): the room's cap of each kind is checked on its twin
+    static void ThemeCaps()
+    {
+        var sum = new int[nDefs];
+        for (int th = 1; th < 3; th++)
+            for (int d = 0; d < nDefs; d++)
+            {
+                int t = defThemeTwin[d * 3 + th];
+                if (t >= 0 && t != d && defMapTheme[t] != 0) sum[t] += defRoomCap[d];
+            }
+        for (int t = 0; t < nDefs; t++) if (sum[t] > defRoomCap[t]) defRoomCap[t] = sum[t] > 6 ? 6 : sum[t];
     }
 
     // after the themes of the slot items are set: a twin is used where its base is
