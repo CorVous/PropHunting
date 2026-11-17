@@ -34,7 +34,8 @@ public class PHPanel : UdonSharpBehaviour
     public RectTransform veilHourglass;
     // the host bar: who hosts, and the buttons to hand the panel over (PHGame's hostLocked / UnlockHost / LockHost /
     // ClaimHost, called by name)
-    public TextMeshProUGUI hostName, hostState;
+    public TextMeshProUGUI hostName;
+    public GameObject claimLock;           // shown on Claim host instead of its text while it cannot be used
     public RectTransform[] hostButton;     // 0 unlock/lock (the host's), 1 claim (everyone else's)
     public Image[] hostButtonImage;
     public TextMeshProUGUI[] hostButtonText;
@@ -253,10 +254,12 @@ public class PHPanel : UdonSharpBehaviour
             VRCPlayerApi owner = Networking.GetOwner(game.gameObject);
             hostName.text = Utilities.IsValid(owner) ? owner.displayName : "";
             bool locked = HostLocked, host = Host;
-            hostState.text = locked ? "locked" : "open: anyone can claim";
             hostButtonText[0].text = locked ? "UNLOCK HOST" : "LOCK HOST";
             Color c0 = hostButtonImage[0].color; c0.a = host ? 1f : 0.35f; hostButtonImage[0].color = c0;
-            Color c1 = hostButtonImage[1].color; c1.a = !host && !locked ? 1f : 0.35f; hostButtonImage[1].color = c1;
+            bool claimable = !host && !locked;
+            Color c1 = hostButtonImage[1].color; c1.a = claimable ? 1f : 0.35f; hostButtonImage[1].color = c1;
+            if (hostButtonText[1].gameObject.activeSelf != claimable) hostButtonText[1].gameObject.SetActive(claimable);
+            if (claimLock.activeSelf == claimable) claimLock.SetActive(!claimable);
         }
         bool lockOn = game.phase != PHGame.PH_LOBBY;
         if (veil.activeSelf != lockOn) veil.SetActive(lockOn);

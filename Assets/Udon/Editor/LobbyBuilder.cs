@@ -210,7 +210,6 @@ public static class LobbyBuilder
         Txt(cv, "HostLabel", P(110, 470), new Vector2(80, 26), "HOST", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
         panel.hostName = Txt(cv, "HostName", P(330, 470), new Vector2(360, 34), "", null, 24, Color.white, TextAlignmentOptions.Left);
         panel.hostName.fontStyle = FontStyles.Bold;
-        panel.hostState = Txt(cv, "HostState", P(640, 470), new Vector2(260, 26), "locked", future, 13, C("c9d8c9"), TextAlignmentOptions.Left);
         panel.hostButton = new RectTransform[2]; panel.hostButtonImage = new Image[2]; panel.hostButtonText = new TextMeshProUGUI[2];
         string[] hb = { "UNLOCK HOST", "CLAIM HOST" };
         var hostTiles = new PHPanelTile[2];
@@ -224,6 +223,11 @@ public static class LobbyBuilder
             panel.hostButtonText[k] = Txt(bimg.transform, "Text", Vector2.zero, new Vector2(180, 30), hb[k], future, 15, C("1e190f"), TextAlignmentOptions.Center);
             panel.hostButton[k] = bimg.rectTransform; panel.hostButtonImage[k] = face;
             hostTiles[k] = AddTile(bimg.gameObject, bt, -2 - k);
+            if (k == 1)
+            {
+                var lk = Img(bimg.transform, "Lock", Vector2.zero, new Vector2(28, 28), Icon("lock"), C("1e190f", 0.8f));
+                panel.claimLock = lk.gameObject;
+            }
         }
 
         // sounds, for everyone near the panel
