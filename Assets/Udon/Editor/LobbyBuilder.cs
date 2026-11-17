@@ -379,8 +379,9 @@ public static class LobbyBuilder
         Slab(root, "PlayRingS", zc + new Vector3(0, 0.012f, -zi), new Vector3(2 * zi + 0.3f, 0.01f, 0.3f), cream);
         Slab(root, "PlayRingE", zc + new Vector3(zi, 0.012f, 0), new Vector3(0.3f, 0.01f, 2 * zi), cream);
         Slab(root, "PlayRingW", zc + new Vector3(-zi, 0.012f, 0), new Vector3(0.3f, 0.01f, 2 * zi), cream);
-        var play = WorldText(root, "PLAY", zc + new Vector3(0, 0.02f, 0.6f), Quaternion.Euler(90f, 0f, 0f), "PLAY", 30f, C("e9f7df"), new Vector2(10f, 3.5f));
-        play.characterSpacing = 8f;
+        var play = WorldText(root, "PLAY", zc + new Vector3(0, 0.02f, 0.6f), Quaternion.Euler(90f, 0f, 0f), "PLAY", 18f, C("e9f7df"), new Vector2(8f, 2.6f));
+        play.characterSpacing = 4f;
+        play.enableAutoSizing = true; play.fontSizeMin = 4f; play.fontSizeMax = 18f;   // stays inside the cream ring
 
         // the spawn disc
         var red = Mat("LobbySpawnRed", C("e05a48"));
