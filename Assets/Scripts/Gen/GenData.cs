@@ -5,14 +5,15 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 9;
+    public const int GEN_VERSION = 10;
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
     // Layout 2 (generator 5): plots along a lane, buildings from the plan library, a wood (MapGenSite.cs, G32).
     // Layout 3 (generator 6): the same, at the smaller sizes of G36 "B" (no front garden at S, fewer and smaller plots).
     // Layout 4 (generator 9): more kinds of plot (shop, garage, farm, park) drawn into a mix per map, more plans.
-    public const int LAYOUT_VERSION = 4;
+    // Layout 5 (generator 10): barns with a farm workshop, a two-cell paddock, parks with a skate corner, a pond and a cafe terrace.
+    public const int LAYOUT_VERSION = 5;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell
@@ -40,8 +41,9 @@ public static class GenData
     // cells of the new kinds' plans by size (least, most); a park's plot in outer cells along the lane and deep
     public static readonly int[] SizeShopCellsMin = { 4, 4, 4, 5 }, SizeShopCellsMax = { 5, 6, 7, 7 };
     public static readonly int[] SizeGarageCellsMin = { 4, 4, 5, 5 }, SizeGarageCellsMax = { 5, 6, 6, 8 };
-    public static readonly int[] SizeBarnCellsMin = { 2, 2, 3, 4 }, SizeBarnCellsMax = { 3, 4, 6, 6 };
-    public static readonly int[] SizeParkAlong = { 2, 2, 3, 3 }, SizeParkDeep = { 2, 3, 3, 3 };
+    // revision 10: barns of 3 cells or more (room for the farm workshop), parks larger (a lawn and feature areas)
+    public static readonly int[] SizeBarnCellsMin = { 3, 3, 4, 4 }, SizeBarnCellsMax = { 4, 5, 6, 6 };   // revision 9: 2, 2, 3, 4 and 3, 4, 6, 6
+    public static readonly int[] SizeParkAlong = { 3, 4, 4, 5 }, SizeParkDeep = { 3, 3, 3, 3 };          // revision 9: 2, 2, 3, 3 and 2, 3, 3, 3
     public static readonly int[] SizeExtraHouse = { 0, 0, 0, 0 };        // chance (per mille) of one more house plot (layout 2: 0, 300, 400, 500)
     // the plans a plot may take, by their cells: houses, warehouses, diners (the least and the most)
     public static readonly int[] SizeHouseCellsMin = { 5, 5, 5, 6 };
@@ -103,6 +105,8 @@ public static class GenData
     // paddock, a park
     public const int R_SHOP_FLOOR = 24, R_STOCKROOM = 25, R_BACK_OFFICE = 26, R_GARAGE_BAY = 27, R_PARTS = 28, R_BARN = 34, R_FEED_STORE = 35;
     public const int R_FORECOURT = 16, R_FARMYARD = 17, R_FIELD = 18, R_PADDOCK = 19, R_PARK = 42;
+    // revision 10: the farm's workshop in the barn; the park's feature areas behind its lawn
+    public const int R_FARM_WORK = 36, R_PLAYGROUND = 43, R_POND = 44, R_TERRACE = 45;
     public const int R_DINER_DINING = 30, R_DINER_KITCHEN = 31, R_DINER_STORE = 32;
     public const int R_FOREST_DENSE = 40, R_FOREST_CLEARING = 41;
     public const int R_RELEASE = 50;
@@ -145,6 +149,10 @@ public static class GenData
             case R_FIELD: return "Field";
             case R_PADDOCK: return "Paddock";
             case R_PARK: return "Park";
+            case R_FARM_WORK: return "Farm workshop";
+            case R_PLAYGROUND: return "Skate corner";
+            case R_POND: return "Pond";
+            case R_TERRACE: return "Cafe terrace";
             case R_RELEASE: return "Hunter release";
         }
         return "Room";
@@ -159,6 +167,7 @@ public static class GenData
     public const int T_DOOR_SIDE = 1 << 18;     // against the wall right beside a doorway's keep-clear cells
     public const int T_GLADE = 1 << 19;         // a clearing: no trees
     public const int T_EARTH = 1 << 20;         // trodden earth around a fire
+    public const int T_WATER = 1 << 21;         // a pond's water (revision 10): no prop stands on it but lilies and ducks
     public const int T_WALL_ANY = T_WALL_N | T_WALL_E | T_WALL_S | T_WALL_W;
     // T_SOFT_GROUND: forest floor, and the planting beds of a garden. T_COVERED: the paved part of a patio.
     // T_PATH: the walkway between a room's doors; outdoors the approach to a building door and a forest path.
@@ -205,7 +214,9 @@ public static class GenData
             case R_STOCKROOM: return TH_SHOP | TH_STORE;
             case R_GARAGE_BAY: case R_PARTS: case R_FORECOURT: return TH_STORE;
             case R_BARN: case R_FEED_STORE: case R_FARMYARD: case R_FIELD: case R_PADDOCK: return TH_FARM;
-            case R_PARK: return TH_GARDEN;
+            case R_PARK: case R_POND: case R_PLAYGROUND: return TH_GARDEN;
+            case R_TERRACE: return TH_PATIO | TH_DINER;
+            case R_FARM_WORK: return TH_FARM | TH_STORE;
             case R_KIDS: return TH_KIDS;
             case R_HALL: return TH_HALL;
             case R_STORAGE: case R_LOADING: case R_YARD: return TH_STORE;
@@ -252,7 +263,7 @@ public static class GenData
     public const int G_INDEPENDENT = 0, G_MATCHED = 1, G_MIRROR_OF = 2, G_ELSE_OF = 3;
 
     // ---- object definitions ----
-    const int MAXD = 384;
+    const int MAXD = 512;
     public static int nDefs;
     public static string[] defId = new string[MAXD];
     public static int[] defModel = new int[MAXD];
@@ -972,8 +983,12 @@ public static class GenData
         D("n_wheat", "crops_wheatStageB", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(8);
         D("n_lettuce", "crops_leafsStageB", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(8);
         D("n_cropTurnip", "crop_turnip", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(6);
+        D("n_cornYoung", "crops_cornStageB", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(8);
+        D("n_wheatYoung", "crops_wheatStageA", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(8);
+        D("n_lettuceYoung", "crops_leafsStageA", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(8);
+        D("n_bamboo", "crops_bambooStageB", 1500, 0, A_SOFT, FL_LIGHT | OUT, 0); Jit(4, 180); Loose(); Cap(8);
         // the park: Fantasy Town fountain and lamp posts
-        D("f_fountain", "fountain-round-detail", 1700, 0, A_CENTER, FL_SOLID | FL_HEAVY | FL_FIXTURE, 1); Cap(1); Jit(0, 0);
+        D("f_fountain", "fountain-round-detail", 1300, 0, A_CENTER, FL_SOLID | FL_HEAVY | FL_FIXTURE, 1); Cap(1); Jit(0, 0);
         D("f_lamp", "lantern", 1700, 0, A_OUT_OPEN, FL_SOLID | FL_HEAVY, 1); Jit(2, 10); Cap(4);
         // the park's statues (Nature Kit at x2) and the farm's dog and cat (Cube Pets)
         D("n_statueHead", "statue_head", 2000, 0, A_OUT_OPEN, FL_SOLID | FL_HEAVY, 1); Cap(1); Jit(2, 10);
@@ -982,6 +997,57 @@ public static class GenData
         D("n_statueRing", "statue_ring", 2000, 0, A_OUT_OPEN, FL_SOLID | FL_HEAVY, 1); Cap(1); Jit(2, 10);
         D("p_dog", "animal-dog", 450, 0, A_OUT_OPEN, FL_LIGHT | BOTH, 2); Jit(10, 180); Cap(1);
         D("p_cat", "animal-cat", 330, 0, A_OUT_OPEN, FL_LIGHT | BOTH, 2); Jit(10, 180); Cap(1);
+
+        // ===== revision 10: the farm and the park brought up to the original places (G58) =====
+        // farm: more animals, the coop and the trough, more machinery, the farm workshop's tools (RPG Tools Bits at
+        // x0.5), the farm stand (Fantasy Town market stalls) and its produce (Food Kit at x0.5)
+        D("p_hog", "animal-hog", 600, 0, A_OUT_OPEN, FL_SOLID | OUT, 2); Jit(10, 180); Cap(2);
+        D("p_rabbit", "animal-bunny", 330, 0, A_OUT_OPEN, FL_LIGHT | OUT, 2); Jit(10, 180); Loose(); Cap(3);
+        D("gen_coop", "gen_coop", 1000, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | OUT, 1); Kind(K_STORE); Cap(1);
+        D("gen_trough", "gen_trough", 1000, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | BOTH, 1); Kind(K_WET); Cap(1);
+        D("c_digger", "tractor-shovel", CK, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | OUT, 2); Kind(K_WORK); Cap(1);
+        D("c_tractorWheel", "wheel-tractor-back", CK, 0, A_WALL, FL_HEAVY | BOTH, 1); Jit(4, 20); Beside(K_WORK | K_STORE); Cap(2);
+        D("g_anvil", "anvil", 600, 0, A_ANY, FL_SOLID | FL_HEAVY | BOTH, 1); Kind(K_WORK); Cap(1);
+        D("g_grindstone", "grindstone", 600, 0, A_WALL, FL_SOLID | FL_HEAVY | BOTH, 1); Kind(K_WORK); Cap(1);
+        string[] hand = { "g_saw", "saw", "g_mallet", "mallet", "g_hammer", "hammer", "g_axe", "axe", "g_shovel", "shovel", "g_pickaxe", "pickaxe",
+            "g_drill", "handdrill", "g_wrench", "wrench_A", "g_tongs", "tongs", "g_trowel", "trowel", "g_plane", "handplane" };
+        for (int k = 0; k < hand.Length; k += 2) { D(hand[k], hand[k + 1], 500, I_TOOL, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Jit(4, 20); Beside(K_WORK | K_STORE); }
+        D("g_rope", "rope_bundle_A", 500, I_STORE, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Beside(K_WORK | K_STORE);
+        D("g_ropeB", "rope_bundle_B", 500, I_STORE, A_WALL, FL_LIGHT | BOTH, 0); Loose(); Beside(K_WORK | K_STORE);
+        D("g_lantern", "lantern", 500, I_DECOR | I_STORE, A_WALL, FL_LIGHT | BOTH, 1); Loose(); Beside(K_WORK | K_STORE | K_TENT);
+        D("f_stallGreen", "stall-green", 1800, 0, A_OUT_EDGE, FL_SOLID | OUT, 1); Kind(K_COUNTER); Cap(1); SlotsTop(5, I_FOOD, SZ_S, 900);
+        D("f_stallRed", "stall-red", 1800, 0, A_OUT_EDGE, FL_SOLID | OUT, 1); Kind(K_COUNTER); Cap(1); SlotsTop(5, I_FOOD, SZ_S, 900);
+        D("f_stallBench", "stall-bench", 1800, 0, A_BESIDE, FL_LIGHT | OUT, 1); Beside(K_COUNTER); Cap(2);
+        D("f_stallStool", "stall-stool", 1800, 0, A_BESIDE, FL_LIGHT | OUT, 1); Beside(K_COUNTER); Cap(2);
+        D("f_wheel", "wheel", 1800, 0, A_WALL, BOTH, 1); Jit(4, 20); Beside(K_WORK | K_STORE); Cap(2);
+        string[] produce = { "fk_cabbage", "cabbage", "fk_carrot", "carrot", "fk_corn", "corn", "fk_eggplant", "eggplant", "fk_leek", "leek", "fk_onion", "onion",
+            "fk_radish", "radish", "fk_egg", "egg", "fk_honey", "honey", "fk_cheese", "cheese", "fk_milk", "carton", "fk_pear", "pear", "fk_grapes", "grapes",
+            "fk_cauliflower", "cauliflower", "fk_broccoli", "broccoli", "fk_pumpkin", "pumpkin-basic" };
+        for (int k = 0; k < produce.Length; k += 2) { D(produce[k], produce[k + 1], 500, I_FOOD, A_SLOT_ONLY, BOTH, 0); ThOf(produce[k], TH_FARM | TH_KITCHEN | TH_PANTRY); }
+        // park: the cafe terrace's kiosks (Coaster Kit at x1.4: 1.4 m wide, about 2.2 m high) and its food; the skate
+        // corner (Mini Skate at x2); the pond's lily pads (flat, like rugs), footbridge, ducks; more planting
+        D("ck_food", "stall-food", 1400, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | OUT, 1); Kind(K_COUNTER); Cap(1);
+        D("ck_drinks", "stall-drinks", 1400, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | OUT, 1); Kind(K_COUNTER); Cap(1);
+        D("ck_info", "stall-information", 1400, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | OUT, 1); Cap(1);
+        D("ck_toilets", "stall-toilets", 1400, 0, A_OUT_EDGE, FL_SOLID | FL_HEAVY | OUT, 1); Cap(1);
+        D("ck_bench", "bench", 1700, 0, A_OUT_EDGE, FL_SOLID | OUT, 0); Col(C_SEAT); Kind(K_SEAT);
+        D("ck_trash", "trash", 1700, 0, A_OUT_EDGE, OUT, 0); Cap(2);
+        D("ck_flowers", "flowers", 1700, 0, A_OUT_OPEN, FL_FLAT | OUT, 0); Cap(3);
+        string[] cafe = { "fk_iceCream", "ice-cream", "fk_coffee", "cup-coffee", "fk_croissant", "croissant", "fk_sandwich", "sandwich", "fk_muffin", "muffin" };
+        for (int k = 0; k < cafe.Length; k += 2) { D(cafe[k], cafe[k + 1], 400, I_FOOD | I_SETTING, A_SLOT_ONLY, BOTH, 0); ThOf(cafe[k], TH_PATIO | TH_DINER); }
+        string[] skate = { "sk_halfPipe", "half-pipe", "sk_halfPipeLow", "half-pipe-low", "sk_ramp", "ramp", "sk_rampRail", "ramp-rail", "sk_rail", "rail-high",
+            "sk_box", "obstacle-middle-rail", "sk_steps", "steps-rail" };
+        for (int k = 0; k < skate.Length; k += 2) { D(skate[k], skate[k + 1], 2000, 0, A_CENTER, FL_SOLID | OUT, 1); Cap(1); Jit(0, 0); }
+        D("sk_benches", "benches", 2000, 0, A_OUT_EDGE, FL_SOLID | OUT, 0); Col(C_SEAT); Kind(K_SEAT); Cap(1);
+        D("sk_scooter", "scooter", 1600, 0, A_OUT_OPEN, FL_LIGHT | BOTH, 1); Loose(); Jit(6, 40); Cap(1);
+        D("sk_board", "skateboard", 1600, 0, A_OUT_OPEN, FL_LIGHT | BOTH, 1); Loose(); Jit(6, 40); Cap(2);
+        D("n_lily", "lily_large", 2500, 0, A_OUT_OPEN, FL_FLAT | OUT, 0); Jit(8, 180); Cap(6);
+        D("n_lilySmall", "lily_small", 2500, 0, A_OUT_OPEN, FL_FLAT | OUT, 0); Jit(8, 180); Cap(6);
+        D("n_footbridge", "bridge_wood", 2400, 0, A_CENTER, FL_SOLID | OUT, 1); Cap(1); Jit(0, 0);
+        D("p_duck", "animal-chick", 280, 0, A_OUT_OPEN, FL_LIGHT | OUT, 2); Jit(10, 180); Loose(); Cap(4);
+        D("n_bushSmall", "plant_bushSmall", 3000, 0, A_OUT_OPEN, OUT, 0); Jit(10, 180); Kind(K_PLANT);
+        D("n_bushTriangle", "plant_bushTriangle", 3000, 0, A_OUT_OPEN, OUT, 0); Jit(10, 180); Kind(K_PLANT);
+        D("f_hedge", "hedge-large", 1800, 0, A_OUT_EDGE, FL_SOLID | OUT, 0); Kind(K_PLANT); Jit(2, 2);
 
         BuildThemes();
         BuildGroups();
@@ -1067,8 +1133,20 @@ public static class GenData
         Grp("rowWheat", GL_ROW, A_SOFT, 3, 5, 80, "n_wheat");
         Grp("rowLettuce", GL_ROW, A_SOFT, 3, 5, 120, "n_lettuce");
         Grp("rowTurnip", GL_ROW, A_SOFT, 3, 5, 110, "n_cropTurnip");
+        // revision 10: rows of young crops (an earlier sowing)
+        Grp("rowCornYoung", GL_ROW, A_SOFT, 3, 5, 120, "n_cornYoung");
+        Grp("rowWheatYoung", GL_ROW, A_SOFT, 3, 5, 80, "n_wheatYoung");
+        Grp("rowLettuceYoung", GL_ROW, A_SOFT, 3, 5, 120, "n_lettuceYoung");
+        Grp("rowBamboo", GL_ROW, A_SOFT, 3, 5, 120, "n_bamboo");
         Grp("hens", GL_CLUSTER, A_OUT_OPEN, 2, 4, 220, "p_hen");
         Grp("baskets", GL_ROW, A_WALL, 2, 3, 40, "ms_basket"); GrpBeside(K_COUNTER | K_STORE);
+        // revision 10
+        Grp("handtools", GL_ROW, A_WALL, 2, 4, 90, "g_saw", "g_mallet", "g_axe", "g_shovel", "g_pickaxe", "g_drill", "g_tongs", "g_trowel"); GrpBeside(K_WORK | K_STORE);
+        Grp("smallTools", GL_ROW, A_WALL, 2, 3, 80, "g_hammer", "g_wrench", "g_plane", "g_rope", "g_ropeB", "g_lantern"); GrpBeside(K_WORK | K_STORE);
+        Grp("rabbits", GL_CLUSTER, A_OUT_OPEN, 2, 3, 200, "p_rabbit");
+        Grp("ducks", GL_CLUSTER, A_OUT_OPEN, 2, 4, 260, "p_duck");
+        Grp("lilies", GL_CLUSTER, A_OUT_OPEN, 3, 5, 200, "n_lily", "n_lilySmall");
+        Grp("shrubs", GL_ROW, A_OUT_EDGE, 2, 3, 120, "n_bushSmall", "n_bushTriangle", "n_bush");
         // the kinds of a group stand in for each other: a hider's metal bucket fits any row of buckets (bots use this)
         int bk = FindGrp("buckets");
         defKin[FindDef("gen_wateringCan")] = bk;
@@ -1121,12 +1199,18 @@ public static class GenData
         Range(R_GARAGE_BAY,        22,   34,       20,             55);
         Range(R_PARTS,             38,   54,       36,             50);
         Range(R_BARN,              20,   32,        8,             50);
-        Range(R_FEED_STORE,        36,   52,       10,             50);
+        Range(R_FEED_STORE,        44,   60,       14,             55);   // revision 9: 36 to 52
         Range(R_FORECOURT,         14,   24,        4,             36);
-        Range(R_FARMYARD,          14,   24,        3,             36,      0,  1,    0,  0);
+        Range(R_FARMYARD,          20,   30,        6,             40,      0,  1,    0,  0);   // revision 9: 14 to 24
         Range(R_FIELD,             30,   50,        0,             45);
-        Range(R_PADDOCK,           10,   18,        2,             30,      0,  1,    0,  0);
-        Range(R_PARK,              10,   18,        2,             34,      1,  3,    0,  0);
+        Range(R_PADDOCK,           18,   28,        2,             36,      0,  1,    0,  0);   // revision 9: 10 to 18
+        Range(R_PARK,              28,   38,        8,             45,      1,  3,    0,  0);   // revision 9: 10 to 18
+        // revision 10
+        Range(R_FARM_WORK,         38,   54,       30,             50);
+        Range(R_PLAYGROUND,        30,   42,        2,             55);
+        Range(R_POND,              30,   42,        2,             45,      0,  1,    0,  0);
+        Range(R_TERRACE,           34,   48,       30,             55);
+        rangeFloorAbs[R_FARM_WORK] = 6; rangeFloorAbs[R_PLAYGROUND] = 6; rangeFloorAbs[R_POND] = 6; rangeFloorAbs[R_TERRACE] = 7;
         rangeFloorAbs[R_FORECOURT] = 6; rangeFloorAbs[R_FARMYARD] = 6; rangeFloorAbs[R_FIELD] = 10; rangeFloorAbs[R_PADDOCK] = 6; rangeFloorAbs[R_PARK] = 7;
     }
 
@@ -1206,7 +1290,7 @@ public static class GenData
         // revision 9: the shop, the garage, the farm, the park
         Native(Z_SHOP, R_SHOP_FLOOR, "ms_shelfBoxes", "ms_shelfBags", "ms_shelfEnd", "ms_freezers", "ms_freezer", "ms_dispBread", "ms_dispCans", "ms_dispFruit", "ms_dispSmall",
             "ms_checkout", "ms_clothesRack", "ms_clothesTable", "ms_cart", "@baskets", "ms_bottleReturn", "ms_gacha", "ms_mannequin", "k_plant", "k_trashcan", "k_doormat", "@crates",
-            "ms_dispFlowers", "@pots", "n_planter", "@watering", "@sacks");
+            "ms_dispFlowers", "@pots", "n_planter", "@watering", "@sacks", "ms_handTruck", "m_wheelbarrow");
         Native(Z_SHOP, R_STOCKROOM, "gen_rack", "gen_rackPantry", "w_pallet", "w_palletLoaded", "@crates", "@boxes", "@cardboard", "ms_handTruck", "s_boxLarge", "@sacks",
             "@cleaning", "ms_dispCans", "ms_cart", "ms_freezer", "k_trashcan");
         string[] office = { "k_desk", "q_cabinet", "k_bookcase", "k_bookcaseLow", "k_trashcan", "k_plant", "s_workbench", "q_tableSmall", "k_lampFloor", "@cardboard", "r_tableRound" };
@@ -1216,18 +1300,31 @@ public static class GenData
             "ms_handTruck", "c_cone", "@cleaning", "@buckets", "k_trashcan");
         Native(Z_GARAGE, R_PARTS, "gen_rack", "@tyres", "@scrap", "@boxes", "@fuel", "@barrels", "s_workbench", "@tools", "w_parts", "s_boxLarge", "ms_handTruck", "@cleaning");
         Native(Z_BARN, R_BARN, "@hay", "p_cow", "p_pig", "@hens", "f_cart", "f_cartHigh", "c_tractor", "m_wheelbarrow", "@buckets", "@tools", "@sacks", "w_pallet", "@barrels",
-            "w_planks", "w_logs", "n_logStack", "p_dog", "p_cat", "s_workbench", "gen_rack", "@crates", "@fuel");
-        Native(Z_BARN, R_FEED_STORE, "@sacks", "@hay", "@barrels", "@buckets", "@crates", "@tools", "w_pallet", "gen_rack", "m_wheelbarrow", "p_cat", "@fuel");
+            "w_planks", "w_logs", "n_logStack", "p_dog", "p_cat", "s_workbench", "gen_rack", "@crates", "@fuel",
+            "p_hog", "gen_trough", "@handtools", "g_lantern", "c_tractorWheel");
+        Native(Z_BARN, R_FEED_STORE, "@sacks", "@hay", "@barrels", "@buckets", "@crates", "@tools", "w_pallet", "gen_rack", "m_wheelbarrow", "p_cat", "@fuel",
+            "@smallTools", "@handtools", "@boxes", "gen_trough");
         Native(Z_LAWN, R_FORECOURT, "c_sedan", "c_suv", "c_van", "c_truck", "c_hatch", "c_taxi", "c_sports", "c_luxury", "c_police", "c_flatbed", "c_cone", "@tyres", "k_bench", "k_trashcan", "ms_dispFlowers", "ms_dispFruit",
             "ms_cart", "ms_bottleReturn", "@pots", "n_pathStone", "n_sign", "@fuel", "gen_dumpster");
         Native(Z_LAWN, R_FARMYARD, "f_cart", "f_cartHigh", "c_tractor", "@hay", "m_wheelbarrow", "@buckets", "@sacks", "@tools", "@hens", "n_logStack", "@barrels", "gen_tap",
-            "n_sign", "n_treeFat", "n_treeOak", "n_pathStone", "@crates", "k_bench", "p_dog", "@logpile", "w_pallet", "@watering");
-        Native(Z_LAWN, R_FIELD, "@rowCorn", "@rowWheat", "@rowLettuce", "@rowTurnip", "@vegCarrot", "@vegPumpkin", "@vegMelon", "n_cropRow", "m_wheelbarrow", "@tools",
+            "n_sign", "n_treeFat", "n_treeOak", "n_pathStone", "@crates", "k_bench", "p_dog", "@logpile", "w_pallet", "@watering",
+            "gen_coop", "gen_trough", "c_digger", "c_tractorWheel", "f_stallGreen", "f_stallRed", "f_stallBench", "f_stallStool", "@rabbits", "p_hog");
+        Native(Z_LAWN, R_FIELD, "@rowCorn", "@rowWheat", "@rowLettuce", "@rowTurnip", "@rowCornYoung", "@rowWheatYoung", "@rowLettuceYoung", "@rowBamboo", "@vegCarrot", "@vegPumpkin", "@vegMelon", "n_cropRow", "m_wheelbarrow", "@tools",
             "@buckets", "@hay", "gen_tap", "s_barrel", "@watering");
-        Native(Z_LAWN, R_PADDOCK, "p_cow", "p_pig", "@hens", "@hay", "@buckets", "n_treeFat", "n_treeOak", "n_bush", "@rocks", "n_bushLarge", "p_dog", "n_logStack");
+        Native(Z_LAWN, R_PADDOCK, "p_cow", "p_pig", "@hens", "@hay", "@buckets", "n_treeFat", "n_treeOak", "n_bush", "@rocks", "n_bushLarge", "p_dog", "n_logStack",
+            "p_hog", "@rabbits", "gen_coop", "gen_trough", "n_stump", "f_cart", "m_wheelbarrow", "@sacks");
+        Native(Z_BARN, R_FARM_WORK, "s_workbench", "g_anvil", "g_grindstone", "@handtools", "@smallTools", "@tools", "@tyres", "c_tractorWheel", "f_wheel", "@fuel",
+            "@barrels", "gen_rack", "@boxes", "w_planks", "w_logs", "ms_handTruck", "@cleaning", "@buckets", "p_cat");
+        Native(Z_LAWN, R_PLAYGROUND, "sk_halfPipe", "sk_halfPipeLow", "sk_ramp", "sk_rampRail", "sk_rail", "sk_box", "sk_steps", "sk_benches", "sk_scooter", "sk_board",
+            "ck_bench", "ck_trash", "f_lamp", "n_bush", "@shrubs", "k_bench", "c_cone", "ck_drinks", "@pots", "@flowersRed", "@flowersYellow", "@flowersPurple");
+        Native(Z_LAWN, R_POND, "@lilies", "@ducks", "n_footbridge", "n_canoe", "@rocks", "n_rockLarge", "n_rockTall", "@shrubs", "n_bushLarge", "n_grassLarge",
+            "n_treeFat", "n_treeOak", "k_bench", "ck_bench", "f_lamp", "n_logLarge", "n_stump", "@mushrooms", "@flowersRed", "@flowersYellow", "@flowersPurple", "ck_trash", "n_bushDetailed");
+        Native(Z_LAWN, R_TERRACE, "ck_food", "ck_drinks", "ck_info", "ck_toilets", "f_stallGreen", "f_stallRed", "f_stallBench", "f_stallStool", "r_tableRound", "r_chair",
+            "k_chair", "ck_bench", "ck_trash", "ck_flowers", "@pots", "f_lamp", "k_plant", "ms_dispFruit");
         Native(Z_LAWN, R_PARK, "f_fountain", "f_lamp", "k_bench", "k_benchCushion", "k_trashcan", "n_statueHead", "n_obelisk", "n_column", "n_statueRing", "n_planter",
             "r_chair", "k_chair", "n_treeFat", "n_treeOak", "n_bush", "n_bushLarge", "n_bushDetailed", "@flowersRed",
-            "@flowersYellow", "@flowersPurple", "@pots", "n_pathStone", "r_tableRound", "@rocks");
+            "@flowersYellow", "@flowersPurple", "@pots", "n_pathStone", "r_tableRound", "@rocks",
+            "@shrubs", "ck_bench", "ck_trash", "ck_flowers", "f_hedge", "ck_info", "r_table", "k_chair");
 
         Table(Z_RELEASE, R_RELEASE);
     }

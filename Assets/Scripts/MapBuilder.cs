@@ -58,7 +58,7 @@ public class MapBuilder
             case GenData.R_STOCKROOM: case GenData.R_PARTS: return C(196, 198, 200);
             case GenData.R_BACK_OFFICE: return C(222, 214, 200);
             case GenData.R_GARAGE_BAY: return C(178, 182, 186);
-            case GenData.R_BARN: case GenData.R_FEED_STORE: return C(176, 132, 92);
+            case GenData.R_BARN: case GenData.R_FEED_STORE: case GenData.R_FARM_WORK: return C(176, 132, 92);
         }
         return C(220, 220, 220);
     }
@@ -114,7 +114,7 @@ public class MapBuilder
         switch (roomType)
         {
             case GenData.R_LIVING: case GenData.R_BEDROOM: case GenData.R_OFFICE: case GenData.R_DINING: case GenData.R_KIDS: case GenData.R_HALL:
-            case GenData.R_WH_OFFICE: case GenData.R_BACK_OFFICE: case GenData.R_FEED_STORE:
+            case GenData.R_WH_OFFICE: case GenData.R_BACK_OFFICE: case GenData.R_FEED_STORE: case GenData.R_FARM_WORK:
                 // wood planks: strips two cells wide, alternating shade; four kinds of wood (the building's scheme)
                 return Vary((((iz / 2) & 1) == 0) ? PlankA[style] : PlankB[style], ix / 4, iz / 2, 4);
             case GenData.R_SHOP_FLOOR:
@@ -249,6 +249,7 @@ public class MapBuilder
             case MapGen.GR_SOIL: return Vary(C(138, 104, 74), ix, iz, 8);
             case MapGen.GR_PAVING: return (((ix / 2 + iz / 2) & 1) == 0) ? C(196, 190, 178) : C(182, 176, 166);
             case MapGen.GR_TRACK: return Vary(C(158, 134, 100), ix, iz, 6);
+            case MapGen.GR_WATER: return Vary(C(86, 150, 196), ix, iz, 5);
         }
         return FloorColour(gen.roomType[gen.innerRoom[i]], ix, iz, StyleAt(ix / GenData.INNER_PER_CELL + iz / GenData.INNER_PER_CELL * gen.W));
     }
@@ -256,7 +257,7 @@ public class MapBuilder
     bool Blends(int i)
     {
         int g = gen.ground[i];
-        return g >= MapGen.GR_LAWN && g != MapGen.GR_RELEASE && g != MapGen.GR_PAVING;
+        return g >= MapGen.GR_LAWN && g != MapGen.GR_RELEASE && g != MapGen.GR_PAVING && g != MapGen.GR_WATER;
     }
 
     // the colour of the grid corner at (cx, cz) for the cell `self`: the mean of the outdoor cells around the

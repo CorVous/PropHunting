@@ -212,6 +212,8 @@ public partial class MapGen
                 int prevEnd = plotSet[prev] + (plotPlan[prev] >= 0 ? PlD(plotPlan[prev]) : 0);
                 if (plotSR[prev] == 0 && plotSet[k] + d + plotBack[k] < prevEnd) plotBack[k] = prevEnd - plotSet[k] - d;
             }
+            // revision 10: from M up a farm's paddock is two cells wide (on the side that has the side yard)
+            if (kinds[i] == GenData.Z_BARN && size >= 1) { if (plotSR[k] >= 1) plotSR[k] = 2; else plotSL[k] = 2; }
             plotY0[k] = off;
             plotAlong[k] = w + plotSL[k] + plotSR[k];
             plotDepth[k] = plotSet[k] + d + plotBack[k];
@@ -339,6 +341,10 @@ public partial class MapGen
         int bx, by, bdir;
         DoorOutside(k, SD_BACK, out bx, out by, out bdir);
         int[] type = cand;   // per plot cell, scratch (u * 16 + v)
+        // a park (revision 10): its lawn along the lane; behind it, side by side in a shuffled order, a skate corner, a
+        // pond and a cafe terrace: one column each, two for the first (and the second) when the park is 4 (5) wide
+        int[] feat = { GenData.R_PLAYGROUND, GenData.R_POND, GenData.R_TERRACE };
+        if (zone == GenData.Z_PARK) Shuffle(feat, 3, ref rng);
         for (int u = 0; u < plotAlong[k]; u++)
             for (int v = 0; v < plotDepth[k]; v++)
             {
@@ -358,7 +364,11 @@ public partial class MapGen
                     else if (zone == GenData.Z_DINER) t = pl == PL_FRONT ? GenData.R_PATIO : ((atBack || pl == PL_BACK) ? GenData.R_YARD : GenData.R_LAWN_OPEN);
                     else if (zone == GenData.Z_SHOP || zone == GenData.Z_GARAGE) t = pl == PL_FRONT ? GenData.R_FORECOURT : ((atBack || pl == PL_BACK) ? GenData.R_YARD : GenData.R_LAWN_OPEN);
                     else if (zone == GenData.Z_BARN) t = pl == PL_FRONT ? GenData.R_FARMYARD : (pl == PL_SIDE ? GenData.R_PADDOCK : GenData.R_FIELD);
-                    else if (zone == GenData.Z_PARK) t = GenData.R_PARK;
+                    else if (zone == GenData.Z_PARK)
+                    {
+                        int a = plotAlong[k], f = a <= 3 ? u : (a == 4 ? (u < 2 ? 0 : u - 1) : (u < 4 ? u / 2 : 2));
+                        t = v == 0 ? GenData.R_PARK : feat[f < 3 ? f : 2];
+                    }
                     else t = pl == PL_FRONT ? GenData.R_LAWN_OPEN : GenData.R_YARD;
                 }
                 type[u * 16 + v] = t;
@@ -692,6 +702,7 @@ public partial class MapGen
             if (rt == GenData.R_SHOP_FLOOR) chance = 850;
             else if (rt == GenData.R_GARAGE_BAY) chance = 0;
             else if (rt == GenData.R_STOCKROOM || rt == GenData.R_PARTS || rt == GenData.R_FEED_STORE) chance = 150;
+            else if (rt == GenData.R_FARM_WORK) chance = 450;
             else if (rt == GenData.R_BARN) chance = 250;
             for (int d = 0; d < 4; d++)
             {
