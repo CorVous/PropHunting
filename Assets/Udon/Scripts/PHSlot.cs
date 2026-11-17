@@ -33,6 +33,11 @@ public class PHSlot : UdonSharpBehaviour
     [UdonSynced] public Vector3 propPos;
     [UdonSynced] public float propYaw;
     [UdonSynced] public bool hiding;                  // seated and hidden this round
+    // a ghost: a caught hider, an eliminated hunter or a mid-round joiner. Seated (Mobile on their own client, so
+    // they walk as their own avatar) and seen only by the other ghosts: every other client parks the station
+    [UdonSynced] public bool ghost;
+    [UdonSynced] public Vector3 walkPos;
+    [UdonSynced] public float walkYaw;
     [UdonSynced] public int health, maxHealth;
     [UdonSynced] public bool caught;
     [UdonSynced] public int survivedMs;
@@ -70,7 +75,7 @@ public class PHSlot : UdonSharpBehaviour
     public void ResetFor(int r, int role)
     {
         round = r;
-        def = -1; lastDef = -1; hiding = false; caught = false; survivedMs = 0;
+        def = -1; lastDef = -1; hiding = false; ghost = false; caught = false; survivedMs = 0;
         health = 0; maxHealth = 0;
         hunterHealth = 100; hunterOut = false; wrongProps = 0; hits = 0; catches = 0;
         Send();
@@ -85,9 +90,25 @@ public class PHSlot : UdonSharpBehaviour
         Send();
     }
 
+    // become a ghost: out of the prop's station mode and back on VRChat's own feet (Mobile on this client)
+    public void StartGhost()
+    {
+        hiding = false;
+        ghost = true;
+        if (seated) station.ExitStation(Networking.LocalPlayer);
+        seated = false;
+        station.PlayerMobility = VRCStation.Mobility.Mobile;
+        nextSit = Time.time + 0.3f;
+        VRCPlayerApi me = Networking.LocalPlayer;
+        walkPos = me.GetPosition(); walkYaw = me.GetRotation().eulerAngles.y;
+        Send();
+    }
+
     public void StopHiding()
     {
         hiding = false;
+        ghost = false;
+        station.PlayerMobility = VRCStation.Mobility.Immobilize;
         if (seated) station.ExitStation(Networking.LocalPlayer);
         seated = false;
         Send();
@@ -162,7 +183,13 @@ public class PHSlot : UdonSharpBehaviour
         }
         // otherwise the station follows the player, so sitting down leaves them where they are
         else station.transform.SetPositionAndRotation(me.GetPosition(), me.GetRotation());
-        if (hiding && !seated && Time.time >= nextSit)
+        if (ghost)
+        {
+            Vector3 p = me.GetPosition();
+            float y = me.GetRotation().eulerAngles.y;
+            if ((p - walkPos).sqrMagnitude > 0.0025f || Mathf.Abs(Mathf.DeltaAngle(y, walkYaw)) > 5f) { walkPos = p; walkYaw = y; Send(); }
+        }
+        if ((hiding || ghost) && !seated && Time.time >= nextSit)
         {
             nextSit = Time.time + 3f;
             station.UseStation(me);
@@ -173,7 +200,20 @@ public class PHSlot : UdonSharpBehaviour
     {
         // everyone else's copy of a hiding player's station is parked out of sight
         station.PlayerMobility = VRCStation.Mobility.Immobilize;
-        if (hiding) station.transform.SetPositionAndRotation(parkAt + new Vector3(index * 3f, 0f, 0f), Quaternion.identity);
+        Vector3 park = parkAt + new Vector3(index * 3f, 0f, 0f);
+        if (hiding) station.transform.SetPositionAndRotation(park, Quaternion.identity);
+        else if (ghost)
+        {
+            // ghosts see ghosts; nobody else does (Cor: the dead see only the dead and the hunters)
+            if (game.local != null && game.local.IsGhost())
+            {
+                Vector3 at = station.transform.position;
+                if ((at - walkPos).sqrMagnitude > 25f) at = walkPos;
+                float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
+                station.transform.SetPositionAndRotation(Vector3.Lerp(at, walkPos, k), Quaternion.Euler(0f, walkYaw, 0f));
+            }
+            else station.transform.SetPositionAndRotation(park, Quaternion.identity);
+        }
     }
 
     // ------------------------------------------------------------------ the prop
@@ -222,7 +262,7 @@ public class PHSlot : UdonSharpBehaviour
         if (Utilities.IsValid(player) && player.isLocal)
         {
             seated = false;
-            if (hiding) nextSit = Time.time + 0.3f;
+            if (hiding || ghost) nextSit = Time.time + 0.3f;
         }
     }
 

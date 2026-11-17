@@ -138,6 +138,72 @@ public class PHLocal : UdonSharpBehaviour
 
     public void OnSlotChanged(PHSlot s) { }
 
+    // ------------------------------------------------------------------ ghosts and voices (Cor, G6, G8, G18, J5)
+    // A ghost is a caught hider, an eliminated hunter or someone who joined mid-round. Ghosts see each other and
+    // the hunters; hiders see only the hunters; hunters see only the hunters. Props are seen by everyone.
+    public bool IsGhost()
+    {
+        PHSlot s = Me();
+        return s != null && s.ghost;
+    }
+
+    // someone who joins while a round is on walks the arena as a ghost (Cor), once their slot and the map are there
+    bool joinChecked;
+    float joinCheckAt = 4f;
+
+    void UpdateJoiner()
+    {
+        if (joinChecked || Time.time < joinCheckAt) return;
+        PHSlot s = Me();
+        if (s == null) return;
+        int phase = game.phase;
+        bool round = phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT;
+        if (!round || game.RoleOf(s.index) != PHGame.ROLE_NONE) { joinChecked = true; return; }
+        if (!game.MapReady) return;
+        joinChecked = true;
+        Networking.LocalPlayer.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+        s.StartGhost();
+        Say("A round is on: you walk the map as a ghost until it ends.", 5f);
+    }
+
+    float nextVoice;
+    VRCPlayerApi[] voicePlayers = new VRCPlayerApi[90];
+
+    // Hunters cannot hear hiders. Hiders hear each other like a radio: the same volume and centred left/right
+    // wherever they are (no fall-off, a volumetric radius bigger than the map and the parking, no lowpass).
+    // Everything else is VRChat's default (the parked stations already put hidden voices far away).
+    void UpdateVoices()
+    {
+        if (Time.time < nextVoice) return;
+        nextVoice = Time.time + 0.5f;
+        int phase = game.phase;
+        bool round = phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT;
+        PHSlot me = Me();
+        bool meGhost = me != null && me.ghost;
+        int myRole = me != null ? game.RoleOf(me.index) : PHGame.ROLE_NONE;
+        int n = VRCPlayerApi.GetPlayerCount();
+        voicePlayers = VRCPlayerApi.GetPlayers(voicePlayers);
+        for (int i = 0; i < n; i++)
+        {
+            VRCPlayerApi p = voicePlayers[i];
+            if (!Utilities.IsValid(p) || p.isLocal) continue;
+            int slot = game.SlotOf(p.playerId);
+            PHSlot ps = slot >= 0 ? game.slots[slot] : null;
+            bool theyHide = round && ps != null && game.RoleOf(slot) == PHGame.ROLE_HIDER && ps.hiding && !ps.ghost;
+            bool iHide = round && myRole == PHGame.ROLE_HIDER && me != null && me.hiding && !meGhost;
+            bool iHunt = round && myRole == PHGame.ROLE_HUNTER && !meGhost;
+            float gain = 15f, near = 0f, far = 25f, radius = 0f;
+            bool lowpass = true;
+            if (iHunt && theyHide) gain = 0f;
+            else if (iHide && theyHide) { near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }
+            p.SetVoiceGain(gain);
+            p.SetVoiceDistanceNear(near);
+            p.SetVoiceDistanceFar(far);
+            p.SetVoiceVolumetricRadius(radius);
+            p.SetVoiceLowpass(lowpass);
+        }
+    }
+
     // ------------------------------------------------------------------ the reveal (prototype Round.EndRound)
     // The roofs come off and a beam marks every hider: green survived, red caught. The results go on the HUD for
     // the reveal and stay on the lobby wall.
@@ -294,6 +360,8 @@ public class PHLocal : UdonSharpBehaviour
         }
         wasEndgame = eg;
         UpdateForcedTaunt();
+        UpdateVoices();
+        UpdateJoiner();
         UpdateHud();
         if (Time.time >= nextPanel) { nextPanel = Time.time + 0.5f; string st = game.SettingsText(); if (panelText != null) panelText.text = st; if (panelUiText != null) panelUiText.text = st; }
     }
@@ -429,7 +497,7 @@ public class PHLocal : UdonSharpBehaviour
         if (game.Endgame) penalty *= 2;
         s.wrongProps++;
         s.hunterHealth -= penalty;
-        if (s.hunterHealth <= 0) { s.hunterHealth = 0; s.hunterOut = true; Say("Out of health: you are out for the round.", 4f); SetFrozen(true); }
+        if (s.hunterHealth <= 0) { s.hunterHealth = 0; s.hunterOut = true; Say("Out of health: you walk as a ghost until the round ends.", 4f); s.StartGhost(); }
         else Say("Just a " + DefName(game.gen.emitDef[e]).ToLower() + ". -" + penalty + " health", 2f);
         s.Send();
         sound.Play("error_006", 0.6f);
@@ -476,11 +544,13 @@ public class PHLocal : UdonSharpBehaviour
         PHSlot s = Me();
         if (nowCaught)
         {
-            Say("You were caught! You stay hidden as a ghost until the round ends.", 5f);
+            Say("You were caught! You walk as a ghost until the round ends.", 5f);
             sound.Play("you_lose", 0.8f);
             s.def = -1; s.Send();
-            body.SetGhost();
+            body.End();
             RestoreEye();
+            s.StartGhost();
+            SetFrozen(false);
         }
         else Say("Hit! " + (s != null ? s.health.ToString() : "?") + " health left. Move!", 2.5f);
     }

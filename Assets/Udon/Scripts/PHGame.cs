@@ -236,7 +236,8 @@ public class PHGame : UdonSharpBehaviour
     {
         if (phase == seenPhase && round == seenRound) return;
         seenPhase = phase; seenRound = round;
-        if (phase == PH_LOADING && genRound != round) BeginMap();
+        // a mid-round joiner builds the round's map too
+        if (phase != PH_LOBBY && genRound != round) BeginMap();
         if (local != null) local.OnPhase(phase);
     }
 
