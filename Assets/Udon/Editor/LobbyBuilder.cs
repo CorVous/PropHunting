@@ -134,6 +134,7 @@ public static class LobbyBuilder
 
         var panel = cv.gameObject.AddUdonSharpComponent<PHPanel>();
         panel.game = game;
+        panel.spinner = Spinner;
 
         string[] titles = { "MAP", "PROPS", "ROUND", "TAUNT" };
         int[][] args = { new[] { -1, 0, 1, 2, 3 }, new[] { 3, 1, 0, 2, 4 }, new[] { 0, 1, 2 }, new[] { 30, 40, 60 } };
@@ -406,7 +407,7 @@ public static class LobbyBuilder
             Slab(root, "Rule", L(0.05f, y, wallH - 0.38f), new Vector3(0.02f, 0.12f, 0.7f), rule);
             Slab(root, "Rule", L(roomW - 0.05f, y, wallH - 0.38f), new Vector3(0.02f, 0.12f, 0.7f), rule);
         }
-        var name = WorldText(root, "Name", L(roomW / 2, roomD - 0.03f, 3.5f), Quaternion.Euler(0f, 180f, 0f), "PROPHUNT", 26f, C("f6d773"), new Vector2(20f, 2.2f));
+        var name = WorldText(root, "Name", L(roomW / 2, roomD - 0.03f, 4.6f), Quaternion.Euler(0f, 180f, 0f), "PROPHUNT", 26f, C("f6d773"), new Vector2(20f, 2.2f));
         name.characterSpacing = 6f;
 
         // the prop shelf on the east wall
@@ -437,6 +438,113 @@ public static class LobbyBuilder
         Piece(root, "furniture-bits/cactus_medium_A", L(22.2f, 20.0f), 1.6f, 0f, true);
         Piece(root, "furniture-bits/lamp_standing", L(22.3f, 18.4f), 2.4f, 0f, false);
         Piece(root, "board-game-bits/meeple_blue", L(18.8f, 9.0f), 1.7f, -30f, true);
+
+        // the sun lights the room through the open box; the walls and the lid cast no shadows into it
+        foreach (Transform c in lobby)
+            if (c.name.StartsWith("Wall")) c.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        BuildLid(root, roomW, roomD, wallH);
+    }
+
+    public static Transform Spinner;   // the lid's spinner arrow (PHPanel spins it when a round starts)
+
+    // the ceiling: the underside of the game box's lid, printed with a giant four-colour spinner
+    static void BuildLid(Transform root, float roomW, float roomD, float wallH)
+    {
+        int first = root.childCount;
+        var lidMat = Glow("LobbyLid", C("efe2bf"));
+        var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        lid.name = "Lid";
+        lid.transform.SetParent(root, false);
+        lid.transform.localPosition = new Vector3(0f, wallH + 0.15f, 0f);
+        lid.transform.localScale = new Vector3(roomW + 0.6f, 0.3f, roomD + 0.6f);
+        lid.GetComponent<MeshRenderer>().sharedMaterial = lidMat;
+        lid.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lid.layer = 11;
+        // the lid's rim, a felt band with gold dashes, just under the lid
+        var felt = Glow("LobbyLidRim", C("8c2a2a"));
+        var gold = Glow("LobbySpinnerHub", C("e2b24a"));
+        float y = wallH - 0.2f;
+        Slab(root, "RimN", new Vector3(0, y, roomD / 2 - 0.3f), new Vector3(roomW, 0.4f, 0.6f), felt);
+        Slab(root, "RimS", new Vector3(0, y, -roomD / 2 + 0.3f), new Vector3(roomW, 0.4f, 0.6f), felt);
+        Slab(root, "RimE", new Vector3(roomW / 2 - 0.3f, y, 0), new Vector3(0.6f, 0.4f, roomD), felt);
+        Slab(root, "RimW", new Vector3(-roomW / 2 + 0.3f, y, 0), new Vector3(0.6f, 0.4f, roomD), felt);
+
+        // the spinner: an outer felt ring, a cream ring, four coloured quarters, a gold hub and a red arrow
+        float sy = wallH - 0.01f;
+        Disc(root, "SpinnerEdge", new Vector3(0, sy, 0), 13.2f, Glow("LobbySpinnerEdge", C("21573f")));
+        Disc(root, "SpinnerRing", new Vector3(0, sy - 0.008f, 0), 12.4f, lidMat);
+        for (int q = 0; q < 4; q++)
+        {
+            var w = new GameObject("Quarter" + q);
+            w.transform.SetParent(root, false);
+            w.transform.localPosition = new Vector3(0, sy - 0.016f, 0);
+            w.AddComponent<MeshFilter>().sharedMesh = Wedge(q * 90f + 2f, q * 90f + 88f, 5.9f);
+            var mr = w.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = Glow("LobbySpinner" + new[] { "Blue", "Yellow", "Green", "Coral" }[q], RowColour[q]);
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+        var pivot = new GameObject("SpinnerArrow").transform;
+        pivot.SetParent(root, false);
+        pivot.localPosition = new Vector3(0, sy - 0.25f, 0);
+        pivot.localRotation = Quaternion.Euler(0f, 35f, 0f);
+        var red = Glow("LobbySpinnerArrow", C("e05a48"));
+        Slab(pivot, "Shaft", new Vector3(0, 0, 1.7f), new Vector3(0.45f, 0.14f, 4.6f), red);
+        var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        tip.name = "Tip"; Object.DestroyImmediate(tip.GetComponent<Collider>());
+        tip.transform.SetParent(pivot, false);
+        tip.transform.localPosition = new Vector3(0, 0, 4.1f);
+        tip.transform.localRotation = Quaternion.Euler(0f, 45f, 0f);
+        tip.transform.localScale = new Vector3(1.3f, 0.14f, 1.3f);
+        tip.GetComponent<MeshRenderer>().sharedMaterial = red;
+        Slab(pivot, "Tail", new Vector3(0, 0, -1.1f), new Vector3(0.9f, 0.14f, 0.9f), red);
+        var hub = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        hub.name = "Hub"; Object.DestroyImmediate(hub.GetComponent<Collider>());
+        hub.transform.SetParent(root, false);
+        hub.transform.localPosition = new Vector3(0, sy - 0.3f, 0);
+        hub.transform.localScale = new Vector3(1.2f, 0.3f, 1.2f);
+        hub.GetComponent<MeshRenderer>().sharedMaterial = gold;
+        Spinner = pivot;
+        // the sun shines in through the open box in the game's story: nothing up here casts shadows into the room
+        for (int i = first; i < root.childCount; i++)
+            foreach (var r in root.GetChild(i).GetComponentsInChildren<Renderer>())
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    }
+
+    // the lid faces down, away from the sun: a little emission keeps its print bright
+    static Material Glow(string name, Color c)
+    {
+        var m = Mat(name, c);
+        m.EnableKeyword("_EMISSION");
+        m.SetColor("_EmissionColor", c * 0.55f);
+        m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    // a flat pie slice (both faces), in the XZ plane
+    static Mesh Wedge(float fromDeg, float toDeg, float r)
+    {
+        int seg = 24;
+        var v = new Vector3[(seg + 2) * 2];
+        var tris = new int[seg * 6];
+        for (int side = 0; side < 2; side++)
+        {
+            int o = side * (seg + 2);
+            v[o] = Vector3.zero;
+            for (int i = 0; i <= seg; i++)
+            {
+                float a = Mathf.Deg2Rad * Mathf.Lerp(fromDeg, toDeg, i / (float)seg);
+                v[o + 1 + i] = new Vector3(Mathf.Sin(a) * r, 0f, Mathf.Cos(a) * r);
+            }
+            for (int i = 0; i < seg; i++)
+            {
+                int t = side * seg * 3 + i * 3;
+                tris[t] = o; tris[t + 1] = side == 0 ? o + 1 + i : o + 2 + i; tris[t + 2] = side == 0 ? o + 2 + i : o + 1 + i;
+            }
+        }
+        var m = new Mesh { name = "Wedge" };
+        m.vertices = v; m.triangles = tris; m.RecalculateNormals(); m.RecalculateBounds();
+        return m;
     }
 
     static void Stack(Transform root, Vector3 at, int n, float dia)
@@ -524,6 +632,7 @@ public static class LobbyBuilder
         go.transform.SetParent(root, false);
         go.transform.localPosition = pos; go.transform.localScale = size;
         go.GetComponent<MeshRenderer>().sharedMaterial = m;
+        go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // flat trim
         Object.DestroyImmediate(go.GetComponent<BoxCollider>());
     }
 

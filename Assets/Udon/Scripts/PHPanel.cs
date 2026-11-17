@@ -32,6 +32,7 @@ public class PHPanel : UdonSharpBehaviour
     public TextMeshProUGUI rollCaption;
     public GameObject veil;              // "Round in progress..."
     public RectTransform veilHourglass;
+    public Transform spinner;           // the ceiling spinner's arrow: spins when a round starts
 
     public AudioSource sfx;
     public AudioClip pluck, select, drop, tick, bong, error, jingle;
@@ -40,6 +41,7 @@ public class PHPanel : UdonSharpBehaviour
     readonly float[] huntPhase = { 180f, 210f, 240f, 270f };       // PHGame's balance
     readonly float[] roundFactor = { 0.75f, 1f, 1.5f };
 
+    int seenPhase = -1; float spinStart = -10f; float spinFrom;
     int seenSize = -99, seenDensity = -1, seenRound = -1, seenTaunt = -1;
     float nextRefresh;
     int wobble = -2; float wobbleStart;
@@ -160,6 +162,18 @@ public class PHPanel : UdonSharpBehaviour
             float e = dt >= 1f ? 1f : 1f - (1f - dt) * (1f - dt) * (1f - dt);
             dice.localRotation = Quaternion.Euler(0f, 0f, -360f * e);
             dice.anchoredPosition = new Vector2(dice.anchoredPosition.x, diceY + Mathf.Sin(Mathf.Min(1f, dt) * Mathf.PI) * 50f);
+        }
+        // a round starts: the ceiling spinner whirls three and a bit turns (everyone sees it)
+        if (game.phase != seenPhase)
+        {
+            if (seenPhase == PHGame.PH_LOBBY && game.phase != PHGame.PH_LOBBY && spinner != null) { spinStart = now; spinFrom = spinner.localEulerAngles.y; }
+            seenPhase = game.phase;
+        }
+        float st = (now - spinStart) / 2.6f;
+        if (spinner != null && st >= 0f && st <= 1f)
+        {
+            float e = 1f - (1f - st) * (1f - st) * (1f - st);
+            spinner.localRotation = Quaternion.Euler(0f, spinFrom + e * (1080f + 137f), 0f);
         }
         if (veil.activeSelf) veilHourglass.localRotation = Quaternion.Euler(0f, 0f, Mathf.Floor(now / 1.2f) * 180f + Mathf.SmoothStep(0f, 180f, Mathf.Clamp01((now - Mathf.Floor(now / 1.2f) * 1.2f - 0.7f) / 0.5f)));
     }

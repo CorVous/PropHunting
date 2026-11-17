@@ -20,7 +20,7 @@ using Mobility = VRC.SDKBase.VRCStation.Mobility;
 public static class WorldSceneBuilder
 {
     static readonly Vector3 LobbyOrigin = new Vector3(-120f, 0f, -120f);
-    const float RoomW = 24f, RoomD = 22f, WallH = 5.5f, ZoneHalf = 5.5f;
+    const float RoomW = 24f, RoomD = 22f, WallH = 8f, ZoneHalf = 5.5f;
     const int SLOTS = 32;
 
     [MenuItem("PropHunt/Build world scene")]
