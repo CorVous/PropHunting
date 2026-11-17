@@ -576,7 +576,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         defFlags = gen.defFlags; zoneWallMm = gen.ZoneWallMm; groundKind = gen.ground;
         objects = new GameObject[gen.nEmit];
         lightPos = new Vector3[64]; lightKind = new int[64]; lightFollow = new Transform[64]; nLights = 0;
-        glow = C(255, 240, 196);
+        glow = new Color32(255, 240, 196, 0);   // alpha 0: PropHunt/Lit draws it glowing
         if (lampDefs == null) lampDefs = new int[] { DefIndex("k_lampFloor"), DefIndex("k_lampTable"), DefIndex("q_lampStanding"), DefIndex("q_lampTable") };
         BufInit(B_GROUND, IW * IH + 8);
         BufInit(B_WALLS, W * H * 40 + 64);

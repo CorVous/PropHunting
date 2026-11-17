@@ -51,6 +51,7 @@ Shader "PropHunt/Lit"
                 float3 worldPos : TEXCOORD3;
                 half3 normal : TEXCOORD4;
                 UNITY_FOG_COORDS(5)
+                half emit : TEXCOORD6;       // 1 for a lamp's bulb (vertex alpha 0): drawn at full brightness
             };
 
             v2f vert (appdata v)
@@ -70,6 +71,7 @@ Shader "PropHunt/Lit"
                 fixed4 tint = UNITY_ACCESS_INSTANCED_PROP(Props, _Color);
                 albedo *= tint.rgb;
                 o.albedo = albedo;
+                o.emit = 1 - v.color.a;
                 // the wrap part of the base sun (the 0.2) stays as fill when the spot sun takes over the direct part
                 o.ambient = albedo * (amb + _LightColor0.rgb * (d * 0.5 + 0.5) * 0.2);
                 o.sun = albedo * _LightColor0.rgb * max(0, d) * 0.8;
@@ -79,19 +81,47 @@ Shader "PropHunt/Lit"
                 return o;
             }
 
+            // inside one of the scene's baked (regular) Light Volumes, e.g. a Bakery-baked lobby
+            bool InBakedVolume(float3 worldPos)
+            {
+                #ifndef VRCLV_DISABLE_REGULAR_VOLUMES
+                uint volumesCount = min((uint) _UdonLightVolumeCount, VRCLV_MAX_VOLUMES_COUNT);
+                uint additiveCount = min((uint) _UdonLightVolumeAdditiveCount, volumesCount);
+                for (uint id = additiveCount; id < volumesCount; id++)
+                    if (LV_PointLocalAABB(LV_LocalFromVolume(id, worldPos))) return true;
+                #endif
+                return false;
+            }
+
             fixed4 frag (v2f i) : SV_Target
             {
                 float3 c;
-                if (_UdonPHSunSpot > 0.5)
+                float3 n = normalize(i.normal);
+                bool lvOn = LightVolumesEnabled() > 0;
+                // additive volumes and point light volumes: the lamps (MapBuilderUdon's light points), and the spot sun
+                // once PHSun has baked it
+                float3 add = 0;
+                if (lvOn)
                 {
-                    float3 n = normalize(i.normal);
-                    float3 L0, L1r, L1g, L1b;
-                    LightVolumeAdditiveSH(i.worldPos, L0, L1r, L1g, L1b, 0, n);
-                    float3 lv = i.albedo * max(0, LightVolumeEvaluate(n, L0, L1r, L1g, L1b));
-                    float r = length(i.worldPos.xz - _UdonPHSunArea.xy);
-                    c = i.ambient + lerp(lv, i.sun, smoothstep(_UdonPHSunArea.z, _UdonPHSunArea.w, r));
+                    float3 A0, A1r, A1g, A1b;
+                    LightVolumeAdditiveSH(i.worldPos, A0, A1r, A1g, A1b, 0, n);
+                    add = i.albedo * max(0, LightVolumeEvaluate(n, A0, A1r, A1g, A1b));
                 }
-                else c = i.ambient + i.sun;
+                if (lvOn && InBakedVolume(i.worldPos))
+                {
+                    // a baked volume carries its own sky, sun and bounce: it replaces the ambient and the base sun
+                    float3 L0 = 0, L1r = 0, L1g = 0, L1b = 0;
+                    LV_LightVolumeRegularSH(i.worldPos, L0, L1r, L1g, L1b);
+                    c = i.albedo * max(0, LightVolumeEvaluate(n, L0, L1r, L1g, L1b)) + add;
+                }
+                else if (_UdonPHSunSpot > 0.5)
+                {
+                    // the spot sun (with the lamps) over the map, handing back to the base sun at the spot's edge
+                    float r = length(i.worldPos.xz - _UdonPHSunArea.xy);
+                    c = i.ambient + lerp(add, i.sun, smoothstep(_UdonPHSunArea.z, _UdonPHSunArea.w, r));
+                }
+                else c = i.ambient + i.sun + add;   // before the spot is baked: the base sun, the lamps on top
+                c = lerp(c, i.albedo * 1.4, i.emit);
                 fixed4 col = fixed4(c, 1);
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return col;

@@ -59,6 +59,18 @@ def srgb(c):
     return max(0, min(255, int(round(c * 255))))
 
 
+# a bulb, a flame or a lit pane glows (vertex alpha 0: PropHunt/Lit draws it at full brightness, unlit): the
+# materials named for it, and bright warm colours in a texture atlas
+GLOW_ALPHA = 0
+
+
+def glowing(material, c):
+    if material and material.lower() in ("lamp", "holiday_glow", "glow", "light", "emission"):
+        return True
+    r, g, b = c
+    return r > 225 and g > 150 and b < 150 and r - b > 110
+
+
 def load_obj(folder, model, skip=()):
     path = os.path.join(folder, model + ".obj")
     base = os.path.dirname(path)
@@ -103,9 +115,11 @@ def load_obj(folder, model, skip=()):
             y = int((1 - (w - math.floor(w))) * im.height) % im.height
             r, g, b = im.getpixel((x, y))
             kd = info["kd"]
-            return (int(r * kd[0]), int(g * kd[1]), int(b * kd[2]))
-        kd = info["kd"]
-        return (srgb(kd[0]), srgb(kd[1]), srgb(kd[2]))
+            c = (int(r * kd[0]), int(g * kd[1]), int(b * kd[2]))
+        else:
+            kd = info["kd"]
+            c = (srgb(kd[0]), srgb(kd[1]), srgb(kd[2]))
+        return c + (GLOW_ALPHA if glowing(m, c) else 255,)
     out = []
     for a, b, c, m in tris:
         if m in skip:
@@ -178,7 +192,7 @@ def write(models):
             for p, n, c in tri:
                 b += struct.pack("<3f", *p)
                 b += struct.pack("<3b", *(max(-127, min(127, int(round(x * 127)))) for x in n))
-                b += bytes([c[0], c[1], c[2], 255])
+                b += bytes([c[0], c[1], c[2], c[3] if len(c) > 3 else 255])
         for i in range(nv):
             b += struct.pack("<H", i)
     open(OUT, "wb").write(bytes(b))

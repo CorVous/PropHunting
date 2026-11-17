@@ -114,6 +114,7 @@ public static class WorldSceneBuilder
         builder.sun = sun;   // the map's mood turns and tints it (MapBuilderUdon.ApplyMood)
         UdonSharpEditorUtility.CopyProxyToUdon(builder);
         LightingBuilder.Build(world.transform, builder, sun);   // the map's sun shadows (Light Volumes spot, PHSun)
+        LampBuilder.Build(world.transform, builder);           // the map's lamps (Point Light Volumes on the light points, PHLamps)
         var seedTool = gameGo.AddUdonSharpComponent<PHSeed>();
         UdonSharpEditorUtility.CopyProxyToUdon(seedTool);
         game.seedTool = seedTool;
@@ -453,8 +454,11 @@ public static class WorldSceneBuilder
     {
         string path = "Assets/Udon/Generated/" + name + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (m == null) { m = new Material(Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
-        m.color = c;
+        // Light Volumes' PBR (Standard's properties) so the lobby's lamps light the floor and walls
+        var lit = Shader.Find("Light Volume Samples/Light Volume PBR");
+        if (m == null) { m = new Material(lit != null ? lit : Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
+        if (lit != null) m.shader = lit;
+        m.color = c; m.SetFloat("_Glossiness", 0.1f);
         EditorUtility.SetDirty(m);
         return m;
     }

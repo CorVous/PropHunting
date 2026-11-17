@@ -217,7 +217,7 @@ public static class PropPrefabBaker
         "fx_wall_modern", "fx_wall_space", "fx_wall_medieval",
         "fx_street_modern", "fx_street_space", "fx_street_medieval" };
 
-    static GameObject[] BakeFixtures(Material mat)
+    static GameObject[] BakeFixtures(Material mat)   // (byte 18 of a vertex: its alpha; 0 glows, Tools/make_fixtures.py)
     {
         var result = new GameObject[FixtureNames.Length];
         var asset = Resources.Load<TextAsset>("PropHunt/fixtures");
@@ -242,7 +242,7 @@ public static class PropPrefabBaker
             {
                 verts[i] = V(b, p);
                 norms[i] = new Vector3((sbyte)b[p + 12] / 127f, (sbyte)b[p + 13] / 127f, (sbyte)b[p + 14] / 127f);
-                cols[i] = new Color32(b[p + 15], b[p + 16], b[p + 17], 255);
+                cols[i] = new Color32(b[p + 15], b[p + 16], b[p + 17], b[p + 18]);
                 p += 19;
             }
             var tris = new int[ni];

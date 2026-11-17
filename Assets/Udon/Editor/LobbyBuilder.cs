@@ -537,6 +537,13 @@ public static class LobbyBuilder
         Piece(root, "furniture-bits/lamp_standing", L(22.3f, 18.4f), 2.4f, 0f, false);
         Piece(root, "board-game-bits/meeple_blue", L(18.8f, 9.0f), 1.7f, -30f, true);
 
+        // the two standing lamps light the room around them (Point Light Volumes: Cor, VRC Light Volumes); the shelf's
+        // small lamps get a faint glow
+        Color warm = new Color(1f, 0.82f, 0.58f);
+        LampBuilder.MakeLight(root, "LampLightCouch", L(1.7f, 16.9f, 2.05f), warm, 22f, 0.3f);
+        LampBuilder.MakeLight(root, "LampLightCorner", L(22.3f, 18.4f, 2.05f), warm, 22f, 0.3f);
+        LampBuilder.MakeLight(root, "LampLightShelf", L(roomW - 0.6f, roomD / 2 - 0.0f, 2.6f), warm, 6f, 0.2f);
+
         // the sun lights the room through the open box; the walls and the lid cast no shadows into it
         foreach (Transform c in lobby)
             if (c.name.StartsWith("Wall")) c.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -705,7 +712,8 @@ public static class LobbyBuilder
                      pack == "board-game-bits" ? "boardgame_bits_texture" : pack == "furniture-bits" ? "furniturebits_texture" : "dungeon_texture";
         string path = Root + "Models/" + pack + "/" + tex + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (m == null) { m = new Material(Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
+        if (m == null) { m = new Material(LitShader()); AssetDatabase.CreateAsset(m, path); }
+        m.shader = LitShader();
         m.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "Models/" + pack + "/" + tex + ".png");
         m.SetFloat("_Glossiness", 0.15f);
         EditorUtility.SetDirty(m);
@@ -752,11 +760,16 @@ public static class LobbyBuilder
         Object.DestroyImmediate(go.GetComponent<Collider>());
     }
 
+    // the lobby's lit shader: Light Volumes' PBR (Standard's properties, and it takes Light Volumes' light), Standard
+    // when the package is missing
+    static Shader LitShader() { var s = Shader.Find("Light Volume Samples/Light Volume PBR"); return s != null ? s : Shader.Find("Standard"); }
+
     public static Material Mat(string name, Color c)
     {
         string path = "Assets/Udon/Generated/" + name + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (m == null) { m = new Material(Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
+        if (m == null) { m = new Material(LitShader()); AssetDatabase.CreateAsset(m, path); }
+        m.shader = LitShader();
         m.color = c; m.SetFloat("_Glossiness", 0.1f);
         EditorUtility.SetDirty(m);
         return m;
