@@ -468,7 +468,8 @@ public static class LobbyBuilder
         for (float x = 0; x < roomW - 0.01f; x += 2) space(x, roomD - T, 2, T);
         for (float y = roomD - T - 2; y > -1.99f; y -= 2) space(0, Mathf.Max(0, y), T, y < 0 ? 2 + y : 2);
         for (float y = 0; y < roomD - T - 0.01f; y += 2) space(roomW - T, y, T, Mathf.Min(2, roomD - T - y));
-        space(11, 17.6f, 2, 2); space(11, 15.4f, 2, 2); space(11, 13.2f, 2, 2);
+        // the path down from the spawn disc (clear of it: Cor saw the disc overlap the spaces)
+        space(11, 16.8f, 2, 2); space(11, 14.6f, 2, 2); space(11, 12.4f, 2, 2);
 
         // the PLAY space: a cream inset ring on the green zone floor, and the word
         var cream = Mat("LobbyCream", C("f3e7c9"));
@@ -484,9 +485,9 @@ public static class LobbyBuilder
 
         // the spawn disc
         var red = Mat("LobbySpawnRed", C("e05a48"));
-        Disc(root, "SpawnDisc", L(roomW / 2, roomD - 2.2f, 0.012f), 1.8f, red);
-        Disc(root, "SpawnRing", L(roomW / 2, roomD - 2.2f, 0.016f), 1.5f, cream);
-        Disc(root, "SpawnDot", L(roomW / 2, roomD - 2.2f, 0.02f), 1.1f, red);
+        Disc(root, "SpawnDisc", L(roomW / 2, roomD - 2.2f, 0.012f), 1.6f, red);   // between the top row and the path
+        Disc(root, "SpawnRing", L(roomW / 2, roomD - 2.2f, 0.016f), 1.3f, cream);
+        Disc(root, "SpawnDot", L(roomW / 2, roomD - 2.2f, 0.02f), 0.95f, red);
 
         // the walls: a cream band with a dashed rule along the top, and the name over the spawn
         var band = Mat("LobbyWallBand", C("f3e7c9"));
