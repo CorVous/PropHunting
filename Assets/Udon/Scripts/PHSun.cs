@@ -69,11 +69,15 @@ public class PHSun : UdonSharpBehaviour
         t.position = centre - dir * height;
         t.rotation = Quaternion.LookRotation(dir);
         spot.gameObject.SetActive(true);
-        spot.SetSpotLight(coneDeg, 0.03f);   // a hard cone edge: the default falloff dims most of a narrow cone
+        // a hard cone edge: the default falloff dims most of a narrow cone
+        spot.SetSpotLight(coneDeg, 0.03f);
         // Light Volumes' point attenuation is size^2 / (d^2 + size^2): scale so that the light reaching the map's
         // centre equals the directional light's (the range follows the intensity, so it reaches well past the map)
         // a large source keeps the numbers small (a tiny one needs intensities that overflow the shader's maths)
-        spot.SetLightSourceSize(height * 2f);   // also flattens the falloff across the map
+        // also flattens the falloff across the map. A dim sun (night, overcast) gets a larger source: Light Volumes cuts
+        // a light's range short where it falls under its brightness cutoff, and a faint moon's spot would end before the
+        // ground and leave the map darker than the land past it (an arc where they meet)
+        spot.SetLightSourceSize(height * 2f * Mathf.Max(1f, Mathf.Sqrt(0.6f / Mathf.Max(0.05f, sun.intensity))));
         float size = spot.LightSourceSize;
         spot.SetColorAndIntensity(sun.color, sun.intensity * (height * height + size * size) / (size * size) * intensityScale);
         spot.LayerMask = 1 << casterLayer;
@@ -90,7 +94,10 @@ public class PHSun : UdonSharpBehaviour
         for (int i = 0; i < fences.childCount; i++) fences.GetChild(i).gameObject.layer = 11;
         builder.ShowRoofs(roofsShown);
         // where the spot reaches: the shader blends back to the shadowless base sun towards the cone's edge
-        VRCShader.SetGlobalVector(areaId, new Vector4(centre.x, centre.z, radius - margin, radius - 1f));
+        // where the spot hands back to the base sun: the map's own rectangle (centre, half width, half depth). The land
+        // past the fence, out to the hills, takes the base sun: the spot's footprint is a tilted ellipse that does not
+        // cover it evenly, and the edge showed as a dark arc (Cor)
+        VRCShader.SetGlobalVector(areaId, new Vector4(centre.x, centre.z, w * 0.5f, h * 0.5f));
         VRCShader.SetGlobalFloat(globalId, 1f);
     }
 

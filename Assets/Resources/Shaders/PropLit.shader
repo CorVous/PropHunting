@@ -32,7 +32,7 @@ Shader "PropHunt/Lit"
             UNITY_INSTANCING_BUFFER_END(Props)
 
             float _UdonPHSunSpot;   // 1 once the spot sun's shadows are baked (PHSun)
-            float4 _UdonPHSunArea;  // the spot's footprint: centre x, z, then the radii where it hands back to the base
+            float4 _UdonPHSunArea;  // the map's rectangle (centre x, z, half width, half depth): the spot sun inside, the base sun 6 m past it
 
             struct appdata
             {
@@ -106,6 +106,7 @@ Shader "PropHunt/Lit"
                     float3 A0, A1r, A1g, A1b;
                     LightVolumeAdditiveSH(i.worldPos, A0, A1r, A1g, A1b, 0, n);
                     add = i.albedo * max(0, LightVolumeEvaluate(n, A0, A1r, A1g, A1b));
+                    add = min(add, i.albedo * 1.3);   // never blown out next to a lamp (a hot spot reads as shine)
                 }
                 if (lvOn && InBakedVolume(i.worldPos))
                 {
@@ -117,8 +118,9 @@ Shader "PropHunt/Lit"
                 else if (_UdonPHSunSpot > 0.5)
                 {
                     // the spot sun (with the lamps) over the map, handing back to the base sun at the spot's edge
-                    float r = length(i.worldPos.xz - _UdonPHSunArea.xy);
-                    c = i.ambient + lerp(add, i.sun, smoothstep(_UdonPHSunArea.z, _UdonPHSunArea.w, r));
+                    float2 o = abs(i.worldPos.xz - _UdonPHSunArea.xy) - _UdonPHSunArea.zw;
+                    float r = max(o.x, o.y);   // metres past the map's edge
+                    c = i.ambient + lerp(add, i.sun, smoothstep(0.5, 6.0, r));   // the base sun from 6 m past the fence
                 }
                 else c = i.ambient + i.sun + add;   // before the spot is baked: the base sun, the lamps on top
                 c = lerp(c, i.albedo * 1.4, i.emit);

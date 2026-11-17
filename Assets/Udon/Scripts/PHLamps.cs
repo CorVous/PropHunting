@@ -13,8 +13,8 @@ public class PHLamps : UdonSharpBehaviour
     public MapBuilderUdon builder;
     public PointLightVolumeInstance[] pool;
     public int questCap = 12;              // a lighter pool on Android
-    public float baseIntensity = 26f;
-    public float sourceSize = 0.25f;       // metres: Light Volumes' falloff is size^2 / (d^2 + size^2)
+    public float baseIntensity = 1.8f;   // with a soft source: about 0.6 of full light at 1 m, 0.1 at 3 m (Cor: no hot, shiny spots)
+    public float sourceSize = 0.8f;        // metres: Light Volumes' falloff is size^2 / (d^2 + size^2)
     public float followSeconds = 0.5f;     // how often a knocked-over lamp prop's light catches up
 
     bool wasBuilt;
@@ -107,11 +107,12 @@ public class PHLamps : UdonSharpBehaviour
             int p = pointOf[s];
             // a street lamp reaches further than a lamp on a table
             int kind = builder.lightKind[p];
-            float scale = kind == MapBuilderUdon.LK_STREET ? 1.6f : (kind == MapBuilderUdon.LK_LAMP ? 0.6f : 1f);
+            float scale = kind == MapBuilderUdon.LK_STREET ? 1.7f : (kind == MapBuilderUdon.LK_LAMP ? 0.7f : 1f);
+            float size = kind == MapBuilderUdon.LK_STREET ? sourceSize * 1.9f : (kind == MapBuilderUdon.LK_LAMP ? sourceSize * 0.75f : sourceSize);
             l.transform.position = w[p];
             l.gameObject.SetActive(true);
             l.SetPointLight();
-            l.SetLightSourceSize(sourceSize);
+            l.SetLightSourceSize(size);
             l.SetColorAndIntensity(col, baseIntensity * k * scale);
             l.UpdateTransform();
         }

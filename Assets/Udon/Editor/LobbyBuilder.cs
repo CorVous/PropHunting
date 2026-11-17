@@ -540,9 +540,9 @@ public static class LobbyBuilder
         // the two standing lamps light the room around them (Point Light Volumes: Cor, VRC Light Volumes); the shelf's
         // small lamps get a faint glow
         Color warm = new Color(1f, 0.82f, 0.58f);
-        LampBuilder.MakeLight(root, "LampLightCouch", L(1.7f, 16.9f, 2.05f), warm, 22f, 0.3f);
-        LampBuilder.MakeLight(root, "LampLightCorner", L(22.3f, 18.4f, 2.05f), warm, 22f, 0.3f);
-        LampBuilder.MakeLight(root, "LampLightShelf", L(roomW - 0.6f, roomD / 2 - 0.0f, 2.6f), warm, 6f, 0.2f);
+        LampBuilder.MakeLight(root, "LampLightCouch", L(1.7f, 16.9f, 2.05f), warm, 2.2f, 0.9f);
+        LampBuilder.MakeLight(root, "LampLightCorner", L(22.3f, 18.4f, 2.05f), warm, 2.2f, 0.9f);
+        LampBuilder.MakeLight(root, "LampLightShelf", L(roomW - 0.6f, roomD / 2 - 0.0f, 2.6f), warm, 0.8f, 0.6f);
 
         // the sun lights the room through the open box; the walls and the lid cast no shadows into it
         foreach (Transform c in lobby)

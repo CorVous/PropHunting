@@ -351,6 +351,15 @@ public class MapBuilderUdon : UdonSharpBehaviour
         return C(a.r + (b.r - a.r) * pct / 100, a.g + (b.g - a.g) * pct / 100, a.b + (b.b - a.b) * pct / 100);
     }
 
+    // colour c at the brightness of colour b
+    Color HueOf(Color c, Color b)
+    {
+        float lc = c.r * 0.3f + c.g * 0.59f + c.b * 0.11f, lb = b.r * 0.3f + b.g * 0.59f + b.b * 0.11f;
+        if (lc < 0.0001f) return b;
+        float s = lb / lc;
+        return new Color(c.r * s, c.g * s, c.b * s, 1f);
+    }
+
     void ApplyMood()
     {
         float elev = 52f, intensity = 1f;
@@ -400,6 +409,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
             skyMat.SetColor("_GroundColor", skyGround);
             skyMat.SetFloat("_Exposure", exposure);
             skyMat.SetFloat("_AtmosphereThickness", thickness);
+            // the shadows take the sky's colour (Cor): the ambient from above takes the hue of the sky's zenith (its tint,
+            // bluer as a clear sky is) and the ambient from the sides the hue of the horizon haze; each keeps the
+            // brightness the mood set, so only the colour follows the sky
+            Color zenith = new Color(skyTint.r * 0.75f, skyTint.g * 0.9f, skyTint.b * 1.25f);
+            sky = HueOf(zenith, sky);
+            eq = HueOf(Color.Lerp(fog, zenith, 0.3f), eq);
         }
         if (sun != null)
         {

@@ -179,7 +179,7 @@ def place(tris, kind, size, turn):
     if kind == "ceiling":
         light = (0.0, mn[1] - 0.1, 0.0)
     elif kind == "wall":
-        light = (0.0, 0.0, mx[2] + 0.1)
+        light = (0.0, 0.0, mx[2] + 0.6)   # well off the wall: a light on the wall's face leaves a hot spot that reads as shine
     elif mx[2] > 1.0 and mn[2] > -0.4:
         # an arm: under the head at its end
         head = [p for p in pts if p[2] > mx[2] - 0.3]
