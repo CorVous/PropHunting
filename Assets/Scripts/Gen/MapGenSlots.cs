@@ -432,34 +432,59 @@ public partial class MapGen
         return k;
     }
 
+    // PlaceLeaks a few attempts a step (Cor: build freezes): the same attempts in the same order. True when done.
+    GenRng lkRng;
+    int lkPlaced, lkAttempts, lkTarget, lkTotalCells, lkPhase;
+
     void PlaceLeaks()
     {
-        BuildNative();
-        lkN = 0; lkListN = 0;   // the native sets are this map's
-        GenRng rng = Rng(ST_LEAK, 0, 0);
-        int target = GenData.SizeLeaks[size];
-        int placed = 0, attempts = target * 14;
-        int totalCells = 0;
-        for (int r = 0; r < nRooms; r++) if (roomZone[r] != GenData.Z_RELEASE) totalCells += roomCellCount[r];
-        while (placed < target && attempts-- > 0)
+        lkPhase = 0;
+        while (!PlaceLeaksStep()) { }
+    }
+
+    bool PlaceLeaksStep()
+    {
+        if (lkPhase == 0)
         {
-            bool comedic = rng.Chance(GenData.LEAK_COMEDIC_PERMILLE);   // D10: about 30% comedic
+            BuildNative();
+            lkN = 0; lkListN = 0;   // the native sets are this map's
+            lkRng = Rng(ST_LEAK, 0, 0);
+            lkTarget = GenData.SizeLeaks[size];
+            lkPlaced = 0; lkAttempts = lkTarget * 14;
+            lkTotalCells = 0;
+            for (int r = 0; r < nRooms; r++) if (roomZone[r] != GenData.Z_RELEASE) lkTotalCells += roomCellCount[r];
+            lkPhase = 1;
+            return false;
+        }
+        for (int k = 0; k < 2; k++)
+        {
+            if (!(lkPlaced < lkTarget && lkAttempts-- > 0)) return true;
+            LeakAttempt();
+        }
+        return false;
+    }
+
+    void LeakAttempt()
+    {
+        int totalCells = lkTotalCells;
+
+            bool comedic = lkRng.Chance(GenData.LEAK_COMEDIC_PERMILLE);   // D10: about 30% comedic
             // room weighted by area, at most 2 leaks per room
-            int pick = rng.Range(totalCells), room = -1;
+            int pick = lkRng.Range(totalCells), room = -1;
             for (int r = 0; r < nRooms; r++)
             {
                 if (roomZone[r] == GenData.Z_RELEASE) continue;
                 if (pick < roomCellCount[r]) { room = r; break; }
                 pick -= roomCellCount[r];
             }
-            if (room < 0 || roomLeaks[room] >= GenData.LEAK_ROOM_MAX) continue;
+            if (room < 0 || roomLeaks[room] >= GenData.LEAK_ROOM_MAX) return;
             int zone = roomZone[room];
             bool outdoor = !GenData.IsBuilding(zone);
             int table = GenData.FindTable(zone, roomType[room]);
             int lk = LeakKey(table, zone, outdoor, comedic);
             int total = lkTotal[lk];
-            if (total == 0) continue;
-            int rr = rng.Range(total), def = -1;
+            if (total == 0) return;
+            int rr = lkRng.Range(total), def = -1;
             int l1 = lkStart[lk] + lkCount[lk];
             for (int i = lkStart[lk]; i < l1; i++)
             {
@@ -467,23 +492,23 @@ public partial class MapGen
                 if (rr < wgt) { def = lkDef[i]; break; }
                 rr -= wgt;
             }
-            if (def < 0) continue;
+            if (def < 0) return;
             def = TwinIn(room, def);   // a themed map's wrong-category things are of its theme too
             int flags = EF_LEAK | (comedic ? EF_COMEDIC : 0);
             int e = -1;
             int first = nEmit;
             // small slot-only things may sit on a free surface instead of the floor
-            bool onSurface = rng.Chance(600);
+            bool onSurface = lkRng.Chance(600);
             if (GenData.defAnchor[def] == GenData.A_SLOT_ONLY && GenData.defSizeClass[def] <= GenData.SZ_M && onSurface && nFree > 0)
             {
-                int f0 = rng.Range(nFree);
+                int f0 = lkRng.Range(nFree);
                 for (int k = 0; k < nFree && e < 0; k++)
                 {
                     int f = (f0 + k) % nFree;
                     if (freeHost[f] < 0 || emitRoom[freeHost[f]] != room || (emitFlags[freeHost[f]] & EF_REMOVED) != 0) continue;
                     int sl = freeSlot[f];
                     if (GenData.slotType[sl] != GenData.S_ON_TOP || GenData.slotSize[sl] < GenData.defSizeClass[def]) continue;
-                    e = EmitInSlot(freeHost[f], sl, def, flags, ref rng);
+                    e = EmitInSlot(freeHost[f], sl, def, flags, ref lkRng);
                     if (e >= 0) freeHost[f] = -1;
                 }
             }
@@ -491,18 +516,17 @@ public partial class MapGen
             {
                 int own = GenData.defAnchor[def];
                 // things that live on furniture and are smaller than a chair stay on furniture
-                if (own == GenData.A_SLOT_ONLY && GenData.defSizeClass[def] <= GenData.SZ_M) continue;
+                if (own == GenData.A_SLOT_ONLY && GenData.defSizeClass[def] <= GenData.SZ_M) return;
                 pRoom = room;
                 BuildSegs(room);
-                e = comedic ? ComedicSpot(def, room, flags, outdoor, ref rng) : DumpSpot(def, room, flags, outdoor, ref rng);
+                e = comedic ? ComedicSpot(def, room, flags, outdoor, ref lkRng) : DumpSpot(def, room, flags, outdoor, ref lkRng);
             }
-            if (e < 0) continue;
+            if (e < 0) return;
             for (int h = first; h < nEmit; h++) FillSlots(h, 0);
-            if (emitParent[e] < 0 && !KeepIfWalkable(room, first, true)) continue;
+            if (emitParent[e] < 0 && !KeepIfWalkable(room, first, true)) return;
             roomLeaks[room]++;
-            placed++;
+            lkPlaced++;
             if (comedic) statLeakComedic++; else statLeakPlausible++;
             for (int h = first; h < nEmit; h++) FillSlots(h, 1);
-        }
-    }
+            }
 }

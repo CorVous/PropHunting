@@ -471,6 +471,7 @@ public partial class MapGenUdon
                     else if (!(CvZone(x, y) == GenData.Z_LAWN && cvInst[y * CV + x] == siteInstLane)) return false;
                 }
         Sd(CO, 0, 0, SD_OPEN);
+        SplitLane();
 
         // (4) the wood
         if (!LayoutWood(offL, offR, rng)) return false;
@@ -708,13 +709,13 @@ public partial class MapGenUdon
                 if (cvInst[c] != yi || cvRoom[c] >= 0 || letters >= 26) continue;
                 int t = type[u * 16 + v], l = letters++;
                 siteType[yi * 26 + l] = t; sitePlace[yi * 26 + l] = cvPlace[c];
-                // flood over plot cells of the same type
+                // flood over plot cells of the same type, at most ROOM_CELLS_MAX of them (layout 14: a big lawn is two)
                 int qh = 0, qt = 0;
                 cvRoom[c] = l; cand[1024 + qt++] = u * 16 + v;
-                while (qh < qt)
+                while (qh < qt && qt < ROOM_CELLS_MAX)
                 {
                     int uv = cand[1024 + qh++], uu = uv / 16, vv = uv % 16;
-                    for (int d = 0; d < 4; d++)
+                    for (int d = 0; d < 4 && qt < ROOM_CELLS_MAX; d++)
                     {
                         int nu = uu + (d == 0 ? 1 : (d == 2 ? -1 : 0)), nv = vv + (d == 1 ? 1 : (d == 3 ? -1 : 0));
                         if (nu < 0 || nv < 0 || nu >= plotAlong[k] || nv >= plotDepth[k] || type[nu * 16 + nv] != t) continue;
@@ -880,6 +881,44 @@ public partial class MapGenUdon
             siteType[wi * 26 + letters] = GenData.R_FOREST_DENSE; sitePlace[wi * 26 + letters] = PL_WOOD;
             letters++;
         }
+    }
+
+    // Layout 14 (Cor: build freezes): the lane in rooms of at most six cells, from the release on. Furnishing a room
+    // costs about its size times what goes in it, and the whole lane in one room took up to 0.6 s in one frame.
+    public const int ROOM_CELLS_MAX = 6;
+
+    void SplitLane()
+    {
+        int li = siteInstLane, letters = 0;
+        for (int i = 0; i < CV * CV; i++) if (cvInst[i] == li) cvRoom[i] = -1;
+        // the cells in order of their distance from the release, along the lane
+        int qh = 0, qt = 0;
+        int[] order = new int[CV * CV];
+        bool[] seen = new bool[CV * CV];
+        int s0 = 1 * CV + CO;
+        if (cvInst[s0] != li) return;
+        order[qt++] = s0; seen[s0] = true;
+        while (qh < qt)
+        {
+            int c = order[qh++];
+            for (int d = 0; d < 4; d++)
+            {
+                int x = c % CV + DX[d], y = c / CV + DZ[d];
+                if (x < 0 || y < 0 || x >= CV || y >= CV) continue;
+                int n = y * CV + x;
+                if (seen[n] || cvInst[n] != li) continue;
+                seen[n] = true; order[qt++] = n;
+            }
+        }
+        for (int k = 0; k < qt && letters < 26; k++)
+        {
+            int c = order[k];
+            if (cvRoom[c] >= 0) continue;
+            GrowRoom(c, li, letters, ROOM_CELLS_MAX);
+            siteType[li * 26 + letters] = GenData.R_LANE; sitePlace[li * 26 + letters] = PL_LANE;
+            letters++;
+        }
+        for (int k = 0; k < qt; k++) if (cvRoom[order[k]] < 0) cvRoom[order[k]] = letters - 1;   // past 26 rooms: the last one
     }
 
     // breadth-first from a cell over unassigned cells of the instance, up to max cells: room letter l

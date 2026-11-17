@@ -8,81 +8,94 @@ public partial class MapGenUdon
     void PlanArcade()
     {
         int room = pRoom, cells = roomOuterCells[room];
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        // the prize counter by the door: the till, the prize shelves behind it, the ticket machine
-        int first = nEmit;
-        int till = WallPlace(Dn("ma_register"), WM_NEAR, dx, dz, WIN_ANY, EF_MANDATORY, r);
-        if (till < 0 || !Keep(first, true)) { till = -1; MandFail(1); }
-        if (till >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn("ma_prizes"), till, RngChance(r, 500) ? 1 : -1, 100, 0, r) >= 0) Keep(first, false); }
-        uint[] r2 = SR(2);
-        if (Fit(1)) { first = nEmit; if (WallPlace(Dn("ma_tickets"), WM_NEAR, dx, dz, WIN_ANY, 0, r2) >= 0) Keep(first, false); }
-        // machines along the walls, a run at a time, of different kinds
-        string[] wall = { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha" };
-        uint[] r3 = SR(3);
-        int w0 = RngRange(r3, wall.Length);
-        for (int k = 0; k < 2 + cells && Fit(2); k++)
+        if (Ph(0))
         {
-            first = nEmit;
-            rowN = 2; rowDef[0] = Dn(wall[(w0 + 2 * k) % wall.Length]); rowDef[1] = Dn(wall[(w0 + 2 * k + 1) % wall.Length]);
-            if (WallRow(0, 2, WM_ANY, 0, 0, WIN_AVOID, 0, r3) >= 0) Keep(first, false);
+            int dx, dz;
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            // the prize counter by the door: the till, the prize shelves behind it, the ticket machine
+            int first = nEmit;
+            int till = WallPlace(Dn("ma_register"), WM_NEAR, dx, dz, WIN_ANY, EF_MANDATORY, r);
+            if (till < 0 || !Keep(first, true)) { till = -1; MandFail(1); }
+            if (till >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn("ma_prizes"), till, RngChance(r, 500) ? 1 : -1, 100, 0, r) >= 0) Keep(first, false); }
+            uint[] r2 = SR(2);
+            if (Fit(1)) { first = nEmit; if (WallPlace(Dn("ma_tickets"), WM_NEAR, dx, dz, WIN_ANY, 0, r2) >= 0) Keep(first, false); }
+            // machines along the walls, a run at a time, of different kinds
+            string[] wall = { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha" };
+            uint[] r3 = SR(3);
+            int w0 = RngRange(r3, wall.Length);
+            for (int k = 0; k < 2 + cells && Fit(2); k++)
+            {
+                first = nEmit;
+                rowN = 2; rowDef[0] = Dn(wall[(w0 + 2 * k) % wall.Length]); rowDef[1] = Dn(wall[(w0 + 2 * k + 1) % wall.Length]);
+                if (WallRow(0, 2, WM_ANY, 0, 0, WIN_AVOID, 0, r3) >= 0) Keep(first, false);
+            }
+            // the middle: air hockey tables, and machines standing free with room round them
+            uint[] r4 = SR(4);
+            for (int k = 0; k < 1 + cells / 2 && Fit(1); k++)
+            {
+                int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r4);
+                if (cell < 0) break;
+                first = nEmit;
+                if (FreePlace(Dn("ma_airHockey"), cell, RngRange(r4, 2) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r5 = SR(5);
+            if (Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("plush"), room, GenData.A_WALL, 2, 0, r5)) Keep(first, false); }
         }
-        // the middle: air hockey tables, and machines standing free with room round them
-        uint[] r4 = SR(4);
-        for (int k = 0; k < 1 + cells / 2 && Fit(1); k++)
-        {
-            int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r4);
-            if (cell < 0) break;
-            first = nEmit;
-            if (FreePlace(Dn("ma_airHockey"), cell, RngRange(r4, 2) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r5 = SR(5);
-        if (Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("plush"), room, GenData.A_WALL, 2, 0, r5)) Keep(first, false); }
-        FillFromPool(50, new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
-            "k_trashcan", "ck_bench", "k_plant" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
+            "k_trashcan", "ck_bench", "k_plant" })) && !PoolStep(50, new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
+            "k_trashcan", "ck_bench", "k_plant" })) PhBreak();
+}
 
     // ============================================================================================ SNACK BAR
     void PlanSnackbar()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int first = nEmit;
-        // the counter and the cooker along one wall (three pieces of 1.4 m are longer than a 4 m wall), the sink at another
-        rowN = 2; rowDef[0] = Dn("r_counter"); rowDef[1] = Dn("r_stove");
-        if (WallRow(0, 1, WM_ANY, 0, 0, WIN_ANY, EF_MANDATORY, r) >= 0) Keep(first, true); else MandFail(1);
-        if (Fit(1)) { first = nEmit; if (WallPlace(Dn("r_counterSink"), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0) Keep(first, false); }
-        uint[] r2 = SR(2);
-        if (Fit(1)) { first = nEmit; if (WallPlace(Dn(RngChance(r2, 500) ? "r_fridge" : "ms_freezers"), WM_ANY, 0, 0, WIN_ANY, 0, r2) >= 0) Keep(first, false); }
-        uint[] r3 = SR(3);
-        if (Fit(1))
+        if (Ph(0))
         {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r3);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
+            uint[] r = SR(1);
+            int first = nEmit;
+            // the counter and the cooker along one wall (three pieces of 1.4 m are longer than a 4 m wall), the sink at another
+            rowN = 2; rowDef[0] = Dn("r_counter"); rowDef[1] = Dn("r_stove");
+            if (WallRow(0, 1, WM_ANY, 0, 0, WIN_ANY, EF_MANDATORY, r) >= 0) Keep(first, true); else MandFail(1);
+            if (Fit(1)) { first = nEmit; if (WallPlace(Dn("r_counterSink"), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0) Keep(first, false); }
+            uint[] r2 = SR(2);
+            if (Fit(1)) { first = nEmit; if (WallPlace(Dn(RngChance(r2, 500) ? "r_fridge" : "ms_freezers"), WM_ANY, 0, 0, WIN_ANY, 0, r2) >= 0) Keep(first, false); }
+            uint[] r3 = SR(3);
+            if (Fit(1))
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r3);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 600) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("crates"), room, GenData.A_WALL, 2, 0, r4)) Keep(first, false); }
         }
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 600) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("crates"), room, GenData.A_WALL, 2, 0, r4)) Keep(first, false); }
-        FillFromPool(50, new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) && !PoolStep(50, new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) PhBreak();
+}
 
     // ============================================================================================ PRIZE STORE
     void PlanPrizeStore()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        if (!RackRun(2, Dn("gen_rack"), Dn("gen_rack"), WM_CENTRE, 0, 0, r)) MandFail(1);
-        string[] rows = { "plush", "boxes", "balls", "toyCars", "boardToys", "cardboard" };
-        for (int k = 0; k < rows.Length; k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            if (!RngChance(rk, k < 2 ? 850 : 550) || !Fit(2)) continue;
-            int first = nEmit;
-            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
+            uint[] r = SR(1);
+            if (!RackRun(2, Dn("gen_rack"), Dn("gen_rack"), WM_CENTRE, 0, 0, r)) MandFail(1);
+            string[] rows = { "plush", "boxes", "balls", "toyCars", "boardToys", "cardboard" };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                uint[] rk = SR(2 + k);
+                if (!RngChance(rk, k < 2 ? 850 : 550) || !Fit(2)) continue;
+                int first = nEmit;
+                if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
+            }
         }
-        FillFromPool(50, new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) && !PoolStep(50, new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) PhBreak();
+}
 
     // ============================================================================================ MIDWAY
     // The paved front: game and food stalls in a row along the fence, the ticket booth and the drinks kiosk by the
@@ -90,23 +103,28 @@ public partial class MapGenUdon
     void PlanMidway()
     {
         int room = pRoom, dx, dz;
-        FrontMarkers(30);
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        string[] stalls = { "f_stallRed", "f_stallGreen", "ck_food", "ck_drinks", "ck_info" };
-        int s0 = RngRange(r, stalls.Length);
-        for (int k = 0; k < 2 + AreaM2(room) / 24 && Fit(1); k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            int first = nEmit;
-            int st = WallPlace(Dn(stalls[(s0 + k) % stalls.Length]), WM_ANY, 0, 0, WIN_ANY, 0, rk);
-            if (st < 0 || !Keep(first, false)) continue;
-            // a game stall's prizes beside it
-            if (defId[emitDef[st]].StartsWith("f_stall") && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp(RngChance(rk, 500) ? "plush" : "balls"), st, 2, 0, rk)) Keep(first, false); }
+            FrontMarkers(30);
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            string[] stalls = { "f_stallRed", "f_stallGreen", "ck_food", "ck_drinks", "ck_info" };
+            int s0 = RngRange(r, stalls.Length);
+            for (int k = 0; k < 2 + AreaM2(room) / 24 && Fit(1); k++)
+            {
+                uint[] rk = SR(2 + k);
+                int first = nEmit;
+                int st = WallPlace(Dn(stalls[(s0 + k) % stalls.Length]), WM_ANY, 0, 0, WIN_ANY, 0, rk);
+                if (st < 0 || !Keep(first, false)) continue;
+                // a game stall's prizes beside it
+                if (defId[emitDef[st]].StartsWith("f_stall") && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp(RngChance(rk, 500) ? "plush" : "balls"), st, 2, 0, rk)) Keep(first, false); }
+            }
         }
-        FillFromPool(50, new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
-            "mb_circus", "r_tableRound", "n_planter" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
+            "mb_circus", "r_tableRound", "n_planter" })) && !PoolStep(50, new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
+            "mb_circus", "r_tableRound", "n_planter" })) PhBreak();
+}
 
     // ============================================================================================ RIDES YARD
     // Where the coaster stands: its cars in a row at the station, the station fence and gate, the ride's entrance and
@@ -114,17 +132,22 @@ public partial class MapGenUdon
     void PlanRides()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (PlaceGroup(FindGrp("coasterCars"), room, GenData.A_OUT_OPEN, Fit(3) ? 3 : 2, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
-        uint[] r2 = SR(2);
-        if (Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("queue"), room, GenData.A_OUT_OPEN, RngBetween(r2, 2, 3), 0, r2)) Keep(first, false); }
-        // the go-kart track's karts parked in a row, now and then
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 500) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("karts"), room, GenData.A_OUT_OPEN, RngBetween(r4, 2, 3), 0, r4)) Keep(first, false); }
-        uint[] r3 = SR(3);
-        if (Fit(1)) { first = nEmit; if (WallPlace(Dn("ck_rideIn"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0 && Keep(first, false) && Fit(1)) { first = nEmit; if (WallPlace(Dn("ck_rideOut"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); } }
-        FillFromPool(50, new string[] { "ck_stationFence", "ck_stationGate", "ck_trainWood", "ck_flume", "ck_monorail", "ck_trainHanging", "mb_circus", "ck_bench", "ck_trash", "f_lamp",
-            "hk_lantern", "ck_food", "ck_drinks", "c_cone", "k_bench" });
-    }
+        if (Ph(0))
+        {
+            uint[] r = SR(1);
+            int first = nEmit;
+            if (PlaceGroup(FindGrp("coasterCars"), room, GenData.A_OUT_OPEN, Fit(3) ? 3 : 2, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
+            uint[] r2 = SR(2);
+            if (Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("queue"), room, GenData.A_OUT_OPEN, RngBetween(r2, 2, 3), 0, r2)) Keep(first, false); }
+            // the go-kart track's karts parked in a row, now and then
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 500) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("karts"), room, GenData.A_OUT_OPEN, RngBetween(r4, 2, 3), 0, r4)) Keep(first, false); }
+            uint[] r3 = SR(3);
+            if (Fit(1)) { first = nEmit; if (WallPlace(Dn("ck_rideIn"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0 && Keep(first, false) && Fit(1)) { first = nEmit; if (WallPlace(Dn("ck_rideOut"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); } }
+        }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ck_stationFence", "ck_stationGate", "ck_trainWood", "ck_flume", "ck_monorail", "ck_trainHanging", "mb_circus", "ck_bench", "ck_trash", "f_lamp",
+            "hk_lantern", "ck_food", "ck_drinks", "c_cone", "k_bench" })) && !PoolStep(50, new string[] { "ck_stationFence", "ck_stationGate", "ck_trainWood", "ck_flume", "ck_monorail", "ck_trainHanging", "mb_circus", "ck_bench", "ck_trash", "f_lamp",
+            "hk_lantern", "ck_food", "ck_drinks", "c_cone", "k_bench" })) PhBreak();
+}
 }

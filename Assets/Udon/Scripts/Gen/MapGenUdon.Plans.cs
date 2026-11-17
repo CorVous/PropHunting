@@ -309,17 +309,19 @@ public partial class MapGenUdon
             // In a small room the walkway takes one side: the table is tried one cell off the middle each way, and
             // stands where it keeps the most chairs (report 15, K3: a seat with its back to a wall needs less room).
             int bestSeats = SeatsOf(t), bestX = emitX[t], bestZ = emitZ[t], tyaw = emitYaw[t];
-            for (int k = 0; k < 4 && bestSeats < 4; k++)
+            int k = 0;
+            while (k < 4 && bestSeats < 4)
             {
                 int nx = bestX + DX[k] * GenData.INNER_MM, nz = bestZ + DZ[k] * GenData.INNER_MM;
                 TakeBack(first0);
                 first0 = nEmit;
                 int alt = FreePlaceAt(table, nx, nz, tyaw, 1, EF_MANDATORY, H_FREE);
-                if (alt >= 0 && Keep(first0, true) && SeatsOf(alt) > bestSeats) { bestSeats = SeatsOf(alt); bestX = nx; bestZ = nz; k = -1; t = alt; continue; }
+                if (alt >= 0 && Keep(first0, true) && SeatsOf(alt) > bestSeats) { bestSeats = SeatsOf(alt); bestX = nx; bestZ = nz; k = 0; t = alt; continue; }
                 if (alt >= 0) TakeBack(first0);
                 first0 = nEmit;
                 t = FreePlaceAt(table, bestX, bestZ, tyaw, 1, EF_MANDATORY, H_FREE);
                 if (t < 0 || !Keep(first0, true)) { t = -1; break; }
+                k++;
             }
         }
         if (t < 0) MandFail(1);

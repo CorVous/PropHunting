@@ -27,12 +27,26 @@ public partial class MapGen
     // flood fill over inner cells from the hunter release
     void Flood()
     {
+        FloodBegin();
+        FloodRun(1 << 30);
+    }
+
+    // the flood in pieces (Cor: build freezes): FloodRun takes at most maxPops cells off the queue, true when done
+    int flQh, flQt;
+
+    void FloodBegin()
+    {
         int n = IW * IH;
         for (int i = 0; i < n; i++) reach[i] = 0;
         int start = (releaseZ * 8 + 4) * IW + releaseX * 8 + 4;
-        int qh = 0, qt = 0;
-        reach[start] = 1; queue[qt++] = start;
-        while (qh < qt)
+        flQh = 0; flQt = 0;
+        reach[start] = 1; queue[flQt++] = start;
+    }
+
+    bool FloodRun(int maxPops)
+    {
+        int qh = flQh, qt = flQt, stop = maxPops;
+        while (qh < qt && stop-- > 0)
         {
             int i = queue[qh++];
             int ix = i % IW, iz = i / IW, cx = ix >> 3, cz = iz >> 3;
@@ -59,6 +73,8 @@ public partial class MapGen
             int l = link[i];   // up or down a stair
             if (l >= 0 && reach[l] == 0 && !SolidAt(l)) { reach[l] = 1; queue[qt++] = l; }
         }
+        flQh = qh; flQt = qt;
+        return qh >= qt;
     }
 
     // Pass: in every room no more free cells are unreachable from the hunter release than a room may have sealed
@@ -222,32 +238,67 @@ public partial class MapGen
         }
     }
 
-    // Finish in three steps (Cor: build freezes), so no one frame holds all of it
-    void Finish2() { BuildGround(); }
+    // The rest of Finish a piece a step (Cor: build freezes): the ground's kinds, the flood from the release, the walk
+    // grid, the hider spawns, the statistics, the map's hash. The same work in the same order as one call.
+    int fsPhase, fsCursor, fsNc;
+    uint fsHash;
+    GenRng fsRng;
+    const int FS_CHUNK = 3000;
 
-    void Finish3()
+    bool FinishStep()
     {
         int n = IW * IH;
-        Flood();
-        for (int i = 0; i < n; i++)
-            walk[i] = (byte)((tags[i] & GenData.T_FLOOR) == 0 ? 0 : (SolidAt(i) ? 2 : 1));
-
-        // hider spawn points: reachable free cells at least 6 m from the release, spread over the map
-        GenRng rng = Rng(ST_SPAWN, 0, 0);
-        int rx = releaseX * 8 + 4, rz = releaseZ * 8 + 4;
-        int nc = 0;
-        for (int i = 0; i < n; i++)
+        if (fsPhase == 0)
         {
-            bool keep = (rng.NextU() & 7) == 0;   // thin out evenly
-            if (reach[i] == 0 || occ[i] != 0 || solid[i] != 0 || !keep || nc >= cand.Length) continue;
-            if ((tags[i] & (GenData.T_NO_SPAWN | GenData.T_DOOR_CLEAR)) != 0) continue;
-            int dx = i % IW - rx, dz = i / IW - rz;
-            if (dx * dx + dz * dz < 12 * 12) continue;
-            cand[nc++] = i;
+            if (fsCursor == 0 && (ground == null || ground.Length != n)) ground = new byte[n];
+            int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
+            for (int i = fsCursor; i < e; i++) { ground[i] = (byte)BaseGround(i); dist[i] = ground[i]; }
+            fsCursor = e;
+            if (e >= n) { fsPhase = 1; fsCursor = 0; }
+            return false;
         }
-        Shuffle(cand, nc, ref rng);
-        nSpawns = nc < spawnCell.Length ? nc : spawnCell.Length;
-        for (int k = 0; k < nSpawns; k++) spawnCell[k] = cand[k];
+        if (fsPhase == 1)
+        {
+            int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
+            for (int i = fsCursor; i < e; i++) BlendGround(i);
+            fsCursor = e;
+            if (e >= n) { fsPhase = 2; fsCursor = 0; }
+            return false;
+        }
+        if (fsPhase == 2) { FloodBegin(); fsPhase = 3; return false; }
+        if (fsPhase == 3) { if (FloodRun(FS_CHUNK)) { fsPhase = 4; fsCursor = 0; } return false; }
+        if (fsPhase == 4)
+        {
+            int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
+            for (int i = fsCursor; i < e; i++) walk[i] = (byte)((tags[i] & GenData.T_FLOOR) == 0 ? 0 : (SolidAt(i) ? 2 : 1));
+            fsCursor = e;
+            if (e >= n) { fsPhase = 5; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; }
+            return false;
+        }
+        if (fsPhase == 5)
+        {
+            // hider spawn points: reachable free cells at least 6 m from the release, spread over the map
+            int rx = releaseX * 8 + 4, rz = releaseZ * 8 + 4;
+            int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
+            for (int i = fsCursor; i < e; i++)
+            {
+                bool keep = (fsRng.NextU() & 7) == 0;   // thin out evenly
+                if (reach[i] == 0 || occ[i] != 0 || solid[i] != 0 || !keep || fsNc >= cand.Length) continue;
+                if ((tags[i] & (GenData.T_NO_SPAWN | GenData.T_DOOR_CLEAR)) != 0) continue;
+                int dx = i % IW - rx, dz = i / IW - rz;
+                if (dx * dx + dz * dz < 12 * 12) continue;
+                cand[fsNc++] = i;
+            }
+            fsCursor = e;
+            if (e >= n) fsPhase = 6;
+            return false;
+        }
+        if (fsPhase == 6)
+        {
+            int nc = fsNc;
+            Shuffle(cand, nc, ref fsRng);
+            nSpawns = nc < spawnCell.Length ? nc : spawnCell.Length;
+            for (int k = 0; k < nSpawns; k++) spawnCell[k] = cand[k];
 
         // counts for the statistics and the tuning overlay (G24): floor and on-furniture props per room type and zone
         statProps = 0; statScenery = 0; statDecor = 0; statSlotItems = 0; statFloor = 0; statTop = 0; statGroups = 0; statLoose = 0;
@@ -272,20 +323,37 @@ public partial class MapGen
             else { statTop++; statTypeTop[t]++; statZoneTop[z]++; }
         }
 
-        // FNV-1a over everything that defines the map: the golden-seed hash of 04 section 6.3
-        uint h2 = 2166136261u;
-        h2 = Fnv(h2, W); h2 = Fnv(h2, size); h2 = Fnv(h2, releaseX); h2 = Fnv(h2, releaseZ);
-        for (int c = 0; c < W * H; c++) { h2 = Fnv(h2, cellZone[c]); h2 = Fnv(h2, cellRoom[c]); }
-        for (int i = 0; i < edgeH.Length; i++) h2 = Fnv(h2, edgeH[i] * 16 + edgeHOff[i]);
-        for (int i = 0; i < edgeV.Length; i++) h2 = Fnv(h2, edgeV[i] * 16 + edgeVOff[i]);
-        for (int r = 0; r < nRooms; r++) h2 = Fnv(h2, roomType[r]);
-        for (int i = 0; i < n; i++) h2 = Fnv(h2, ground[i]);
-        for (int e = 0; e < nEmit; e++)
-        {
-            h2 = Fnv(h2, emitDef[e]); h2 = Fnv(h2, emitX[e]); h2 = Fnv(h2, emitY[e]); h2 = Fnv(h2, emitZ[e]);
-            h2 = Fnv(h2, emitYaw[e]); h2 = Fnv(h2, emitParent[e]); h2 = Fnv(h2, emitFlags[e]);
+            // FNV-1a over everything that defines the map: the golden-seed hash of 04 section 6.3
+            uint h2 = 2166136261u;
+            h2 = Fnv(h2, W); h2 = Fnv(h2, size); h2 = Fnv(h2, releaseX); h2 = Fnv(h2, releaseZ);
+            for (int c = 0; c < W * H; c++) { h2 = Fnv(h2, cellZone[c]); h2 = Fnv(h2, cellRoom[c]); }
+            for (int i = 0; i < edgeH.Length; i++) h2 = Fnv(h2, edgeH[i] * 16 + edgeHOff[i]);
+            for (int i = 0; i < edgeV.Length; i++) h2 = Fnv(h2, edgeV[i] * 16 + edgeVOff[i]);
+            for (int r = 0; r < nRooms; r++) h2 = Fnv(h2, roomType[r]);
+            fsHash = h2;
+            fsPhase = 7; fsCursor = 0;
+            return false;
         }
-        mapHash = h2;
+        if (fsPhase == 7)
+        {
+            uint h2 = fsHash;
+            int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
+            for (int i = fsCursor; i < e; i++) h2 = Fnv(h2, ground[i]);
+            fsHash = h2;
+            fsCursor = e;
+            if (e >= n) fsPhase = 8;
+            return false;
+        }
+        {
+            uint h2 = fsHash;
+            for (int e = 0; e < nEmit; e++)
+            {
+                h2 = Fnv(h2, emitDef[e]); h2 = Fnv(h2, emitX[e]); h2 = Fnv(h2, emitY[e]); h2 = Fnv(h2, emitZ[e]);
+                h2 = Fnv(h2, emitYaw[e]); h2 = Fnv(h2, emitParent[e]); h2 = Fnv(h2, emitFlags[e]);
+            }
+            mapHash = h2;
+            return true;
+        }
     }
 
     // =====================================================================================================
@@ -623,6 +691,30 @@ public partial class MapGen
             if (h < (away == 1 ? 38u : 14u)) ground[i] = (byte)other;
         }
     }
+
+    // one cell of BuildGround's blending pass
+    void BlendGround(int i)
+    {
+            int g = dist[i];
+            if (g < GR_LAWN || g == GR_RELEASE || g == GR_PAVING || g == GR_WATER || g == GR_DECK) return;
+            int ix = i % IW, iz = i / IW;
+            int other = 0, away = 3;
+            for (int d = 0; d < 4 && away > 1; d++)
+                for (int step = 1; step <= 2; step++)
+                {
+                    int jx = ix + DX[d] * step, jz = iz + DZ[d] * step;
+                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) break;
+                    // a wall or a fence between the two cells is not a border to blend across
+                    if (!CanStep(ix + DX[d] * (step - 1), iz + DZ[d] * (step - 1), d)) break;
+                    int gj = dist[jz * IW + jx];
+                    if (gj < GR_LAWN || gj == GR_RELEASE || gj == GR_PAVING || gj == GR_WATER || gj == GR_DECK) break;
+                    if (gj != g && step < away) { away = step; other = gj; }
+                    if (gj != g) break;
+                }
+            if (other == 0) return;
+            uint h = GenRng.Hash32(seed, (uint)GenData.GEN_VERSION, 77, (uint)i, (uint)size) % 100u;
+            if (h < (away == 1 ? 38u : 14u)) ground[i] = (byte)other;
+        }
 
     static uint Fnv(uint h, int v)
     {

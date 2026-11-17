@@ -57,36 +57,41 @@ public partial class MapGenUdon
     void PlanZooPlaza()
     {
         int room = pRoom, dx, dz;
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (WallPlace(Dn("ck_info"), WM_NEAR, dx, dz, WIN_ANY, EF_MANDATORY, r) >= 0) Keep(first, true); else MandFail(1);
-        string[] kiosks = { "ck_food", "ck_drinks", "ck_toilets" };
-        for (int k = 0; k < kiosks.Length && Fit(1); k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            if (!RngChance(rk, k == 0 ? 900 : 650)) continue;
-            first = nEmit;
-            if (WallPlace(Dn(kiosks[k]), WM_FAR, dx, dz, WIN_ANY, 0, rk) >= 0) Keep(first, false);
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            int first = nEmit;
+            if (WallPlace(Dn("ck_info"), WM_NEAR, dx, dz, WIN_ANY, EF_MANDATORY, r) >= 0) Keep(first, true); else MandFail(1);
+            string[] kiosks = { "ck_food", "ck_drinks", "ck_toilets" };
+            for (int k = 0; k < kiosks.Length && Fit(1); k++)
+            {
+                uint[] rk = SR(2 + k);
+                if (!RngChance(rk, k == 0 ? 900 : 650)) continue;
+                first = nEmit;
+                if (WallPlace(Dn(kiosks[k]), WM_FAR, dx, dz, WIN_ANY, 0, rk) >= 0) Keep(first, false);
+            }
+            uint[] r5 = SR(5);
+            if (RngChance(r5, 700) && Fit(2))
+            {
+                first = nEmit;
+                int st = WallPlace(Dn(RngChance(r5, 500) ? "f_stallRed" : "f_stallGreen"), WM_ANY, 0, 0, WIN_ANY, 0, r5);
+                if (st >= 0 && Keep(first, false) && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp("plush"), st, 2, 0, r5)) Keep(first, false); }
+            }
+            uint[] r6 = SR(6);
+            for (int k = 0; k < 1 + AreaM2(room) / 20 && Fit(2); k++)
+            {
+                int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r6);
+                if (cell < 0) break;
+                first = nEmit;
+                if (FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
         }
-        uint[] r5 = SR(5);
-        if (RngChance(r5, 700) && Fit(2))
-        {
-            first = nEmit;
-            int st = WallPlace(Dn(RngChance(r5, 500) ? "f_stallRed" : "f_stallGreen"), WM_ANY, 0, 0, WIN_ANY, 0, r5);
-            if (st >= 0 && Keep(first, false) && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp("plush"), st, 2, 0, r5)) Keep(first, false); }
-        }
-        uint[] r6 = SR(6);
-        for (int k = 0; k < 1 + AreaM2(room) / 20 && Fit(2); k++)
-        {
-            int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r6);
-            if (cell < 0) break;
-            first = nEmit;
-            if (FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        FillFromPool(50, new string[] { "ma_vending", "ma_claw", "ms_gacha", "ck_bench", "k_bench", "ck_trash", "ck_flowers", "f_lamp", "f_hedge", "k_plant", "ms_cart", "n_planter", "hk_bench", "hk_lantern", "sk_scooter", "ck_toilets",
-            "f_stallBench", "f_stallStool", "ma_prizeWheel", "ma_tickets", "n_statueRing", "f_hedgeCurve", "k_trashcan", "hk_benchShort" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ma_vending", "ma_claw", "ms_gacha", "ck_bench", "k_bench", "ck_trash", "ck_flowers", "f_lamp", "f_hedge", "k_plant", "ms_cart", "n_planter", "hk_bench", "hk_lantern", "sk_scooter", "ck_toilets",
+            "f_stallBench", "f_stallStool", "ma_prizeWheel", "ma_tickets", "n_statueRing", "f_hedgeCurve", "k_trashcan", "hk_benchShort" })) && !PoolStep(50, new string[] { "ma_vending", "ma_claw", "ms_gacha", "ck_bench", "k_bench", "ck_trash", "ck_flowers", "f_lamp", "f_hedge", "k_plant", "ms_cart", "n_planter", "hk_bench", "hk_lantern", "sk_scooter", "ck_toilets",
+            "f_stallBench", "f_stallStool", "ma_prizeWheel", "ma_tickets", "n_statueRing", "f_hedgeCurve", "k_trashcan", "hk_benchShort" })) PhBreak();
+}
 
     // ============================================================================================ KEEPERS' WALK
     // The path between the enclosures: a gravel strip down the middle, benches and bins at the fences, lamps, the
@@ -94,27 +99,32 @@ public partial class MapGenUdon
     void PlanZooWalk()
     {
         int room = pRoom;
-        int x0 = roomX0[room], z0 = roomZ0[room], x1 = roomX1[room], z1 = roomZ1[room];
-        bool alongX = (x1 - x0) > (z1 - z0);
-        int mid = alongX ? (z0 + z1) / 2 : (x0 + x1) / 2;
-        for (int k = roomCellStart[room]; k < roomCellStart[room] + roomCellCount[room]; k++)
+        if (Ph(0))
         {
-            int i = roomCells[k], a = alongX ? i / IW : i % IW;
-            if (a >= mid - 1 && a <= mid) tags[i] |= GenData.T_PATH;
+            int x0 = roomX0[room], z0 = roomZ0[room], x1 = roomX1[room], z1 = roomZ1[room];
+            bool alongX = (x1 - x0) > (z1 - z0);
+            int mid = alongX ? (z0 + z1) / 2 : (x0 + x1) / 2;
+            for (int k = roomCellStart[room]; k < roomCellStart[room] + roomCellCount[room]; k++)
+            {
+                int i = roomCells[k], a = alongX ? i / IW : i % IW;
+                if (a >= mid - 1 && a <= mid) tags[i] |= GenData.T_PATH;
+            }
+            RoomWalkable(room);
+            uint[] r = SR(1);
+            int first = nEmit;
+            if (WallPlace(Dn(RngChance(r, 500) ? "f_cart" : "m_wheelbarrow"), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0 && Keep(first, false) && Fit(2))
+            {
+                first = nEmit;
+                if (GroupAt(FindGrp(RngChance(r, 500) ? "hay" : "buckets"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r)) Keep(first, false);
+            }
+            uint[] r2 = SR(2);
+            if (RngChance(r2, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn(RngChance(r2, 500) ? "ck_food" : "ck_drinks"), WM_ANY, 0, 0, WIN_ANY, 0, r2) >= 0) Keep(first, false); }
         }
-        RoomWalkable(room);
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (WallPlace(Dn(RngChance(r, 500) ? "f_cart" : "m_wheelbarrow"), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0 && Keep(first, false) && Fit(2))
-        {
-            first = nEmit;
-            if (GroupAt(FindGrp(RngChance(r, 500) ? "hay" : "buckets"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r)) Keep(first, false);
-        }
-        uint[] r2 = SR(2);
-        if (RngChance(r2, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn(RngChance(r2, 500) ? "ck_food" : "ck_drinks"), WM_ANY, 0, 0, WIN_ANY, 0, r2) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
-            "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
+            "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" })) && !PoolStep(50, new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
+            "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" })) PhBreak();
+}
 
     // ============================================================================================ ENCLOSURES
     // One part of the world each: its beasts on the open ground, the water they need, what they climb on and shelter
@@ -193,19 +203,23 @@ public partial class MapGenUdon
     void PlanKeeper()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (PlaceGroup(FindGrp("hay"), room, GenData.A_WALL, 3, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
-        string[] rows = { "buckets", "sacks", "crates", "tools", "barrels" };
-        for (int k = 0; k < rows.Length; k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            if (!RngChance(rk, k < 2 ? 850 : 550) || !Fit(2)) continue;
-            first = nEmit;
-            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
+            uint[] r = SR(1);
+            int first = nEmit;
+            if (PlaceGroup(FindGrp("hay"), room, GenData.A_WALL, 3, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
+            string[] rows = { "buckets", "sacks", "crates", "tools", "barrels" };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                uint[] rk = SR(2 + k);
+                if (!RngChance(rk, k < 2 ? 850 : 550) || !Fit(2)) continue;
+                first = nEmit;
+                if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
+            }
         }
-        FillFromPool(50, new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) && !PoolStep(50, new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) PhBreak();
+}
 
     // ============================================================================================ CABIN ROOM
     // One room for living: the wood stove against a wall with the log basket beside it and an armchair on a rug in
@@ -214,42 +228,47 @@ public partial class MapGenUdon
     void PlanCabinMain()
     {
         int room = pRoom, dx, dz;
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        int first = nEmit;
-        int stove = WallPlace(Dn("cb_woodstove"), WM_FAR, dx, dz, WIN_NEVER, EF_MANDATORY, r);
-        if (stove < 0 || !Keep(first, true)) { stove = -1; MandFail(1); }
-        if (stove >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn("n_logStack"), stove, RngChance(r, 500) ? 1 : -1, 120, 0, r) >= 0) Keep(first, false); }
-        uint[] r2 = SR(2);
-        if (Fit(3))
+        if (Ph(0))
         {
-            first = nEmit;
-            rowN = 3; rowDef[0] = Dn("k_counter"); rowDef[1] = Dn("k_stoveElectric"); rowDef[2] = Dn("k_sink");
-            if (WallRow(0, 2, WM_ANY, 0, 0, WIN_ANY, 0, r2) >= 0) Keep(first, false);
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            int first = nEmit;
+            int stove = WallPlace(Dn("cb_woodstove"), WM_FAR, dx, dz, WIN_NEVER, EF_MANDATORY, r);
+            if (stove < 0 || !Keep(first, true)) { stove = -1; MandFail(1); }
+            if (stove >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn("n_logStack"), stove, RngChance(r, 500) ? 1 : -1, 120, 0, r) >= 0) Keep(first, false); }
+            uint[] r2 = SR(2);
+            if (Fit(3))
+            {
+                first = nEmit;
+                rowN = 3; rowDef[0] = Dn("k_counter"); rowDef[1] = Dn("k_stoveElectric"); rowDef[2] = Dn("k_sink");
+                if (WallRow(0, 2, WM_ANY, 0, 0, WIN_ANY, 0, r2) >= 0) Keep(first, false);
+            }
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 650) && Fit(1)) { first = nEmit; if (WallPlace(Dn("k_fridgeSmall"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); }
+            uint[] r4 = SR(4);
+            if (Fit(1))
+            {
+                int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r4);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Dn(RngChance(r4, 600) ? "k_table" : "q_table"), cell, RngRange(r4, 2) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r5 = SR(5);
+            if (Fit(1))
+            {
+                int sx = stove >= 0 ? emitX[stove] : RoomMidX(room), sz = stove >= 0 ? emitZ[stove] : RoomMidZ(room);
+                first = nEmit;
+                if (WallPlace(Dn(RngChance(r5, 500) ? "k_recliner" : "k_loungeChair"), WM_NEAR, sx, sz, WIN_AVOID, 0, r5) >= 0) Keep(first, false);
+                int cell = OpenSpot(2, WM_NEAR, sx, sz, 0, r5);
+                if (cell >= 0) FreePlace(Dn(RngChance(r5, 500) ? "k_rug" : "q_rug"), cell, RngRange(r5, 2) * 90, 0, 0, H_FREE);
+            }
+            uint[] r6 = SR(6);
+            if (RngChance(r6, 700) && Fit(1)) { first = nEmit; if (WallPlace(Dn("k_coatRack"), WM_NEAR, dx, dz, WIN_ANY, 0, r6) >= 0) Keep(first, false); }
         }
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 650) && Fit(1)) { first = nEmit; if (WallPlace(Dn("k_fridgeSmall"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); }
-        uint[] r4 = SR(4);
-        if (Fit(1))
-        {
-            int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r4);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Dn(RngChance(r4, 600) ? "k_table" : "q_table"), cell, RngRange(r4, 2) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r5 = SR(5);
-        if (Fit(1))
-        {
-            int sx = stove >= 0 ? emitX[stove] : RoomMidX(room), sz = stove >= 0 ? emitZ[stove] : RoomMidZ(room);
-            first = nEmit;
-            if (WallPlace(Dn(RngChance(r5, 500) ? "k_recliner" : "k_loungeChair"), WM_NEAR, sx, sz, WIN_AVOID, 0, r5) >= 0) Keep(first, false);
-            int cell = OpenSpot(2, WM_NEAR, sx, sz, 0, r5);
-            if (cell >= 0) FreePlace(Dn(RngChance(r5, 500) ? "k_rug" : "q_rug"), cell, RngRange(r5, 2) * 90, 0, 0, H_FREE);
-        }
-        uint[] r6 = SR(6);
-        if (RngChance(r6, 700) && Fit(1)) { first = nEmit; if (WallPlace(Dn("k_coatRack"), WM_NEAR, dx, dz, WIN_ANY, 0, r6) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "k_bookcaseClosed", "k_bookcaseWide", "hk_sled", "n_paddle", "s_chest", "k_lampSquare", "k_bench", "hk_benchShort", "s_barrel", "k_plant",
-            "q_cabinet", "k_trashcan" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "k_bookcaseClosed", "k_bookcaseWide", "hk_sled", "n_paddle", "s_chest", "k_lampSquare", "k_bench", "hk_benchShort", "s_barrel", "k_plant",
+            "q_cabinet", "k_trashcan" })) && !PoolStep(50, new string[] { "k_bookcaseClosed", "k_bookcaseWide", "hk_sled", "n_paddle", "s_chest", "k_lampSquare", "k_bench", "hk_benchShort", "s_barrel", "k_plant",
+            "q_cabinet", "k_trashcan" })) PhBreak();
+}
 
     // ============================================================================================ BUNK ROOM
     void PlanBunkRoom()
@@ -278,39 +297,47 @@ public partial class MapGenUdon
     void PlanPorch()
     {
         int room = pRoom, dx, dz;
-        FrontMarkers(30);
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (GroupAt(FindGrp("woodpile"), GenData.A_BUILDING, 2, WM_ANY, 0, 0, 0, r)) Keep(first, false);
-        uint[] r2 = SR(2);
-        for (int k = 0; k < 2 && Fit(1); k++)
+        if (Ph(0))
         {
-            int cell = OpenSpot(1, WM_NEAR, dx, dz, 0, r2);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("hk_lantern"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+            FrontMarkers(30);
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            int first = nEmit;
+            if (GroupAt(FindGrp("woodpile"), GenData.A_BUILDING, 2, WM_ANY, 0, 0, 0, r)) Keep(first, false);
+            uint[] r2 = SR(2);
+            for (int k = 0; k < 2 && Fit(1); k++)
+            {
+                int cell = OpenSpot(1, WM_NEAR, dx, dz, 0, r2);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("hk_lantern"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn("n_canoe"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0 && Keep(first, false) && Fit(1)) { first = nEmit; if (WallPlace(Dn("n_paddle"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); } }
         }
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn("n_canoe"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0 && Keep(first, false) && Fit(1)) { first = nEmit; if (WallPlace(Dn("n_paddle"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); } }
-        FillFromPool(50, new string[] { "hk_bench", "hk_benchShort", "k_recliner", "hk_sled", "hk_sledLong", "s_barrel", "n_logStack", "s_bedrollPacked", "gen_tap", "n_planter" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "hk_bench", "hk_benchShort", "k_recliner", "hk_sled", "hk_sledLong", "s_barrel", "n_logStack", "s_bedrollPacked", "gen_tap", "n_planter" })) && !PoolStep(50, new string[] { "hk_bench", "hk_benchShort", "k_recliner", "hk_sled", "hk_sledLong", "s_barrel", "n_logStack", "s_bedrollPacked", "gen_tap", "n_planter" })) PhBreak();
+}
 
     // ============================================================================================ WOOD YARD
     void PlanWoodyard()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r);
-        int first = nEmit;
-        int block = cell >= 0 ? FreePlace(Dn("s_block"), cell, RngRange(r, 360), 0, 0, H_FREE) : -1;
-        if (block < 0 || !Keep(first, true)) { block = -1; MandFail(1); }
-        if (block >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn(RngChance(r, 500) ? "s_axe" : "s_axeB"), block, RngChance(r, 500) ? 1 : -1, 60, 0, r) >= 0) Keep(first, false); }
-        uint[] r2 = SR(2);
-        if (Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("woodpile"), room, GenData.A_WALL, 3, 0, r2)) Keep(first, false); }
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 650) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("tools"), room, GenData.A_WALL, 2, 0, r3)) Keep(first, false); }
-        FillFromPool(50, new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" });
-    }
+        if (Ph(0))
+        {
+            uint[] r = SR(1);
+            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r);
+            int first = nEmit;
+            int block = cell >= 0 ? FreePlace(Dn("s_block"), cell, RngRange(r, 360), 0, 0, H_FREE) : -1;
+            if (block < 0 || !Keep(first, true)) { block = -1; MandFail(1); }
+            if (block >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn(RngChance(r, 500) ? "s_axe" : "s_axeB"), block, RngChance(r, 500) ? 1 : -1, 60, 0, r) >= 0) Keep(first, false); }
+            uint[] r2 = SR(2);
+            if (Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("woodpile"), room, GenData.A_WALL, 3, 0, r2)) Keep(first, false); }
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 650) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("tools"), room, GenData.A_WALL, 2, 0, r3)) Keep(first, false); }
+        }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) && !PoolStep(50, new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) PhBreak();
+}
 
     // ============================================================================================ CAMPGROUND
     // The fire ring with its seats and wood pile, the spit and the fish stand by the fire, tents round it with
@@ -318,25 +345,29 @@ public partial class MapGenUdon
     void PlanCampsite()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        FindGates(room);   // AroundFire keeps the tents off the lines from the gates to the fire
-        int fire = FireRing(6, RoomMidX(room), RoomMidZ(room), false, r);
-        FireSeats(fire, false, 7);
-        if (fire >= 0)
+        if (Ph(0))
         {
-            uint[] r2 = SR(2);
-            if (RngChance(r2, 850)) WoodPile(fire, true, r2);
-            uint[] r3 = SR(3);
-            if (Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r3, 500) ? "s_spit" : "s_fishStand"), fire, RngChance(r3, 500) ? 1 : -1, 200, 0, r3) >= 0) Keep(first, false); }
-            uint[] r4 = SR(4);
-            string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
-            int t0 = RngRange(r4, tents.Length);
-            for (int k = 0; k < 1 + AreaM2(room) / 24 && Fit(1); k++)
+            uint[] r = SR(1);
+            FindGates(room);   // AroundFire keeps the tents off the lines from the gates to the fire
+            int fire = FireRing(6, RoomMidX(room), RoomMidZ(room), false, r);
+            FireSeats(fire, false, 7);
+            if (fire >= 0)
             {
-                int tent = AroundFire(Dn(tents[(t0 + k) % tents.Length]), fire, 180, 1800, 3400, 0, false, true, r4);
-                if (tent >= 0 && Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r4, 500) ? "s_bedroll" : "s_bedrollFrame"), tent, RngChance(r4, 500) ? 1 : -1, 80, 0, r4) >= 0) Keep(first, false); }
+                uint[] r2 = SR(2);
+                if (RngChance(r2, 850)) WoodPile(fire, true, r2);
+                uint[] r3 = SR(3);
+                if (Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r3, 500) ? "s_spit" : "s_fishStand"), fire, RngChance(r3, 500) ? 1 : -1, 200, 0, r3) >= 0) Keep(first, false); }
+                uint[] r4 = SR(4);
+                string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
+                int t0 = RngRange(r4, tents.Length);
+                for (int k = 0; k < 1 + AreaM2(room) / 24 && Fit(1); k++)
+                {
+                    int tent = AroundFire(Dn(tents[(t0 + k) % tents.Length]), fire, 180, 1800, 3400, 0, false, true, r4);
+                    if (tent >= 0 && Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r4, 500) ? "s_bedroll" : "s_bedrollFrame"), tent, RngChance(r4, 500) ? 1 : -1, 80, 0, r4) >= 0) Keep(first, false); }
+                }
             }
         }
-        FillFromPool(50, new string[] { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" })) && !PoolStep(50, new string[] { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" })) PhBreak();
+}
 }

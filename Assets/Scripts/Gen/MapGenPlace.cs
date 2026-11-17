@@ -502,8 +502,40 @@ public partial class MapGen
         int cover = GenData.rangeCover[type] * GenData.DensityPercent[density] / 100;
         roomCoverMax[room] = roomCellCount[room] * (cover > 70 ? 70 : cover) / 100;
         int firstEmit = nEmit;
+        popFirst = firstEmit;
         BuildSegs(room);
         RoomWalkable(room);
+        planPhase = 0; planIter = 0; planBroken = false;
+    }
+
+    // A plan in phases (Cor: build freezes). A plan that marks its parts with Ph(k) (once) and PhLoop(k, n) (n
+    // times, planIter counting) runs one part a call; one that marks none runs whole on its first call. The parts
+    // run in the same order as the plan's code, with the same random streams, so a map comes out the same.
+    // Returns true when the plan is done.
+    int planPhase, planMax, planIter, planN, planLoopN, planHX, planHZ, planA, planB;
+    bool planBroken, planLooped;
+    GenRng planR;
+
+    bool Ph(int k)
+    {
+        if (k > planMax) planMax = k;
+        return k == planPhase;
+    }
+
+    bool PhLoop(int k, int n)
+    {
+        if (k > planMax) planMax = k;
+        if (k != planPhase) return false;
+        planLooped = true; planLoopN = n;
+        return planIter < n && !planBroken;
+    }
+
+    void PhBreak() { planBroken = true; }
+
+    bool PlanStep(int room)
+    {
+        int type = roomType[room];
+        planMax = 0; planLooped = false;
         switch (type)
         {
             case GenData.R_LIVING: PlanLiving(); break;
@@ -569,12 +601,47 @@ public partial class MapGen
             case GenData.R_CHURCHYARD: PlanChurchyard(); break;
             case GenData.R_GRAVEYARD: PlanGraveyard(); break;
         }
-        if (holiday != 0) HolidayDecor();
-        if (mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE) ThemeDecor();
-        if (roomFloorMin[room] > 0) FillToMinimum();
-        // what sits on, in and under the furniture, thinned evenly to the room's cap
-        SetTopFactor(room, firstEmit);
-        for (int h = firstEmit; h < nEmit; h++)
-            if (emitRoom[h] == room) FillSlots(h, 1);
+        if (planLooped && !planBroken && planIter + 1 < planLoopN) { planIter++; return false; }
+        planPhase++; planIter = 0; planBroken = false;
+        return planPhase > planMax;
+    }
+
+    // The rest of a room's furnishing, a piece a step (Cor: build freezes), in the order PopulateRoom used to do it
+    // all at once: the holiday's decorations, the theme's, the outdoor minimum, then the slots, one host a step.
+    // Returns true when the room is done.
+    int popFirst, popPhase, popHost;
+
+    bool PopulateRoomStep(int room)
+    {
+        pRoom = room;
+        int type = roomType[room];
+        if (popPhase == 0)
+        {
+            popPhase = 10;
+            if (type == GenData.R_RELEASE || GenData.FindTable(roomZone[room], type) < 0) return true;
+            PopulateRoom(room);
+            return false;
+        }
+        if (popPhase == 10) { if (PlanStep(room)) popPhase = 1; return false; }
+        if (popPhase == 1) { popPhase = 2; if (holiday != 0) HolidayDecor(); return false; }
+        if (popPhase == 2) { popPhase = 3; if (mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE) ThemeDecor(); return false; }
+        if (popPhase == 3) { popPhase = 4; if (roomFloorMin[room] > 0) FillToMinimum(); return false; }
+        if (popPhase == 4)
+        {
+            // what sits on, in and under the furniture, thinned evenly to the room's cap
+            SetTopFactor(room, popFirst);
+            popHost = popFirst; popPhase = 5;
+            return false;
+        }
+        // one host's slots a step (the hosts this room has so far; slots add none that hold slots of their own)
+        int guard = 0;
+        while (popHost < nEmit && guard < 4)
+        {
+            int h = popHost++;
+            if (emitRoom[h] != room) continue;
+            FillSlots(h, 1);
+            guard++;
+        }
+        return popHost >= nEmit;
     }
 }

@@ -10,41 +10,45 @@ public partial class MapGenUdon
     void PlanFarmWork()
     {
         int room = pRoom;
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        int first = nEmit;
-        int wb = WallPlace(Dn("s_workbench"), WM_FAR, dx, dz, WIN_PREFER, EF_MANDATORY, r);
-        if (wb < 0 || !Keep(first, true)) { wb = -1; MandFail(1); }
-        uint[] r2 = SR(2);
-        if (Fit(1))
+        if (Ph(0))
         {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r2);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("g_anvil"), cell, RngRange(r2, 4) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
+            int dx, dz;
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            int first = nEmit;
+            int wb = WallPlace(Dn("s_workbench"), WM_FAR, dx, dz, WIN_PREFER, EF_MANDATORY, r);
+            if (wb < 0 || !Keep(first, true)) { wb = -1; MandFail(1); }
+            uint[] r2 = SR(2);
+            if (Fit(1))
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r2);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("g_anvil"), cell, RngRange(r2, 4) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 700) && Fit(1)) { first = nEmit; if (WallPlace(Dn("g_grindstone"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); }
+            string[] rows = { "handtools", "smallTools", "tyres", "fuel", "boxes" };
+            int[] chance = { 950, 800, 650, 500, 400 };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                uint[] rk = SR(4 + k);
+                if (!RngChance(rk, chance[k]) || !Fit(2)) continue;
+                first = nEmit;
+                int g = FindGrp(rows[k]);
+                bool ok = k < 2 && wb >= 0 ? GroupBeside(g, wb, RngBetween(rk, 2, 3), 0, rk) : false;
+                if (!ok) ok = PlaceGroup(g, room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk);
+                if (ok) Keep(first, false);
+            }
+            uint[] r9 = SR(9);
+            if (RngChance(r9, 650) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r9, "c_tractorWheel", 5, "f_wheel", 3), WM_ANY, 0, 0, WIN_ANY, 0, r9) >= 0) Keep(first, false); }
+            uint[] r10 = SR(10);
+            if (RngChance(r10, 550) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_rack"), WM_ANY, 0, 0, WIN_NEVER, 0, r10) >= 0) Keep(first, false); }
+            uint[] r11 = SR(11);
+            if (RngChance(r11, 400) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r11, "w_planks", 4, "w_logs", 4), WM_ANY, 0, 0, WIN_ANY, 0, r11) >= 0) Keep(first, false); }
         }
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 700) && Fit(1)) { first = nEmit; if (WallPlace(Dn("g_grindstone"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); }
-        string[] rows = { "handtools", "smallTools", "tyres", "fuel", "boxes" };
-        int[] chance = { 950, 800, 650, 500, 400 };
-        for (int k = 0; k < rows.Length; k++)
-        {
-            uint[] rk = SR(4 + k);
-            if (!RngChance(rk, chance[k]) || !Fit(2)) continue;
-            first = nEmit;
-            int g = FindGrp(rows[k]);
-            bool ok = k < 2 && wb >= 0 ? GroupBeside(g, wb, RngBetween(rk, 2, 3), 0, rk) : false;
-            if (!ok) ok = PlaceGroup(g, room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk);
-            if (ok) Keep(first, false);
-        }
-        uint[] r9 = SR(9);
-        if (RngChance(r9, 650) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r9, "c_tractorWheel", 5, "f_wheel", 3), WM_ANY, 0, 0, WIN_ANY, 0, r9) >= 0) Keep(first, false); }
-        uint[] r10 = SR(10);
-        if (RngChance(r10, 550) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_rack"), WM_ANY, 0, 0, WIN_NEVER, 0, r10) >= 0) Keep(first, false); }
-        uint[] r11 = SR(11);
-        if (RngChance(r11, 400) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r11, "w_planks", 4, "w_logs", 4), WM_ANY, 0, 0, WIN_ANY, 0, r11) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) && !PoolStep(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) PhBreak();
+}
 
     // ============================================================================================ SKATE CORNER
     // A paved corner of the park with ramps: a half-pipe or a ramp at one end, a rail and a box in the middle, a
@@ -217,70 +221,93 @@ public partial class MapGenUdon
     void PlanTerrace()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        string[] kiosks = { "ck_food", "ck_drinks", "ck_info", "ck_toilets", "f_stallGreen", "f_stallRed" };
-        int k0 = RngRange(r, kiosks.Length), got = 0;
-        for (int k = 0; k < kiosks.Length && got < 2 + AreaM2(room) / 16 && Fit(1); k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            int first = nEmit;
-            int e = WallPlace(Dn(kiosks[(k0 + k) % kiosks.Length]), WM_ANY, 0, 0, WIN_ANY, 0, rk);
-            if (e >= 0 && Keep(first, false))
+            uint[] r = SR(1);
+            string[] kiosks = { "ck_food", "ck_drinks", "ck_info", "ck_toilets", "f_stallGreen", "f_stallRed" };
+            int k0 = RngRange(r, kiosks.Length), got = 0;
+            for (int k = 0; k < kiosks.Length && got < 2 + AreaM2(room) / 16 && Fit(1); k++)
             {
-                got++;
-                if (defId[emitDef[e]].StartsWith("f_stall") && Fit(1)) { first = nEmit; if (RelBeside(Dn(RngChance(rk, 500) ? "f_stallBench" : "f_stallStool"), e, RngChance(rk, 500) ? 1 : -1, 150, 0, rk) >= 0) Keep(first, false); }
+                uint[] rk = SR(2 + k);
+                int first = nEmit;
+                int e = WallPlace(Dn(kiosks[(k0 + k) % kiosks.Length]), WM_ANY, 0, 0, WIN_ANY, 0, rk);
+                if (e >= 0 && Keep(first, false))
+                {
+                    got++;
+                    if (defId[emitDef[e]].StartsWith("f_stall") && Fit(1)) { first = nEmit; if (RelBeside(Dn(RngChance(rk, 500) ? "f_stallBench" : "f_stallStool"), e, RngChance(rk, 500) ? 1 : -1, 150, 0, rk) >= 0) Keep(first, false); }
+                }
+            }
+            if (got == 0) MandFail(1);
+            uint[] r10 = SR(10);
+            int tables = 2 + AreaM2(room) / 14;
+            for (int k = 0; k < tables && Fit(2); k++)
+            {
+                int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r10);
+                if (cell < 0) break;
+                int first = nEmit;
+                if (FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r11 = SR(11);
+            if (Fit(1))
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r11);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, RngRange(r11, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r12 = SR(12);
+            if (RngChance(r12, 700) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("pots"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r12)) Keep(first, false); }
+            uint[] r13 = SR(13);
+            if (Fit(1)) { int first = nEmit; if (WallPlace(Pick(r13, "ck_trash", 5, "k_trashcan", 3), WM_ANY, 0, 0, WIN_ANY, 0, r13) >= 0) Keep(first, false); }
+            uint[] r14 = SR(14);
+            if (RngChance(r14, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_bench"), WM_ANY, 0, 0, WIN_ANY, 0, r14) >= 0) Keep(first, false); }
+            uint[] r15 = SR(15);
+            if (RngChance(r15, 600) && Fit(1))
+            {
+                int cell = OpenSpot(1, WM_ANY, 0, 0, 0, r15);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("f_lamp"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            // revision 11: a vending machine and a pallet of drinks crates by the kiosks, stools at a stall
+            uint[] r18 = SR(18);
+            if (RngChance(r18, 550) && Fit(1)) { int first = nEmit; if (WallPlace(Dn(RngChance(r18, 600) ? "ma_vending" : "ma_claw"), WM_ANY, 0, 0, WIN_ANY, 0, r18) >= 0) Keep(first, false); }
+            uint[] r19 = SR(19);
+            if (RngChance(r19, 500) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("crates"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r19)) Keep(first, false); }
+            // fruit set out by a kiosk, a plant, a second flower bed
+            uint[] r16 = SR(16);
+            if (RngChance(r16, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(r16, "ms_dispFruit", 4, "k_plant", 4), WM_ANY, 0, 0, WIN_ANY, 0, r16) >= 0) Keep(first, false); }
+            uint[] r17 = SR(17);
+            if (RngChance(r17, 500) && Fit(1))
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r17);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, RngRange(r17, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
             }
         }
-        if (got == 0) MandFail(1);
-        uint[] r10 = SR(10);
-        int tables = 2 + AreaM2(room) / 14;
-        for (int k = 0; k < tables && Fit(2); k++)
-        {
-            int cell = OpenSpot(3, WM_ANY, 0, 0, 0, r10);
-            if (cell < 0) break;
-            int first = nEmit;
-            if (FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r11 = SR(11);
-        if (Fit(1))
-        {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r11);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, RngRange(r11, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r12 = SR(12);
-        if (RngChance(r12, 700) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("pots"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r12)) Keep(first, false); }
-        uint[] r13 = SR(13);
-        if (Fit(1)) { int first = nEmit; if (WallPlace(Pick(r13, "ck_trash", 5, "k_trashcan", 3), WM_ANY, 0, 0, WIN_ANY, 0, r13) >= 0) Keep(first, false); }
-        uint[] r14 = SR(14);
-        if (RngChance(r14, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_bench"), WM_ANY, 0, 0, WIN_ANY, 0, r14) >= 0) Keep(first, false); }
-        uint[] r15 = SR(15);
-        if (RngChance(r15, 600) && Fit(1))
-        {
-            int cell = OpenSpot(1, WM_ANY, 0, 0, 0, r15);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("f_lamp"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        // revision 11: a vending machine and a pallet of drinks crates by the kiosks, stools at a stall
-        uint[] r18 = SR(18);
-        if (RngChance(r18, 550) && Fit(1)) { int first = nEmit; if (WallPlace(Dn(RngChance(r18, 600) ? "ma_vending" : "ma_claw"), WM_ANY, 0, 0, WIN_ANY, 0, r18) >= 0) Keep(first, false); }
-        uint[] r19 = SR(19);
-        if (RngChance(r19, 500) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("crates"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r19)) Keep(first, false); }
-        // fruit set out by a kiosk, a plant, a second flower bed
-        uint[] r16 = SR(16);
-        if (RngChance(r16, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(r16, "ms_dispFruit", 4, "k_plant", 4), WM_ANY, 0, 0, WIN_ANY, 0, r16) >= 0) Keep(first, false); }
-        uint[] r17 = SR(17);
-        if (RngChance(r17, 500) && Fit(1))
-        {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r17);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, RngRange(r17, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        FillFromPool(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) && !PoolStep(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) PhBreak();
+}
 
     // revision 11: what an area's own steps could not place is made up from the rest of what belongs there, each kind
     // tried once in a shuffled order: at the fence or a wall, else (a thing that may stand alone) in the open
+    int PoolLen(string[] pool) { return pool.Length; }
+
+    // FillFromPool one piece a step (planIter: which of the pool; Cor, build freezes). False when it stops.
+    bool PoolStep(int k0, string[] pool)
+    {
+        int room = pRoom;
+        if (planIter == 0) { planR = SR(k0); planB = RngRange(planR, pool.Length); }
+        if (!Fit(1)) return false;
+        int def = Dn(pool[(planB + planIter) % pool.Length]);
+        if (CountInRoom(def, room) >= ScaledCap(defRoomCap[def], room)) return true;
+        int first = nEmit;
+        if (WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, planR) >= 0 && Keep(first, false)) return true;
+        if (Has(def, GenData.FL_LOOSE)) return true;
+        int cell = OpenSpot(2, WM_ANY, 0, 0, 0, planR);
+        first = nEmit;
+        if (cell >= 0 && FreePlace(def, cell, RngRange(planR, 4) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
+        return true;
+    }
+
     void FillFromPool(int k0, string[] pool)
     {
         int room = pRoom;

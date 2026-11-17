@@ -139,6 +139,15 @@ public partial class MapGen
     }
 
     // borders until the room's floor budget is used or no stretch is left
+    // one stretch of Borders: false when it stops
+    bool BorderStep(int k0, int b, bool soil)
+    {
+        if (!Fit(1)) return false;
+        GenRng r = SR(k0 + b);
+        int longest = 2500 + r.Range(4) * 500;
+        return Border(longest, soil, WM_ANY, 0, 0, ref r) != 0;
+    }
+
     void Borders(int k0, int max, bool soil)
     {
         for (int b = 0; b < max && Fit(1); b++)
@@ -363,28 +372,38 @@ public partial class MapGen
     }
 
     // ============================================================================================ OPEN LAWN
+    // in phases a step each (Cor: build freezes; MapGenPlace.PlanStep): the same pieces in the same order
     void PlanLawn()
     {
         int room = pRoom;
-        GenRng r = SR(1);
-        StonePaths(40, ref r);
-        FrontMarkers(30);
-        DoorSides(50);
-        int trees = TreeCount(room, ref r);
-        if (trees < 1 && AreaM2(room) >= 30) trees = 1;
-        for (int t = 0; t < trees; t++) LawnTree(60 + t);
-        if (r.Chance(650)) BenchAtEdge(2);
-        GenRng r3 = SR(3);
-        if (r3.Chance(350) && Fit(1))
+        if (Ph(0))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(first, false);
+            planR = SR(1);
+            StonePaths(40, ref planR);
+            FrontMarkers(30);
+            DoorSides(50);
+            planN = TreeCount(room, ref planR);
+            if (planN < 1 && AreaM2(room) >= 30) planN = 1;
         }
-        // planted borders along the fences fill the rest of the budget: no lawn is left bare (G29)
-        ClearBans();
-        Borders(10, 6, true);
-        GenRng r4 = SR(4);
-        for (int k = 0; k < 3 && Fit(1); k++) if (!Island(ref r4)) break;
+        if (PhLoop(1, planN)) LawnTree(60 + planIter);
+        if (Ph(2))
+        {
+            if (planR.Chance(650)) BenchAtEdge(2);
+            GenRng r3 = SR(3);
+            if (r3.Chance(350) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(first, false);
+            }
+            // planted borders along the fences fill the rest of the budget: no lawn is left bare (G29)
+            ClearBans();
+        }
+        if (PhLoop(3, 6) && !BorderStep(10, planIter, true)) PhBreak();
+        if (Ph(4))
+        {
+            GenRng r4 = SR(4);
+            for (int k = 0; k < 3 && Fit(1); k++) if (!Island(ref r4)) break;
+        }
     }
 
     // ============================================================================================ GARDEN
@@ -639,9 +658,14 @@ public partial class MapGen
     void PlanLane()
     {
         int room = pRoom;
+        if (Ph(0))
+        {
         int rx = (releaseX * 8 + 4) * GenData.INNER_MM, rz = (releaseZ * 8 + 4) * GenData.INNER_MM;
         GenRng r = SR(1);
-        if (Fit(1))
+        // the sign by the release, in the lane's first room only (layout 14: the lane is in rooms of six cells)
+        int fx = releaseX + DX[releaseDir], fz = releaseZ + DZ[releaseDir];
+        bool firstRoom = InGrid(fx, fz) && cellRoom[fz * W + fx] == room;
+        if (firstRoom && Fit(1))
         {
             int first = nEmit;
             if (WallPlace(Dn("n_sign"), SignGap, WM_NEAR, rx, rz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
@@ -656,7 +680,8 @@ public partial class MapGen
             if (WallPlace(Dn("k_trashcan"), WM_ANY, 0, 0, WIN_ANY, 0, ref r4) >= 0) Keep(first, false);
         }
         ClearBans();
-        Borders(10, 6, false);
+        }
+        if (PhLoop(1, 6) && !BorderStep(10, planIter, false)) PhBreak();
     }
 
     // ============================================================================================ YARD
@@ -927,179 +952,190 @@ public partial class MapGen
     void PlanForest(bool camp)
     {
         int room = pRoom, area = AreaM2(room);
-        GenRng r = SR(1);
-        // (a) the middle of the area and the path to it from the entrances
-        int hub = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, ref r);
-        if (hub < 0) hub = roomCells[roomCellStart[room] + roomCellCount[room] / 2];
-        int hubX = hub % IW * GenData.INNER_MM + 250, hubZ = hub / IW * GenData.INNER_MM + 250;
-        int fire = -1, tent = -1;
-        if (camp)
+        // in three parts a step each (Cor: build freezes): the clearing and the camp, the stands of trees, the rest
+        if (Ph(0))
         {
-            // (b) the camp in its clearing: the fire in the middle, the tent facing it
-            fire = FireRing(7, hubX, hubZ, true, ref r);
-            if (fire >= 0) { hubX = emitX[fire]; hubZ = emitZ[fire]; hub = FloorDiv(hubZ, GenData.INNER_MM) * IW + FloorDiv(hubX, GenData.INNER_MM); }
-        }
-        FindGates(room);
-        if (camp && fire >= 0)
-        {
-            // the tent across the fire from the way in, its door to the fire; the small tent if the large one has no room
-            GenRng r2 = SR(2);
-            int tentDef = Pick(ref r2, "n_tentOpen", 5, "n_tentClosed", 3);
-            tent = AroundFire(tentDef, fire, 180, 2600, 3800, EF_MANDATORY, true, true, ref r2);
-            if (tent < 0 && tentDef != Dn("n_tentClosed")) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2600, 3800, EF_MANDATORY, true, true, ref r2);
-            // a narrow clearing: the tent with its back to the fence, as near the fire as the fence allows
-            if (tent < 0) tent = WallKeep(tentDef, WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
-            if (tent < 0) tent = WallKeep(Dn("n_tentClosed"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
-            if (tent < 0) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2300, 3800, EF_MANDATORY, true, false, ref r2);
-            // a clearing too narrow for any tent (a strip of wood two cells long): a bedroll laid out by the fire,
-            // its foot to the fire, the gear beside it as beside a tent
-            if (tent < 0) tent = AroundFire(Dn("s_bedroll"), fire, 0, 1500, 2700, EF_MANDATORY, true, false, ref r2);
-            if (tent < 0) tent = WallKeep(Dn("s_bedroll"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
-            if (tent < 0) MandFail(1);
-            FireSeats(fire, true, 8);
-            GenRng rgear = SR(9);
-            FireGear(fire, ref rgear);
-        }
-        // a piece of forest of one cell (4 x 4 m) is too small for a path of its own
-        if (camp || roomOuterCells[room] >= 2)
-            for (int g = 0; g < nGate; g++) { GenRng rg = SR(20 + g); Track(room, gateCell[g], hub, ref rg); }
-        if (camp && fire >= 0)
-        {
-            GenRng r3 = SR(3);
-            if (tent >= 0 && Fit(2))
+            GenRng r = SR(1);
+            // (a) the middle of the area and the path to it from the entrances
+            int hub = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, ref r);
+            if (hub < 0) hub = roomCells[roomCellStart[room] + roomCellCount[room] / 2];
+            int hubX = hub % IW * GenData.INNER_MM + 250, hubZ = hub / IW * GenData.INNER_MM + 250;
+            int fire = -1, tent = -1;
+            if (camp)
             {
-                // the gear beside the tent: a box or a chest with a barrel
+                // (b) the camp in its clearing: the fire in the middle, the tent facing it
+                fire = FireRing(7, hubX, hubZ, true, ref r);
+                if (fire >= 0) { hubX = emitX[fire]; hubZ = emitZ[fire]; hub = FloorDiv(hubZ, GenData.INNER_MM) * IW + FloorDiv(hubX, GenData.INNER_MM); }
+            }
+            FindGates(room);
+            if (camp && fire >= 0)
+            {
+                // the tent across the fire from the way in, its door to the fire; the small tent if the large one has no room
+                GenRng r2 = SR(2);
+                int tentDef = Pick(ref r2, "n_tentOpen", 5, "n_tentClosed", 3);
+                tent = AroundFire(tentDef, fire, 180, 2600, 3800, EF_MANDATORY, true, true, ref r2);
+                if (tent < 0 && tentDef != Dn("n_tentClosed")) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2600, 3800, EF_MANDATORY, true, true, ref r2);
+                // a narrow clearing: the tent with its back to the fence, as near the fire as the fence allows
+                if (tent < 0) tent = WallKeep(tentDef, WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
+                if (tent < 0) tent = WallKeep(Dn("n_tentClosed"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
+                if (tent < 0) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2300, 3800, EF_MANDATORY, true, false, ref r2);
+                // a clearing too narrow for any tent (a strip of wood two cells long): a bedroll laid out by the fire,
+                // its foot to the fire, the gear beside it as beside a tent
+                if (tent < 0) tent = AroundFire(Dn("s_bedroll"), fire, 0, 1500, 2700, EF_MANDATORY, true, false, ref r2);
+                if (tent < 0) tent = WallKeep(Dn("s_bedroll"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
+                if (tent < 0) MandFail(1);
+                FireSeats(fire, true, 8);
+                GenRng rgear = SR(9);
+                FireGear(fire, ref rgear);
+            }
+            // a piece of forest of one cell (4 x 4 m) is too small for a path of its own
+            if (camp || roomOuterCells[room] >= 2)
+                for (int g = 0; g < nGate; g++) { GenRng rg = SR(20 + g); Track(room, gateCell[g], hub, ref rg); }
+            if (camp && fire >= 0)
+            {
+                GenRng r3 = SR(3);
+                if (tent >= 0 && Fit(2))
+                {
+                    // the gear beside the tent: a box or a chest with a barrel
+                    int first = nEmit;
+                    FSet(Pick(ref r3, "s_box", 5, "s_chest", 4), Dn("s_barrel"));
+                    if (FormBeside(GenData.GL_ROW, 80, tent, 0, ref r3) >= 0) Keep(first, false);
+                }
+                if (tent >= 0 && r3.Chance(600) && Fit(2))
+                {
+                    int first = nEmit;
+                    if (GroupBeside(GenData.FindGrp("tools"), tent, 2, 0, ref r3)) Keep(first, false);
+                }
+                GenRng r4 = SR(4);
+                if (r4.Chance(800)) WoodPile(fire, false, ref r4);
+            }
+            planHX = hubX; planHZ = hubZ;
+        }
+        if (Ph(1))
+        {
+            // (b) trees in stands, away from the path and the clearing; open ground between the stands
+            GenRng rt = SR(5);
+            int trees = TreeCount(room, ref rt);
+            if (trees < 3) trees = 3;
+            int stands = (trees + 3) / 4;
+            if (stands > standX.Length) stands = standX.Length;
+            standN = 0;
+            int main0 = Pick(ref rt, "n_treeDefault", 6, "n_treePineTall", 6, "n_treeOak", 5);
+            int left = trees;
+            for (int s = 0; s < stands && left > 0; s++)
+            {
+                // the candidate farthest from the stands so far, with room for crowns
+                int best = -1, bestD = -1;
+                for (int k = 0; k < 14; k++)
+                {
+                    int i = roomCells[roomCellStart[room] + rt.Range(roomCellCount[room])];
+                    if ((tags[i] & (GenData.T_PATH | GenData.T_GLADE | GenData.T_NO_SPAWN)) != 0 || occ[i] != 0) continue;
+                    int x = i % IW * GenData.INNER_MM + 250, z = i / IW * GenData.INNER_MM + 250;
+                    int dmin = 1 << 28;
+                    for (int q = 0; q < standN; q++) { int dd = Abs(standX[q] - x) + Abs(standZ[q] - z); if (dd < dmin) dmin = dd; }
+                    int hx, hz;
+                    FullHalf(main0, 0, out hx, out hz);
+                    if (!WallsClear(x - hx, z - hz, x + hx, z + hz, true)) dmin /= 8;   // too near an edge for a crown
+                    if (dmin > bestD) { bestD = dmin; best = i; }
+                }
+                if (best < 0) break;
+                int sx = best % IW * GenData.INNER_MM + 250, sz = best / IW * GenData.INNER_MM + 250;
+                int kind = s == 0 ? main0 : (rt.Chance(190) ? Dn("n_treePineRound") : Pick(ref rt, "n_treeDefault", 6, "n_treePineTall", 6, "n_treeOak", 5));
+                int accent = rt.Chance(400) ? Pick(ref rt, "n_treePineRound", 4, "n_treeOak", 4, "n_treeDefault", 4) : -1;
+                int want = left < 3 ? left : rt.Between(3, left < 5 ? left : 5);
+                int got = Stand(sx, sz, want, kind, accent, ref rt);
+                left -= got;
+                if (got > 0 && standN < standX.Length) { standX[standN] = sx; standZ[standN] = sz; standN++; }
+            }
+            // crowns have to stay inside the fence (G31), so a stand near an edge comes out short: the trees still
+            // missing join the stands that stand, wherever a crown has the room
+            for (int tries = left * 12; tries > 0 && left > 0 && standN > 0; tries--)
+            {
+                int s = rt.Range(standN), a = rt.Range(360), rad = 1200 + rt.Range(2400);
+                if (TreeAt(main0, standX[s] + rad * sinTab[a] / 4096, standZ[s] + rad * sinTab[(a + 90) % 360] / 4096, ref rt) >= 0) left--;
+            }
+        }
+        if (Ph(2))
+        {
+            // (c) undergrowth: bushes at the edge of a stand and along the fence
+            GenRng r6 = SR(6);
+            int bushes = 1 + area / 28;
+            for (int b = 0; b < bushes && Fit(1); b++)
+            {
                 int first = nEmit;
-                FSet(Pick(ref r3, "s_box", 5, "s_chest", 4), Dn("s_barrel"));
-                if (FormBeside(GenData.GL_ROW, 80, tent, 0, ref r3) >= 0) Keep(first, false);
+                bool ok = false;
+                if (standN > 0 && r6.Chance(600))
+                {
+                    int s = r6.Range(standN), a = r6.Range(360), rad = 1500 + r6.Range(1200);
+                    int px = standX[s] + rad * sinTab[a] / 4096, pz = standZ[s] + rad * sinTab[(a + 90) % 360] / 4096;
+                    int ix = FloorDiv(px, GenData.INNER_MM), iz = FloorDiv(pz, GenData.INNER_MM);
+                    if (ix >= 0 && iz >= 0 && ix < IW && iz < IH && innerRoom[iz * IW + ix] == room && (tags[iz * IW + ix] & GenData.T_GLADE) == 0)
+                        ok = StampAt(Pick(ref r6, "n_bush", 5, "n_bushDetailed", 4), room, px, pz, r6.Range(360), 0, -1, H_NATURE, false) >= 0;
+                }
+                if (!ok) ok = WallPlace(Pick(ref r6, "n_bushLarge", 5, "n_bush", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r6) >= 0;
+                if (ok) Keep(first, false);
             }
-            if (tent >= 0 && r3.Chance(600) && Fit(2))
+            // (d) dead wood as one feature: a fallen log, a stump beside it, mushrooms at the stump
+            GenRng r7 = SR(7);
+            if (r7.Chance(camp ? 350 : 800) && Fit(2)) DeadWood(ref r7);
+            // a boulder with smaller rocks beside it
+            GenRng r8 = SR(8);
+            if (r8.Chance(camp ? 300 : 600) && Fit(2))
+            {
+                int cell = SoftSpot(ref r8);
+                int first = nEmit;
+                int rock = cell >= 0 ? FreePlace(Pick(ref r8, "n_rockLarge", 5, "n_rockTall", 3), cell, r8.Range(360), 0, 0, H_NATURE) : -1;
+                if (rock >= 0 && Keep(first, false) && Fit(2))
+                {
+                    first = nEmit;
+                    if (GroupBeside(GenData.FindGrp("rocks"), rock, r8.Between(2, 3), 0, ref r8)) Keep(first, false);
+                }
+            }
+            // mushrooms at the foot of a tree, a drift of flowers by the path, a signpost at an entrance
+            GenRng r9 = SR(9);
+            int clumps = camp ? 1 : 1 + area / 50;
+            for (int m = 0; m < clumps && Fit(2); m++)
             {
                 int first = nEmit;
-                if (GroupBeside(GenData.FindGrp("tools"), tent, 2, 0, ref r3)) Keep(first, false);
+                if (PlaceGroup(GenData.FindGrp("mushrooms"), room, GenData.A_BESIDE, r9.Between(2, Fit(4) ? 4 : 2), 0, ref r9)) Keep(first, false);
             }
-            GenRng r4 = SR(4);
-            if (r4.Chance(800)) WoodPile(fire, false, ref r4);
-        }
-        // (b) trees in stands, away from the path and the clearing; open ground between the stands
-        GenRng rt = SR(5);
-        int trees = TreeCount(room, ref rt);
-        if (trees < 3) trees = 3;
-        int stands = (trees + 3) / 4;
-        if (stands > standX.Length) stands = standX.Length;
-        standN = 0;
-        int main0 = Pick(ref rt, "n_treeDefault", 6, "n_treePineTall", 6, "n_treeOak", 5);
-        int left = trees;
-        for (int s = 0; s < stands && left > 0; s++)
-        {
-            // the candidate farthest from the stands so far, with room for crowns
-            int best = -1, bestD = -1;
-            for (int k = 0; k < 14; k++)
+            GenRng r10 = SR(10);
+            if (r10.Chance(600) && Fit(3))
             {
-                int i = roomCells[roomCellStart[room] + rt.Range(roomCellCount[room])];
-                if ((tags[i] & (GenData.T_PATH | GenData.T_GLADE | GenData.T_NO_SPAWN)) != 0 || occ[i] != 0) continue;
-                int x = i % IW * GenData.INNER_MM + 250, z = i / IW * GenData.INNER_MM + 250;
-                int dmin = 1 << 28;
-                for (int q = 0; q < standN; q++) { int dd = Abs(standX[q] - x) + Abs(standZ[q] - z); if (dd < dmin) dmin = dd; }
-                int hx, hz;
-                FullHalf(main0, 0, out hx, out hz);
-                if (!WallsClear(x - hx, z - hz, x + hx, z + hz, true)) dmin /= 8;   // too near an edge for a crown
-                if (dmin > bestD) { bestD = dmin; best = i; }
+                int first = nEmit;
+                if (GroupAt(FlowerGroup(ref r10), GenData.A_SOFT, r10.Between(3, Fit(5) ? 5 : 3), WM_NEAR, planHX, planHZ, 0, ref r10)) Keep(first, false);
             }
-            if (best < 0) break;
-            int sx = best % IW * GenData.INNER_MM + 250, sz = best / IW * GenData.INNER_MM + 250;
-            int kind = s == 0 ? main0 : (rt.Chance(190) ? Dn("n_treePineRound") : Pick(ref rt, "n_treeDefault", 6, "n_treePineTall", 6, "n_treeOak", 5));
-            int accent = rt.Chance(400) ? Pick(ref rt, "n_treePineRound", 4, "n_treeOak", 4, "n_treeDefault", 4) : -1;
-            int want = left < 3 ? left : rt.Between(3, left < 5 ? left : 5);
-            int got = Stand(sx, sz, want, kind, accent, ref rt);
-            left -= got;
-            if (got > 0 && standN < standX.Length) { standX[standN] = sx; standZ[standN] = sz; standN++; }
-        }
-        // crowns have to stay inside the fence (G31), so a stand near an edge comes out short: the trees still
-        // missing join the stands that stand, wherever a crown has the room
-        for (int tries = left * 12; tries > 0 && left > 0 && standN > 0; tries--)
-        {
-            int s = rt.Range(standN), a = rt.Range(360), rad = 1200 + rt.Range(2400);
-            if (TreeAt(main0, standX[s] + rad * sinTab[a] / 4096, standZ[s] + rad * sinTab[(a + 90) % 360] / 4096, ref rt) >= 0) left--;
-        }
-        // (c) undergrowth: bushes at the edge of a stand and along the fence
-        GenRng r6 = SR(6);
-        int bushes = 1 + area / 28;
-        for (int b = 0; b < bushes && Fit(1); b++)
-        {
-            int first = nEmit;
-            bool ok = false;
-            if (standN > 0 && r6.Chance(600))
+            GenRng r11 = SR(11);
+            if (nGate > 0 && r11.Chance(400) && Fit(1)) Signpost(gateCell[0], ref r11);
+            // fill up to the area's budget: more undergrowth at the fence, rocks and stumps on open ground (G29)
+            GenRng r12 = SR(12);
+            for (int k = 0; k < 10 && Fit(1); k++)
             {
-                int s = r6.Range(standN), a = r6.Range(360), rad = 1500 + r6.Range(1200);
+                int first = nEmit;
+                int roll = r12.Range(10);
+                bool ok;
+                if (roll < 4) ok = WallPlace(Pick(ref r12, "n_bushLarge", 5, "n_bush", 4, "n_bushDetailed", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r12) >= 0;
+                else if (roll < 7 && Fit(2)) ok = GroupAt(GenData.FindGrp("rocks"), GenData.A_SOFT, r12.Between(2, 3), WM_ANY, 0, 0, 0, ref r12);
+                else
+                {
+                    int cell = SoftSpot(ref r12);
+                    ok = cell >= 0 && FreePlace(Pick(ref r12, "n_stump", 5, "n_stumpRound", 4, "n_bush", 3), cell, r12.Range(360), 0, 0, H_NATURE) >= 0;
+                }
+                if (ok) Keep(first, false);
+            }
+            // grass tufts in patches under the stands (ground cover, not props)
+            GenRng r13 = SR(13);
+            int type = roomType[room];
+            int grass = r13.Between(PerArea(GenData.rangeDecorMin[type], room, false), PerArea(GenData.rangeDecorMax[type], room, false));
+            for (int tries = grass * 4; tries > 0 && grass > 0 && standN > 0; tries--)
+            {
+                int s = r13.Range(standN), a = r13.Range(360), rad = 400 + r13.Range(1800);
                 int px = standX[s] + rad * sinTab[a] / 4096, pz = standZ[s] + rad * sinTab[(a + 90) % 360] / 4096;
                 int ix = FloorDiv(px, GenData.INNER_MM), iz = FloorDiv(pz, GenData.INNER_MM);
-                if (ix >= 0 && iz >= 0 && ix < IW && iz < IH && innerRoom[iz * IW + ix] == room && (tags[iz * IW + ix] & GenData.T_GLADE) == 0)
-                    ok = StampAt(Pick(ref r6, "n_bush", 5, "n_bushDetailed", 4), room, px, pz, r6.Range(360), 0, -1, H_NATURE, false) >= 0;
+                if (ix < 0 || iz < 0 || ix >= IW || iz >= IH || innerRoom[iz * IW + ix] != room) continue;
+                if ((tags[iz * IW + ix] & (GenData.T_PATH | GenData.T_GLADE)) != 0) continue;
+                if (StampAt(Dn(r13.Chance(600) ? "n_grass" : "n_grassLarge"), room, px, pz, r13.Range(360), 0, -1, H_NATURE, false) >= 0) grass--;
             }
-            if (!ok) ok = WallPlace(Pick(ref r6, "n_bushLarge", 5, "n_bush", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r6) >= 0;
-            if (ok) Keep(first, false);
-        }
-        // (d) dead wood as one feature: a fallen log, a stump beside it, mushrooms at the stump
-        GenRng r7 = SR(7);
-        if (r7.Chance(camp ? 350 : 800) && Fit(2)) DeadWood(ref r7);
-        // a boulder with smaller rocks beside it
-        GenRng r8 = SR(8);
-        if (r8.Chance(camp ? 300 : 600) && Fit(2))
-        {
-            int cell = SoftSpot(ref r8);
-            int first = nEmit;
-            int rock = cell >= 0 ? FreePlace(Pick(ref r8, "n_rockLarge", 5, "n_rockTall", 3), cell, r8.Range(360), 0, 0, H_NATURE) : -1;
-            if (rock >= 0 && Keep(first, false) && Fit(2))
-            {
-                first = nEmit;
-                if (GroupBeside(GenData.FindGrp("rocks"), rock, r8.Between(2, 3), 0, ref r8)) Keep(first, false);
-            }
-        }
-        // mushrooms at the foot of a tree, a drift of flowers by the path, a signpost at an entrance
-        GenRng r9 = SR(9);
-        int clumps = camp ? 1 : 1 + area / 50;
-        for (int m = 0; m < clumps && Fit(2); m++)
-        {
-            int first = nEmit;
-            if (PlaceGroup(GenData.FindGrp("mushrooms"), room, GenData.A_BESIDE, r9.Between(2, Fit(4) ? 4 : 2), 0, ref r9)) Keep(first, false);
-        }
-        GenRng r10 = SR(10);
-        if (r10.Chance(600) && Fit(3))
-        {
-            int first = nEmit;
-            if (GroupAt(FlowerGroup(ref r10), GenData.A_SOFT, r10.Between(3, Fit(5) ? 5 : 3), WM_NEAR, hubX, hubZ, 0, ref r10)) Keep(first, false);
-        }
-        GenRng r11 = SR(11);
-        if (nGate > 0 && r11.Chance(400) && Fit(1)) Signpost(gateCell[0], ref r11);
-        // fill up to the area's budget: more undergrowth at the fence, rocks and stumps on open ground (G29)
-        GenRng r12 = SR(12);
-        for (int k = 0; k < 10 && Fit(1); k++)
-        {
-            int first = nEmit;
-            int roll = r12.Range(10);
-            bool ok;
-            if (roll < 4) ok = WallPlace(Pick(ref r12, "n_bushLarge", 5, "n_bush", 4, "n_bushDetailed", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r12) >= 0;
-            else if (roll < 7 && Fit(2)) ok = GroupAt(GenData.FindGrp("rocks"), GenData.A_SOFT, r12.Between(2, 3), WM_ANY, 0, 0, 0, ref r12);
-            else
-            {
-                int cell = SoftSpot(ref r12);
-                ok = cell >= 0 && FreePlace(Pick(ref r12, "n_stump", 5, "n_stumpRound", 4, "n_bush", 3), cell, r12.Range(360), 0, 0, H_NATURE) >= 0;
-            }
-            if (ok) Keep(first, false);
-        }
-        // grass tufts in patches under the stands (ground cover, not props)
-        GenRng r13 = SR(13);
-        int type = roomType[room];
-        int grass = r13.Between(PerArea(GenData.rangeDecorMin[type], room, false), PerArea(GenData.rangeDecorMax[type], room, false));
-        for (int tries = grass * 4; tries > 0 && grass > 0 && standN > 0; tries--)
-        {
-            int s = r13.Range(standN), a = r13.Range(360), rad = 400 + r13.Range(1800);
-            int px = standX[s] + rad * sinTab[a] / 4096, pz = standZ[s] + rad * sinTab[(a + 90) % 360] / 4096;
-            int ix = FloorDiv(px, GenData.INNER_MM), iz = FloorDiv(pz, GenData.INNER_MM);
-            if (ix < 0 || iz < 0 || ix >= IW || iz >= IH || innerRoom[iz * IW + ix] != room) continue;
-            if ((tags[iz * IW + ix] & (GenData.T_PATH | GenData.T_GLADE)) != 0) continue;
-            if (StampAt(Dn(r13.Chance(600) ? "n_grass" : "n_grassLarge"), room, px, pz, r13.Range(360), 0, -1, H_NATURE, false) >= 0) grass--;
         }
     }
 

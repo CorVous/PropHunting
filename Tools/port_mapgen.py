@@ -62,14 +62,25 @@ def table_fields():
     return out
 
 
+RECURSIVE = ["Remove", "RemoveOne"]   # found by a call-graph check (WallPlace and StampObject only call their own overloads)
+GLOBAL_RNG = {"planR"}   # rng fields declared in one file and used in others (MapGenPlace.planR)
+
+
 def convert(text, fields, used):
     # rng variables and parameters
-    rng_names = set(re.findall(r"\bGenRng\s+(\w+)", text))
+    rng_names = set(re.findall(r"\bGenRng\s+(\w+)", text)) | GLOBAL_RNG
 
     # trace output: whole statements guarded by TraceRoom, and bare Console lines
     text = re.sub(r"^[ \t]*(?:else\s+)?if\s*\(TraceRoom[^\n]*\n", lambda m: "", text, flags=re.M)
     text = re.sub(r"^[^\n]*System\.Console\.[^\n]*\n", "", text, flags=re.M)
     text = re.sub(r"\bpublic static int TraceRoom = -1;", "int TraceRoom = -1;", text)
+
+    # methods that call themselves (or each other): UdonSharp keeps one set of locals per method unless it is told
+    # otherwise, so a nested call overwrote the outer one's (Remove taking back a table left its cells taken: the
+    # Udon maps differed from C#)
+    for n in RECURSIVE:
+        text = re.sub(r"^(\s{4})((?:(?:public|private|static|internal)\s+)*[\w\[\]<>]+\s+" + n + r"\s*\()",
+                      lambda m: m.group(1) + "[UdonSharp.RecursiveMethod]" + chr(10) + m.group(1) + m.group(2), text, flags=re.M)
 
     # class declaration
     text = re.sub(r"\bpublic partial class MapGen\b", "public partial class " + CLS, text)

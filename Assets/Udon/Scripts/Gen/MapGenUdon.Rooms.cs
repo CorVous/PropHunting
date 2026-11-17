@@ -133,17 +133,21 @@ public partial class MapGenUdon
         return dir == 0 ? GenData.T_WALL_N : (dir == 1 ? GenData.T_WALL_E : (dir == 2 ? GenData.T_WALL_S : GenData.T_WALL_W));
     }
 
+    // BuildTags in pieces (Cor: build freezes): the same work in the same order, a few outer cells or a few thousand
+    // inner cells a step. True when done.
+    int btPhase, btCursor, btQh, btQt;
+    const int BT_CHUNK = 3000;
+
     void BuildTags()
     {
-        int n = IW * IH;
-        for (int i = 0; i < n; i++) { tags[i] = 0; innerRoom[i] = -1; occ[i] = 0; flatOcc[i] = 0; solid[i] = 0; reserve[i] = 0; walk[i] = 0; reach[i] = 0; canopy[i] = 0; }
-        for (int r = 0; r < nRooms; r++) { roomDoorCount[r] = 0; roomDoorStart[r] = r * 8; roomX0[r] = 1 << 20; roomZ0[r] = 1 << 20; roomX1[r] = -1; roomZ1[r] = -1; }
-        nEmit = 0; nFree = 0; nSockets = 0;
+        btPhase = 0; btCursor = 0;
+        while (!BuildTagsStep()) { }
+    }
 
-        for (int c = 0; c < W * H; c++)
-        {
+    void TagCell(int c)
+    {
             int zone = cellZone[c];
-            if (zone == GenData.Z_NONE) continue;
+            if (zone == GenData.Z_NONE) return;
             int cx = c % W, cz = c / W, room = cellRoom[c], rt = roomType[room];
             int baseTags = GenData.T_FLOOR;
             if (!IsBuilding(zone)) baseTags |= GenData.T_OUTDOOR;
@@ -179,6 +183,31 @@ public partial class MapGenUdon
                     if (iz > roomZ1[room]) roomZ1[room] = iz;
                 }
         }
+
+    bool BuildTagsStep()
+    {
+        int n = IW * IH;
+        if (btPhase == 0)
+        {
+            int e = btCursor + BT_CHUNK < n ? btCursor + BT_CHUNK : n;
+            for (int i = btCursor; i < e; i++) { tags[i] = 0; innerRoom[i] = -1; occ[i] = 0; flatOcc[i] = 0; solid[i] = 0; reserve[i] = 0; walk[i] = 0; reach[i] = 0; canopy[i] = 0; }
+            btCursor = e;
+            if (e < n) return false;
+            for (int r = 0; r < nRooms; r++) { roomDoorCount[r] = 0; roomDoorStart[r] = r * 8; roomX0[r] = 1 << 20; roomZ0[r] = 1 << 20; roomX1[r] = -1; roomZ1[r] = -1; }
+            nEmit = 0; nFree = 0; nSockets = 0;
+            btPhase = 1; btCursor = 0;
+            return false;
+        }
+        if (btPhase == 1)
+        {
+            int e = btCursor + 6 < W * H ? btCursor + 6 : W * H;
+            for (int c = btCursor; c < e; c++) TagCell(c);
+            btCursor = e;
+            if (e >= W * H) btPhase = 2;
+            return false;
+        }
+        if (btPhase == 2)
+        {
         // doors: keep-clear cells on both sides (two deep, one wider than the doorway), and the room door lists
         for (int c = 0; c < W * H; c++)
         {
@@ -253,40 +282,80 @@ public partial class MapGenUdon
                     if (depth < 3) tags[(hz * 8 + lz) * IW + hx * 8 + lx] |= GenData.T_NO_SPAWN;
                 }
         }
-        // per-room cell lists
-        int pos = 0;
-        for (int r = 0; r < nRooms; r++) roomCellCount[r] = 0;
-        for (int i = 0; i < n; i++) if (innerRoom[i] >= 0) roomCellCount[innerRoom[i]]++;
-        for (int r = 0; r < nRooms; r++) { roomCellStart[r] = pos; pos += roomCellCount[r]; roomCellCount[r] = 0; }
-        for (int i = 0; i < n; i++)
-        {
-            int r = innerRoom[i];
-            if (r < 0) continue;
-            roomCells[roomCellStart[r] + roomCellCount[r]++] = i;
+            btPhase = 3; btCursor = 0;
+            return false;
         }
-        // CENTER: two or more cells from the nearest wall, within the room
-        for (int i = 0; i < n; i++) dist[i] = -1;
-        int qh = 0, qt = 0;
-        for (int i = 0; i < n; i++)
-            if (innerRoom[i] >= 0 && (tags[i] & GenData.T_WALL_ANY) != 0) { dist[i] = 0; queue[qt++] = i; }
-        while (qh < qt)
+        if (btPhase == 3)
         {
-            int i = queue[qh++];
-            int ix = i % IW, iz = i / IW;
-            for (int d = 0; d < 4; d++)
+            // per-room cell lists: the counts
+            if (btCursor == 0) for (int r = 0; r < nRooms; r++) roomCellCount[r] = 0;
+            int e = btCursor + BT_CHUNK < n ? btCursor + BT_CHUNK : n;
+            for (int i = btCursor; i < e; i++) if (innerRoom[i] >= 0) roomCellCount[innerRoom[i]]++;
+            btCursor = e;
+            if (e < n) return false;
+            int pos = 0;
+            for (int r = 0; r < nRooms; r++) { roomCellStart[r] = pos; pos += roomCellCount[r]; roomCellCount[r] = 0; }
+            btPhase = 4; btCursor = 0;
+            return false;
+        }
+        if (btPhase == 4)
+        {
+            // ... and the cells
+            int e = btCursor + BT_CHUNK < n ? btCursor + BT_CHUNK : n;
+            for (int i = btCursor; i < e; i++)
             {
-                int jx = ix + DX[d], jz = iz + DZ[d];
-                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
-                int j = jz * IW + jx;
-                if (innerRoom[j] != innerRoom[i] || dist[j] >= 0) continue;
-                dist[j] = dist[i] + 1; queue[qt++] = j;
+                int r = innerRoom[i];
+                if (r < 0) continue;
+                roomCells[roomCellStart[r] + roomCellCount[r]++] = i;
             }
+            btCursor = e;
+            if (e >= n) { btPhase = 5; btCursor = 0; btQh = 0; btQt = 0; }
+            return false;
         }
-        for (int i = 0; i < n; i++)
-            if (innerRoom[i] >= 0 && (dist[i] < 0 || dist[i] >= 2)) tags[i] |= GenData.T_CENTER;
-        // No walkway is marked between a room's doors any more (generator 2 kept the shortest path clear, which
-        // ran straight through the middle of small rooms, where the table belongs). The walkway test of every
-        // placement (RoomWalkable) keeps all doors joined by floor at least 1 m wide instead, wherever the
-        // furniture leaves it. T_PATH is now only the approach to a building's door outdoors and a forest path.
+        if (btPhase == 5)
+        {
+            // CENTER: two or more cells from the nearest wall, within the room
+            int e = btCursor + BT_CHUNK < n ? btCursor + BT_CHUNK : n;
+            for (int i = btCursor; i < e; i++) dist[i] = -1;
+            btCursor = e;
+            if (e >= n) { btPhase = 6; btCursor = 0; }
+            return false;
+        }
+        if (btPhase == 6)
+        {
+            int e = btCursor + BT_CHUNK < n ? btCursor + BT_CHUNK : n;
+            for (int i = btCursor; i < e; i++)
+                if (innerRoom[i] >= 0 && (tags[i] & GenData.T_WALL_ANY) != 0) { dist[i] = 0; queue[btQt++] = i; }
+            btCursor = e;
+            if (e >= n) btPhase = 7;
+            return false;
+        }
+        if (btPhase == 7)
+        {
+            int qh = btQh, qt = btQt, stop = BT_CHUNK;
+            while (qh < qt && stop-- > 0)
+            {
+                int i = queue[qh++];
+                int ix = i % IW, iz = i / IW;
+                for (int d = 0; d < 4; d++)
+                {
+                    int jx = ix + DX[d], jz = iz + DZ[d];
+                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
+                    int j = jz * IW + jx;
+                    if (innerRoom[j] != innerRoom[i] || dist[j] >= 0) continue;
+                    dist[j] = dist[i] + 1; queue[qt++] = j;
+                }
+            }
+            btQh = qh; btQt = qt;
+            if (qh >= qt) { btPhase = 8; btCursor = 0; }
+            return false;
+        }
+        {
+            int e = btCursor + BT_CHUNK < n ? btCursor + BT_CHUNK : n;
+            for (int i = btCursor; i < e; i++)
+                if (innerRoom[i] >= 0 && (dist[i] < 0 || dist[i] >= 2)) tags[i] |= GenData.T_CENTER;
+            btCursor = e;
+            return e >= n;
+        }
     }
 }

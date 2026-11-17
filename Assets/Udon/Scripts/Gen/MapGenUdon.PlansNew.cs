@@ -297,49 +297,54 @@ public partial class MapGenUdon
     void PlanGarageBay()
     {
         int room = pRoom, cells = roomOuterCells[room];
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        int front = SideToward(room, GenData.R_FORECOURT);
-        int yaw = front >= 0 ? DirYawSite(front) : 0;
-        string[] inRepair = { "c_sedan", "c_suv", "c_hatch", "c_sports", "c_luxury", "c_taxi", "c_police", "c_ambulance" };   // revision 12: the police car and the ambulance
-        int car = CentrePiece(Dn(inRepair[RngRange(r, inRepair.Length)]), yaw, false, 1, 0, WM_CENTRE, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r);
-        if (car < 0) car = CentrePiece(Dn("c_hatch"), yaw + 90, false, 0, 0, WM_ANY, 0, 0, 0, EF_MANDATORY, r);
-        if (car < 0) MandFail(1);
-        int cx = car >= 0 ? emitX[car] : RoomMidX(room), cz = car >= 0 ? emitZ[car] : RoomMidZ(room);
-        uint[] r2 = SR(2);
-        if (Fit(1))
+        if (Ph(0))
         {
-            int first = nEmit;
-            int wb = WallPlace(Dn("s_workbench"), WM_ANY, 0, 0, WIN_ANY, 0, r2);
-            if (wb >= 0 && Keep(first, false) && Fit(2))
+            int dx, dz;
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            int front = SideToward(room, GenData.R_FORECOURT);
+            int yaw = front >= 0 ? DirYawSite(front) : 0;
+            string[] inRepair = { "c_sedan", "c_suv", "c_hatch", "c_sports", "c_luxury", "c_taxi", "c_police", "c_ambulance" };   // revision 12: the police car and the ambulance
+            int car = CentrePiece(Dn(inRepair[RngRange(r, inRepair.Length)]), yaw, false, 1, 0, WM_CENTRE, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r);
+            if (car < 0) car = CentrePiece(Dn("c_hatch"), yaw + 90, false, 0, 0, WM_ANY, 0, 0, 0, EF_MANDATORY, r);
+            if (car < 0) MandFail(1);
+            int cx = car >= 0 ? emitX[car] : RoomMidX(room), cz = car >= 0 ? emitZ[car] : RoomMidZ(room);
+            uint[] r2 = SR(2);
+            if (Fit(1))
             {
-                first = nEmit;
-                if (GroupBeside(FindGrp("tools"), wb, RngBetween(r2, 2, 3), 0, r2)) Keep(first, false);
+                int first = nEmit;
+                int wb = WallPlace(Dn("s_workbench"), WM_ANY, 0, 0, WIN_ANY, 0, r2);
+                if (wb >= 0 && Keep(first, false) && Fit(2))
+                {
+                    first = nEmit;
+                    if (GroupBeside(FindGrp("tools"), wb, RngBetween(r2, 2, 3), 0, r2)) Keep(first, false);
+                }
             }
+            string[] rows = { "tyres", "scrap", "fuel", "barrels" };
+            int[] chance = { 900, 750, 550, 350 };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                uint[] rk = SR(3 + k);
+                if (!RngChance(rk, chance[k]) || !Fit(2)) continue;
+                int first = nEmit;
+                if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, k == 0 ? 4 : 3), 0, rk)) Keep(first, false);
+            }
+            uint[] r8 = SR(8);
+            if (cells >= 2 && RngChance(r8, 600) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_rack"), WM_FAR, cx, cz, WIN_NEVER, 0, r8) >= 0) Keep(first, false); }
+            uint[] r9 = SR(9);
+            if (RngChance(r9, 500) && LooseFit(1) && car >= 0)
+            {
+                int first = nEmit;
+                if (RelBeside(Dn("c_cone"), car, RngChance(r9, 500) ? 1 : -1, 250, 0, r9) >= 0 && Keep(first, false)) MarkLoose(first);
+            }
+            uint[] r10 = SR(10);
+            if (RngChance(r10, 400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, r10) >= 0) Keep(first, false); }
         }
-        string[] rows = { "tyres", "scrap", "fuel", "barrels" };
-        int[] chance = { 900, 750, 550, 350 };
-        for (int k = 0; k < rows.Length; k++)
-        {
-            uint[] rk = SR(3 + k);
-            if (!RngChance(rk, chance[k]) || !Fit(2)) continue;
-            int first = nEmit;
-            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, k == 0 ? 4 : 3), 0, rk)) Keep(first, false);
-        }
-        uint[] r8 = SR(8);
-        if (cells >= 2 && RngChance(r8, 600) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_rack"), WM_FAR, cx, cz, WIN_NEVER, 0, r8) >= 0) Keep(first, false); }
-        uint[] r9 = SR(9);
-        if (RngChance(r9, 500) && LooseFit(1) && car >= 0)
-        {
-            int first = nEmit;
-            if (RelBeside(Dn("c_cone"), car, RngChance(r9, 500) ? 1 : -1, 250, 0, r9) >= 0 && Keep(first, false)) MarkLoose(first);
-        }
-        uint[] r10 = SR(10);
-        if (RngChance(r10, 400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, r10) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "gen_toolwall", "s_workbench", "gen_rack", "ms_handTruck", "c_cone", "k_trashcan", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
-            "c_spoiler", "c_axle", "c_wheelRacing" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "gen_toolwall", "s_workbench", "gen_rack", "ms_handTruck", "c_cone", "k_trashcan", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
+            "c_spoiler", "c_axle", "c_wheelRacing" })) && !PoolStep(50, new string[] { "gen_toolwall", "s_workbench", "gen_rack", "ms_handTruck", "c_cone", "k_trashcan", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
+            "c_spoiler", "c_axle", "c_wheelRacing" })) PhBreak();
+}
 
     // a run of up to n racks along a wall (a, then b, a, ...), fewer if no wall is that long: kept, or false
     bool RackRun(int n, int a, int b, int mode, int tx, int tz, uint[] rng)
@@ -361,24 +366,29 @@ public partial class MapGenUdon
     void PlanParts()
     {
         int room = pRoom, cells = roomOuterCells[room];
-        uint[] r = SR(1);
-        if (!RackRun(cells >= 2 ? 3 : 2, Dn("gen_rack"), Dn("gen_rack"), WM_CENTRE, 0, 0, r)) MandFail(1);
-        int first;
-        uint[] r2 = SR(2);
-        if (cells >= 2) RackRows(room, Dn("gen_rack"), cells, r2);
-        string[] rows = { "tyres", "scrap", "boxes", "fuel" };
-        for (int k = 0; k < rows.Length; k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(3 + k);
-            if (!RngChance(rk, k < 2 ? 850 : 500) || !Fit(2)) continue;
-            first = nEmit;
-            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
+            uint[] r = SR(1);
+            if (!RackRun(cells >= 2 ? 3 : 2, Dn("gen_rack"), Dn("gen_rack"), WM_CENTRE, 0, 0, r)) MandFail(1);
+            int first;
+            uint[] r2 = SR(2);
+            if (cells >= 2) RackRows(room, Dn("gen_rack"), cells, r2);
+            string[] rows = { "tyres", "scrap", "boxes", "fuel" };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                uint[] rk = SR(3 + k);
+                if (!RngChance(rk, k < 2 ? 850 : 500) || !Fit(2)) continue;
+                first = nEmit;
+                if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
+            }
+            uint[] r7 = SR(7);
+            if (RngChance(r7, 450) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r7, "s_workbench", 4, "s_boxLarge", 4, "w_parts", 3), WM_ANY, 0, 0, WIN_ANY, 0, r7) >= 0) Keep(first, false); }
         }
-        uint[] r7 = SR(7);
-        if (RngChance(r7, 450) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r7, "s_workbench", 4, "s_boxLarge", 4, "w_parts", 3), WM_ANY, 0, 0, WIN_ANY, 0, r7) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "gen_toolwall", "gen_rack", "s_workbench", "w_parts", "s_boxLarge", "ms_handTruck", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
-            "c_spoiler", "c_axle", "c_wheelTruck" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "gen_toolwall", "gen_rack", "s_workbench", "w_parts", "s_boxLarge", "ms_handTruck", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
+            "c_spoiler", "c_axle", "c_wheelTruck" })) && !PoolStep(50, new string[] { "gen_toolwall", "gen_rack", "s_workbench", "w_parts", "s_boxLarge", "ms_handTruck", "c_engine", "c_bumper", "c_door", "c_plate", "c_tire", "c_wheel",
+            "c_spoiler", "c_axle", "c_wheelTruck" })) PhBreak();
+}
 
     // ============================================================================================ BARN
     // Hay stacked at the walls, the animals in the back half, the cart or the tractor inside the big door, the
@@ -386,120 +396,128 @@ public partial class MapGenUdon
     void PlanBarn()
     {
         int room = pRoom, cells = roomOuterCells[room];
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (PlaceGroup(FindGrp("hay"), room, GenData.A_WALL, Fit(4) ? RngBetween(r, 3, 4) : 2, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
-        uint[] r2 = SR(2);
-        if (Fit(1))
+        if (Ph(0))
         {
-            int cell = OpenSpot(3, WM_NEAR, dx, dz, 0, r2);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Pick(r2, "f_cart", 5, "c_tractor", cells >= 3 ? 4 : 0, "f_cartHigh", 3), cell, RngRange(r2, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+            int dx, dz;
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            int first = nEmit;
+            if (PlaceGroup(FindGrp("hay"), room, GenData.A_WALL, Fit(4) ? RngBetween(r, 3, 4) : 2, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
+            uint[] r2 = SR(2);
+            if (Fit(1))
+            {
+                int cell = OpenSpot(3, WM_NEAR, dx, dz, 0, r2);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Pick(r2, "f_cart", 5, "c_tractor", cells >= 3 ? 4 : 0, "f_cartHigh", 3), cell, RngRange(r2, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r3 = SR(3);
+            for (int k = 0; k < (cells >= 3 ? 2 : 1) && Fit(1); k++)
+            {
+                int cell = OpenSpot(2, WM_FAR, dx, dz, 0, r3);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Pick(r3, "p_cow", 5, "p_pig", 4), cell, RngRange(r3, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 500) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("hens"), room, GenData.A_OUT_OPEN, 2, 0, r4)) Keep(first, false); }
+            string[] rows = { "sacks", "buckets", "tools", "hay" };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                uint[] rk = SR(5 + k);
+                if (!RngChance(rk, k < 2 ? 700 : 450) || !Fit(2)) continue;
+                first = nEmit;
+                if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
+            }
+            uint[] r9 = SR(9);
+            if (RngChance(r9, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn("m_wheelbarrow"), WM_NEAR, dx, dz, WIN_ANY, 0, r9) >= 0) Keep(first, false); }
+            // the bench where things get mended, a rack of feed and fuel, produce in crates, timber, the farm cat
+            uint[] r10 = SR(10);
+            if (cells >= 2 && RngChance(r10, 650) && Fit(1))
+            {
+                first = nEmit;
+                int wb = WallPlace(Dn("s_workbench"), WM_ANY, 0, 0, WIN_ANY, 0, r10);
+                if (wb >= 0 && Keep(first, false) && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp("tools"), wb, 2, 0, r10)) Keep(first, false); }
+            }
+            uint[] r11 = SR(11);
+            if (RngChance(r11, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_rack"), WM_FAR, dx, dz, WIN_NEVER, 0, r11) >= 0) Keep(first, false); }
+            string[] more = { "crates", "fuel" };
+            for (int k = 0; k < more.Length; k++)
+            {
+                uint[] rk = SR(12 + k);
+                if (!RngChance(rk, k == 0 ? 650 : 400) || !Fit(2)) continue;
+                first = nEmit;
+                if (PlaceGroup(FindGrp(more[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
+            }
+            uint[] r14 = SR(14);
+            if (RngChance(r14, 500) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r14, "w_planks", 4, "w_logs", 4, "w_pallet", 3), WM_ANY, 0, 0, WIN_ANY, 0, r14) >= 0) Keep(first, false); }
+            uint[] r15 = SR(15);
+            if (RngChance(r15, 450) && Fit(1))
+            {
+                int cell = OpenSpot(1, WM_ANY, 0, 0, 0, r15);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("p_cat"), cell, RngRange(r15, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            // revision 10: the trough by the animals, a hog, tools at the wall, a lantern, a spare wheel
+            uint[] r16 = SR(16);
+            if (RngChance(r16, 650) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_trough"), WM_FAR, dx, dz, WIN_ANY, 0, r16) >= 0) Keep(first, false); }
+            uint[] r17 = SR(17);
+            if (cells >= 2 && RngChance(r17, 500) && Fit(1))
+            {
+                int cell = OpenSpot(2, WM_FAR, dx, dz, 0, r17);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("p_hog"), cell, RngRange(r17, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r18 = SR(18);
+            if (RngChance(r18, 600) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("handtools"), room, GenData.A_WALL, 2, 0, r18)) Keep(first, false); }
+            uint[] r19 = SR(19);
+            if (RngChance(r19, 450) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r19, "g_lantern", 4, "c_tractorWheel", 3), WM_ANY, 0, 0, WIN_ANY, 0, r19) >= 0) Keep(first, false); }
         }
-        uint[] r3 = SR(3);
-        for (int k = 0; k < (cells >= 3 ? 2 : 1) && Fit(1); k++)
-        {
-            int cell = OpenSpot(2, WM_FAR, dx, dz, 0, r3);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Pick(r3, "p_cow", 5, "p_pig", 4), cell, RngRange(r3, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 500) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("hens"), room, GenData.A_OUT_OPEN, 2, 0, r4)) Keep(first, false); }
-        string[] rows = { "sacks", "buckets", "tools", "hay" };
-        for (int k = 0; k < rows.Length; k++)
-        {
-            uint[] rk = SR(5 + k);
-            if (!RngChance(rk, k < 2 ? 700 : 450) || !Fit(2)) continue;
-            first = nEmit;
-            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
-        }
-        uint[] r9 = SR(9);
-        if (RngChance(r9, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn("m_wheelbarrow"), WM_NEAR, dx, dz, WIN_ANY, 0, r9) >= 0) Keep(first, false); }
-        // the bench where things get mended, a rack of feed and fuel, produce in crates, timber, the farm cat
-        uint[] r10 = SR(10);
-        if (cells >= 2 && RngChance(r10, 650) && Fit(1))
-        {
-            first = nEmit;
-            int wb = WallPlace(Dn("s_workbench"), WM_ANY, 0, 0, WIN_ANY, 0, r10);
-            if (wb >= 0 && Keep(first, false) && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp("tools"), wb, 2, 0, r10)) Keep(first, false); }
-        }
-        uint[] r11 = SR(11);
-        if (RngChance(r11, 600) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_rack"), WM_FAR, dx, dz, WIN_NEVER, 0, r11) >= 0) Keep(first, false); }
-        string[] more = { "crates", "fuel" };
-        for (int k = 0; k < more.Length; k++)
-        {
-            uint[] rk = SR(12 + k);
-            if (!RngChance(rk, k == 0 ? 650 : 400) || !Fit(2)) continue;
-            first = nEmit;
-            if (PlaceGroup(FindGrp(more[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
-        }
-        uint[] r14 = SR(14);
-        if (RngChance(r14, 500) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r14, "w_planks", 4, "w_logs", 4, "w_pallet", 3), WM_ANY, 0, 0, WIN_ANY, 0, r14) >= 0) Keep(first, false); }
-        uint[] r15 = SR(15);
-        if (RngChance(r15, 450) && Fit(1))
-        {
-            int cell = OpenSpot(1, WM_ANY, 0, 0, 0, r15);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("p_cat"), cell, RngRange(r15, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        // revision 10: the trough by the animals, a hog, tools at the wall, a lantern, a spare wheel
-        uint[] r16 = SR(16);
-        if (RngChance(r16, 650) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_trough"), WM_FAR, dx, dz, WIN_ANY, 0, r16) >= 0) Keep(first, false); }
-        uint[] r17 = SR(17);
-        if (cells >= 2 && RngChance(r17, 500) && Fit(1))
-        {
-            int cell = OpenSpot(2, WM_FAR, dx, dz, 0, r17);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("p_hog"), cell, RngRange(r17, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r18 = SR(18);
-        if (RngChance(r18, 600) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("handtools"), room, GenData.A_WALL, 2, 0, r18)) Keep(first, false); }
-        uint[] r19 = SR(19);
-        if (RngChance(r19, 450) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r19, "g_lantern", 4, "c_tractorWheel", 3), WM_ANY, 0, 0, WIN_ANY, 0, r19) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "s_workbench", "gen_rack", "w_pallet", "w_planks", "w_logs", "n_logStack", "m_wheelbarrow", "gen_trough", "g_lantern", "c_tractorWheel", "f_cart" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "s_workbench", "gen_rack", "w_pallet", "w_planks", "w_logs", "n_logStack", "m_wheelbarrow", "gen_trough", "g_lantern", "c_tractorWheel", "f_cart" })) && !PoolStep(50, new string[] { "s_workbench", "gen_rack", "w_pallet", "w_planks", "w_logs", "n_logStack", "m_wheelbarrow", "gen_trough", "g_lantern", "c_tractorWheel", "f_cart" })) PhBreak();
+}
 
     // ============================================================================================ FEED STORE
     void PlanFeedStore()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (PlaceGroup(FindGrp("sacks"), room, GenData.A_WALL, 3, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
-        string[] rows = { "hay", "barrels", "buckets", "crates" };
-        for (int k = 0; k < rows.Length; k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            if (!RngChance(rk, k < 2 ? 750 : 450) || !Fit(2)) continue;
-            first = nEmit;
-            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
+            uint[] r = SR(1);
+            int first = nEmit;
+            if (PlaceGroup(FindGrp("sacks"), room, GenData.A_WALL, 3, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
+            string[] rows = { "hay", "barrels", "buckets", "crates" };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                uint[] rk = SR(2 + k);
+                if (!RngChance(rk, k < 2 ? 750 : 450) || !Fit(2)) continue;
+                first = nEmit;
+                if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
+            }
+            uint[] r6 = SR(6);
+            if (RngChance(r6, 500) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r6, "gen_rack", 4, "w_pallet", 4), WM_ANY, 0, 0, WIN_ANY, 0, r6) >= 0) Keep(first, false); }
+            uint[] r7 = SR(7);
+            if (RngChance(r7, 400) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("fuel"), room, GenData.A_WALL, 2, 0, r7)) Keep(first, false); }
+            // revision 10: rope and the lantern, hand tools, the wheelbarrow, the farm cat
+            string[] more = { "smallTools", "handtools", "boxes" };
+            for (int k = 0; k < more.Length; k++)
+            {
+                uint[] rk = SR(8 + k);
+                if (!RngChance(rk, k == 0 ? 750 : 500) || !Fit(2)) continue;
+                first = nEmit;
+                if (PlaceGroup(FindGrp(more[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
+            }
+            uint[] r11 = SR(11);
+            if (RngChance(r11, 500) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r11, "m_wheelbarrow", 4, "gen_trough", 3), WM_ANY, 0, 0, WIN_ANY, 0, r11) >= 0) Keep(first, false); }
+            uint[] r12 = SR(12);
+            if (RngChance(r12, 400) && Fit(1))
+            {
+                int cell = OpenSpot(1, WM_ANY, 0, 0, 0, r12);
+                first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("p_cat"), cell, RngRange(r12, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
         }
-        uint[] r6 = SR(6);
-        if (RngChance(r6, 500) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r6, "gen_rack", 4, "w_pallet", 4), WM_ANY, 0, 0, WIN_ANY, 0, r6) >= 0) Keep(first, false); }
-        uint[] r7 = SR(7);
-        if (RngChance(r7, 400) && Fit(2)) { first = nEmit; if (PlaceGroup(FindGrp("fuel"), room, GenData.A_WALL, 2, 0, r7)) Keep(first, false); }
-        // revision 10: rope and the lantern, hand tools, the wheelbarrow, the farm cat
-        string[] more = { "smallTools", "handtools", "boxes" };
-        for (int k = 0; k < more.Length; k++)
-        {
-            uint[] rk = SR(8 + k);
-            if (!RngChance(rk, k == 0 ? 750 : 500) || !Fit(2)) continue;
-            first = nEmit;
-            if (PlaceGroup(FindGrp(more[k]), room, GenData.A_WALL, 2, 0, rk)) Keep(first, false);
-        }
-        uint[] r11 = SR(11);
-        if (RngChance(r11, 500) && Fit(1)) { first = nEmit; if (WallPlace(Pick(r11, "m_wheelbarrow", 4, "gen_trough", 3), WM_ANY, 0, 0, WIN_ANY, 0, r11) >= 0) Keep(first, false); }
-        uint[] r12 = SR(12);
-        if (RngChance(r12, 400) && Fit(1))
-        {
-            int cell = OpenSpot(1, WM_ANY, 0, 0, 0, r12);
-            first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("p_cat"), cell, RngRange(r12, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        FillFromPool(50, new string[] { "gen_rack", "w_pallet", "m_wheelbarrow", "gen_trough", "g_rope", "g_lantern", "dg_barrel" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "gen_rack", "w_pallet", "m_wheelbarrow", "gen_trough", "g_rope", "g_lantern", "dg_barrel" })) && !PoolStep(50, new string[] { "gen_rack", "w_pallet", "m_wheelbarrow", "gen_trough", "g_rope", "g_lantern", "dg_barrel" })) PhBreak();
+}
 
     // ============================================================================================ FORECOURT
     // In front of a shop: the sign by the door, a bench and a bin, flowers and fruit set out by the door, a trolley
@@ -572,48 +590,52 @@ public partial class MapGenUdon
     void PlanFarmyard()
     {
         int room = pRoom, dx, dz;
-        FrontMarkers(30);
-        MainDoor(room, out dx, out dz);
-        uint[] r = SR(1);
-        if (Fit(1)) { int first = nEmit; if (WallPlace(Pick(r, "c_tractor", 5, "f_cart", 4, "f_cartHigh", 3), WM_FAR, dx, dz, WIN_ANY, 0, r) >= 0) Keep(first, false); }
-        uint[] r2 = SR(2);
-        if (Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("hay"), GenData.A_BUILDING, RngBetween(r2, 2, 3), WM_ANY, 0, 0, 0, r2)) Keep(first, false); }
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 750) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("hens"), room, GenData.A_OUT_OPEN, RngBetween(r3, 2, Fit(4) ? 4 : 2), 0, r3)) Keep(first, false); }
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 600) && Fit(2))
+        if (Ph(0))
         {
-            int first = nEmit;
-            int tap = WallPlace(Dn("gen_tap"), WM_ANY, 0, 0, WIN_ANY, 0, r4);
-            if (tap >= 0 && Keep(first, false) && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp("buckets"), tap, 2, 0, r4)) Keep(first, false); }
+            FrontMarkers(30);
+            MainDoor(room, out dx, out dz);
+            uint[] r = SR(1);
+            if (Fit(1)) { int first = nEmit; if (WallPlace(Pick(r, "c_tractor", 5, "f_cart", 4, "f_cartHigh", 3), WM_FAR, dx, dz, WIN_ANY, 0, r) >= 0) Keep(first, false); }
+            uint[] r2 = SR(2);
+            if (Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("hay"), GenData.A_BUILDING, RngBetween(r2, 2, 3), WM_ANY, 0, 0, 0, r2)) Keep(first, false); }
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 750) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("hens"), room, GenData.A_OUT_OPEN, RngBetween(r3, 2, Fit(4) ? 4 : 2), 0, r3)) Keep(first, false); }
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 600) && Fit(2))
+            {
+                int first = nEmit;
+                int tap = WallPlace(Dn("gen_tap"), WM_ANY, 0, 0, WIN_ANY, 0, r4);
+                if (tap >= 0 && Keep(first, false) && Fit(2)) { first = nEmit; if (GroupBeside(FindGrp("buckets"), tap, 2, 0, r4)) Keep(first, false); }
+            }
+            uint[] r5 = SR(5);
+            if (RngChance(r5, 550) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(r5, "m_wheelbarrow", 5, "n_logStack", 4), WM_ANY, 0, 0, WIN_ANY, 0, r5) >= 0) Keep(first, false); }
+            uint[] r6 = SR(6);
+            if (RngChance(r6, 400) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("sacks"), GenData.A_BUILDING, 2, WM_NEAR, dx, dz, 0, r6)) Keep(first, false); }
+            // the farm stand at the lane: crates of produce and a bench; the farm dog; the wood pile
+            uint[] r7 = SR(7);
+            if (RngChance(r7, 650) && Fit(3))
+            {
+                int first = nEmit;
+                if (GroupAt(FindGrp("crates"), GenData.A_OUT_EDGE, 3, WM_FAR, dx, dz, 0, r7) && Keep(first, false) && Fit(1)) BenchAtEdge(8);
+            }
+            uint[] r9 = SR(9);
+            if (RngChance(r9, 600) && Fit(1))
+            {
+                int cell = OpenSpot(2, WM_NEAR, dx, dz, 0, r9);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("p_dog"), cell, RngRange(r9, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r10 = SR(10);
+            if (RngChance(r10, 450) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("logpile"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r10)) Keep(first, false); }
+            // revision 10: the farm stand, the coop, the trough, rabbits; the digger now and then
+            FarmStand(40);
+            FarmAnimals(41, true);
+            uint[] r45 = SR(45);
+            if (RngChance(r45, 300) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("c_digger"), WM_FAR, dx, dz, WIN_ANY, 0, r45) >= 0) Keep(first, false); }
         }
-        uint[] r5 = SR(5);
-        if (RngChance(r5, 550) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(r5, "m_wheelbarrow", 5, "n_logStack", 4), WM_ANY, 0, 0, WIN_ANY, 0, r5) >= 0) Keep(first, false); }
-        uint[] r6 = SR(6);
-        if (RngChance(r6, 400) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("sacks"), GenData.A_BUILDING, 2, WM_NEAR, dx, dz, 0, r6)) Keep(first, false); }
-        // the farm stand at the lane: crates of produce and a bench; the farm dog; the wood pile
-        uint[] r7 = SR(7);
-        if (RngChance(r7, 650) && Fit(3))
-        {
-            int first = nEmit;
-            if (GroupAt(FindGrp("crates"), GenData.A_OUT_EDGE, 3, WM_FAR, dx, dz, 0, r7) && Keep(first, false) && Fit(1)) BenchAtEdge(8);
-        }
-        uint[] r9 = SR(9);
-        if (RngChance(r9, 600) && Fit(1))
-        {
-            int cell = OpenSpot(2, WM_NEAR, dx, dz, 0, r9);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("p_dog"), cell, RngRange(r9, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r10 = SR(10);
-        if (RngChance(r10, 450) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("logpile"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r10)) Keep(first, false); }
-        // revision 10: the farm stand, the coop, the trough, rabbits; the digger now and then
-        FarmStand(40);
-        FarmAnimals(41, true);
-        uint[] r45 = SR(45);
-        if (RngChance(r45, 300) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("c_digger"), WM_FAR, dx, dz, WIN_ANY, 0, r45) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "f_cart", "f_cartHigh", "m_wheelbarrow", "n_logStack", "gen_tap", "k_bench", "w_pallet", "gen_coop", "gen_trough", "c_tractorWheel" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "f_cart", "f_cartHigh", "m_wheelbarrow", "n_logStack", "gen_tap", "k_bench", "w_pallet", "gen_coop", "gen_trough", "c_tractorWheel" })) && !PoolStep(50, new string[] { "f_cart", "f_cartHigh", "m_wheelbarrow", "n_logStack", "gen_tap", "k_bench", "w_pallet", "gen_coop", "gen_trough", "c_tractorWheel" })) PhBreak();
+}
 
     // ============================================================================================ FIELD
     // Ploughed ground in rows of one crop each, the rows along the field's long side; the wheelbarrow and the
@@ -655,38 +677,42 @@ public partial class MapGenUdon
     void PlanPaddock()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        // revision 10: more animals, of two kinds
-        int animals = 2 + AreaM2(room) / 16, got = 0;
-        string kind = RngChance(r, 550) ? "p_cow" : "p_pig", kind2 = RngChance(r, 500) ? "p_hog" : (kind == "p_cow" ? "p_pig" : "p_cow");
-        for (int k = 0; k < animals && Fit(1); k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, rk);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn((k & 1) == 0 ? kind : kind2), cell, RngRange(rk, 360), 0, 0, H_FREE) >= 0 && Keep(first, false)) got++;
+            uint[] r = SR(1);
+            // revision 10: more animals, of two kinds
+            int animals = 2 + AreaM2(room) / 16, got = 0;
+            string kind = RngChance(r, 550) ? "p_cow" : "p_pig", kind2 = RngChance(r, 500) ? "p_hog" : (kind == "p_cow" ? "p_pig" : "p_cow");
+            for (int k = 0; k < animals && Fit(1); k++)
+            {
+                uint[] rk = SR(2 + k);
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, rk);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn((k & 1) == 0 ? kind : kind2), cell, RngRange(rk, 360), 0, 0, H_FREE) >= 0 && Keep(first, false)) got++;
+            }
+            if (got == 0) MandFail(1);
+            uint[] r8 = SR(8);
+            if (Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("hay"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r8)) Keep(first, false); }
+            uint[] r9 = SR(9);
+            if (RngChance(r9, 650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("m_bucketWater"), WM_ANY, 0, 0, WIN_ANY, 0, r9) >= 0) Keep(first, false); }
+            uint[] r10 = SR(10);
+            if (RngChance(r10, 450) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("hens"), room, GenData.A_OUT_OPEN, 2, 0, r10)) Keep(first, false); }
+            uint[] r11 = SR(11);
+            if (RngChance(r11, 450) && Fit(1))
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r11);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("p_dog"), cell, RngRange(r11, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r12 = SR(12);
+            if (RngChance(r12, 400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, r12) >= 0) Keep(first, false); }
+            FarmAnimals(40, false);
+            int trees = TreeCount(room, r);
+            for (int t = 0; t < trees; t++) LawnTree(60 + t);
         }
-        if (got == 0) MandFail(1);
-        uint[] r8 = SR(8);
-        if (Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("hay"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r8)) Keep(first, false); }
-        uint[] r9 = SR(9);
-        if (RngChance(r9, 650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("m_bucketWater"), WM_ANY, 0, 0, WIN_ANY, 0, r9) >= 0) Keep(first, false); }
-        uint[] r10 = SR(10);
-        if (RngChance(r10, 450) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("hens"), room, GenData.A_OUT_OPEN, 2, 0, r10)) Keep(first, false); }
-        uint[] r11 = SR(11);
-        if (RngChance(r11, 450) && Fit(1))
-        {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r11);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("p_dog"), cell, RngRange(r11, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r12 = SR(12);
-        if (RngChance(r12, 400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, r12) >= 0) Keep(first, false); }
-        FarmAnimals(40, false);
-        int trees = TreeCount(room, r);
-        for (int t = 0; t < trees; t++) LawnTree(60 + t);
-        FillFromPool(50, new string[] { "n_stump", "f_cart", "m_wheelbarrow", "gen_trough", "gen_coop", "n_logStack", "n_bushLarge" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "n_stump", "f_cart", "m_wheelbarrow", "gen_trough", "gen_coop", "n_logStack", "n_bushLarge" })) && !PoolStep(50, new string[] { "n_stump", "f_cart", "m_wheelbarrow", "gen_trough", "gen_coop", "n_logStack", "n_bushLarge" })) PhBreak();
+}
 
     // ============================================================================================ PARK
     // A small public garden off the lane: a fountain in the middle of a big one, gravel paths from it to the
@@ -695,119 +721,124 @@ public partial class MapGenUdon
     void PlanPark()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int mx = RoomMidX(room), mz = RoomMidZ(room);
-        int fountain = -1;
-        if (AreaM2(room) >= 40 && Fit(1)) fountain = CentrePiece(Dn(RngChance(r, 550) ? "f_fountain" : "f_fountainSq"), 0, false, 1, 0, WM_NEAR, mx, mz, 0, 0, r);
-        int fx = fountain >= 0 ? emitX[fountain] : mx, fz = fountain >= 0 ? emitZ[fountain] : mz;
-        // the gravel path, 1 m wide: across the lawn from the lane to the areas behind it (revision 10: no longer
-        // along it too, which cut the 4 m strip into pieces too small for anything but benches)
-        int cx = FloorDiv(fx, GenData.INNER_MM), cz = FloorDiv(fz, GenData.INNER_MM);
-        for (int d = 0; d < 4; d++)
-            for (int s = 0; s < 40 && (((d & 1) == 1) != (RoomLongAxis(room) == 0)); s++)
-            {
-                bool stop = false;
-                for (int w = 0; w < 2; w++)
+        if (Ph(0))
+        {
+            uint[] r = SR(1);
+            int mx = RoomMidX(room), mz = RoomMidZ(room);
+            int fountain = -1;
+            if (AreaM2(room) >= 40 && Fit(1)) fountain = CentrePiece(Dn(RngChance(r, 550) ? "f_fountain" : "f_fountainSq"), 0, false, 1, 0, WM_NEAR, mx, mz, 0, 0, r);
+            int fx = fountain >= 0 ? emitX[fountain] : mx, fz = fountain >= 0 ? emitZ[fountain] : mz;
+            // the gravel path, 1 m wide: across the lawn from the lane to the areas behind it (revision 10: no longer
+            // along it too, which cut the 4 m strip into pieces too small for anything but benches)
+            int cx = FloorDiv(fx, GenData.INNER_MM), cz = FloorDiv(fz, GenData.INNER_MM);
+            for (int d = 0; d < 4; d++)
+                for (int s = 0; s < 40 && (((d & 1) == 1) != (RoomLongAxis(room) == 0)); s++)
                 {
-                    int x = cx + DX[d] * s + ((d & 1) == 0 ? w : 0), z = cz + DZ[d] * s + ((d & 1) == 1 ? w : 0);
-                    if (x < 0 || z < 0 || x >= IW || z >= IH || innerRoom[z * IW + x] != room) { stop = true; continue; }
-                    int i = z * IW + x;
-                    if (occ[i] != 0 || solid[i] > 0) continue;   // round the fountain
-                    tags[i] |= GenData.T_PATH;
+                    bool stop = false;
+                    for (int w = 0; w < 2; w++)
+                    {
+                        int x = cx + DX[d] * s + ((d & 1) == 0 ? w : 0), z = cz + DZ[d] * s + ((d & 1) == 1 ? w : 0);
+                        if (x < 0 || z < 0 || x >= IW || z >= IH || innerRoom[z * IW + x] != room) { stop = true; continue; }
+                        int i = z * IW + x;
+                        if (occ[i] != 0 || solid[i] > 0) continue;   // round the fountain
+                        tags[i] |= GenData.T_PATH;
+                    }
+                    if (stop) break;
                 }
-                if (stop) break;
-            }
-        RoomWalkable(room);
-        uint[] r3 = SR(3);
-        for (int k = 0; k < 1 + AreaM2(room) / 50 && Fit(1); k++)
-        {
-            int cell = OpenSpot(1, WM_NEAR, fx, fz, GenData.T_PATH, r3);
-            if (cell < 0) break;
-            // the lamp beside the path, not on it
-            int lx = cell % IW, lz = cell / IW, best = -1;
-            for (int d = 0; d < 4 && best < 0; d++)
+            RoomWalkable(room);
+            uint[] r3 = SR(3);
+            for (int k = 0; k < 1 + AreaM2(room) / 50 && Fit(1); k++)
             {
-                int x = lx + DX[d], z = lz + DZ[d];
-                if (x >= 0 && z >= 0 && x < IW && z < IH && innerRoom[z * IW + x] == room && (tags[z * IW + x] & GenData.T_PATH) == 0 && occ[z * IW + x] == 0) best = z * IW + x;
+                int cell = OpenSpot(1, WM_NEAR, fx, fz, GenData.T_PATH, r3);
+                if (cell < 0) break;
+                // the lamp beside the path, not on it
+                int lx = cell % IW, lz = cell / IW, best = -1;
+                for (int d = 0; d < 4 && best < 0; d++)
+                {
+                    int x = lx + DX[d], z = lz + DZ[d];
+                    if (x >= 0 && z >= 0 && x < IW && z < IH && innerRoom[z * IW + x] == room && (tags[z * IW + x] & GenData.T_PATH) == 0 && occ[z * IW + x] == 0) best = z * IW + x;
+                }
+                int first = nEmit;
+                if (best >= 0 && FreePlace(Dn("f_lamp"), best, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
             }
-            int first = nEmit;
-            if (best >= 0 && FreePlace(Dn("f_lamp"), best, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+            int trees = TreeCount(room, r);
+            for (int t = 0; t < trees; t++) LawnTree(60 + t);
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 500) && Fit(1))
+            {
+                int cell = OpenSpot(3, WM_FAR, fx, fz, 0, r4);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r5 = SR(5);
+            if (RngChance(r5, 700) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_trashcan"), WM_NEAR, fx, fz, WIN_ANY, 0, r5) >= 0) Keep(first, false); }
+            // statues on the grass beside the paths, turned to them; planters and pots at the fence
+            uint[] r6 = SR(6);
+            string[] statues = { "n_statueHead", "n_obelisk", "n_column", "n_statueRing", "n_statueBlock", "n_columnBroken" };
+            int s0 = RngRange(r6, statues.Length);
+            for (int k = 0; k < 3 + AreaM2(room) / 60 && Fit(1); k++)
+            {
+                int cell = OpenSpot(1, WM_FAR, fx, fz, 0, r6);
+                if (cell < 0) break;
+                int first = nEmit, yaw = (int)(System.Math.Atan2(fx - (cell % IW * GenData.INNER_MM + 250), fz - (cell / IW * GenData.INNER_MM + 250)) * 180 / System.Math.PI);
+                if (FreePlace(Dn(statues[(s0 + k) % statues.Length]), cell, (yaw + 360) % 360, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r7 = SR(7);
+            if (RngChance(r7, 700) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("pots"), GenData.A_OUT_EDGE, RngBetween(r7, 2, 3), WM_ANY, 0, 0, 0, r7)) Keep(first, false); }
+            for (int k = 0; k < 1 + AreaM2(room) / 50; k++) BenchAtEdge(10 + k);
+            // revision 10: shrubs along the fence, flower beds on the grass, the park's own bench and bin
+            uint[] r8 = SR(8);
+            if (Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("shrubs"), GenData.A_OUT_EDGE, RngBetween(r8, 2, 3), WM_ANY, 0, 0, 0, r8)) Keep(first, false); }
+            uint[] r9 = SR(9);
+            for (int k = 0; k < 2 && Fit(1); k++)
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r9);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, RngRange(r9, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r20 = SR(20);
+            if (Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_bench"), WM_ANY, 0, 0, WIN_ANY, 0, r20) >= 0) Keep(first, false); }
+            uint[] r21 = SR(21);
+            if (RngChance(r21, 600) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_trash"), WM_ANY, 0, 0, WIN_ANY, 0, r21) >= 0) Keep(first, false); }
+            // revision 10: the information kiosk by the way in from the lane, a clipped hedge along the fence, a picnic
+            // spot (a table with its chairs and what was brought, from the slots)
+            uint[] r22 = SR(22);
+            if (RngChance(r22, 600) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_info"), WM_ANY, 0, 0, WIN_ANY, 0, r22) >= 0) Keep(first, false); }
+            uint[] r25 = SR(25);
+            if (RngChance(r25, 450) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(r25, "ck_drinks", 5, "ck_food", 4), WM_ANY, 0, 0, WIN_ANY, 0, r25) >= 0) Keep(first, false); }
+            // revision 11: a curved hedge in a corner, a dog out for a walk, a bench of the other kind, a vending machine
+            uint[] r26 = SR(26);
+            if (RngChance(r26, 600) && Fit(1)) { int first = nEmit; if (CornerPlace(Dn("f_hedgeCurve"), WM_ANY, 0, 0, false, 0, r26) >= 0) Keep(first, false); }
+            uint[] r27 = SR(27);
+            if (RngChance(r27, 550) && Fit(1))
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, GenData.T_PATH, r27);
+                if (cell < 0) cell = OpenSpot(2, WM_ANY, 0, 0, 0, r27);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("p_dog"), cell, RngRange(r27, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            uint[] r28 = SR(28);
+            if (RngChance(r28, 400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ma_vending"), WM_ANY, 0, 0, WIN_ANY, 0, r28) >= 0) Keep(first, false); }
+            uint[] r23 = SR(23);
+            if (RngChance(r23, 700) && Fit(2))
+            {
+                int first = nEmit;
+                FSet(Dn("f_hedge"), Dn("f_hedge"));
+                if (FormAt(GenData.GL_ROW, 0, GenData.A_OUT_EDGE, WM_ANY, 0, 0, 0, r23) >= 0) Keep(first, false);
+            }
+            uint[] r24 = SR(24);
+            if (Fit(2))
+            {
+                int cell = OpenSpot(3, WM_FAR, fx, fz, 0, r24);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn(RngChance(r24, 500) ? "r_table" : "r_tableRound"), cell, RngRange(r24, 2) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
+            }
+            ClearBans();
+            Borders(30, 6, true);
         }
-        int trees = TreeCount(room, r);
-        for (int t = 0; t < trees; t++) LawnTree(60 + t);
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 500) && Fit(1))
-        {
-            int cell = OpenSpot(3, WM_FAR, fx, fz, 0, r4);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r5 = SR(5);
-        if (RngChance(r5, 700) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_trashcan"), WM_NEAR, fx, fz, WIN_ANY, 0, r5) >= 0) Keep(first, false); }
-        // statues on the grass beside the paths, turned to them; planters and pots at the fence
-        uint[] r6 = SR(6);
-        string[] statues = { "n_statueHead", "n_obelisk", "n_column", "n_statueRing", "n_statueBlock", "n_columnBroken" };
-        int s0 = RngRange(r6, statues.Length);
-        for (int k = 0; k < 3 + AreaM2(room) / 60 && Fit(1); k++)
-        {
-            int cell = OpenSpot(1, WM_FAR, fx, fz, 0, r6);
-            if (cell < 0) break;
-            int first = nEmit, yaw = (int)(System.Math.Atan2(fx - (cell % IW * GenData.INNER_MM + 250), fz - (cell / IW * GenData.INNER_MM + 250)) * 180 / System.Math.PI);
-            if (FreePlace(Dn(statues[(s0 + k) % statues.Length]), cell, (yaw + 360) % 360, 1, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r7 = SR(7);
-        if (RngChance(r7, 700) && Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("pots"), GenData.A_OUT_EDGE, RngBetween(r7, 2, 3), WM_ANY, 0, 0, 0, r7)) Keep(first, false); }
-        for (int k = 0; k < 1 + AreaM2(room) / 50; k++) BenchAtEdge(10 + k);
-        // revision 10: shrubs along the fence, flower beds on the grass, the park's own bench and bin
-        uint[] r8 = SR(8);
-        if (Fit(2)) { int first = nEmit; if (GroupAt(FindGrp("shrubs"), GenData.A_OUT_EDGE, RngBetween(r8, 2, 3), WM_ANY, 0, 0, 0, r8)) Keep(first, false); }
-        uint[] r9 = SR(9);
-        for (int k = 0; k < 2 && Fit(1); k++)
-        {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r9);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, RngRange(r9, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r20 = SR(20);
-        if (Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_bench"), WM_ANY, 0, 0, WIN_ANY, 0, r20) >= 0) Keep(first, false); }
-        uint[] r21 = SR(21);
-        if (RngChance(r21, 600) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_trash"), WM_ANY, 0, 0, WIN_ANY, 0, r21) >= 0) Keep(first, false); }
-        // revision 10: the information kiosk by the way in from the lane, a clipped hedge along the fence, a picnic
-        // spot (a table with its chairs and what was brought, from the slots)
-        uint[] r22 = SR(22);
-        if (RngChance(r22, 600) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_info"), WM_ANY, 0, 0, WIN_ANY, 0, r22) >= 0) Keep(first, false); }
-        uint[] r25 = SR(25);
-        if (RngChance(r25, 450) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(r25, "ck_drinks", 5, "ck_food", 4), WM_ANY, 0, 0, WIN_ANY, 0, r25) >= 0) Keep(first, false); }
-        // revision 11: a curved hedge in a corner, a dog out for a walk, a bench of the other kind, a vending machine
-        uint[] r26 = SR(26);
-        if (RngChance(r26, 600) && Fit(1)) { int first = nEmit; if (CornerPlace(Dn("f_hedgeCurve"), WM_ANY, 0, 0, false, 0, r26) >= 0) Keep(first, false); }
-        uint[] r27 = SR(27);
-        if (RngChance(r27, 550) && Fit(1))
-        {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, GenData.T_PATH, r27);
-            if (cell < 0) cell = OpenSpot(2, WM_ANY, 0, 0, 0, r27);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("p_dog"), cell, RngRange(r27, 360), 0, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        uint[] r28 = SR(28);
-        if (RngChance(r28, 400) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ma_vending"), WM_ANY, 0, 0, WIN_ANY, 0, r28) >= 0) Keep(first, false); }
-        uint[] r23 = SR(23);
-        if (RngChance(r23, 700) && Fit(2))
-        {
-            int first = nEmit;
-            FSet(Dn("f_hedge"), Dn("f_hedge"));
-            if (FormAt(GenData.GL_ROW, 0, GenData.A_OUT_EDGE, WM_ANY, 0, 0, 0, r23) >= 0) Keep(first, false);
-        }
-        uint[] r24 = SR(24);
-        if (Fit(2))
-        {
-            int cell = OpenSpot(3, WM_FAR, fx, fz, 0, r24);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn(RngChance(r24, 500) ? "r_table" : "r_tableRound"), cell, RngRange(r24, 2) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
-        }
-        ClearBans();
-        Borders(30, 6, true);
-        FillFromPool(50, new string[] { "ck_bench", "k_benchCushion", "n_planter", "ck_trash", "f_lamp", "n_bushDetailed", "n_bushLarge", "f_hedge", "ck_flowers", "n_statueBlock",
-            "n_obelisk", "n_column", "ck_info", "r_tableRound", "f_hedgeCurve", "hk_bench", "hk_lantern", "n_statueRing", "n_columnBroken" });
-    }
+        // the pool a piece a step (Cor: build freezes)
+        if (PhLoop(1, PoolLen(new string[] { "ck_bench", "k_benchCushion", "n_planter", "ck_trash", "f_lamp", "n_bushDetailed", "n_bushLarge", "f_hedge", "ck_flowers", "n_statueBlock",
+            "n_obelisk", "n_column", "ck_info", "r_tableRound", "f_hedgeCurve", "hk_bench", "hk_lantern", "n_statueRing", "n_columnBroken" })) && !PoolStep(50, new string[] { "ck_bench", "k_benchCushion", "n_planter", "ck_trash", "f_lamp", "n_bushDetailed", "n_bushLarge", "f_hedge", "ck_flowers", "n_statueBlock",
+            "n_obelisk", "n_column", "ck_info", "r_tableRound", "f_hedgeCurve", "hk_bench", "hk_lantern", "n_statueRing", "n_columnBroken" })) PhBreak();
+}
 }
