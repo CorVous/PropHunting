@@ -1,0 +1,69 @@
+using TMPro;
+using UdonSharp;
+using UnityEngine;
+using VRC.SDKBase;
+
+// Debug: generate a fresh map with a random seed (the panel's size and props settings) and walk around it, outside
+// any round. Only the presser's client builds it and only they are teleported there; nothing is synced. Use VRChat's
+// Respawn to come back to the lobby. A real round's START rebuilds its own map as usual.
+[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
+public class PHExplore : UdonSharpBehaviour
+{
+    public PHGame game;
+    public TextMeshProUGUI label;
+    public AudioSource sfx;
+    public AudioClip select, error, done;
+
+    bool generating;
+
+    public void Press()
+    {
+        MapBuilderUdon builder = game.builder;
+        if (generating || game.phase != PHGame.PH_LOBBY || builder.busy)
+        {
+            if (sfx != null && error != null) sfx.PlayOneShot(error);
+            return;
+        }
+        if (sfx != null && select != null) sfx.PlayOneShot(select);
+        generating = true;
+        builder.Clear();
+        uint seed = (uint)Random.Range(1, int.MaxValue);
+        game.gen.Begin(seed, game.RoundSize(), game.densityChoice, 0);
+        label.text = "GENERATING...";
+    }
+
+    void Update()
+    {
+        if (!generating) return;
+        if (game.phase != PHGame.PH_LOBBY) { generating = false; label.text = "EXPLORE A NEW MAP"; return; }   // a round took over
+        MapBuilderUdon builder = game.builder;
+        MapGenUdon gen = game.gen;
+        if (!builder.busy && !builder.built)
+        {
+            float t0 = Time.realtimeSinceStartup;
+            bool finished = false;
+            while (!finished && Time.realtimeSinceStartup - t0 < 0.006f) finished = gen.Step();
+            if (finished)
+            {
+                if (gen.failed) { generating = false; label.text = "FAILED, TRY AGAIN"; return; }
+                builder.BeginBuild();
+                label.text = "BUILDING...";
+            }
+        }
+        else if (builder.built)
+        {
+            generating = false;
+            builder.ShowRoofs(true);
+            if (game.local != null && game.local.doors != null) game.local.doors.ListDoors();   // openable props
+            Vector3 at = builder.ReleasePoint();
+            if (gen.nSpawns > 0)
+            {
+                int c = gen.spawnCell[Random.Range(0, gen.nSpawns)];
+                at = new Vector3((c % gen.IW + 0.5f) * 0.5f, 0f, (c / gen.IW + 0.5f) * 0.5f);
+            }
+            Networking.LocalPlayer.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, Random.Range(0, 24) * 15f, 0f));
+            if (sfx != null && done != null) sfx.PlayOneShot(done);
+            label.text = "EXPLORE A NEW MAP";
+        }
+    }
+}

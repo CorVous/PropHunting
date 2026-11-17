@@ -189,6 +189,7 @@ public static class WorldSceneBuilder
         // design (LobbyBuilder). Everyone can read it; only the host's presses count (PHPanel and PHGame check).
         // A world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR.
         LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 0.9f + 1.68f, RoomD / 2 - 0.12f));   // 7.2 x 3.36 m, bottom 0.9 m up
+        LobbyBuilder.BuildExplore(lobby.transform, game, new Vector3(-5.9f, 1.4f, RoomD / 2 - 0.12f));   // debug: explore a new map
         // the last round's results, a score pad on the west wall
         LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
         local.panelUiText = null; local.resultsText = null;

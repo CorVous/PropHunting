@@ -292,6 +292,29 @@ public static class LobbyBuilder
         return panel;
     }
 
+    // Debug: a small sign beside the panel that builds a fresh random map for the presser and takes them there (PHExplore)
+    public static PHExplore BuildExplore(Transform lobby, PHGame game, Vector3 localPos)
+    {
+        var cv = Canvas(lobby, "ExploreDebug", localPos, Quaternion.identity, new Vector2(300f, 130f), 0.006f, true);
+        var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
+        Txt(cv, "Label", new Vector2(0, 42), new Vector2(280, 24), "DEBUG", future, 14, C("e1cfa5"), TextAlignmentOptions.Center);
+        var bimg = Img(cv, "Button", new Vector2(0, -12), new Vector2(270, 64), sRound, new Color(1f, 1f, 1f, 0.01f), 3f);
+        bimg.raycastTarget = true;
+        var bt = bimg.gameObject.AddComponent<Button>();
+        var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = bimg;
+        Img(bimg.transform, "Face", Vector2.zero, new Vector2(270, 64), sTile, C("9bd18a"), 2f);
+        var ex = cv.gameObject.AddUdonSharpComponent<PHExplore>();
+        ex.game = game;
+        ex.label = Txt(bimg.transform, "Text", new Vector2(0, 3), new Vector2(256, 40), "EXPLORE A NEW MAP", future, 16, C("1e190f"), TextAlignmentOptions.Center);
+        var src = cv.gameObject.AddComponent<AudioSource>();
+        src.spatialBlend = 1f; src.rolloffMode = AudioRolloffMode.Linear; src.minDistance = 2f; src.maxDistance = 15f; src.playOnAwake = false; src.volume = 0.7f;
+        ex.sfx = src; ex.select = Clip("select_003"); ex.error = Clip("error_004"); ex.done = Clip("jingles_NES03");
+        UdonSharpEditorUtility.CopyProxyToUdon(ex);
+        var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(ex);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, udon.SendCustomEvent, nameof(PHExplore.Press));
+        return ex;
+    }
+
     static AudioClip Clip(string n) { return AssetDatabase.LoadAssetAtPath<AudioClip>(Root + "Audio/" + n + ".ogg"); }
 
     static PHPanelTile AddTile(GameObject go, Button b, int index)
