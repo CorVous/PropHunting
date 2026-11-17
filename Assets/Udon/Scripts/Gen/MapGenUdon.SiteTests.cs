@@ -221,14 +221,15 @@ public partial class MapGenUdon
     // a path from an outdoor cell to the lane over open edges, never through a building
     bool PathToLane(int start)
     {
-        if (start < 0) return false;
+        if (start < 0 || start >= W * H) return false;
+        if (stMark == null || stMark.Length < W * H) stMark = new int[W * H];
         for (int c = 0; c < W * H; c++) stMark[c] = 0;
         int qh = 0, qt = 0;
         stMark[start] = 1; queue[qt++] = start;
         while (qh < qt)
         {
             int c = queue[qh++];
-            if (roomType[cellRoom[c]] == GenData.R_LANE) return true;
+            if (cellRoom[c] >= 0 && roomType[cellRoom[c]] == GenData.R_LANE) return true;
             for (int d = 0; d < 4; d++)
             {
                 int nx = c % W + DX[d], nz = c / W + DZ[d];

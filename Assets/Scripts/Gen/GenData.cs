@@ -5,13 +5,13 @@
 public static class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 8;
+    public const int GEN_VERSION = 9;   // 9: site shapes (bend, T, cul-de-sac)
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
     // Layout 2 (generator 5): plots along a lane, buildings from the plan library, a wood (MapGenSite.cs, G32).
     // Layout 3 (generator 6): the same, at the smaller sizes of G36 "B" (no front garden at S, fewer and smaller plots).
-    public const int LAYOUT_VERSION = 3;
+    public const int LAYOUT_VERSION = 4;
 
     public const int CELL_MM = 4000;      // outer cell
     public const int INNER_MM = 500;      // inner cell

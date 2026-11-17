@@ -106,18 +106,87 @@ public partial class MapGenUdon
     // plot-local cell (u along the lane, v away from it) on the canvas
     void PlotXY(int k, int u, int v, out int x, out int y)
     {
-        y = plotY0[k] + u;
-        x = plotSide[k] < 0 ? CO - 1 - v : CO + 1 + v;
+        int cy = plotY0[k] + u;
+        int cx = plotSide[k] < 0 ? CO - 1 - v : CO + 1 + v;
+        Canon(plotSeg[k], cx, cy, out x, out y);
     }
 
-    // a plan direction (0 back, 1 right, 2 front, 3 left) on the canvas: +u is +y (direction 0)
+    // a plan direction (0 back, 1 right, 2 front, 3 left) on the canvas: +u is +y (direction 0) in the plot's
+    // segment, turned with the segment
     int PlotDir(int k, int planDir)
     {
-        int front = plotSide[k] < 0 ? 1 : 3;
-        if (planDir == 2) return front;
-        if (planDir == 0) return (front + 2) & 3;
-        bool plus = (planDir == 1) != (plotMir[k] != 0);
-        return plus ? 0 : 2;
+        int front = plotSide[k] < 0 ? 1 : 3, d;
+        if (planDir == 2) d = front;
+        else if (planDir == 0) d = (front + 2) & 3;
+        else d = ((planDir == 1) != (plotMir[k] != 0)) ? 0 : 2;
+        return (d + laneRot[plotSeg[k]]) & 3;
+    }
+
+    // ---- site shapes and lane segments
+    public const int SHAPE_STRAIGHT = 0, SHAPE_BEND = 1, SHAPE_T = 2, SHAPE_CUL = 3;
+    public int siteShape;
+    public int forceShape = -1;
+    int nLane, laneEnd0;
+    int[] laneOX = new int[3], laneOY = new int[3], laneRot = new int[3], laneLen = new int[3];
+    public int[] plotSeg = new int[16];
+
+    // a canonical cell (lane along +y at x = CO from y = 0) of segment s on the canvas: turned laneRot[s] quarter
+    // turns clockwise about the segment's origin
+    void Canon(int s, int cx, int cy, out int x, out int y)
+    {
+        int rx = cx - CO, ry = cy;
+        for (int r = 0; r < laneRot[s]; r++) { int t = rx; rx = ry; ry = -t; }
+        x = laneOX[s] + rx; y = laneOY[s] + ry;
+    }
+
+    // a canonical direction of segment s on the canvas
+    int LaneDir(int s, int d) { return (d + laneRot[s]) & 3; }
+
+    // the lane of a segment runs to the far end of its longer row of plots
+    void FinishSegment(int s, int offL, int offR, int lastL, int lastR)
+    {
+        // the last plot on each side keeps a side yard: no building at the edge of the site
+        if (lastL >= 0 && plotSR[lastL] == 0) { plotSR[lastL] = 1; plotAlong[lastL]++; offL++; }
+        if (lastR >= 0 && plotSR[lastR] == 0) { plotSR[lastR] = 1; plotAlong[lastR]++; offR++; }
+        laneLen[s] = offL > offR ? offL : offR;
+        if (laneLen[s] < 2) laneLen[s] = 2;
+    }
+
+    // a segment after a corner: the side that faces back down the first lane starts past that lane's plots
+    void StartSegment(int s, int dmax0L, int dmax0R, out int offL, out int offR)
+    {
+        offL = 1; offR = 1;
+        int lx, ly, rx, ry;
+        Canon(s, CO - 1, 1, out lx, out ly);
+        Canon(s, CO + 1, 1, out rx, out ry);
+        // a side whose cells lie below the corner (toward the release) is the inner side
+        int inner = dmax0L > dmax0R ? dmax0L : dmax0R;
+        if (ly < laneOY[s]) offL = inner + 1;
+        if (ry < laneOY[s]) offR = inner + 1;
+    }
+
+    // every cell of the plot on the canvas and free
+    bool PlotFits(int k)
+    {
+        for (int u = 0; u < plotAlong[k]; u++)
+            for (int v = 0; v < plotDepth[k]; v++)
+            {
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                if (x < 1 || y < 0 || x >= CV - 1 || y >= CV - 1) return false;
+                for (int q = 0; q < k; q++)
+                {
+                    // no two plots overlap
+                    for (int u2 = 0; u2 < plotAlong[q]; u2++)
+                        for (int v2 = 0; v2 < plotDepth[q]; v2++)
+                        {
+                            int x2, y2;
+                            PlotXY(q, u2, v2, out x2, out y2);
+                            if (x2 == x && y2 == y) return false;
+                        }
+                }
+            }
+        return true;
     }
 
     // a plan cell (x along its front, y back from it) as plot-local u and v
@@ -173,13 +242,56 @@ public partial class MapGenUdon
             for (int i = 0; i < nk; i++) kinds[i] = cand[i];
         }
 
-        // (2) each plot: its plan, which side of the lane, its setback, side yards and back garden
+        // (2) the shape of the site (Cor: maps should not all look alike): a straight lane, a lane with a bend, a T at
+        // its end, or a cul-de-sac with a plot across its end. Each lane piece is a segment with its own frame; the
+        // plots of a segment are laid out in the canonical frame and turned onto the canvas (Canon).
+        siteShape = SHAPE_STRAIGHT;
+        int shapeRoll = RngRange(rng, 100);
+        if (nk >= 3 && shapeRoll < 22) siteShape = SHAPE_T;
+        else if (nk >= 2 && shapeRoll < 55) siteShape = SHAPE_BEND;
+        else if (nk >= 2 && shapeRoll < 75) siteShape = SHAPE_CUL;
+        if (forceShape >= 0) siteShape = forceShape;   // test aid
+        int bendDir = RngChance(rng, 500) ? 1 : 3;
+        // which plots go on which segment
+        int n0 = nk;
+        if (siteShape == SHAPE_BEND) n0 = (nk + 1) / 2;
+        else if (siteShape == SHAPE_T) n0 = nk - 2 * ((nk - 1) / 2) > 0 ? nk - 2 * ((nk - 1) / 2) : 1;
+        else if (siteShape == SHAPE_CUL) n0 = nk - 1;
+        nLane = 1; laneOX[0] = CO; laneOY[0] = 0; laneRot[0] = 0;
         int offL = 1, offR = 1;
         bool touchL = false, touchR = false;
         int lastL = -1, lastR = -1;
+        int seg = 0;
+        int dmax0L = 0, dmax0R = 0;
         for (int i = 0; i < nk; i++)
         {
+            if (i == n0 && siteShape != SHAPE_STRAIGHT)
+            {
+                // seg 0 is done: its lane ends where the next segment (or the cul-de-sac) begins
+                FinishSegment(0, offL, offR, lastL, lastR);
+                laneEnd0 = laneLen[0];
+                for (int q = 0; q < nPlots; q++)
+                {
+                    if (plotSide[q] < 0) { if (plotDepth[q] > dmax0L) dmax0L = plotDepth[q]; }
+                    else if (plotDepth[q] > dmax0R) dmax0R = plotDepth[q];
+                }
+                seg = 1;
+                if (siteShape == SHAPE_CUL) { laneRot[1] = 1; laneOX[1] = CO; laneOY[1] = laneEnd0; }
+                else { laneRot[1] = siteShape == SHAPE_T ? 1 : bendDir; laneOX[1] = CO; laneOY[1] = laneEnd0; }
+                nLane = 2;
+                StartSegment(1, dmax0L, dmax0R, out offL, out offR);
+                touchL = false; touchR = false; lastL = -1; lastR = -1;
+            }
+            if (siteShape == SHAPE_T && seg == 1 && i == n0 + (nk - n0) / 2)
+            {
+                FinishSegment(1, offL, offR, lastL, lastR);
+                seg = 2; nLane = 3;
+                laneRot[2] = 3; laneOX[2] = CO; laneOY[2] = laneEnd0;
+                StartSegment(2, dmax0L, dmax0R, out offL, out offR);
+                touchL = false; touchR = false; lastL = -1; lastR = -1;
+            }
             int k = nPlots;
+            plotSeg[k] = seg;
             int p = PickPlan(kinds[i], rng);
             if (p < 0) continue;
             // evolution step 3: one plot's building takes another plan of its kind (the main draw stays as it was,
@@ -196,6 +308,7 @@ public partial class MapGenUdon
             nPlots++;
             plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = RngChance(rng, 500) ? 1 : 0;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (RngChance(rng, 500) ? -1 : 1));
+            if (siteShape == SHAPE_CUL && seg == 1) side = -1;   // the cul-de-sac's plot lies across the lane's end
             plotSide[k] = side;
             int w = PlW(p), d = PlD(p);
             // front garden 1 cell (2 now and then on L and XL), back garden 1 or 2 cells deep (2 or 3 on L and XL)
@@ -208,7 +321,7 @@ public partial class MapGenUdon
             if (bd == 1 || bd == 3) { if ((bd == 1) != (plotMir[k] != 0)) plotSR[k] = 1; else plotSL[k] = 1; }
             // a building never touches the map's edge or its neighbour's building (report 16, T3, T12)
             int off = side < 0 ? offL : offR, prev = side < 0 ? lastL : lastR;
-            if (off == 1 || (side < 0 ? touchL : touchR)) plotSL[k] = 1;
+            if (off == 1 || (side < 0 ? touchL : touchR) || (seg > 0 && prev < 0)) plotSL[k] = 1;
             if (prev >= 0)
             {
                 // nor stands beside the open end of a shallower neighbour: this plot's side yard, or a deeper garden
@@ -224,16 +337,49 @@ public partial class MapGenUdon
             else { offR += plotAlong[k]; touchR = plotSR[k] == 0; lastR = k; }
         }
         if (nPlots == 0) return false;
-        // the last plot on each side keeps a side yard toward the wood at the lane's end
-        if (lastL >= 0 && plotSR[lastL] == 0) { plotSR[lastL] = 1; plotAlong[lastL]++; offL++; }
-        if (lastR >= 0 && plotSR[lastR] == 0) { plotSR[lastR] = 1; plotAlong[lastR]++; offR++; }
+        if (siteShape == SHAPE_STRAIGHT)
+        {
+            // the last plot on each side keeps a side yard toward the wood at the lane's end
+            if (lastL >= 0 && plotSR[lastL] == 0) { plotSR[lastL] = 1; plotAlong[lastL]++; offL++; }
+            if (lastR >= 0 && plotSR[lastR] == 0) { plotSR[lastR] = 1; plotAlong[lastR]++; offR++; }
+            laneLen[0] = offL > offR ? offL : offR;
+        }
+        else if (siteShape == SHAPE_CUL)
+        {
+            // the plot across the end: centred on the lane, its front to the lane's last cell
+            int ek = nPlots - 1;
+            if (plotSR[ek] == 0) { plotSR[ek] = 1; plotAlong[ek]++; }
+            plotY0[ek] = 0;
+            laneOX[1] = CO - plotAlong[ek] / 2;
+            laneOY[1] = laneEnd0;
+            laneLen[1] = 0;
+        }
+        else FinishSegment(seg, offL, offR, lastL, lastR);
+        for (int k = 0; k < nPlots; k++)
+            if (!PlotFits(k)) return false;
         for (int k = 0; k < nPlots; k++) StampPlot(k, rng);
 
-        // (3) the lane, from the release to the far end of the longer row of plots
-        laneEnd = offL > offR ? offL : offR;
+        // (3) the lanes: from the release, then each further segment from the corner
+        laneEnd = laneLen[0];
         siteInstLane = NewInst(GenData.Z_LAWN);
         siteType[siteInstLane * 26] = GenData.R_LANE; sitePlace[siteInstLane * 26] = PL_LANE;
-        for (int y = 1; y < laneEnd; y++) Put(CO, y, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+        int laneTo = siteShape == SHAPE_STRAIGHT ? laneEnd : laneEnd + 1;   // a bent lane includes its corner cell
+        for (int y = 1; y < laneTo; y++) Put(CO, y, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+        // a cul-de-sac's turning head: the lane widens along the whole front of the plot across its end
+        if (siteShape == SHAPE_CUL)
+        {
+            int ek = nPlots - 1;
+            for (int x = laneOX[1]; x < laneOX[1] + plotAlong[ek]; x++)
+                if (x != CO && Free(x, laneEnd)) Put(x, laneEnd, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+        }
+        for (int s = 1; s < nLane; s++)
+            for (int y = 1; y < laneLen[s]; y++)
+            {
+                int x, yy;
+                Canon(s, CO, y, out x, out yy);
+                if (!Free(x, yy)) return false;
+                Put(x, yy, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+            }
         Sd(CO, 0, 0, SD_OPEN);
 
         // (4) the wood
@@ -403,7 +549,38 @@ public partial class MapGenUdon
         if (need < SizeWoodMin[size]) need = SizeWoodMin[size];
         // the box the wood may take: as wide as the plots and two cells more, up to three rows past the lane's end
         int bx0 = CO - dmaxL - 2, bx1 = CO + dmaxR + 2, by0 = 1, by1 = laneEnd + 2;
-        Put(CO, laneEnd, GenData.Z_FOREST, wi, -1, PL_WOOD, -1);
+        int sx = CO, sy = laneEnd, intoDir = 0, intoX = CO, intoY = laneEnd - 1;
+        if (siteShape != SHAPE_STRAIGHT)
+        {
+            // the box: everything laid out so far, two cells more
+            bx0 = CV; by0 = CV; bx1 = -1; by1 = -1;
+            for (int i = 0; i < CV * CV; i++)
+            {
+                if (cvZone[i] == GenData.Z_NONE) continue;
+                int x = i % CV, y = i / CV;
+                if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y;
+            }
+            bx0 = bx0 - 2 < 0 ? 0 : bx0 - 2; by0 = by0 < 1 ? 1 : by0; bx1 = bx1 + 2 > CV - 1 ? CV - 1 : bx1 + 2; by1 = by1 + 2 > CV - 1 ? CV - 1 : by1 + 2;
+            if (siteShape == SHAPE_CUL)
+            {
+                // beside the lane's last cell, on whichever side has room
+                sx = -1;
+                int ek = nPlots - 1, hx0 = laneOX[1], hx1 = laneOX[1] + plotAlong[ek] - 1;
+                if (Free(hx1 + 1, laneEnd) && !BuildingNear(hx1 + 1, laneEnd)) { sx = hx1 + 1; sy = laneEnd; intoX = hx1; intoY = laneEnd; intoDir = 1; }
+                else if (Free(hx0 - 1, laneEnd) && !BuildingNear(hx0 - 1, laneEnd)) { sx = hx0 - 1; sy = laneEnd; intoX = hx0; intoY = laneEnd; intoDir = 3; }
+                if (sx < 0) return false;
+            }
+            else
+            {
+                // at the end of the last segment's lane
+                int s = nLane - 1;
+                Canon(s, CO, laneLen[s], out sx, out sy);
+                Canon(s, CO, laneLen[s] - 1, out intoX, out intoY);
+                intoDir = LaneDir(s, 0);
+                if (!Free(sx, sy)) return false;
+            }
+        }
+        Put(sx, sy, GenData.Z_FOREST, wi, -1, PL_WOOD, -1);
         int wood = 1;
         while (wood < need)
         {
@@ -417,7 +594,7 @@ public partial class MapGenUdon
                     if (n == 0) continue;
                     for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) if (CvZone(x + dx, y + dz) == GenData.Z_FOREST) n8++;
                     // next to the lane on the shorter side first: the lane is not left with an open side
-                    bool byLane = (x == CO - 1 || x == CO + 1) && y < laneEnd;
+                    bool byLane = siteShape == SHAPE_STRAIGHT ? (x == CO - 1 || x == CO + 1) && y < laneEnd : NextToLane(x, y);
                     int score = n * 20 + n8 * 6 + (byLane ? 40 : 0) + RngRange(rng, 30);
                     if (score > bestScore) { bestScore = score; best = y * CV + x; }
                 }
@@ -425,15 +602,26 @@ public partial class MapGenUdon
             Put(best % CV, best / CV, GenData.Z_FOREST, wi, -1, PL_WOOD, -1);
             wood++;
         }
-        Sd(CO, laneEnd - 1, 0, SD_OPEN);   // the lane runs on into the wood
+        Sd(intoX, intoY, intoDir, SD_OPEN);   // the lane runs on into the wood
         // a second way in from the lane where the wood lies beside it
-        for (int side = -1; side <= 1; side += 2)
-        {
-            int off = side < 0 ? offL : offR, mid = (off + laneEnd) / 2;
-            if (laneEnd - off >= 2 && CvZone(CO + side, mid) == GenData.Z_FOREST) Sd(CO, mid, side < 0 ? 3 : 1, SD_OPEN);
-        }
+        if (siteShape == SHAPE_STRAIGHT)
+            for (int side = -1; side <= 1; side += 2)
+            {
+                int off = side < 0 ? offL : offR, mid = (off + laneEnd) / 2;
+                if (laneEnd - off >= 2 && CvZone(CO + side, mid) == GenData.Z_FOREST) Sd(CO, mid, side < 0 ? 3 : 1, SD_OPEN);
+            }
         WoodRooms(rng);
         return wood >= SizeWoodMin[size];
+    }
+
+    bool NextToLane(int x, int y)
+    {
+        for (int d = 0; d < 4; d++)
+        {
+            int nx = x + DX[d], ny = y + DZ[d];
+            if (nx >= 0 && ny >= 0 && nx < CV && ny < CV && cvPlace[ny * CV + nx] == PL_LANE && cvZone[ny * CV + nx] == GenData.Z_LAWN) return true;
+        }
+        return false;
     }
 
     bool BuildingNear(int x, int y)
@@ -516,7 +704,7 @@ public partial class MapGenUdon
 
     void Gates(int k, uint[] rng)
     {
-        int front = plotSide[k] < 0 ? 1 : 3, back = (front + 2) & 3;
+        int front = PlotDir(k, 2), back = (front + 2) & 3;
         if (plotZone[k] == GenData.Z_HOUSE)
         {
             // the garden gate where the front path meets the lane (none when the front door opens onto the lane)
