@@ -120,6 +120,11 @@ public static class WorldSceneBuilder
         local.hud = null; local.hudRoot = null;   // no head-locked text (Cor): PHView shows the little there is
         game.local = local;
         builder.sun = sun;   // the map's mood turns and tints it (MapBuilderUdon.ApplyMood)
+        // the hider's own prop and the prop pointed at are drawn with materials of their own (MapBuilderUdon.SelfOnly, Hover)
+        builder.propLitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
+        builder.selfMat = Variant("PropLitSelf", builder.propLitMat, "_PipOnly");
+        builder.hoverMat = Variant("PropLitHover", builder.propLitMat, "_Hover");
+        builder.shadeSelfMat = Variant("PropShadeSelf", AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropShade.mat"), "_PipOnly");
         UdonSharpEditorUtility.CopyProxyToUdon(builder);
         LightingBuilder.Build(world.transform, builder, sun);   // the map's sun shadows (Light Volumes spot, PHSun)
         LampBuilder.Build(world.transform, builder);           // the map's lamps (Point Light Volumes on the light points, PHLamps)
@@ -369,10 +374,10 @@ public static class WorldSceneBuilder
         // the own prop's footprint on the ground (PHView sizes its edges to the prop)
         var outlineMat = Flat("OutlineTeal", new Color(0.30f, 0.95f, 0.85f));
         var outline = Empty(viewGo.transform, "PropOutline");
-        string[] edgeNames = { "Front", "Back", "Right", "Left", "Nub" };
-        view.outlineParts = new Transform[edgeNames.Length];
-        for (int i = 0; i < edgeNames.Length; i++)
-            view.outlineParts[i] = Part(outline, PrimitiveType.Cube, edgeNames[i], Vector3.zero, Vector3.zero, new Vector3(0.02f, 0.004f, 0.02f), outlineMat).transform;
+        // 40 short pieces for the edges, each laid on what is under it, and the front's nub (the last)
+        view.outlineParts = new Transform[41];
+        for (int i = 0; i < view.outlineParts.Length; i++)
+            view.outlineParts[i] = Part(outline, PrimitiveType.Cube, i < 40 ? "Piece" + i : "Nub", Vector3.zero, Vector3.zero, new Vector3(0.02f, 0.004f, 0.02f), outlineMat).transform;
         view.outline = outline;
 
         // desktop: the controls, lower left
@@ -399,6 +404,21 @@ public static class WorldSceneBuilder
         view.legend = lt;
 
         UdonSharpEditorUtility.CopyProxyToUdon(view);
+    }
+
+    // a copy of a material with one of its float marks set
+    static Material Variant(string name, Material from, string flag)
+    {
+        if (from == null) { Debug.LogError("[prophunt] no material to make " + name + " from"); return null; }
+        string path = "Assets/Udon/Generated/" + name + ".mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (m == null) { m = new Material(from); AssetDatabase.CreateAsset(m, path); }
+        m.shader = from.shader;
+        m.CopyPropertiesFromMaterial(from);
+        m.enableInstancing = true;
+        m.SetFloat(flag, 1f);
+        EditorUtility.SetDirty(m);
+        return m;
     }
 
     static Transform Empty(Transform parent, string name)

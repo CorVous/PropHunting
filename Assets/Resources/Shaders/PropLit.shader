@@ -11,10 +11,10 @@ Shader "PropHunt/Lit"
     {
         _Color ("Tint", Color) = (1,1,1,1)
         _Toon ("Toon ramp", Range(0, 1)) = 1   // Cor: the direct light in three flat bands (lit, half, shade)
-        // 1 on a hider's own prop (PHSlot, by property block): drawn only into the third-person view's texture,
+        // 1 in the material of a hider's own prop (PropLitSelf, MapBuilderUdon.SelfOnly; never by property block): drawn only into the third-person view's texture,
         // which is _PipWidth pixels wide; no other camera shows it (Cor: you could see your own prop)
         [HideInInspector] _PipOnly ("Third-person view only", Float) = 0
-        // 1 on the prop a hider points at and could become (PHLocal, by property block): a warm glow, strongest at its rim
+        // 1 in the material of the prop a hider points at and could become (PropLitHover, MapBuilderUdon.Hover): a warm glow, strongest at its rim
         [HideInInspector] _Hover ("Pointed at", Float) = 0
     }
     SubShader
@@ -35,11 +35,6 @@ Shader "PropHunt/Lit"
 
             UNITY_INSTANCING_BUFFER_START(Props)
                 UNITY_DEFINE_INSTANCED_PROP(fixed4, _Color)
-                // per instance, as the tint: props of one model are drawn in one instanced batch, and a value that
-                // is not per instance is taken from one of them for all (Cor: as a hider, the props near you vanished:
-                // they were drawn with the hider's own prop and took its _PipOnly)
-                UNITY_DEFINE_INSTANCED_PROP(float, _PipOnly)
-                UNITY_DEFINE_INSTANCED_PROP(float, _Hover)
             UNITY_INSTANCING_BUFFER_END(Props)
 
             // Indoors (Cor: a separate, dimmer indoor light): MapBuilderUdon draws the buildings' footprints into a small
@@ -50,6 +45,8 @@ Shader "PropHunt/Lit"
             float _UdonPHSunSpot;   // 1 once the spot sun's shadows are baked (PHSun)
             float4 _UdonPHSunArea;
             float _Toon;
+            float _PipOnly;
+            float _Hover;
 
             // the toon ramp: three flat bands with short soft edges; above full light (a bright lamp) it stays linear
             float Ramp(float x)
@@ -84,7 +81,6 @@ Shader "PropHunt/Lit"
                 float3 worldPos : TEXCOORD3;
                 half3 normal : TEXCOORD4;
                 UNITY_FOG_COORDS(5)
-                half hover : TEXCOORD7;      // 1 on the prop a hider points at
                 half3 emit : TEXCOORD6;      // x: 1 for a lamp's bulb (vertex alpha 0): drawn at full brightness; y: 1 indoors; z: the roof's height there (0 outdoors)
             };
 
@@ -94,8 +90,7 @@ Shader "PropHunt/Lit"
                 UNITY_SETUP_INSTANCE_ID(v);
                 o.pos = UnityObjectToClipPos(v.vertex);
                 // a hider's own prop, in any view but the third-person one (384 pixels wide, WorldSceneBuilder): off screen
-                if (UNITY_ACCESS_INSTANCED_PROP(Props, _PipOnly) > 0.5 && abs(_ScreenParams.x - 384.0) > 0.5) o.pos = float4(2.0, 2.0, 2.0, 1.0);
-                o.hover = UNITY_ACCESS_INSTANCED_PROP(Props, _Hover);
+                if (_PipOnly > 0.5 && abs(_ScreenParams.x - 384.0) > 0.5) o.pos = float4(2.0, 2.0, 2.0, 1.0);
                 float3 n = UnityObjectToWorldNormal(v.normal);
                 float d = dot(n, _WorldSpaceLightPos0.xyz);
                 float ndl = max(0, d) * 0.8 + (d * 0.5 + 0.5) * 0.2;
@@ -209,7 +204,7 @@ Shader "PropHunt/Lit"
                 }
                 else c = i.ambient + Toon(i.sun, i.albedo) + lamps;   // before the spot is baked: the base sun, the lamps on top
                 c = lerp(c, i.albedo * 1.4, i.emit.x);
-                if (i.hover > 0.5)
+                if (_Hover > 0.5)
                 {
                     float rim = 1.0 - saturate(dot(n, normalize(_WorldSpaceCameraPos - i.worldPos)));
                     float pulse = 0.85 + 0.15 * sin(_Time.y * 6.0);

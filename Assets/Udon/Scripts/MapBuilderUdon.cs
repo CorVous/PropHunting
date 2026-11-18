@@ -1652,33 +1652,31 @@ public class MapBuilderUdon : UdonSharpBehaviour
         for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(tintBlock);
     }
 
-    // A hider's own prop (PHSlot): its tint as TintProp gave it, and the mark that keeps it out of every view but
-    // the third-person one (PropLit's _PipOnly)
-    MaterialPropertyBlock selfBlock;
+    // A hider's own prop (PHSlot) and the prop a hider points at (PHLocal) have materials of their own: PropLit with
+    // _PipOnly set (drawn only in the third-person view), PropLit with _Hover set (the glow), and the shade patch's
+    // with _PipOnly. Not a mark in a property block (Cor: tables went missing while the hider was a table, and
+    // props vanished when pointed at): props of one model are drawn in one instanced batch, and a mark that one
+    // prop's block carried reached the others in it. Another material is never in the same batch. The tint stays
+    // in the block (TintProp), per instance.
+    public Material propLitMat, selfMat, hoverMat, shadeSelfMat;   // WorldSceneBuilder
+
     public void SelfOnly(GameObject go, int def)
     {
-        if (go == null) return;
-        if (selfBlock == null) selfBlock = new MaterialPropertyBlock();
-        Color c = Color.white;
-        if (defTint != null && def >= 0 && def < defTint.Length && defTint[def].a > 0f) c = defTint[def];
-        selfBlock.SetColor("_Color", c);
-        selfBlock.SetFloat("_PipOnly", 1f);
+        if (go == null || selfMat == null) return;
         MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
-        for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(selfBlock);
+        for (int i = 0; i < rs.Length; i++) rs[i].sharedMaterial = rs[i].gameObject.name == "Shade" ? shadeSelfMat : selfMat;
     }
 
-    // The prop a hider points at glows (PHLocal; PropLit's _Hover); off: back to its tint as TintProp gave it
-    MaterialPropertyBlock hoverBlock;
     public void Hover(GameObject go, int def, bool on)
     {
-        if (go == null) return;
-        if (hoverBlock == null) hoverBlock = new MaterialPropertyBlock();
-        Color c = Color.white;
-        if (defTint != null && def >= 0 && def < defTint.Length && defTint[def].a > 0f) c = defTint[def];
-        hoverBlock.SetColor("_Color", c);
-        hoverBlock.SetFloat("_Hover", on ? 1f : 0f);
+        if (go == null || hoverMat == null) return;
         MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
-        for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(hoverBlock);
+        for (int i = 0; i < rs.Length; i++)
+        {
+            Material m = rs[i].sharedMaterial;
+            if (on && m == propLitMat) rs[i].sharedMaterial = hoverMat;
+            else if (!on && m == hoverMat) rs[i].sharedMaterial = propLitMat;
+        }
     }
 
     // the average of a model's vertex colours that pass the test (green-ish: g over r), 0 alpha when none

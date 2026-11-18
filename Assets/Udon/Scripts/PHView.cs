@@ -51,7 +51,7 @@ public class PHView : UdonSharpBehaviour
     public Material capReady, capWait;
     public TextMeshProUGUI legend;     // desktop
     public Transform outline;          // the own prop's footprint on the ground
-    public Transform[] outlineParts;   // front, back, right, left edges and the nub on the front
+    public Transform[] outlineParts;   // short pieces of the edges, and the nub on the front (the last)
 
     // the taunt button, in the casing's own metres (z towards the back of the device): where it sits, and its press
     readonly Vector3 BUTTON_AT = new Vector3(-0.12f, -0.175f, -0.010f);
@@ -70,7 +70,13 @@ public class PHView : UdonSharpBehaviour
     int legendMode = -1;
     float legendSince;
     int outlineDef = -2;
-    const float OUTLINE_W = 0.02f, OUTLINE_H = 0.004f;
+    const float OUTLINE_W = 0.02f, OUTLINE_H = 0.004f, OUTLINE_STEP = 0.12f;
+    // the pieces in use, where each lies in the prop's own frame, and what they were last laid for
+    int nPieces;
+    float[] pieceX, pieceZ;
+    float nubZ;
+    Vector3 outlinePos;
+    float outlineYaw = -999f, outlineNext;
 
     // The panel keeps its place in the real room (Cor): its pose is kept relative to the playspace's origin, in
     // units of the avatar's size, so walking with the stick or turning with it does not move it about the room.
@@ -226,13 +232,39 @@ public class PHView : UdonSharpBehaviour
         if (outline.gameObject.activeSelf != hider) outline.gameObject.SetActive(hider);
         if (!hider || s.def == outlineDef) return;
         outlineDef = s.def;
+        int pool = outlineParts.Length - 1;
+        if (pieceX == null) { pieceX = new float[pool]; pieceZ = new float[pool]; }
         float hx = game.gen.defSx[s.def] / 2000f, hz = game.gen.defSz[s.def] / 2000f;
-        outlineParts[0].localPosition = new Vector3(0f, 0f, hz); outlineParts[0].localScale = new Vector3(2f * hx + OUTLINE_W, OUTLINE_H, OUTLINE_W);
-        outlineParts[1].localPosition = new Vector3(0f, 0f, -hz); outlineParts[1].localScale = new Vector3(2f * hx + OUTLINE_W, OUTLINE_H, OUTLINE_W);
-        outlineParts[2].localPosition = new Vector3(hx, 0f, 0f); outlineParts[2].localScale = new Vector3(OUTLINE_W, OUTLINE_H, 2f * hz + OUTLINE_W);
-        outlineParts[3].localPosition = new Vector3(-hx, 0f, 0f); outlineParts[3].localScale = new Vector3(OUTLINE_W, OUTLINE_H, 2f * hz + OUTLINE_W);
+        // pieces about 12 cm long; longer on a big prop, so the pool is enough
+        float step = Mathf.Max(OUTLINE_STEP, 4f * (hx + hz) / (pool - 4));
+        int nx = Mathf.Max(1, Mathf.CeilToInt(2f * hx / step)), nz = Mathf.Max(1, Mathf.CeilToInt(2f * hz / step));
+        float lx = 2f * hx / nx, lz = 2f * hz / nz;
+        nPieces = 0;
+        for (int i = 0; i < nx; i++)
+        {
+            float x = -hx + (i + 0.5f) * lx;
+            Piece(x, hz, lx, true); Piece(x, -hz, lx, true);
+        }
+        for (int i = 0; i < nz; i++)
+        {
+            float z = -hz + (i + 0.5f) * lz;
+            Piece(hx, z, lz, false); Piece(-hx, z, lz, false);
+        }
+        for (int i = nPieces; i < pool; i++) outlineParts[i].gameObject.SetActive(false);
         float nub = Mathf.Clamp(hx * 0.5f, 0.03f, 0.08f);
-        outlineParts[4].localPosition = new Vector3(0f, 0f, hz + nub * 0.5f); outlineParts[4].localScale = new Vector3(nub, OUTLINE_H, nub);
+        outlineParts[pool].localScale = new Vector3(nub, OUTLINE_H, nub);
+        nubZ = hz + nub * 0.5f;
+        outlineYaw = -999f;   // lay them anew
+    }
+
+    void Piece(float x, float z, float len, bool alongX)
+    {
+        if (nPieces >= pieceX.Length) return;
+        Transform t = outlineParts[nPieces];
+        t.gameObject.SetActive(true);
+        t.localScale = alongX ? new Vector3(len + OUTLINE_W, OUTLINE_H, OUTLINE_W) : new Vector3(OUTLINE_W, OUTLINE_H, len + OUTLINE_W);
+        pieceX[nPieces] = x; pieceZ[nPieces] = z;
+        nPieces++;
     }
 
     // behind the prop, looking at it; pulled in front of walls and ceilings
@@ -264,13 +296,35 @@ public class PHView : UdonSharpBehaviour
     void PostLateBody()
     {
         VRCPlayerApi me = Networking.LocalPlayer;
-        if (hiderNow && outline != null)
+        if (hiderNow && outline != null && nPieces > 0)
         {
-            // on the ground under the prop: in a hop, where it will come down
+            // The outline falls from above onto whatever is there (Cor): each piece lies on the first thing under
+            // it, seen from the height of the eyes, so a prop or a step in the way carries the line instead of
+            // covering it. Laid anew when the prop has moved or turned, and a few times a second besides (a door,
+            // a knocked prop).
             Vector3 foot = local.body.pos;
-            RaycastHit g;
-            if (!local.body.grounded && Physics.Raycast(foot + Vector3.up * 0.05f, Vector3.down, out g, 4f, 1 << 11, QueryTriggerInteraction.Ignore)) foot = g.point;
-            outline.SetPositionAndRotation(foot + Vector3.up * 0.012f, Quaternion.Euler(0f, local.body.yaw, 0f));
+            float yaw = local.body.yaw;
+            if ((foot - outlinePos).sqrMagnitude > 1e-6f || Mathf.Abs(Mathf.DeltaAngle(yaw, outlineYaw)) > 0.1f || Time.time >= outlineNext)
+            {
+                outlinePos = foot; outlineYaw = yaw; outlineNext = Time.time + 0.25f;
+                Quaternion q = Quaternion.Euler(0f, yaw, 0f);
+                bool grounded = local.body.grounded;
+                float top = Mathf.Max(0.3f, me.GetAvatarEyeHeightAsMeters());
+                float reach = top + (grounded ? 0.35f : 4f);
+                RaycastHit g;
+                // in a hop: the ground it will come down on, where nothing else is under a piece
+                float baseY = foot.y;
+                if (!grounded && Physics.Raycast(foot + Vector3.up * 0.05f, Vector3.down, out g, 4f, 1 << 11, QueryTriggerInteraction.Ignore)) baseY = g.point.y;
+                int last = outlineParts.Length - 1;
+                for (int i = 0; i <= nPieces; i++)
+                {
+                    bool isNub = i == nPieces;
+                    Vector3 p = foot + q * (isNub ? new Vector3(0f, 0f, nubZ) : new Vector3(pieceX[i], 0f, pieceZ[i]));
+                    float y = baseY;
+                    if (Physics.Raycast(new Vector3(p.x, foot.y + top, p.z), Vector3.down, out g, reach, 1 << 11, QueryTriggerInteraction.Ignore)) y = g.point.y;
+                    outlineParts[isNub ? last : i].SetPositionAndRotation(new Vector3(p.x, y + 0.012f, p.z), q);
+                }
+            }
         }
         if (!vr)
         {
