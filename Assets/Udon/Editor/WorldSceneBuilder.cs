@@ -366,6 +366,15 @@ public static class WorldSceneBuilder
         view.tauntButton = button; view.tauntCap = cap.transform; view.tauntCapRenderer = cap.GetComponent<MeshRenderer>();
         view.capReady = red; view.capWait = grey;
 
+        // the own prop's footprint on the ground (PHView sizes its edges to the prop)
+        var outlineMat = Flat("OutlineTeal", new Color(0.30f, 0.95f, 0.85f));
+        var outline = Empty(viewGo.transform, "PropOutline");
+        string[] edgeNames = { "Front", "Back", "Right", "Left", "Nub" };
+        view.outlineParts = new Transform[edgeNames.Length];
+        for (int i = 0; i < edgeNames.Length; i++)
+            view.outlineParts[i] = Part(outline, PrimitiveType.Cube, edgeNames[i], Vector3.zero, Vector3.zero, new Vector3(0.02f, 0.004f, 0.02f), outlineMat).transform;
+        view.outline = outline;
+
         // desktop: the controls, lower left
         var lg = new GameObject("Legend");
         lg.transform.SetParent(desk.transform, false);

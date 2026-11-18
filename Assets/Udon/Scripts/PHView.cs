@@ -19,6 +19,8 @@ using VRC.Udon.Common;
 //                       the prop, standing as the prop stands in the world
 //           on the screen device's casing: the taunt button, pushed with a hand; never by grabbing
 //   desktop: the controls, in the lower left corner; after a while only the two that are easy to forget
+//   the own prop's outline (Cor), desktop and VR: the hider does not see their own prop in first person, so its
+//           footprint lies on the ground under it as a thin rectangle, with a nub on the front; seen only by the hider
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHView : UdonSharpBehaviour
 {
@@ -48,6 +50,8 @@ public class PHView : UdonSharpBehaviour
     public MeshRenderer tauntCapRenderer;
     public Material capReady, capWait;
     public TextMeshProUGUI legend;     // desktop
+    public Transform outline;          // the own prop's footprint on the ground
+    public Transform[] outlineParts;   // front, back, right, left edges and the nub on the front
 
     // the taunt button, in the casing's own metres (z towards the back of the device): where it sits, and its press
     readonly Vector3 BUTTON_AT = new Vector3(-0.12f, -0.175f, -0.010f);
@@ -65,6 +69,8 @@ public class PHView : UdonSharpBehaviour
     Vector3 miniBase = Vector3.one;
     int legendMode = -1;
     float legendSince;
+    int outlineDef = -2;
+    const float OUTLINE_W = 0.02f, OUTLINE_H = 0.004f;
 
     // The panel keeps its place in the real room (Cor): its pose is kept relative to the playspace's origin, in
     // units of the avatar's size, so walking with the stick or turning with it does not move it about the room.
@@ -88,6 +94,7 @@ public class PHView : UdonSharpBehaviour
         ShowDevices(false);
         devicesOn = false;
         if (legend != null) legend.text = "";
+        if (outline != null) outline.gameObject.SetActive(false);
     }
 
     void ShowDevices(bool on)
@@ -203,12 +210,29 @@ public class PHView : UdonSharpBehaviour
             desktopPip.SetActive(hider);
             UpdateLegend(s, hider);
         }
+        UpdateOutline(s, hider);
         hiderNow = hider;
         // the third-person camera renders every second frame while there is a prop to show
         frame++;
         bool pip = hider;
         pipCam.enabled = pip && (frame & 1) == 0;
         if (pip) PlaceCamera(s);
+    }
+
+    // the own prop's outline: shown while hiding, its edges sized to the prop's footprint when the prop changes
+    void UpdateOutline(PHSlot s, bool hider)
+    {
+        if (outline == null) return;
+        if (outline.gameObject.activeSelf != hider) outline.gameObject.SetActive(hider);
+        if (!hider || s.def == outlineDef) return;
+        outlineDef = s.def;
+        float hx = game.gen.defSx[s.def] / 2000f, hz = game.gen.defSz[s.def] / 2000f;
+        outlineParts[0].localPosition = new Vector3(0f, 0f, hz); outlineParts[0].localScale = new Vector3(2f * hx + OUTLINE_W, OUTLINE_H, OUTLINE_W);
+        outlineParts[1].localPosition = new Vector3(0f, 0f, -hz); outlineParts[1].localScale = new Vector3(2f * hx + OUTLINE_W, OUTLINE_H, OUTLINE_W);
+        outlineParts[2].localPosition = new Vector3(hx, 0f, 0f); outlineParts[2].localScale = new Vector3(OUTLINE_W, OUTLINE_H, 2f * hz + OUTLINE_W);
+        outlineParts[3].localPosition = new Vector3(-hx, 0f, 0f); outlineParts[3].localScale = new Vector3(OUTLINE_W, OUTLINE_H, 2f * hz + OUTLINE_W);
+        float nub = Mathf.Clamp(hx * 0.5f, 0.03f, 0.08f);
+        outlineParts[4].localPosition = new Vector3(0f, 0f, hz + nub * 0.5f); outlineParts[4].localScale = new Vector3(nub, OUTLINE_H, nub);
     }
 
     // behind the prop, looking at it; pulled in front of walls and ceilings
@@ -240,6 +264,14 @@ public class PHView : UdonSharpBehaviour
     void PostLateBody()
     {
         VRCPlayerApi me = Networking.LocalPlayer;
+        if (hiderNow && outline != null)
+        {
+            // on the ground under the prop: in a hop, where it will come down
+            Vector3 foot = local.body.pos;
+            RaycastHit g;
+            if (!local.body.grounded && Physics.Raycast(foot + Vector3.up * 0.05f, Vector3.down, out g, 4f, 1 << 11, QueryTriggerInteraction.Ignore)) foot = g.point;
+            outline.SetPositionAndRotation(foot + Vector3.up * 0.012f, Quaternion.Euler(0f, local.body.yaw, 0f));
+        }
         if (!vr)
         {
             VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);

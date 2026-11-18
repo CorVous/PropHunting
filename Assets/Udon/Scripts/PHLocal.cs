@@ -567,15 +567,17 @@ public class PHLocal : UdonSharpBehaviour
         int e = EmitOf(hit.collider.transform);
         if (e < 0) return;
         int d = game.gen.emitDef[e];
-        if (game.gen.defDisguise[d] <= 0) { Say("That can't be a disguise.", 2f); return; }
+        // a prop that cannot be taken says so, and a change that took has its own cue; both heard only by the hider (Cor)
+        if (game.gen.defDisguise[d] <= 0) { sound.Play("error_004", 0.5f); Say("That can't be a disguise.", 2f); return; }
         if (game.phase == PHGame.PH_HUNT)
         {
-            if (changesLeft <= 0) { Say("No disguise changes left.", 2f); return; }
-            if (Time.time - lastChange < HUNT_CHANGE_COOLDOWN) return;
+            if (changesLeft <= 0) { sound.Play("error_004", 0.5f); Say("No disguise changes left.", 2f); return; }
+            if (Time.time - lastChange < HUNT_CHANGE_COOLDOWN) { sound.Play("error_004", 0.5f); return; }
             changesLeft--;
         }
-        if (!SetDisguise(d)) { if (game.phase == PHGame.PH_HUNT) changesLeft++; return; }
+        if (!SetDisguise(d)) { sound.Play("error_004", 0.5f); if (game.phase == PHGame.PH_HUNT) changesLeft++; return; }
         lastChange = Time.time;
+        sound.Play("powerUp1", 0.5f);
         Say("You are a " + DefName(d).ToLower(), 2f);
     }
 
