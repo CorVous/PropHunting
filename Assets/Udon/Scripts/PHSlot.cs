@@ -258,6 +258,10 @@ public class PHSlot : UdonSharpBehaviour
                 proxy.transform.position = propPos;
                 proxy.name = "Hider" + index;
                 shownPos = propPos; shownYaw = propYaw;
+                // the squash through a doorway starts from the prefab's own scale
+                proxyScale = proxy.transform.localScale;
+                squashX = 1f; squashZ = 1f; squashVX = 0f; squashVZ = 0f; wantX = 1f; wantZ = 1f; squashNext = 0f;
+                proxyHalf = new Vector3(game.gen.defSx[want], game.gen.defSy[want], game.gen.defSz[want]) / 2000f;
                 // its shade patch (the prefab's last child), shown only while it stands on a floor (ShadeCheck)
                 proxyShade = null; shadeNext = 0f;
                 Transform pt = proxy.transform;
@@ -286,6 +290,55 @@ public class PHSlot : UdonSharpBehaviour
         shownYaw = Mathf.LerpAngle(shownYaw, propYaw, k);
         proxy.transform.SetPositionAndRotation(shownPos, Quaternion.Euler(0f, shownYaw, 0f));
         if (proxyShade != null && Time.time >= shadeNext) { shadeNext = Time.time + 0.15f; ShadeCheck(); }
+        Squash();
+    }
+
+    // A big prop squeezes through a doorway (PHHiderBody moves it as a narrower box there). What everyone sees (Cor:
+    // a bouncy squeeze, only visually): where the walls to its sides are closer than it is wide, the prop is squashed
+    // across to fit between them and stretched the other way, on a spring that overshoots a little; clear of the
+    // walls it springs back. Measured on each client against the architecture's collider: nothing is synced.
+    Vector3 proxyScale = Vector3.one, proxyHalf;
+    float squashX = 1f, squashZ = 1f, squashVX, squashVZ, wantX = 1f, wantZ = 1f, squashNext;
+
+    // how far the architecture is from the prop's middle along dir, at most reach
+    float WallAt(Vector3 from, Vector3 dir, float reach)
+    {
+        Collider arch = game.builder.collisionCollider;
+        if (arch == null) return reach;
+        RaycastHit r;
+        if (arch.Raycast(new Ray(from, dir), out r, reach)) return r.distance;
+        return reach;
+    }
+
+    void Squash()
+    {
+        if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f) return;   // it never squeezes (PHHiderBody.SQUEEZE_HALF)
+        if (Time.time >= squashNext)
+        {
+            squashNext = Time.time + 0.08f;
+            Quaternion q = Quaternion.Euler(0f, shownYaw, 0f);
+            Vector3 mid = shownPos + Vector3.up * Mathf.Min(proxyHalf.y, 0.9f);
+            Vector3 ax = q * Vector3.right, az = q * Vector3.forward;
+            // (a doorway's frame stands 6 cm into the opening on each side and is not in the collider)
+            float gx = WallAt(mid, ax, proxyHalf.x) + WallAt(mid, -ax, proxyHalf.x), gz = WallAt(mid, az, proxyHalf.z) + WallAt(mid, -az, proxyHalf.z);
+            float fx = gx < 2f * proxyHalf.x - 0.001f ? (gx - 0.14f) / (2f * proxyHalf.x) : 1f;
+            float fz = gz < 2f * proxyHalf.z - 0.001f ? (gz - 0.14f) / (2f * proxyHalf.z) : 1f;
+            fx = Mathf.Clamp(fx, 0.35f, 1f); fz = Mathf.Clamp(fz, 0.35f, 1f);
+            // squashed one way, it stretches the other (its volume roughly kept, to a limit)
+            wantX = fx < 0.999f ? fx : Mathf.Min(1.35f, 1f / Mathf.Sqrt(fz));
+            wantZ = fz < 0.999f ? fz : Mathf.Min(1.35f, 1f / Mathf.Sqrt(fx));
+        }
+        if (wantX == 1f && wantZ == 1f && Mathf.Abs(squashX - 1f) < 0.002f && Mathf.Abs(squashZ - 1f) < 0.002f && Mathf.Abs(squashVX) < 0.01f && Mathf.Abs(squashVZ) < 0.01f)
+        {
+            if (squashX != 1f || squashZ != 1f) { squashX = 1f; squashZ = 1f; proxy.transform.localScale = proxyScale; }
+            return;
+        }
+        // a spring, a little under-damped: it overshoots once and settles
+        float dt = Mathf.Min(Time.deltaTime, 0.033f);
+        squashVX += ((wantX - squashX) * 260f - squashVX * 17f) * dt; squashX += squashVX * dt;
+        squashVZ += ((wantZ - squashZ) * 260f - squashVZ * 17f) * dt; squashZ += squashVZ * dt;
+        squashX = Mathf.Clamp(squashX, 0.25f, 1.6f); squashZ = Mathf.Clamp(squashZ, 0.25f, 1.6f);
+        proxy.transform.localScale = new Vector3(proxyScale.x * squashX, proxyScale.y, proxyScale.z * squashZ);
     }
 
     // A real prop has its shade patch only where it stands on a floor (not on a table or a shelf, never in the
