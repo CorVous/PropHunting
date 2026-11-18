@@ -1668,7 +1668,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // instead of being cut away (Cor), while the architecture and the merged scenery (PropLit itself) are cut.
     public Material propLitMat, selfMat, hoverMat, shadeSelfMat, fadeMat;   // WorldSceneBuilder
 
-    void FadeProp(GameObject go)
+    public void FadeProp(GameObject go)
     {
         if (go == null || fadeMat == null) return;
         MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);

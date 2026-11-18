@@ -148,8 +148,11 @@ void PointLights(float3 worldPos, float3 n, out float3 sun, out float3 lamps)
 
 fixed4 frag (v2f i) : SV_Target
 {
-    // the prop viewer's cutout (PipCut.cginc): a prop in it is see-through (_Fade), the rest cut; never on the hider's own prop
-    half cutRim = _PipOnly < 0.5 ? PipCut(i.worldPos, i.pos.xy, _Fade) : 0;
+    // the prop viewer's cutout (PipCut.cginc): a prop in it is see-through (_Fade), the rest cut; never on the hider's own prop.
+    // An if, never ?: or &&: HLSL works out both sides of those, so PipCut's clip() ran on the own prop too and cut away
+    // the half of it nearer the camera (Cor: half the prop was clipped out)
+    half cutRim = 0;
+    [branch] if (_PipOnly < 0.5) cutRim = PipCut(i.worldPos, i.pos.xy, _Fade);
     float3 c;
     float3 n = normalize(i.normal);
     bool lvOn = LightVolumesEnabled() > 0;

@@ -303,7 +303,7 @@ public static class WorldSceneBuilder
         var raw = pip.AddComponent<RawImage>(); raw.texture = rt; raw.raycastTarget = false; raw.material = hudMat;
         var prt = pip.GetComponent<RectTransform>();   // the bottom right corner
         prt.anchorMin = new Vector2(1f, 0f); prt.anchorMax = new Vector2(1f, 0f); prt.pivot = new Vector2(1f, 0f);
-        prt.anchoredPosition = new Vector2(-24f, 24f); prt.sizeDelta = new Vector2(270f, 180f);   // a margin inside the screen's edge
+        prt.anchoredPosition = new Vector2(-24f, 24f); prt.sizeDelta = new Vector2(420f, 280f);   // a margin inside the screen's edge; clear of the health bar (centre, 140 each side) down to 4:3 (Cor: bigger)
         view.desktopPip = pip;
         view.desktopRoot = desk.transform;
 

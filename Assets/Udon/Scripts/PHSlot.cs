@@ -288,6 +288,7 @@ public class PHSlot : UdonSharpBehaviour
                     for (int i = 0; i < parts.Length; i++) parts[i].gameObject.layer = HIDER_SELF;
                     game.builder.SelfOnly(proxy, want);   // ...and the shader keeps it out of any other camera too
                 }
+                else game.builder.FadeProp(proxy);   // another hider's prop is a prop: see-through in the prop viewer's cutout, not cut
             }
         }
         if (proxy == null) return;

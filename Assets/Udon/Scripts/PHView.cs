@@ -395,12 +395,36 @@ public class PHView : UdonSharpBehaviour
     // the prop viewer's cutout (PipCut.cginc, Cor: "a stylized cutout in the geometry so you can see the prop in full,
     // along with the things around it"): the own prop's centre and the hole's radius there, its bounding radius and half
     // a metre, and the floor it stands on. Radius 0 while not hiding, so no view cuts anything.
+    // The hole opens only while the prop is well hidden from the viewer's camera (Cor: "only expand the cutout if the
+    // prop is being significantly obscured"): a few times a second rays go from the camera to points on the prop, and
+    // the share of them that something stops is how hidden it is. It opens at CUT_OPEN and closes below CUT_CLOSE (so
+    // it does not flicker at one value), and grows in or shrinks away over CUT_EASE.
+    const float CUT_OPEN = 0.4f;      // hidden share that opens the hole
+    const float CUT_CLOSE = 0.2f;     // hidden share under which it closes again
+    const float CUT_EASE = 0.25f;     // seconds for the hole to grow to full size or shrink to nothing
+    const float CUT_EVERY = 0.2f;     // seconds between rounds of rays
+    const float CUT_SHORT = 0.15f;    // the rays stop this short of the prop: what stands right behind or under it does not count
+    const float CUT_PULL = 0.7f;      // the corner points, pulled in towards the middle (on the prop, not on its box's air)
+    const int CUT_RAYS = 9, CUT_PER_FRAME = 3;   // rays a round, spread over frames
     int cutId, cutFloorId;
-    bool cutOn;
+    bool cutOn = true, cutWant;   // on at first, so the first frame clears whatever a value was left (the editor keeps globals between plays)
+    int cutRay = CUT_RAYS, cutBlocked, cutMask;
+    float cutNext, cutAmt;
+    Vector3 cutLo, cutHi;
+    [System.NonSerialized] public float cutHidden;   // the last round's hidden share (also read by tests)
+
     void SetCut(PHSlot s, bool on)
     {
         if (cutId == 0) { cutId = VRCShader.PropertyToID("_UdonPHCut"); cutFloorId = VRCShader.PropertyToID("_UdonPHCutFloor"); }
         if (!on)
+        {
+            cutAmt = 0f; cutWant = false; cutRay = CUT_RAYS; cutNext = 0f; cutHidden = 0f;
+            if (cutOn) { VRCShader.SetGlobalVector(cutId, Vector4.zero); cutOn = false; }
+            return;
+        }
+        UpdateHidden(s);
+        cutAmt = Mathf.MoveTowards(cutAmt, cutWant ? 1f : 0f, Time.deltaTime / CUT_EASE);
+        if (cutAmt <= 0f)
         {
             if (cutOn) { VRCShader.SetGlobalVector(cutId, Vector4.zero); cutOn = false; }
             return;
@@ -408,9 +432,77 @@ public class PHView : UdonSharpBehaviour
         cutOn = true;
         float sx = game.gen.defSx[s.def] / 1000f, sy = game.gen.defSy[s.def] / 1000f, sz = game.gen.defSz[s.def] / 1000f;
         float r = Mathf.Clamp(0.5f * Mathf.Sqrt(sx * sx + sy * sy + sz * sz) + 0.5f, 0.8f, 2.5f);
+        r *= cutAmt * cutAmt * (3f - 2f * cutAmt);
         Vector3 c = s.propPos + Vector3.up * (sy * 0.5f);
         VRCShader.SetGlobalVector(cutId, new Vector4(c.x, c.y, c.z, r));
         VRCShader.SetGlobalVector(cutFloorId, new Vector4(s.propPos.y, 0f, 0f, 0f));
+    }
+
+    // a round of CUT_RAYS rays every CUT_EVERY seconds, CUT_PER_FRAME of them a frame; at the round's end the share
+    // that something stopped, and whether the hole wants to be open
+    void UpdateHidden(PHSlot s)
+    {
+        if (cutRay >= CUT_RAYS)
+        {
+            if (Time.time < cutNext) return;
+            cutNext = Time.time + CUT_EVERY;
+            cutRay = 0; cutBlocked = 0;
+            // what the cut affects: what the camera draws, but not the own prop, pickups or the panel
+            cutMask = pipCam.cullingMask & ~((1 << PHSlot.HIDER_SELF) | (1 << 13));
+            // the prop's fitted shape (the hider's body), its own box where it has none
+            PHHiderBody b = local.body;
+            if (b.shapeDef == s.def && b.shapeN > 0 && b.shapeMin != null)
+            {
+                cutLo = b.shapeMin[0]; cutHi = b.shapeMax[0];
+                for (int i = 1; i < b.shapeN; i++) { cutLo = Vector3.Min(cutLo, b.shapeMin[i]); cutHi = Vector3.Max(cutHi, b.shapeMax[i]); }
+            }
+            else
+            {
+                Vector3 half = new Vector3(game.gen.defSx[s.def], 0f, game.gen.defSz[s.def]) / 2000f;
+                cutLo = -half; cutHi = half; cutHi.y = game.gen.defSy[s.def] / 1000f;
+            }
+        }
+        Vector3 cam = pipCam.transform.position;
+        Quaternion q = Quaternion.Euler(0f, s.propYaw, 0f);
+        int end = Mathf.Min(CUT_RAYS, cutRay + CUT_PER_FRAME);
+        while (cutRay < end)
+        {
+            if (Blocked(cam, s.propPos + q * CutPoint(cutRay))) cutBlocked++;
+            cutRay++;
+        }
+        if (cutRay < CUT_RAYS) return;
+        cutHidden = (float)cutBlocked / CUT_RAYS;
+        if (!cutWant && cutHidden >= CUT_OPEN) cutWant = true;
+        else if (cutWant && cutHidden < CUT_CLOSE) cutWant = false;
+    }
+
+    // point k on the prop, in its own frame: the middle, the top, then the corners of its box (upper four, lower three),
+    // pulled in towards the middle
+    Vector3 CutPoint(int k)
+    {
+        Vector3 mid = (cutLo + cutHi) * 0.5f;
+        float h = cutHi.y - cutLo.y;
+        if (k == 0) return mid;
+        if (k == 1) return new Vector3(mid.x, cutLo.y + h * 0.9f, mid.z);
+        int c = (k - 2) & 3;
+        float x = (c & 1) == 0 ? cutLo.x : cutHi.x, z = (c & 2) == 0 ? cutLo.z : cutHi.z;
+        float y = cutLo.y + h * (k < 6 ? 0.75f : 0.3f);
+        if (k >= 6) x = (c & 1) == 0 ? cutHi.x : cutLo.x;   // the lower three mirrored, so they do not sit under the upper ones' first three
+        return new Vector3(mid.x + (x - mid.x) * CUT_PULL, y, mid.z + (z - mid.z) * CUT_PULL);
+    }
+
+    // whether something lies between the camera and a point, stopping CUT_SHORT before it. Both ways: a ray that
+    // starts inside a building's walls does not see them from inside, the one coming back from the prop does
+    bool Blocked(Vector3 cam, Vector3 p)
+    {
+        Vector3 d = p - cam;
+        float dist = d.magnitude;
+        float len = dist - CUT_SHORT;
+        if (len <= 0.05f) return false;
+        d = d / dist;
+        RaycastHit hit;
+        if (Physics.Raycast(cam, d, out hit, len, cutMask, QueryTriggerInteraction.Ignore)) return true;
+        return Physics.Raycast(cam + d * len, -d, out hit, len, cutMask, QueryTriggerInteraction.Ignore);
     }
 
     public override void PostLateUpdate()

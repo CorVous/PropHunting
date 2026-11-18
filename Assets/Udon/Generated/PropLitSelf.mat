@@ -25,6 +25,7 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _Fade: 0
     - _Hover: 0
     - _PipOnly: 1
     - _Toon: 1
