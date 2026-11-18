@@ -101,11 +101,32 @@ public class PHHiderBody : UdonSharpBehaviour
     // prop is stopped but a box no wider than SQUEEZE_HALF could go on for a good way (a doorway, a gap: not a wall),
     // it moves as that narrower box until its own box fits again. The prop looks as it always does: in the doorway
     // it overlaps the frame. Left standing in a gap for a while, it is moved to the nearest place where it fits.
-    const float SQUEEZE_HALF = 0.28f, SQUEEZE_HALF_Y = 0.99f, SQUEEZE_PASS = 0.9f, SQUEEZE_TIME = 2.5f;
+    const float SQUEEZE_HALF = 0.28f, SQUEEZE_HALF_Y = 0.99f, SQUEEZE_PASS = 0.9f, SQUEEZE_TIME = 1.2f;
     Vector3 fullHalf, narrowHalf;
     bool canSqueeze, narrow;
     Vector3 squeezeAxis;   // the way through the gap it is squeezing through
     float narrowSince;
+
+    // Is what lies ahead (along dir, from 'from') a gap narrower than the prop: something within the prop's own half
+    // width on both sides, a little past its front? A doorway's two jambs, two cupboards. Without this a prop
+    // walking along a wall took a table against that wall, or a door frame's edge, for a gap, squeezed "through"
+    // along the wall, and could then only move along it (Cor: stuck near a doorway until it let go).
+    bool GapAhead(Vector3 from, Vector3 dir, Vector3 side)
+    {
+        Quaternion q = Rot();
+        Vector3 r = q * Vector3.right, f = q * Vector3.forward;
+        float across = Mathf.Abs(Vector3.Dot(side, r)) * fullHalf.x + Mathf.Abs(Vector3.Dot(side, f)) * fullHalf.z;
+        float front = Mathf.Abs(Vector3.Dot(dir, r)) * fullHalf.x + Mathf.Abs(Vector3.Dot(dir, f)) * fullHalf.z;
+        Vector3 mid = from + Vector3.up * Mathf.Min(fullHalf.y, 0.9f);
+        RaycastHit h;
+        for (int k = 0; k < 4; k++)
+        {
+            Vector3 at = mid + dir * (front + 0.05f + 0.15f * k);
+            if (Physics.Raycast(at, side, out h, across, mask, QueryTriggerInteraction.Ignore)
+                && Physics.Raycast(at, -side, out h, across, mask, QueryTriggerInteraction.Ignore)) return true;
+        }
+        return false;
+    }
 
     void SqueezeAfterMove()
     {
@@ -439,6 +460,7 @@ public class PHHiderBody : UdonSharpBehaviour
                         if (off != 0f && SweepH(start, off > 0f ? along : -along, Mathf.Abs(off))) continue;
                         Vector3 from = start + along * off;
                         if (SweepH(from, -n, SQUEEZE_PASS)) continue;
+                        if (!GapAhead(from, -n, along)) continue;   // a way past a thing on one side is no gap: walk round it
                         narrow = true; narrowSince = Time.time; squeezeAxis = -n;
                         pos = from;
                         SlideMove(-n * delta.magnitude, wasGrounded);

@@ -329,8 +329,10 @@ public class PHSlot : UdonSharpBehaviour
                 float ahead = reach + 0.1f + 0.2f * k;
                 if (WallAt(mid, dir, ahead) < ahead - 0.001f) break;
                 Vector3 at = mid + dir * ahead;
-                float g = WallAt(at, across, half) + WallAt(at, -across, half);
-                if (g < gap) gap = g;
+                // only a gap counts there: a wall on both sides. (A wall on one side of a place beside the prop is the
+                // wall the doorway is in: the prop squashed along its way instead of across it, Cor)
+                float ga = WallAt(at, across, half), gb = WallAt(at, -across, half);
+                if (ga < half - 0.001f && gb < half - 0.001f && ga + gb < gap) gap = ga + gb;
             }
         }
         return gap;
