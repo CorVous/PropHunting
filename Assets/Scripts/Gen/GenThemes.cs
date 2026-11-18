@@ -45,14 +45,52 @@ public static partial class GenData
             int bg = defGroupStart[b] + g;
             Group(groupMode[bg], groupChance[bg], groupRef[bg]);
         }
+        // the twin's own boards (as SlotsShelves reads them: the model's wide level surfaces), lowest first
+        int m = defModel[d], sc = defScale[d];
+        int s0 = GenModels.SurfStart[m], s1 = GenModels.SurfStart[m + 1];
+        int maxArea = 0;
+        for (int i = s0; i < s1; i++) if (GenModels.Surf[i * 6 + 5] > maxArea) maxArea = GenModels.Surf[i * 6 + 5];
+        int[] ys = new int[16];
+        int n = 0;
+        for (int i = s0; i < s1 && n < ys.Length; i++)
+        {
+            if (GenModels.Surf[i * 6 + 5] * 2 < maxArea) continue;
+            int by = GenModels.Surf[i * 6] * sc / 1000;
+            int q = n++;
+            while (q > 0 && ys[q - 1] > by) { ys[q] = ys[q - 1]; q--; }
+            ys[q] = by;
+        }
+        int[] usedX = new int[64], usedY = new int[64];
+        int nUsed = 0;
         for (int k = 0; k < defSlotCount[b]; k++)
         {
             int bs = defSlotStart[b] + k;
+            int x = Fit(slotX[bs], defSx[b], defSx[d]);
             int y = slotY[bs] == defTopY[b] ? defTopY[d] : (defSy[b] > 0 ? slotY[bs] * defSy[d] / defSy[b] : slotY[bs]);
-            Slot(slotGroup[bs], slotType[bs], Fit(slotX[bs], defSx[b], defSx[d]), y, Fit(slotZ[bs], defSz[b], defSz[d]), slotYaw[bs], slotSize[bs], slotAccept[bs], slotFill[bs]);
+            int size = slotSize[bs];
+            if (slotType[bs] == S_INSIDE)
+            {
+                // a place on a shelf board: on the twin's nearest board, with the room there is up to the next one
+                // (Cor: boxes floated between the boards); no board, or the place already taken: no such place
+                int best = -1;
+                for (int i = 0; i < n; i++) if (best < 0 || Abs(ys[i] - y) < Abs(ys[best] - y)) best = i;
+                if (best < 0) continue;
+                y = ys[best];
+                int gap = (best + 1 < n ? ys[best + 1] : defSy[d]) - y;
+                int fits = gap >= 620 ? SZ_L : (gap >= 330 ? SZ_M : (gap >= 150 ? SZ_S : SZ_XS));
+                if (best == n - 1 && y >= defSy[d] - 150) fits = size;   // the top board is open above
+                if (fits < size) size = fits;
+                bool taken = false;
+                for (int u = 0; u < nUsed; u++) if (usedY[u] == y && Abs(usedX[u] - x) < 150) taken = true;
+                if (taken) continue;
+                if (nUsed < usedX.Length) { usedX[nUsed] = x; usedY[nUsed] = y; nUsed++; }
+            }
+            Slot(slotGroup[bs], slotType[bs], x, y, Fit(slotZ[bs], defSz[b], defSz[d]), slotYaw[bs], size, slotAccept[bs], slotFill[bs]);
             if (slotHiding[bs]) Hiding();
         }
     }
+
+    static int Abs(int v) { return v < 0 ? -v : v; }
 
     static int Fit(int v, int sizeB, int sizeD)
     {
