@@ -418,7 +418,38 @@ public class PHLocal : UdonSharpBehaviour
         UpdateVoices();
         UpdateJoiner();
         UpdateHud();
+        UpdateHover();
         if (Time.time >= nextPanel) { nextPanel = Time.time + 0.5f; string st = game.SettingsText(); if (panelText != null) panelText.text = st; if (panelUiText != null) panelUiText.text = st; }
+    }
+
+    // A hider sees which prop the pointer is on (Cor: it was unclear what would be picked, or whether a thing could
+    // be picked at all): the prop that Use would take glows; a thing that cannot be a disguise does not.
+    Collider hoverCol;
+    GameObject hoverObj;
+    int hoverDef = -1;
+
+    void UpdateHover()
+    {
+        int phase = game.phase;
+        bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT) && !aimOverride;
+        Collider c = null;
+        if (can && Aim(TAKE_RANGE)) c = hit.collider;
+        if (c == hoverCol && (c != null || hoverObj == null)) return;
+        hoverCol = c;
+        GameObject o = null; int d = -1;
+        if (c != null)
+        {
+            int e = EmitOf(c.transform);
+            if (e >= 0)
+            {
+                d = game.gen.emitDef[e];
+                if (game.gen.defDisguise[d] > 0) o = game.builder.objects[e];
+            }
+        }
+        if (o == hoverObj) return;
+        if (hoverObj != null) game.builder.Hover(hoverObj, hoverDef, false);
+        hoverObj = o; hoverDef = d;
+        if (o != null) game.builder.Hover(o, d, true);
     }
 
     // the host's interval; a small group (under 6) three quarters of it, the endgame half (9.4, G53)

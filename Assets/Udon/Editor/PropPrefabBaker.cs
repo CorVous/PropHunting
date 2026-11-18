@@ -30,6 +30,7 @@ public static class PropPrefabBaker
         Directory.CreateDirectory(OUT + "/Fixtures");
         AssetDatabase.Refresh();
         LoadModels();
+        FixModels();
 
         var mat = AssetDatabase.LoadAssetAtPath<Material>(OUT + "/PropLit.mat");
         if (mat == null)
@@ -311,6 +312,36 @@ public static class PropPrefabBaker
             if (sk >= 0) skyPrefabs[sk] = prefab;
         }
         return result;
+    }
+
+    // Small corrections to the models as they come from the packs (Cor's playtest):
+    //   crop_carrot, crop_turnip: the root stood on the ground; it goes into it (the leaves and its shoulder show)
+    //   gen_laundrybasket: the lining's top lay in the rim's plane and flickered; it sits a little lower
+    static void FixModels()
+    {
+        for (int m = 0; m < mesh.Length; m++)
+        {
+            string n = GenModels.Name[m].ToLower();
+            if (mesh[m] == null) continue;
+            if (n == "crop_carrot" || n == "crop_turnip")
+            {
+                Vector3[] v = mesh[m].vertices;
+                float sink = bounds[m].size.y * 0.4f;
+                for (int i = 0; i < v.Length; i++) v[i].y -= sink;
+                mesh[m].vertices = v; mesh[m].RecalculateBounds(); bounds[m] = mesh[m].bounds;
+            }
+            else if (n == "gen_laundrybasket")
+            {
+                Vector3[] v = mesh[m].vertices; Color32[] c = mesh[m].colors32;
+                float top = bounds[m].max.y;
+                for (int i = 0; i < v.Length; i++)
+                {
+                    bool lining = c[i].r == 214 && c[i].g == 182 && c[i].b == 138;
+                    if (lining && v[i].y > 0.35f) v[i].y -= 0.008f;
+                }
+                mesh[m].vertices = v; mesh[m].RecalculateBounds(); bounds[m] = mesh[m].bounds;
+            }
+        }
     }
 
     static void LoadModels()

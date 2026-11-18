@@ -28,8 +28,13 @@ public class PHView : UdonSharpBehaviour
     public VRCPickup vrPanelPickup;
     public LayerMask pipBlockers = 1 << 11;
 
-    Vector3 panelOffset = new Vector3(0.45f, 1.1f, 0.55f);   // relative to the player, in the player's facing
-    float panelYawOffset;
+    // The panel keeps its place in the real room (Cor): its pose is kept relative to the playspace's origin, in
+    // units of the avatar's size, so walking with the stick or turning with it does not move it about the room.
+    Vector3 panelLocal;
+    Quaternion panelLocalRot = Quaternion.identity;
+    bool panelPlaced;
+    Vector3 panelBaseScale = new Vector3(0.36f, 0.24f, 1f);
+    Vector3 wristBaseScale = Vector3.one * 0.0004f;
     bool vr;
     int frame;
 
@@ -38,7 +43,17 @@ public class PHView : UdonSharpBehaviour
         vr = Networking.LocalPlayer.IsUserInVR();
         if (desktopRoot != null) desktopRoot.gameObject.SetActive(!vr);
         if (wristRoot != null) wristRoot.gameObject.SetActive(vr);
-        if (vrPanel != null) vrPanel.gameObject.SetActive(false);
+        if (vrPanel != null) { panelBaseScale = vrPanel.localScale; vrPanel.gameObject.SetActive(false); }
+        if (wristRoot != null) wristBaseScale = wristRoot.localScale;
+        // the third-person camera does not draw the panel that shows its picture (Cor: the screen saw itself)
+        if (pipCam != null && vrPanel != null) pipCam.cullingMask &= ~(1 << vrPanel.gameObject.layer);
+    }
+
+    // the avatar's size against a 1.6 m eye height: what is worn or held scales with it
+    float AvatarScale()
+    {
+        float eye = Networking.LocalPlayer.GetAvatarEyeHeightAsMeters();
+        return Mathf.Clamp(eye > 0.01f ? eye / 1.6f : 1f, 0.2f, 5f);
     }
 
     PHSlot Me() { return game.LocalSlot(); }
@@ -115,18 +130,53 @@ public class PHView : UdonSharpBehaviour
             desktopRoot.SetPositionAndRotation(head.position + head.rotation * new Vector3(0f, 0f, 0.5f), head.rotation);
             return;
         }
-        VRCPlayerApi.TrackingData hand = me.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand);
-        // on the back of the left wrist, facing up when the palm faces down
-        wristRoot.SetPositionAndRotation(hand.position + hand.rotation * new Vector3(0f, 0.03f, -0.05f), hand.rotation * Quaternion.Euler(90f, 0f, 0f));
-        if (!vrPanel.gameObject.activeSelf) return;
-        Quaternion facing = Quaternion.Euler(0f, me.GetRotation().eulerAngles.y, 0f);
+        float sc = AvatarScale();
+        VRCPlayerApi.TrackingData headT = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+        // The health bar lies along the left forearm, near the wrist, and faces the eyes (Cor: it floated off the
+        // arm and kept one size). From the avatar's bones, so it fits any avatar; from the hand's tracking where
+        // an avatar has no such bones.
+        Vector3 elbow = me.GetBonePosition(HumanBodyBones.LeftLowerArm), wrist = me.GetBonePosition(HumanBodyBones.LeftHand);
+        Vector3 arm = wrist - elbow;
+        if (elbow.sqrMagnitude > 1e-6f && wrist.sqrMagnitude > 1e-6f && arm.sqrMagnitude > 1e-6f)
+        {
+            float len = arm.magnitude;
+            Vector3 along = arm / len;
+            Vector3 at = elbow + arm * 0.72f;
+            Vector3 toEye = headT.position - at;
+            Vector3 up = toEye - along * Vector3.Dot(toEye, along);   // off the arm, towards the eyes
+            if (up.sqrMagnitude < 1e-6f) up = Vector3.up;
+            up.Normalize();
+            // the canvas's right runs along the arm; its face looks at the eyes
+            wristRoot.SetPositionAndRotation(at + up * (0.2f * len), Quaternion.LookRotation(-up, Vector3.Cross(along, -up)));
+            wristRoot.localScale = wristBaseScale * (len / 0.25f) * 0.75f;
+        }
+        else
+        {
+            VRCPlayerApi.TrackingData hand = me.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand);
+            wristRoot.SetPositionAndRotation(hand.position + hand.rotation * new Vector3(0f, 0.03f, -0.05f) * sc, hand.rotation * Quaternion.Euler(90f, 0f, 0f));
+            wristRoot.localScale = wristBaseScale * sc;
+        }
+        if (!vrPanel.gameObject.activeSelf) { panelPlaced = false; return; }
+        vrPanel.localScale = new Vector3(panelBaseScale.x * sc, panelBaseScale.y * sc, panelBaseScale.z);
+        VRCPlayerApi.TrackingData origin = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Origin);
+        Quaternion inv = Quaternion.Inverse(origin.rotation);
+        if (!panelPlaced)
+        {
+            // where it first appears: to the right of the view, a little below the eyes, turned to the player
+            panelPlaced = true;
+            Quaternion yawOnly = Quaternion.Euler(0f, headT.rotation.eulerAngles.y, 0f);
+            Vector3 p = headT.position + yawOnly * (new Vector3(0.38f, -0.22f, 0.55f) * sc);
+            Quaternion r = Quaternion.LookRotation(p - headT.position + Vector3.up * (0.1f * sc), Vector3.up);
+            panelLocal = inv * (p - origin.position) / sc;
+            panelLocalRot = inv * r;
+        }
         if (vrPanelPickup.IsHeld)
         {
-            // remember where the player put it, relative to themselves
-            panelOffset = Quaternion.Inverse(facing) * (vrPanel.position - me.GetPosition());
-            panelYawOffset = vrPanel.rotation.eulerAngles.y - facing.eulerAngles.y;
+            // remember where the player put it, in the room
+            panelLocal = inv * (vrPanel.position - origin.position) / sc;
+            panelLocalRot = inv * vrPanel.rotation;
             return;
         }
-        vrPanel.SetPositionAndRotation(me.GetPosition() + facing * panelOffset, Quaternion.Euler(0f, facing.eulerAngles.y + panelYawOffset, 0f));
+        vrPanel.SetPositionAndRotation(origin.position + origin.rotation * (panelLocal * sc), origin.rotation * panelLocalRot);
     }
 }

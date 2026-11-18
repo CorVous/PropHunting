@@ -80,7 +80,7 @@ public partial class MapGenUdon
         "sp_vent", "sp_ventB", "sp_gate", "sp_gateB", "sp_podB", "sp_podC", "sp_frameLow" };
      string[] MedievalIn = { "md_torch", "md_barrelSmall", "md_kegDeco", "md_boxStacked", "md_trunkSmallB", "md_swordWall", "md_coinsM", "md_trunkLargeC", "md_drum",
         "md_torchWall", "md_weaponRack", "md_crateA", "md_crateLongA", "md_oakBarrel", "md_trunkMedA", "md_arrows" };
-     string[] MedievalOut = { "md_torchStand", "md_barrierHalf", "md_crates", "md_well", "md_barrelLarge", "md_rockSmall", "md_drum",
+     string[] MedievalOut = { "md_barrierHalf", "md_crates", "md_well", "md_barrelLarge", "md_rockSmall", "md_drum",
         "md_target", "md_flag", "md_tent", "md_lumber", "md_stone", "md_crateOpen", "md_crateLongC", "md_ladder" };
 
     void ThemeDecor()

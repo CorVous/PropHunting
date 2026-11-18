@@ -1622,25 +1622,42 @@ public class MapBuilderUdon : UdonSharpBehaviour
         for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(selfBlock);
     }
 
+    // The prop a hider points at glows (PHLocal; PropLit's _Hover); off: back to its tint as TintProp gave it
+    MaterialPropertyBlock hoverBlock;
+    public void Hover(GameObject go, int def, bool on)
+    {
+        if (go == null) return;
+        if (hoverBlock == null) hoverBlock = new MaterialPropertyBlock();
+        Color c = Color.white;
+        if (defTint != null && def >= 0 && def < defTint.Length && defTint[def].a > 0f) c = defTint[def];
+        hoverBlock.SetColor("_Color", c);
+        hoverBlock.SetFloat("_Hover", on ? 1f : 0f);
+        MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
+        for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(hoverBlock);
+    }
+
     // the average of a model's vertex colours that pass the test (green-ish: g over r), 0 alpha when none
     Color AverageGreen(GameObject go)
     {
         MeshFilter[] fs = go.GetComponentsInChildren<MeshFilter>(true);
-        float r = 0, g = 0, b = 0; int n = 0;
+        float r = 0, g = 0, b = 0; int n = 0, total = 0;
         for (int f = 0; f < fs.Length; f++)
         {
             Mesh m = fs[f].sharedMesh;
             if (m == null) continue;
             Color32[] cs = m.colors32;
+            total += cs.Length;
             for (int i = 0; i < cs.Length; i++)
             {
                 if (cs[i].g < cs[i].r + 20) continue;
                 r += cs[i].r; g += cs[i].g; b += cs[i].b; n++;
             }
         }
+        greenShare = total > 0 ? (float)n / total : 0f;
         if (n == 0) return new Color(0, 0, 0, 0);
         return new Color(r / n / 255f, g / n / 255f, b / n / 255f, 1f);
     }
+    float greenShare;   // AverageGreen: the share of the model's vertices that passed
 
     public void TintProp(GameObject go, int def)
     {
@@ -1652,8 +1669,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             defTintDone[def] = true;
             Color avg = propPrefabs[def] != null ? AverageGreen(propPrefabs[def]) : new Color(0, 0, 0, 0);
             Color t = new Color(0, 0, 0, 0);
-            // only the cyan greens: blue close to green
-            if (avg.a > 0f && avg.b > avg.g * 0.72f)
+            // only the cyan greens: blue close to green; and only a thing that is mostly foliage (the tint is on the
+            // whole prop: a tan basket with a blue towel in it turned olive)
+            if (avg.a > 0f && avg.b > avg.g * 0.72f && greenShare >= 0.2f)
             {
                 Color32 want = Blend(palGrass, C(54, 112, 58), 45);   // the map's green, darker and fuller than its grass
                 t = new Color(Mathf.Clamp(want.r / 255f / Mathf.Max(0.05f, avg.r), 0.3f, 1.6f), Mathf.Clamp(want.g / 255f / Mathf.Max(0.05f, avg.g), 0.3f, 1.6f),

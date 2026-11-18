@@ -14,6 +14,8 @@ Shader "PropHunt/Lit"
         // 1 on a hider's own prop (PHSlot, by property block): drawn only into the third-person view's texture,
         // which is _PipWidth pixels wide; no other camera shows it (Cor: you could see your own prop)
         [HideInInspector] _PipOnly ("Third-person view only", Float) = 0
+        // 1 on the prop a hider points at and could become (PHLocal, by property block): a warm glow, strongest at its rim
+        [HideInInspector] _Hover ("Pointed at", Float) = 0
     }
     SubShader
     {
@@ -39,6 +41,7 @@ Shader "PropHunt/Lit"
             float4 _UdonPHSunArea;
             float _Toon;
             float _PipOnly;
+            float _Hover;
 
             // the toon ramp: three flat bands with short soft edges; above full light (a bright lamp) it stays linear
             float Ramp(float x)
@@ -172,6 +175,12 @@ Shader "PropHunt/Lit"
                 }
                 else c = i.ambient + Toon(i.sun, i.albedo) + lamps;   // before the spot is baked: the base sun, the lamps on top
                 c = lerp(c, i.albedo * 1.4, i.emit);
+                if (_Hover > 0.5)
+                {
+                    float rim = 1.0 - saturate(dot(n, normalize(_WorldSpaceCameraPos - i.worldPos)));
+                    float pulse = 0.85 + 0.15 * sin(_Time.y * 6.0);
+                    c = lerp(c, float3(1.0, 0.86, 0.35), (0.28 + 0.6 * rim * rim) * pulse);
+                }
                 fixed4 col = fixed4(c, 1);
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return col;

@@ -79,7 +79,7 @@ public partial class MapGen
         "sp_vent", "sp_ventB", "sp_gate", "sp_gateB", "sp_podB", "sp_podC", "sp_frameLow" };
     static readonly string[] MedievalIn = { "md_torch", "md_barrelSmall", "md_kegDeco", "md_boxStacked", "md_trunkSmallB", "md_swordWall", "md_coinsM", "md_trunkLargeC", "md_drum",
         "md_torchWall", "md_weaponRack", "md_crateA", "md_crateLongA", "md_oakBarrel", "md_trunkMedA", "md_arrows" };
-    static readonly string[] MedievalOut = { "md_torchStand", "md_barrierHalf", "md_crates", "md_well", "md_barrelLarge", "md_rockSmall", "md_drum",
+    static readonly string[] MedievalOut = { "md_barrierHalf", "md_crates", "md_well", "md_barrelLarge", "md_rockSmall", "md_drum",
         "md_target", "md_flag", "md_tent", "md_lumber", "md_stone", "md_crateOpen", "md_crateLongC", "md_ladder" };
 
     void ThemeDecor()
