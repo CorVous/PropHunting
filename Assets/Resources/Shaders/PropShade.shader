@@ -23,6 +23,7 @@ Shader "PropHunt/Shade"
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
             #include "UnityCG.cginc"
+            #include "PipCut.cginc"
 
             fixed4 _Shade;
             float _PipOnly;
@@ -38,6 +39,7 @@ Shader "PropHunt/Shade"
             {
                 float4 pos : SV_POSITION;
                 half a : TEXCOORD0;
+                float3 worldPos : TEXCOORD2;
                 UNITY_FOG_COORDS(1)
             };
 
@@ -48,12 +50,15 @@ Shader "PropHunt/Shade"
                 o.pos = UnityObjectToClipPos(v.vertex);
                 if (_PipOnly > 0.5 && abs(_ScreenParams.x - 384.0) > 0.5) o.pos = float4(2.0, 2.0, 2.0, 1.0);
                 o.a = v.color.a;
+                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 UNITY_TRANSFER_FOG(o, o.pos);
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target
             {
+                // a patch on an upper floor goes with the floor in the prop viewer's cutout (PipCut.cginc); its rim stays unshaded
+                if (_PipOnly < 0.5 && PipCut(i.worldPos, i.pos.xy) > 0.5) return fixed4(1, 1, 1, 1);
                 half a = i.a * i.a * (3.0 - 2.0 * i.a);
                 fixed4 col = fixed4(lerp(float3(1, 1, 1), _Shade.rgb, a), 1);
                 UNITY_APPLY_FOG_COLOR(i.fogCoord, col, fixed4(1, 1, 1, 1));   // far off it fades out with the fog

@@ -122,7 +122,7 @@ public static class WorldSceneBuilder
         builder.sun = sun;   // the map's mood turns and tints it (MapBuilderUdon.ApplyMood)
         // the hider's own prop and the prop pointed at are drawn with materials of their own (MapBuilderUdon.SelfOnly, Hover)
         builder.propLitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
-        builder.selfMat = Variant("PropLitSelf", builder.propLitMat, "_PipOnly", Shader.Find("PropHunt/LitSelf"));   // + the see-through pass
+        builder.selfMat = Variant("PropLitSelf", builder.propLitMat, "_PipOnly");
         builder.hoverMat = Variant("PropLitHover", builder.propLitMat, "_Hover");
         builder.shadeSelfMat = Variant("PropShadeSelf", AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropShade.mat"), "_PipOnly");
         UdonSharpEditorUtility.CopyProxyToUdon(builder);
@@ -265,11 +265,9 @@ public static class WorldSceneBuilder
         var rt = AssetDatabase.LoadAssetAtPath<RenderTexture>("Assets/Udon/Generated/Pip.renderTexture");
         if (rt == null)
         {
-            rt = new RenderTexture(384, 256, 24) { name = "Pip" };
+            rt = new RenderTexture(384, 256, 16) { name = "Pip" };
             AssetDatabase.CreateAsset(rt, "Assets/Udon/Generated/Pip.renderTexture");
         }
-        // 24-bit depth carries a stencil, which the own prop's see-through pass uses (PropLitSelf.shader)
-        if (rt.depth < 24) { rt.Release(); rt.depth = 24; EditorUtility.SetDirty(rt); }
         var camGo = new GameObject("PipCamera");
         camGo.transform.SetParent(viewGo.transform, false);
         var cam = camGo.AddComponent<Camera>();
@@ -408,15 +406,14 @@ public static class WorldSceneBuilder
     }
 
     // a copy of a material with one of its float marks set
-    static Material Variant(string name, Material from, string flag, Shader shader = null)
+    static Material Variant(string name, Material from, string flag)
     {
         if (from == null) { Debug.LogError("[prophunt] no material to make " + name + " from"); return null; }
         string path = "Assets/Udon/Generated/" + name + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
         if (m == null) { m = new Material(from); AssetDatabase.CreateAsset(m, path); }
-        m.shader = shader != null ? shader : from.shader;
+        m.shader = from.shader;
         m.CopyPropertiesFromMaterial(from);
-        m.renderQueue = -1;   // the shader's own queue
         m.enableInstancing = true;
         m.SetFloat(flag, 1f);
         EditorUtility.SetDirty(m);

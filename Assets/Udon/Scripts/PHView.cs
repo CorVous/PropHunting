@@ -238,6 +238,7 @@ public class PHView : UdonSharpBehaviour
         bool pip = hider;
         pipCam.enabled = pip && (frame & 1) == 0;
         if (pip) PlaceCamera(s);
+        SetCut(s, pip);
     }
 
     // the own prop's outline: shown while hiding, laid out anew when the prop changes. It is the footprint of the
@@ -376,8 +377,8 @@ public class PHView : UdonSharpBehaviour
         nPieces++;
     }
 
-    // behind the prop, looking at it, at full distance whatever is in the way (Cor: free flying); where a wall hides the
-    // prop, the prop's material draws it through the wall (PropLitSelf.shader)
+    // behind the prop, looking at it, at full distance whatever is in the way (Cor: free flying); whatever lies between
+    // is cut away in this view (SetCut, PipCut.cginc)
     void PlaceCamera(PHSlot s)
     {
         float h = game.gen.defSy[s.def] / 1000f;
@@ -389,6 +390,27 @@ public class PHView : UdonSharpBehaviour
         float dist = Mathf.Clamp(2.2f + h, 2.2f, 5f);
         Vector3 want = target + back * dist + Vector3.up * (0.8f + h * 0.5f);
         pipCam.transform.SetPositionAndRotation(want, Quaternion.LookRotation(target - want, Vector3.up));
+    }
+
+    // the prop viewer's cutout (PipCut.cginc, Cor: "a stylized cutout in the geometry so you can see the prop in full,
+    // along with the things around it"): the own prop's centre and the hole's radius there, its bounding radius and half
+    // a metre, and the floor it stands on. Radius 0 while not hiding, so no view cuts anything.
+    int cutId, cutFloorId;
+    bool cutOn;
+    void SetCut(PHSlot s, bool on)
+    {
+        if (cutId == 0) { cutId = VRCShader.PropertyToID("_UdonPHCut"); cutFloorId = VRCShader.PropertyToID("_UdonPHCutFloor"); }
+        if (!on)
+        {
+            if (cutOn) { VRCShader.SetGlobalVector(cutId, Vector4.zero); cutOn = false; }
+            return;
+        }
+        cutOn = true;
+        float sx = game.gen.defSx[s.def] / 1000f, sy = game.gen.defSy[s.def] / 1000f, sz = game.gen.defSz[s.def] / 1000f;
+        float r = Mathf.Clamp(0.5f * Mathf.Sqrt(sx * sx + sy * sy + sz * sz) + 0.5f, 0.8f, 2.5f);
+        Vector3 c = s.propPos + Vector3.up * (sy * 0.5f);
+        VRCShader.SetGlobalVector(cutId, new Vector4(c.x, c.y, c.z, r));
+        VRCShader.SetGlobalVector(cutFloorId, new Vector4(s.propPos.y, 0f, 0f, 0f));
     }
 
     public override void PostLateUpdate()

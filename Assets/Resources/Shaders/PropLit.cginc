@@ -6,6 +6,7 @@
 #include "UnityCG.cginc"
 #include "UnityLightingCommon.cginc"
 #include "Packages/red.sim.lightvolumes/Shaders/LightVolumes.cginc"
+#include "PipCut.cginc"
 
 UNITY_INSTANCING_BUFFER_START(Props)
     UNITY_DEFINE_INSTANCED_PROP(fixed4, _Color)
@@ -146,6 +147,8 @@ void PointLights(float3 worldPos, float3 n, out float3 sun, out float3 lamps)
 
 fixed4 frag (v2f i) : SV_Target
 {
+    // the prop viewer's cutout (PipCut.cginc); never on the hider's own prop
+    half cutRim = _PipOnly < 0.5 ? PipCut(i.worldPos, i.pos.xy) : 0;
     float3 c;
     float3 n = normalize(i.normal);
     bool lvOn = LightVolumesEnabled() > 0;
@@ -184,6 +187,7 @@ fixed4 frag (v2f i) : SV_Target
         float pulse = 0.85 + 0.15 * sin(_Time.y * 6.0);
         c = lerp(c, float3(1.0, 0.86, 0.35), (0.28 + 0.6 * rim * rim) * pulse);
     }
+    if (cutRim > 0.5) c = PipCutRim();
     fixed4 col = fixed4(c, 1);
     UNITY_APPLY_FOG(i.fogCoord, col);
     return col;
