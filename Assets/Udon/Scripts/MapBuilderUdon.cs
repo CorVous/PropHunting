@@ -1689,7 +1689,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             {
                 Color32 want = Blend(palGrass, C(54, 112, 58), 45);   // the map's green, darker and fuller than its grass
                 t = new Color(Mathf.Clamp(want.r / 255f / Mathf.Max(0.05f, avg.r), 0.3f, 1.6f), Mathf.Clamp(want.g / 255f / Mathf.Max(0.05f, avg.g), 0.3f, 1.6f),
-                              Mathf.Clamp(want.b / 255f / Mathf.Max(0.05f, avg.b), 0.3f, 1.6f), 1f);
+                              Mathf.Clamp(want.b / 255f / Mathf.Max(0.05f, avg.b), 0.3f, 1.6f), 0.5f);   // alpha 0.5: the leaves only (PropLit, MergeOne). The trunk took the tint too and turned orange
             }
             defTint[def] = t;
         }
@@ -2651,6 +2651,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         mr.GetPropertyBlock(mergeBlock);
         Color pc = mergeBlock.GetColor("_Color");
         if (pc.a > 0f) tint = pc;
+        bool leafOnly = pc.a > 0f && pc.a < 0.75f;   // a foliage tint (TintProp): not on the trunk
         Matrix4x4 M = mr.transform.localToWorldMatrix;
         int b = B_SCENERY, s = nv[b];
         while (nv[b] + v.Length > bv[b].Length || nt[b] + tri.Length > bt[b].Length) BufGrow(b);
@@ -2660,7 +2661,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             bv[b][s + i] = M.MultiplyPoint3x4(v[i]);
             bn[b][s + i] = hasN ? M.MultiplyVector(n[i]).normalized : Vector3.up;
             Color32 k = hasC ? c[i] : new Color32(255, 255, 255, 255);
-            bc[b][s + i] = new Color32((byte)Mathf.Min(255, (int)(k.r * tint.r)), (byte)Mathf.Min(255, (int)(k.g * tint.g)), (byte)Mathf.Min(255, (int)(k.b * tint.b)), k.a);
+            if (leafOnly && k.g < k.r + 20) bc[b][s + i] = k;
+            else bc[b][s + i] = new Color32((byte)Mathf.Min(255, (int)(k.r * tint.r)), (byte)Mathf.Min(255, (int)(k.g * tint.g)), (byte)Mathf.Min(255, (int)(k.b * tint.b)), k.a);
         }
         int t0 = nt[b];
         for (int i = 0; i < tri.Length; i++) bt[b][t0 + i] = s + tri[i];

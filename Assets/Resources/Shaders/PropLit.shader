@@ -96,7 +96,10 @@ Shader "PropHunt/Lit"
                 albedo = GammaToLinearSpace(albedo);
                 #endif
                 fixed4 tint = UNITY_ACCESS_INSTANCED_PROP(Props, _Color);
-                albedo *= tint.rgb;
+                // alpha 0.5 marks a foliage tint (MapBuilderUdon.TintProp): only on what is green in the model, so a
+                // tree's trunk keeps its wood (it turned orange under the leaves' tint)
+                float leaf = tint.a < 0.75 ? step(v.color.r + 0.078, v.color.g) : 1.0;
+                albedo *= lerp(float3(1.0, 1.0, 1.0), tint.rgb, leaf);
                 // grounding (Cor: more cohesion): an upright surface is a little darker at its foot, where it meets
                 // what it stands on. In the mesh's own space: a prop's base, a wall's foot.
                 albedo *= lerp(0.74, 1.0, saturate(v.vertex.y * 2.2 + max(n.y, 0.0) * 2.0));

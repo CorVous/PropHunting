@@ -412,12 +412,14 @@ public static class PropPrefabBaker
                 float h, s, val;
                 Color.RGBToHSV(c[i], out h, out s, out val);
                 float deg = h * 360f;
-                if (deg >= 8f && deg <= 44f && s >= 0.22f && s <= 0.85f && val >= 0.2f && val <= 0.97f)
+                // wood: a warm brown that is not a pure bright orange (a cone, a carrot, a space base's trim stay)
+                if (deg >= 8f && deg <= 44f && s >= 0.22f && s <= 0.78f && val >= 0.2f && !(s >= 0.66f && val >= 0.96f))
                 {
                     deg = Mathf.Lerp(deg, 25f, 0.7f);
-                    s = Mathf.Lerp(s, Mathf.Clamp(s, 0.34f, 0.52f), 0.8f);
+                    s = Mathf.Lerp(s, Mathf.Clamp(s, 0.36f, 0.52f), 0.8f);
+                    if (val > 0.7f) val = Mathf.Lerp(val, 0.82f, 0.5f);   // the pale packs and the bright ones meet in the middle
                 }
-                else if (s > 0.72f) s = 0.72f + (s - 0.72f) * 0.4f;
+                else if (s > 0.85f) s = 0.85f + (s - 0.85f) * 0.5f;
                 Color o = Color.HSVToRGB(deg / 360f, s, val);
                 c[i] = new Color32((byte)Mathf.RoundToInt(o.r * 255f), (byte)Mathf.RoundToInt(o.g * 255f), (byte)Mathf.RoundToInt(o.b * 255f), c[i].a);
             }
