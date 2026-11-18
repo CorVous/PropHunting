@@ -258,6 +258,14 @@ public class PHSlot : UdonSharpBehaviour
                 proxy.transform.position = propPos;
                 proxy.name = "Hider" + index;
                 shownPos = propPos; shownYaw = propYaw;
+                // its shade patch (the prefab's last child), shown only while it stands on a floor (ShadeCheck)
+                proxyShade = null; shadeNext = 0f;
+                Transform pt = proxy.transform;
+                if (pt.childCount > 0)
+                {
+                    Transform last = pt.GetChild(pt.childCount - 1);
+                    if (last.name == "Shade") proxyShade = last.gameObject;
+                }
                 // the owner's own prop must not block the owner; for everyone else its colliders are the target
                 Collider[] cols = proxy.GetComponentsInChildren<Collider>(true);
                 for (int i = 0; i < cols.Length; i++) cols[i].enabled = !mine;
@@ -277,6 +285,29 @@ public class PHSlot : UdonSharpBehaviour
         shownPos = Vector3.Lerp(shownPos, propPos, k);
         shownYaw = Mathf.LerpAngle(shownYaw, propYaw, k);
         proxy.transform.SetPositionAndRotation(shownPos, Quaternion.Euler(0f, shownYaw, 0f));
+        if (proxyShade != null && Time.time >= shadeNext) { shadeNext = Time.time + 0.15f; ShadeCheck(); }
+    }
+
+    // A real prop has its shade patch only where it stands on a floor (not on a table or a shelf, never in the
+    // air). A hider's prop the same, or the patch would give it away (Cor): what is right under it decides.
+    GameObject proxyShade;
+    float shadeNext;
+
+    void ShadeCheck()
+    {
+        RaycastHit r;
+        bool floor = false;
+        if (Physics.Raycast(shownPos + Vector3.up * 0.04f, Vector3.down, out r, 0.16f, ~(1 << 9 | 1 << 10 | 1 << 18 | 1 << HIDER_SELF), QueryTriggerInteraction.Ignore))
+        {
+            floor = true;
+            Transform t = r.collider.transform, props = game.builder.propRoot;
+            for (int up = 0; up < 4 && t != null; up++)
+            {
+                if (t == props || t == proxyRoot) { floor = false; break; }
+                t = t.parent;
+            }
+        }
+        if (proxyShade.activeSelf != floor) proxyShade.SetActive(floor);
     }
 
     public override void OnStationEntered(VRCPlayerApi player)
