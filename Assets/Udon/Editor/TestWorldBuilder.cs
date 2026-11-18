@@ -41,6 +41,29 @@ public static class TestWorldBuilder
         }
     }
 
+    // The world as it is (no pilot: you play it yourself), exported for Tools/Launch-Clients.ps1: a local test
+    // in the real client, on the desktop or in VR (-VR). The lobby's DEBUG plaque starts a round alone.
+    [MenuItem("PropHunt/Export world for a local test")]
+    public static void ExportPlain()
+    {
+        try
+        {
+            File.WriteAllText(ResultFile, "RUNNING");
+            WorldSceneBuilder.Build();
+            MapGenTableBaker.Bake();
+            var game = UnityEngine.Object.FindObjectOfType<PHGame>(true);
+            EditorSceneManager.SaveScene(game.gameObject.scene);
+            string path = Export();
+            File.WriteAllText(ResultFile, "OK\n" + path);
+            Debug.Log("[prophunt] exported the world for a local test: " + path);
+        }
+        catch (Exception e)
+        {
+            File.WriteAllText(ResultFile, "FAILED\n" + e);
+            Debug.LogError("[prophunt] export failed: " + e);
+        }
+    }
+
     // the SDK's own local export (Station Lab's StationLabBuilder.Export)
     public static string Export()
     {

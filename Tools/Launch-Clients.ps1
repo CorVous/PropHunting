@@ -3,6 +3,7 @@
 #
 #   .\Launch-Clients.ps1 -Count 2                 # start a fresh instance with two clients
 #   .\Launch-Clients.ps1 -Count 1 -RoomId 12345   # add a late joiner to an existing instance
+#   .\Launch-Clients.ps1 -Count 1 -VR             # one client in VR (the world from PropHunt > Export world for a local test)
 param(
     [int]$Count = 2,
     [int]$FirstProfile = 0,   # each client needs its own VRChat profile (--profile=N), or a second one crashes
@@ -10,7 +11,8 @@ param(
     [string]$World = "",
     [string]$VRChat = "C:\Program Files (x86)\Steam\steamapps\common\VRChat\VRChat.exe",
     [int]$Width = 800,
-    [int]$Height = 450
+    [int]$Height = 450,
+    [switch]$VR               # the first client in VR (SteamVR and the headset must be running); any others on the desktop
 )
 
 $project = Split-Path $PSScriptRoot -Parent
@@ -27,10 +29,8 @@ $logDir = Join-Path $env:USERPROFILE "AppData\LocalLow\VRChat\VRChat"
 
 for ($i = 0; $i -lt $Count; $i++) {
     $before = @(Get-ChildItem $logDir -Filter "output_log*" | Select-Object -ExpandProperty Name)
-    $clientArgs = @(
-        "--url=$url", "--profile=$($FirstProfile + $i)", "--no-vr", "--enable-debug-gui", "--enable-sdk-log-levels", "--enable-udon-debug-logging",
-        "-screen-fullscreen", "0", "-screen-width", "$Width", "-screen-height", "$Height"
-    )
+    $clientArgs = @("--url=$url", "--profile=$($FirstProfile + $i)", "--enable-debug-gui", "--enable-sdk-log-levels", "--enable-udon-debug-logging")
+    if (-not ($VR -and $i -eq 0)) { $clientArgs += @("--no-vr", "-screen-fullscreen", "0", "-screen-width", "$Width", "-screen-height", "$Height") }
     Start-Process -FilePath $VRChat -ArgumentList $clientArgs -WorkingDirectory (Split-Path $VRChat) | Out-Null
 
     # Each client names its log by start time; wait for the new file so clients can be told apart.
