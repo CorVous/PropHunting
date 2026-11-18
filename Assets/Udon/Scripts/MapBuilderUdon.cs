@@ -287,6 +287,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void Box(int b, Vector3 mn, Vector3 mx, Color32 col, int faces) { Box3(b, mn, mx, col, col, col, faces); }
 
+    Mesh collMesh;
+
     Mesh ToMesh(int b, string name)
     {
         int n = nv[b];
@@ -760,8 +762,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
             case 23: Canopies(); PitchedRoofs(); stage = 24; break;
             case 24: Dressing(); stage = 25; break;
             case 25: roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs"); stage = 26; break;
-            case 26:
-                collisionCollider.sharedMesh = ToMesh(B_COLL, "ArchCollision");
+            case 26: collMesh = ToMesh(B_COLL, "ArchCollision"); stage = 27; break;
+            case 27:
+                collisionCollider.sharedMesh = collMesh;   // the engine prepares the collider here: a step of its own
+                collMesh = null;
                 stage = 3; cursor = 0; phase = "Placing props";
                 break;
             case 3:
