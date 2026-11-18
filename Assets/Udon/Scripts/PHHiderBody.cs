@@ -55,10 +55,97 @@ public class PHHiderBody : UdonSharpBehaviour
     bool jumpPressed;
     RaycastHit hit;
 
+    // A correction (a nudge to where the prop fits, out of a gap, aside into a doorway) moves the prop at once but
+    // not the player's view (Cor: being displaced is disorienting): the seat stays where it was, and the prop makes
+    // its way back under it as the player moves (Move), as far as walls let it. lag is how far the seat is from the
+    // prop; PHSlot seats the player at pos + lag. Only its height eases away by itself (the seat ends at the prop's
+    // floor). Nudges look for room around the seat, not the prop, so repeated ones do not walk the prop away.
+    [HideInInspector] public Vector3 lag;
+    const float LAG_MAX = 1.5f;
+    void Shift(Vector3 to)
+    {
+        lag += pos - to;
+        if (lag.sqrMagnitude > LAG_MAX * LAG_MAX) lag = Vector3.zero;   // too far to glide: the view goes with it
+        pos = to;
+    }
+
+    // The prop's own shape (Cor: the fitted colliders, not the box around them): the boxes of its prefab's
+    // colliders, in the prop's frame from the middle of its base. shape*: as they are (the outline draws their
+    // footprint, PHView); box*: a skin smaller, what the body is moved as. Wherever the box around the prop meets
+    // something, these are asked instead, so a table walks over a stool and a chair's legs pass a rug's edge.
+    // nBox 0: the one box (a ghost, a prop with other colliders than boxes).
+    const int SHAPE_MAX = 12;
+    [HideInInspector] public int shapeN, shapeSerial, shapeDef = -1;
+    [System.NonSerialized] public Vector3[] shapeMin, shapeMax;
+    Vector3[] boxC, boxH;
+    int nBox;
+
+    void SetShape(int def, Vector3 size)
+    {
+        if (shapeMin == null || shapeMin.Length < SHAPE_MAX)
+        {
+            shapeMin = new Vector3[SHAPE_MAX]; shapeMax = new Vector3[SHAPE_MAX];
+            boxC = new Vector3[SHAPE_MAX]; boxH = new Vector3[SHAPE_MAX];
+        }
+        nBox = 0; shapeN = 0; shapeDef = def; shapeSerial++;
+        Vector3 lo = new Vector3(-size.x * 0.5f, 0f, -size.z * 0.5f), hi = new Vector3(size.x * 0.5f, size.y, size.z * 0.5f);
+        GameObject pf = null;
+        if (game.builder != null && game.builder.propPrefabs != null && def >= 0 && def < game.builder.propPrefabs.Length) pf = game.builder.propPrefabs[def];
+        bool ok = pf != null;
+        if (ok)
+        {
+            Transform root = pf.transform;
+            Quaternion inv = Quaternion.Inverse(root.rotation);
+            Vector3 origin = root.position;
+            Collider[] all = pf.GetComponentsInChildren<Collider>(true);
+            BoxCollider[] boxes = pf.GetComponentsInChildren<BoxCollider>(true);
+            int solid = 0, solidBoxes = 0;
+            for (int i = 0; i < all.Length; i++) if (all[i] != null && !all[i].isTrigger) solid++;
+            for (int i = 0; i < boxes.Length; i++) if (boxes[i] != null && !boxes[i].isTrigger) solidBoxes++;
+            if (solid != solidBoxes || solidBoxes == 0 || solidBoxes > SHAPE_MAX) ok = false;
+            for (int i = 0; ok && i < boxes.Length; i++)
+            {
+                BoxCollider b = boxes[i];
+                if (b == null || b.isTrigger) continue;
+                Transform t = b.transform;
+                Vector3 ce = b.center, ex = b.size * 0.5f;
+                Vector3 mn = new Vector3(1e6f, 1e6f, 1e6f), mx = new Vector3(-1e6f, -1e6f, -1e6f);
+                for (int k = 0; k < 8; k++)
+                {
+                    Vector3 corner = ce + new Vector3((k & 1) == 0 ? -ex.x : ex.x, (k & 2) == 0 ? -ex.y : ex.y, (k & 4) == 0 ? -ex.z : ex.z);
+                    Vector3 w = inv * (t.TransformPoint(corner) - origin);
+                    mn = Vector3.Min(mn, w); mx = Vector3.Max(mx, w);
+                }
+                mn = Vector3.Max(mn, lo); mx = Vector3.Min(mx, hi);
+                if (mx.x - mn.x < 0.004f || mx.y - mn.y < 0.004f || mx.z - mn.z < 0.004f) continue;
+                shapeMin[shapeN] = mn; shapeMax[shapeN] = mx; shapeN++;
+            }
+        }
+        if (!ok || shapeN == 0) { shapeN = 1; shapeMin[0] = lo; shapeMax[0] = hi; return; }
+        // the lowest boxes reach down to the base: the fitting leaves off a prop's feet (a chair's, a bookcase's
+        // plinth start some centimetres up), and the base is where the prop stands
+        float minY = 1e6f;
+        for (int i = 0; i < shapeN; i++) minY = Mathf.Min(minY, shapeMin[i].y);
+        for (int i = 0; i < shapeN; i++) if (shapeMin[i].y <= minY + 0.02f) shapeMin[i].y = 0f;
+        for (int i = 0; i < shapeN; i++)
+        {
+            Vector3 mn = shapeMin[i], mx = shapeMax[i];
+            Vector3 c = (mn + mx) * 0.5f;
+            float y0 = mn.y + RAISE, y1 = Mathf.Max(y0 + 0.01f, mx.y - SKIN);
+            c.y = (y0 + y1) * 0.5f;
+            boxC[i] = c;
+            boxH[i] = new Vector3(Mathf.Max(0.01f, (mx.x - mn.x) * 0.5f - SKIN), (y1 - y0) * 0.5f, Mathf.Max(0.01f, (mx.z - mn.z) * 0.5f - SKIN));
+        }
+        nBox = shapeN;
+    }
+
+    // moved as its own shape: not while it is the narrow box of a squeeze, or the thin one of a look for room
+    bool Fitted() { return nBox > 0 && half == fullHalf; }
+
     // ------------------------------------------------------------------ shape
     public void Begin(Vector3 at, float facing)
     {
-        pos = at; yaw = facing; stationYaw = facing;
+        pos = at; yaw = facing; stationYaw = facing; lag = Vector3.zero;
         velY = 0f; grounded = false; lifting = false;
         active = true; ghost = false;
         turnHeld = false; wasTurning = false; keyDir = 0;
@@ -72,6 +159,7 @@ public class PHHiderBody : UdonSharpBehaviour
         ghost = false;
         Vector3 size = new Vector3(game.gen.defSx[def], game.gen.defSy[def], game.gen.defSz[def]) / 1000f;
         SetBox(size);
+        SetShape(def, size);
         int cls = Mathf.Clamp(game.gen.defDisguise[def] - 1, 0, 3);
         stepHeight = Mathf.Clamp(0.4f * size.y, 0.04f, 0.30f);
         hop = hopHeight[cls];
@@ -84,6 +172,7 @@ public class PHHiderBody : UdonSharpBehaviour
     {
         ghost = true;
         SetBox(new Vector3(0.4f, 1.7f, 0.4f));
+        nBox = 0; shapeN = 0; shapeDef = -1; shapeSerial++;
         stepHeight = 0.35f; hop = 0.45f; ledge = 0f; speed = 4f;
         mask = 0;   // through everything; the ground is kept by the height clamp below
     }
@@ -148,7 +237,7 @@ public class PHHiderBody : UdonSharpBehaviour
                 bool wall = SweepH(pos, (at - pos).normalized, d);
                 half = fullHalf;
                 if (wall) continue;
-                pos = at; narrow = false;
+                Shift(at); narrow = false;
                 return;
             }
         half = narrowHalf;
@@ -289,6 +378,9 @@ public class PHHiderBody : UdonSharpBehaviour
             left -= step;
         }
         if (ghost && pos.y < -12f) { pos.y = 0f; velY = 0f; grounded = true; }   // fell out of the world
+        // the seat's height settles on the prop's floor: at least half a metre a second, quicker the further it is
+        float lagY = Mathf.Abs(lag.y);
+        if (lagY > 0f) lag.y = lagY < 0.002f ? 0f : Mathf.MoveTowards(lag.y, 0f, Mathf.Max(0.5f, lagY * 5f) * dt);
     }
 
     // ------------------------------------------------------------------ casts (BoxBody)
@@ -302,7 +394,20 @@ public class PHHiderBody : UdonSharpBehaviour
         RaycastHit r;   // (an out parameter into a field is not written back in Udon)
         // A tenth of a degree off: at exactly 90 or 270 degrees PhysX sweeps a box that is longer than wide as if it
         // were not turned, and short sweeps miss the walls (a prop facing east or west walked through them)
-        bool any = Physics.BoxCast(c, h, dir, out r, Quaternion.Euler(0f, yaw + 0.1f, 0f), dist + GAP, mask, QueryTriggerInteraction.Ignore);
+        Quaternion q = Quaternion.Euler(0f, yaw + 0.1f, 0f);
+        bool any = Physics.BoxCast(c, h, dir, out r, q, dist + GAP, mask, QueryTriggerInteraction.Ignore);
+        if (any && Fitted())
+        {
+            // the box around the prop meets something: what its own boxes meet, the nearest
+            any = false;
+            float best = 1e9f;
+            for (int i = 0; i < nBox; i++)
+            {
+                RaycastHit s;
+                if (Physics.BoxCast(from + q * boxC[i], boxH[i], dir, out s, q, dist + GAP, mask, QueryTriggerInteraction.Ignore) && s.distance < best)
+                { best = s.distance; r = s; any = true; }
+            }
+        }
         hit = r;
         return any;
     }
@@ -328,7 +433,22 @@ public class PHHiderBody : UdonSharpBehaviour
         Vector3 h = new Vector3(half.x - 0.005f, half.y - RAISE * 0.5f, half.z - 0.005f);
         Vector3 c = from + Vector3.up * (half.y + RAISE * 0.5f);
         RaycastHit r;
-        if (Physics.BoxCast(c, h, Vector3.down, out r, Rot(), dist + RAISE, mask, QueryTriggerInteraction.Ignore))
+        Quaternion q = Rot();
+        bool any = Physics.BoxCast(c, h, Vector3.down, out r, q, dist + RAISE, mask, QueryTriggerInteraction.Ignore);
+        if (any && Fitted())
+        {
+            any = false;
+            float best = 1e9f;
+            for (int i = 0; i < nBox; i++)
+            {
+                RaycastHit s;
+                Vector3 bh = boxH[i];
+                bh.x = Mathf.Max(0.004f, bh.x - 0.005f); bh.z = Mathf.Max(0.004f, bh.z - 0.005f);
+                if (Physics.BoxCast(from + q * boxC[i], bh, Vector3.down, out s, q, dist + RAISE, mask, QueryTriggerInteraction.Ignore) && s.distance < best)
+                { best = s.distance; r = s; any = true; }
+            }
+        }
+        if (any)
         {
             hit = r;
             groundY = from.y + RAISE - hit.distance;
@@ -344,16 +464,30 @@ public class PHHiderBody : UdonSharpBehaviour
         Vector3 h = new Vector3(half.x - 0.005f, half.y - RAISE * 0.5f, half.z - 0.005f);
         Vector3 c = from + Vector3.up * (half.y + RAISE * 0.5f);
         RaycastHit r;
-        if (Physics.BoxCast(c, h, Vector3.up, out r, Rot(), dist + GAP, mask, QueryTriggerInteraction.Ignore))
-            return Mathf.Max(0f, r.distance - GAP);
-        return dist;
+        Quaternion q = Rot();
+        if (!Physics.BoxCast(c, h, Vector3.up, out r, q, dist + GAP, mask, QueryTriggerInteraction.Ignore)) return dist;
+        if (!Fitted()) return Mathf.Max(0f, r.distance - GAP);
+        float best = dist + GAP;
+        for (int i = 0; i < nBox; i++)
+        {
+            RaycastHit s;
+            Vector3 bh = boxH[i];
+            bh.x = Mathf.Max(0.004f, bh.x - 0.005f); bh.z = Mathf.Max(0.004f, bh.z - 0.005f);
+            if (Physics.BoxCast(from + q * boxC[i], bh, Vector3.up, out s, q, dist + GAP, mask, QueryTriggerInteraction.Ignore) && s.distance < best) best = s.distance;
+        }
+        return Mathf.Max(0f, best - GAP);
     }
 
     public bool Fits(Vector3 at, float atYaw)
     {
         if (mask == 0) return true;
         Vector3 h = new Vector3(half.x, half.y - RAISE * 0.5f, half.z);
-        return !Physics.CheckBox(at + Vector3.up * (half.y + RAISE * 0.5f), h, Quaternion.Euler(0, atYaw, 0), mask, QueryTriggerInteraction.Ignore);
+        Quaternion q = Quaternion.Euler(0, atYaw, 0);
+        if (!Physics.CheckBox(at + Vector3.up * (half.y + RAISE * 0.5f), h, q, mask, QueryTriggerInteraction.Ignore)) return true;
+        if (!Fitted()) return false;
+        for (int i = 0; i < nBox; i++)
+            if (Physics.CheckBox(at + q * boxC[i], boxH[i], q, mask, QueryTriggerInteraction.Ignore)) return false;
+        return true;
     }
 
     bool hitSomething;
@@ -402,7 +536,9 @@ public class PHHiderBody : UdonSharpBehaviour
                     b.y = groundY;
                     float da = new Vector2(a.x - start.x, a.z - start.z).sqrMagnitude;
                     float db = new Vector2(b.x - start.x, b.z - start.z).sqrMagnitude;
-                    if (db > da + 1e-4f && b.y - start.y <= stepHeight + 0.01f) { pos = b; blocked = hitB; return; }
+                    // (and it fits where it comes down: with its own shape, a box raised over a thing can find the
+                    // floor beyond it with another, and would be set down through that thing)
+                    if (db > da + 1e-4f && b.y - start.y <= stepHeight + 0.01f && (!Fitted() || Fits(b, yaw))) { pos = b; blocked = hitB; return; }
                 }
             }
         }
@@ -464,7 +600,7 @@ public class PHHiderBody : UdonSharpBehaviour
                         if (SweepH(from, -n, SQUEEZE_PASS)) continue;
                         if (!GapAhead(from, -n, along)) continue;   // a way past a thing on one side is no gap: walk round it
                         narrow = true; narrowSince = Time.time; squeezeAxis = -n;
-                        pos = from;
+                        Shift(from);
                         SlideMove(-n * delta.magnitude, wasGrounded);
                     }
                     if (!narrow) half = fullHalf;
@@ -478,6 +614,22 @@ public class PHHiderBody : UdonSharpBehaviour
                 if (got.magnitude < 0.35f * len) CornerAssist(start, delta / len, len, wasGrounded);
             }
             if (mask != 0) Unstick(start, delta, dt);
+            // a corrected prop makes its way back under the player while they move: alone, flat, no further than
+            // they moved this step (or 1.5 m/s), as far as walls let it; the seat does not move from this
+            if (mask != 0 && !narrow && (lag.x != 0f || lag.z != 0f))
+            {
+                Vector3 back = new Vector3(lag.x, 0f, lag.z);
+                float most = Mathf.Max(delta.magnitude, 1.5f * dt);
+                if (back.sqrMagnitude > most * most) back = back.normalized * most;
+                bool keepBlocked = blocked, keepHit = hitSomething;
+                Vector3 keepNormal = firstNormal;
+                Vector3 p2 = Slide(pos, back);
+                p2.y = pos.y;
+                lag -= p2 - pos;
+                pos = p2;
+                if (lag.x * lag.x + lag.z * lag.z < 1e-6f) { lag.x = 0f; lag.z = 0f; }
+                blocked = keepBlocked; hitSomething = keepHit; firstNormal = keepNormal;
+            }
         }
         if (narrow) SqueezeAfterMove();
         if (velY > 0f)
@@ -535,30 +687,52 @@ public class PHHiderBody : UdonSharpBehaviour
         if (mask == 0) return true;
         Vector3 keep = half;
         half = fullHalf;
-        Vector3 thin = new Vector3(Mathf.Min(fullHalf.x, 0.08f), fullHalf.y, Mathf.Min(fullHalf.z, 0.08f));
+        // around the seat (where the player is), the seat itself first
+        Vector3 centre = pos + new Vector3(lag.x, 0f, lag.z);
+        bool off = lag.x != 0f || lag.z != 0f;
+        if (off && PlaceAt(centre, atYaw)) return true;
         for (int ring = 1; ring <= 5; ring++)
             for (int k = 0; k < 12; k++)
             {
                 float a = k * Mathf.PI / 6f, d = reach * ring / 5f;
-                Vector3 at = pos + new Vector3(Mathf.Cos(a) * d, 0f, Mathf.Sin(a) * d);
-                if (!Fits(at, atYaw)) continue;
-                half = thin;
-                bool wall = SweepH(pos, (at - pos).normalized, d);
-                half = fullHalf;
-                if (wall) continue;
-                if (!GroundBelow(at, 0.5f) || groundN.y < 0.64f) continue;   // not out over a drop
-                at.y = groundY;
-                pos = at; narrow = false;
-                return true;
+                if (PlaceAt(centre + new Vector3(Mathf.Cos(a) * d, 0f, Mathf.Sin(a) * d), atYaw)) return true;
             }
         half = keep;
         return false;
+    }
+
+    // the prop there (with half its full box), if it fits at this facing, has something to stand on, and no wall
+    // lies between it and there (a thin box gets there)
+    bool PlaceAt(Vector3 at, float atYaw)
+    {
+        if (!Fits(at, atYaw)) return false;
+        Vector3 to = at - pos; to.y = 0f;
+        float d = to.magnitude;
+        if (d > 1e-4f)
+        {
+            half = new Vector3(Mathf.Min(fullHalf.x, 0.08f), fullHalf.y, Mathf.Min(fullHalf.z, 0.08f));
+            bool wall = SweepH(pos, to / d, d);
+            half = fullHalf;
+            if (wall) return false;
+        }
+        if (!GroundBelow(at, 0.5f) || groundN.y < 0.64f) return false;   // not out over a drop
+        at.y = groundY;
+        Shift(at); narrow = false;
+        return true;
     }
 
     // A new disguise where the hider stands; where its box has no room there, the nearest place it has, as it faces
     // or turned a quarter (Cor: a large thing that does not fit looks for a spot where it does)
     public bool FitHere()
     {
+        if (lag.x != 0f || lag.z != 0f)
+        {
+            // where the player is, if it fits there
+            Vector3 keep = half;
+            half = fullHalf;
+            if (PlaceAt(pos + new Vector3(lag.x, 0f, lag.z), yaw)) return true;
+            half = keep;
+        }
         if (Fits(pos, yaw)) return true;
         float reach = Mathf.Max(fullHalf.x, fullHalf.z) + 1f;
         if (Nudge(yaw, reach)) return true;

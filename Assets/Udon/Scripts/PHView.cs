@@ -75,7 +75,14 @@ public class PHView : UdonSharpBehaviour
     Vector3 miniBase = Vector3.one;
     int legendMode = -1;
     float legendSince;
-    int outlineDef = -2;
+    int outlineDef = -2, outlineSerial = -1;
+    // the footprint of the prop's own boxes: their edges cut the ground plan into cells, the covered ones marked,
+    // and the outline runs wherever a covered cell lies beside one that is not
+    const int CUTS = 26, RUNS = 48;
+    float[] cutX, cutZ, runA, runB, runAt;
+    bool[] runAlongX, cellIn;
+    float[] fMinX, fMaxX, fMinZ, fMaxZ;
+    int nRuns;
     const float OUTLINE_W = 0.02f, OUTLINE_H = 0.004f, OUTLINE_STEP = 0.12f;
     // the pieces in use, where each lies in the prop's own frame, and what they were last laid for
     int nPieces;
@@ -232,36 +239,130 @@ public class PHView : UdonSharpBehaviour
         if (pip) PlaceCamera(s);
     }
 
-    // the own prop's outline: shown while hiding, its edges sized to the prop's footprint when the prop changes
+    // the own prop's outline: shown while hiding, laid out anew when the prop changes. It is the footprint of the
+    // prop's own collider boxes as the hider's body is moved (Cor: the projection should match the actual collider),
+    // so an L-shaped sofa shows as an L; the one box of its size where the body has no such shape.
     void UpdateOutline(PHSlot s, bool hider)
     {
         if (outline == null) return;
         if (outline.gameObject.activeSelf != hider) outline.gameObject.SetActive(hider);
-        if (!hider || s.def == outlineDef) return;
-        outlineDef = s.def;
+        if (!hider) return;
+        PHHiderBody b = local.body;
+        if (s.def == outlineDef && b.shapeSerial == outlineSerial) return;
+        outlineDef = s.def; outlineSerial = b.shapeSerial;
         int pool = outlineParts.Length - 1;
-        if (pieceX == null) { pieceX = new float[pool]; pieceZ = new float[pool]; }
-        float hx = game.gen.defSx[s.def] / 2000f, hz = game.gen.defSz[s.def] / 2000f;
-        // pieces about 12 cm long; longer on a big prop, so the pool is enough
-        float step = Mathf.Max(OUTLINE_STEP, 4f * (hx + hz) / (pool - 4));
-        int nx = Mathf.Max(1, Mathf.CeilToInt(2f * hx / step)), nz = Mathf.Max(1, Mathf.CeilToInt(2f * hz / step));
-        float lx = 2f * hx / nx, lz = 2f * hz / nz;
-        nPieces = 0;
-        for (int i = 0; i < nx; i++)
+        if (pieceX == null)
         {
-            float x = -hx + (i + 0.5f) * lx;
-            Piece(x, hz, lx, true); Piece(x, -hz, lx, true);
+            pieceX = new float[pool]; pieceZ = new float[pool];
+            cutX = new float[CUTS]; cutZ = new float[CUTS];
+            runA = new float[RUNS]; runB = new float[RUNS]; runAt = new float[RUNS]; runAlongX = new bool[RUNS];
+            cellIn = new bool[CUTS * CUTS];
+            fMinX = new float[CUTS / 2]; fMaxX = new float[CUTS / 2]; fMinZ = new float[CUTS / 2]; fMaxZ = new float[CUTS / 2];
         }
-        for (int i = 0; i < nz; i++)
+        int n = 0;
+        if (b.shapeDef == s.def && b.shapeN > 0 && b.shapeMin != null)
         {
-            float z = -hz + (i + 0.5f) * lz;
-            Piece(hx, z, lz, false); Piece(-hx, z, lz, false);
+            n = Mathf.Min(b.shapeN, CUTS / 2);
+            for (int i = 0; i < n; i++)
+            {
+                fMinX[i] = b.shapeMin[i].x; fMaxX[i] = b.shapeMax[i].x;
+                fMinZ[i] = b.shapeMin[i].z; fMaxZ[i] = b.shapeMax[i].z;
+            }
+        }
+        else
+        {
+            float dx = game.gen.defSx[s.def] / 2000f, dz = game.gen.defSz[s.def] / 2000f;
+            n = 1; fMinX[0] = -dx; fMaxX[0] = dx; fMinZ[0] = -dz; fMaxZ[0] = dz;
+        }
+        // the cuts, in order, those within a centimetre of each other as one
+        int nx = 0, nz = 0;
+        for (int i = 0; i < n; i++)
+        {
+            nx = AddCut(cutX, nx, fMinX[i]); nx = AddCut(cutX, nx, fMaxX[i]);
+            nz = AddCut(cutZ, nz, fMinZ[i]); nz = AddCut(cutZ, nz, fMaxZ[i]);
+        }
+        int cx = nx - 1, cz = nz - 1;   // cells each way
+        for (int i = 0; i < cx * cz; i++) cellIn[i] = false;
+        for (int k = 0; k < n; k++)
+        {
+            int i0 = CutAt(cutX, nx, fMinX[k]), i1 = CutAt(cutX, nx, fMaxX[k]);
+            int j0 = CutAt(cutZ, nz, fMinZ[k]), j1 = CutAt(cutZ, nz, fMaxZ[k]);
+            for (int i = i0; i < i1; i++)
+                for (int j = j0; j < j1; j++) cellIn[i * cz + j] = true;
+        }
+        // the runs of edge: along x on each cut in z, along z on each cut in x
+        nRuns = 0;
+        float total = 0f;
+        for (int j = 0; j <= cz; j++)
+        {
+            int from = -1;
+            for (int i = 0; i <= cx; i++)
+            {
+                bool edge = i < cx && ((j > 0 && cellIn[i * cz + j - 1]) != (j < cz && cellIn[i * cz + j]));
+                if (edge && from < 0) from = i;
+                if (!edge && from >= 0)
+                {
+                    if (nRuns < RUNS) { runA[nRuns] = cutX[from]; runB[nRuns] = cutX[i]; runAt[nRuns] = cutZ[j]; runAlongX[nRuns] = true; total += cutX[i] - cutX[from]; nRuns++; }
+                    from = -1;
+                }
+            }
+        }
+        for (int i = 0; i <= cx; i++)
+        {
+            int from = -1;
+            for (int j = 0; j <= cz; j++)
+            {
+                bool edge = j < cz && ((i > 0 && cellIn[(i - 1) * cz + j]) != (i < cx && cellIn[i * cz + j]));
+                if (edge && from < 0) from = j;
+                if (!edge && from >= 0)
+                {
+                    if (nRuns < RUNS) { runA[nRuns] = cutZ[from]; runB[nRuns] = cutZ[j]; runAt[nRuns] = cutX[i]; runAlongX[nRuns] = false; total += cutZ[j] - cutZ[from]; nRuns++; }
+                    from = -1;
+                }
+            }
+        }
+        // pieces about 12 cm long; longer on a big prop, so the pool is enough
+        float step = Mathf.Max(OUTLINE_STEP, total / Mathf.Max(4, pool - nRuns));
+        nPieces = 0;
+        for (int r = 0; r < nRuns; r++)
+        {
+            float len = runB[r] - runA[r];
+            int parts = Mathf.Max(1, Mathf.CeilToInt(len / step - 0.001f));
+            float l = len / parts;
+            for (int i = 0; i < parts; i++)
+            {
+                float m = runA[r] + (i + 0.5f) * l;
+                if (runAlongX[r]) Piece(m, runAt[r], l, true); else Piece(runAt[r], m, l, false);
+            }
         }
         for (int i = nPieces; i < pool; i++) outlineParts[i].gameObject.SetActive(false);
+        // the nub on the front: at the foremost edge of the footprint (not the foremost edge across the middle: an
+        // open tent's is its back wall)
+        float hx = Mathf.Max(-cutX[0], cutX[nx - 1]), front = cutZ[nz - 1];
         float nub = Mathf.Clamp(hx * 0.5f, 0.03f, 0.08f);
         outlineParts[pool].localScale = new Vector3(nub, OUTLINE_H, nub);
-        nubZ = hz + nub * 0.5f;
+        nubZ = front + nub * 0.5f;
         outlineYaw = -999f;   // lay them anew
+    }
+
+    // a value into the ordered cuts (unless one within a centimetre is there); the new count
+    int AddCut(float[] cuts, int n, float v)
+    {
+        int at = 0;
+        while (at < n && cuts[at] < v - 0.01f) at++;
+        if (at < n && Mathf.Abs(cuts[at] - v) <= 0.01f) return n;
+        if (n >= cuts.Length) return n;
+        for (int i = n; i > at; i--) cuts[i] = cuts[i - 1];
+        cuts[at] = v;
+        return n + 1;
+    }
+
+    // the cut nearest a value
+    int CutAt(float[] cuts, int n, float v)
+    {
+        int best = 0;
+        for (int i = 1; i < n; i++) if (Mathf.Abs(cuts[i] - v) < Mathf.Abs(cuts[best] - v)) best = i;
+        return best;
     }
 
     void Piece(float x, float z, float len, bool alongX)

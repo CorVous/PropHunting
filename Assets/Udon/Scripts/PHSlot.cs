@@ -202,7 +202,8 @@ public class PHSlot : UdonSharpBehaviour
         if (hiding && body != null && body.active)
         {
             // the hider's body moves the station (and the seated player with it)
-            station.transform.SetPositionAndRotation(body.pos, Quaternion.Euler(0f, body.stationYaw, 0f));
+            // (after a correction the seat stays where it was until the prop makes its way back: PHHiderBody.lag)
+            station.transform.SetPositionAndRotation(body.pos + body.lag, Quaternion.Euler(0f, body.stationYaw, 0f));
             if ((body.pos - propPos).sqrMagnitude > 0.0004f) { propPos = body.pos; Send(); }
             if (Mathf.Abs(Mathf.DeltaAngle(body.yaw, propYaw)) > 1f) { propYaw = body.yaw; Send(); }
         }
