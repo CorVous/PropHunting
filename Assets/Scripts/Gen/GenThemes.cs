@@ -308,7 +308,8 @@ public static partial class GenData
         Like("gen_toolwall", "md_ladder", "ladder", 2600);
         Like("w_palletLoaded", "md_lumber", "resource_lumber", 2600);
         Like("s_boxLarge", "md_stone", "resource_stone", 2600);
-        Like("n_statueBlock", "md_target", "target", 3000);
+        // an archery target stands with its back to a fence or a wall and faces the open (Cor: one faced the fence)
+        defAnchor[Like("n_statueBlock", "md_target", "target", 3000)] = A_OUT_EDGE;
         Like("gen_toolwall", "md_weaponRack", "weaponrack", 3000);
         Like("n_obelisk", "md_flag", "flag_red", 3500);
         Like("n_tentClosed", "md_tent", "hexagon_tent", 3000);
