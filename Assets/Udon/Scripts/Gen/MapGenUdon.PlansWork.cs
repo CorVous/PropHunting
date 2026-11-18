@@ -245,118 +245,124 @@ public partial class MapGenUdon
     void PlanDinerDining()
     {
         int room = pRoom, area = AreaM2(room);
-        uint[] r = SR(1);
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        // (b) the counter: two to four bar units along a wall, a stool at each, facing it
-        int barDef = Dn("k_bar");
-        int first0 = nEmit;
-        rowN = area >= 60 ? 4 : (area >= 40 ? 3 : 2);
-        for (int i = 0; i < rowN; i++) rowDef[i] = barDef;
-        int bar = WallRow(0, 2, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, r);
-        if (bar >= 0)
+        if (Ph(0))
         {
-            int stool = Pick(r, "r_stool", 6, "k_stool", 4), last = nEmit, skip = RngRange(r, 8);
-            for (int e = bar; e < last; e++)
+            uint[] r = SR(1);
+            int dx, dz;
+            MainDoor(room, out dx, out dz);
+            // (b) the counter: two to four bar units along a wall, a stool at each, facing it
+            int barDef = Dn("k_bar");
+            int first0 = nEmit;
+            rowN = area >= 60 ? 4 : (area >= 40 ? 3 : 2);
+            for (int i = 0; i < rowN; i++) rowDef[i] = barDef;
+            int bar = WallRow(0, 2, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, r);
+            if (bar >= 0)
             {
-                if (emitDef[e] != barDef || emitParent[e] >= 0) continue;
-                if ((e - bar) == skip) continue;            // one stool is away now and then
-                Rel(stool, e, 0, Sz(barDef) / 2 + 90 + Sz(stool) / 2, 180, 0);
-            }
-            Keep(first0, true);
-        }
-        // booths along a wall, at the windows if there are any: a table end-on to the wall, cushioned benches facing each other
-        uint[] r2 = SR(2);
-        int boothsPlaced = 0;
-        int tableB = Dn("k_table"), benchDef = Dn("k_benchCushion");
-        int boothW = Sz(tableB) + 2 * (60 + Sz(benchDef));
-        if (RngChance(r2, 850) && Fit(5))
-        {
-            for (int n = area >= 48 ? 2 : 1; n >= 1; n--)
-            {
-                int len = n * boothW + (n - 1) * 120;
-                if (!FindWallRun(room, len, Sx(tableB) + 40, 1, WM_CENTRE, 0, 0, WIN_PREFER, r2)) continue;
-                int d = wrDir, back = wrBack, start = wrCentre - len / 2;
-                for (int b = 0; b < n && Fit(5); b++)
+                int stool = Pick(r, "r_stool", 6, "k_stool", 4), last = nEmit, skip = RngRange(r, 8);
+                for (int e = bar; e < last; e++)
                 {
-                    int along = start + boothW / 2 + b * (boothW + 120);
-                    int px, pz, rot;
-                    WallPos(d, back, along, Sx(tableB), out px, out pz, out rot);
-                    int first = nEmit;
-                    int t = StampAt(tableB, room, px, pz, rot * 90 + 90, EF_BOOTH, -1, H_WALL, false);
-                    if (t < 0) continue;
-                    // benches along both long sides of the table, two to a side, facing it
-                    for (int side = -1; side <= 1; side += 2)
-                        for (int k = -1; k <= 1; k += 2)
-                            Rel(benchDef, t, k * (Sx(benchDef) / 2 + 20), side * (Sz(tableB) / 2 + 60 + Sz(benchDef) / 2), side > 0 ? 180 : 0, 0);
-                    if (Keep(first, false)) boothsPlaced++;
+                    if (emitDef[e] != barDef || emitParent[e] >= 0) continue;
+                    if ((e - bar) == skip) continue;            // one stool is away now and then
+                    Rel(stool, e, 0, Sz(barDef) / 2 + 90 + Sz(stool) / 2, 180, 0);
                 }
-                break;
+                Keep(first0, true);
             }
-        }
-        // floor tables on a lattice in the open part; one kind per room, a cell that is taken stays empty (C13)
-        uint[] r3 = SR(3);
-        int tDef = Pick(r3, "r_table", 6, "r_tableRound", 4);
-        // the first table where the floor is most open; the others on its lattice, 3.5 m apart both ways: a table,
-        // a chair each side and an aisle of a metre between the chair backs
-        int tables = 0;
-        int t0 = CentrePiece(tDef, 0, false, 2, 1, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r3);
-        if (t0 < 0) { tDef = Dn("r_tableRound"); t0 = CentrePiece(tDef, 0, false, 2, 1, WM_ANY, 0, 0, 0, EF_MANDATORY, r3); }
-        if (t0 >= 0)
-        {
-            tables = 1;
-            int bx = emitX[t0], bz = emitZ[t0], pitch = 7 * GenData.INNER_MM;
-            for (int ring = 1; ring <= 3; ring++)
-                for (int j = -ring; j <= ring; j++)
-                    for (int i = -ring; i <= ring; i++)
-                    {
-                        if ((Abs(i) != ring && Abs(j) != ring) || !Fit(3)) continue;
-                        int px = bx + i * pitch, pz = bz + j * pitch;
-                        int cx = FloorDiv(px, GenData.INNER_MM), cz = FloorDiv(pz, GenData.INNER_MM);
-                        if (cx < 0 || cz < 0 || cx >= IW || cz >= IH || innerRoom[cz * IW + cx] != room) continue;
-                        int first = nEmit;
-                        if (FreePlaceAt(tDef, px, pz, 0, 1, 0, H_FREE) >= 0 && Keep(first, false)) tables++;
-                    }
-        }
-        if (tables == 0 && boothsPlaced == 0) MandFail(1);   // a diner without any table to sit at
-        // the entry: a mat inside each outside door, coats in the nearest corner
-        int ext = ExtDoor(room);
-        for (int k = 0; k < roomDoorCount[room]; k++)
-            if (roomDoorExt[roomDoorStart[room] + k] && Fit(1)) Doormat(room, k);
-        uint[] r4 = SR(4);
-        if (ext >= 0 && RngChance(r4, 600) && Fit(1))
-        {
-            int first = nEmit;
-            if (CornerPlace(Dn("k_coatRack"), WM_NEAR, dx, dz, false, 0, r4) >= 0) Keep(first, false);
-        }
-        // a waiting corner in a large room: couch against the wall, low table in front, a lamp beside
-        uint[] r5 = SR(5);
-        if (area >= 44 && RngChance(r5, 450) && Fit(3))
-        {
-            int first = nEmit;
-            int couch = WallPlace(Dn("q_couch"), WM_NEAR, dx, dz, WIN_AVOID, 0, r5);
-            if (couch >= 0 && Keep(first, false))
+            // booths along a wall, at the windows if there are any: a table end-on to the wall, cushioned benches facing each other
+            uint[] r2 = SR(2);
+            int boothsPlaced = 0;
+            int tableB = Dn("k_table"), benchDef = Dn("k_benchCushion");
+            int boothW = Sz(tableB) + 2 * (60 + Sz(benchDef));
+            if (RngChance(r2, 850) && Fit(5))
             {
-                first = nEmit;
-                int low = Dn("q_tableLow");
-                if (Rel(low, couch, 0, Sz(emitDef[couch]) / 2 + 380 + Sz(low) / 2, 0, 0) >= 0) Keep(first, false);
-                first = nEmit;
-                if (Fit(1) && RelBeside(Dn("q_lampStanding"), couch, 0, 60, 0, r5) >= 0) Keep(first, false);
+                for (int n = area >= 48 ? 2 : 1; n >= 1; n--)
+                {
+                    int len = n * boothW + (n - 1) * 120;
+                    if (!FindWallRun(room, len, Sx(tableB) + 40, 1, WM_CENTRE, 0, 0, WIN_PREFER, r2)) continue;
+                    int d = wrDir, back = wrBack, start = wrCentre - len / 2;
+                    for (int b = 0; b < n && Fit(5); b++)
+                    {
+                        int along = start + boothW / 2 + b * (boothW + 120);
+                        int px, pz, rot;
+                        WallPos(d, back, along, Sx(tableB), out px, out pz, out rot);
+                        int first = nEmit;
+                        int t = StampAt(tableB, room, px, pz, rot * 90 + 90, EF_BOOTH, -1, H_WALL, false);
+                        if (t < 0) continue;
+                        // benches along both long sides of the table, two to a side, facing it
+                        for (int side = -1; side <= 1; side += 2)
+                            for (int k = -1; k <= 1; k += 2)
+                                Rel(benchDef, t, k * (Sx(benchDef) / 2 + 20), side * (Sz(tableB) / 2 + 60 + Sz(benchDef) / 2), side > 0 ? 180 : 0, 0);
+                        if (Keep(first, false)) boothsPlaced++;
+                    }
+                    break;
+                }
+            }
+            // floor tables on a lattice in the open part; one kind per room, a cell that is taken stays empty (C13)
+            uint[] r3 = SR(3);
+            int tDef = Pick(r3, "r_table", 6, "r_tableRound", 4);
+            // the first table where the floor is most open; the others on its lattice, 3.5 m apart both ways: a table,
+            // a chair each side and an aisle of a metre between the chair backs
+            int tables = 0;
+            int t0 = CentrePiece(tDef, 0, false, 2, 1, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r3);
+            if (t0 < 0) { tDef = Dn("r_tableRound"); t0 = CentrePiece(tDef, 0, false, 2, 1, WM_ANY, 0, 0, 0, EF_MANDATORY, r3); }
+            if (t0 >= 0)
+            {
+                tables = 1;
+                int bx = emitX[t0], bz = emitZ[t0], pitch = 7 * GenData.INNER_MM;
+                for (int ring = 1; ring <= 3; ring++)
+                    for (int j = -ring; j <= ring; j++)
+                        for (int i = -ring; i <= ring; i++)
+                        {
+                            if ((Abs(i) != ring && Abs(j) != ring) || !Fit(3)) continue;
+                            int px = bx + i * pitch, pz = bz + j * pitch;
+                            int cx = FloorDiv(px, GenData.INNER_MM), cz = FloorDiv(pz, GenData.INNER_MM);
+                            if (cx < 0 || cz < 0 || cx >= IW || cz >= IH || innerRoom[cz * IW + cx] != room) continue;
+                            int first = nEmit;
+                            if (FreePlaceAt(tDef, px, pz, 0, 1, 0, H_FREE) >= 0 && Keep(first, false)) tables++;
+                        }
+            }
+            if (tables == 0 && boothsPlaced == 0) MandFail(1);   // a diner without any table to sit at
+            // the entry: a mat inside each outside door, coats in the nearest corner
+            int ext = ExtDoor(room);
+            for (int k = 0; k < roomDoorCount[room]; k++)
+                if (roomDoorExt[roomDoorStart[room] + k] && Fit(1)) Doormat(room, k);
+            uint[] r4 = SR(4);
+            if (ext >= 0 && RngChance(r4, 600) && Fit(1))
+            {
+                int first = nEmit;
+                if (CornerPlace(Dn("k_coatRack"), WM_NEAR, dx, dz, false, 0, r4) >= 0) Keep(first, false);
+            }
+            // a waiting corner in a large room: couch against the wall, low table in front, a lamp beside
+            uint[] r5 = SR(5);
+            if (area >= 44 && RngChance(r5, 450) && Fit(3))
+            {
+                int first = nEmit;
+                int couch = WallPlace(Dn("q_couch"), WM_NEAR, dx, dz, WIN_AVOID, 0, r5);
+                if (couch >= 0 && Keep(first, false))
+                {
+                    first = nEmit;
+                    int low = Dn("q_tableLow");
+                    if (Rel(low, couch, 0, Sz(emitDef[couch]) / 2 + 380 + Sz(low) / 2, 0, 0) >= 0) Keep(first, false);
+                    first = nEmit;
+                    if (Fit(1) && RelBeside(Dn("q_lampStanding"), couch, 0, 60, 0, r5) >= 0) Keep(first, false);
+                }
+            }
+            CornerExtra(6, 800, "k_plant", 6, "q_cactus", 3, false);
+            CornerExtra(7, 500, "k_plant", 5, "q_lampStanding", 4, false);
+            uint[] r8 = SR(8);
+            if (RngChance(r8, 450) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, r8) >= 0) Keep(first, false);
             }
         }
-        CornerExtra(6, 800, "k_plant", 6, "q_cactus", 3, false);
-        CornerExtra(7, 500, "k_plant", 5, "q_lampStanding", 4, false);
-        uint[] r8 = SR(8);
-        if (RngChance(r8, 450) && Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, r8) >= 0) Keep(first, false);
-        }
-        uint[] r9 = SR(9);
-        if (RngChance(r9, 400) && Fit(1))
-        {
-            int first = nEmit;
-            if (WallPlace(Dn("q_cabinet"), WM_ANY, 0, 0, WIN_AVOID, 0, r9) >= 0) Keep(first, false);
+            uint[] r9 = SR(9);
+            if (RngChance(r9, 400) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("q_cabinet"), WM_ANY, 0, 0, WIN_AVOID, 0, r9) >= 0) Keep(first, false);
+            }
         }
     }
 
@@ -365,65 +371,80 @@ public partial class MapGenUdon
     void PlanDinerKitchen()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int sk = Dn("r_counterSink"), sv = Dn("r_stove"), ct = Dn("r_counter"), fr = Dn("r_fridge");
-        int line = -1;
-        for (int n = 3; n >= 2 && line < 0; n--)
+        if (Ph(0))
         {
-            rowN = 0;
-            rowDef[rowN++] = sk;
-            if (n == 3) rowDef[rowN++] = ct;
-            rowDef[rowN++] = sv;
-            if (RngChance(r, 500)) { int tmp = rowDef[0]; rowDef[0] = rowDef[rowN - 1]; rowDef[rowN - 1] = tmp; }
-            int first = nEmit;
-            line = WallRow(0, 2, WM_CORNER, 0, 0, WIN_ANY, EF_MANDATORY, r);
-            if (line >= 0 && !Keep(first, true)) line = -1;
+            uint[] r = SR(1);
+            int sk = Dn("r_counterSink"), sv = Dn("r_stove");
+            hp_PlanDinerKitchen_ct = Dn("r_counter");
+            hp_PlanDinerKitchen_fr = Dn("r_fridge");
+            int line = -1;
+            for (int n = 3; n >= 2 && line < 0; n--)
+            {
+                rowN = 0;
+                rowDef[rowN++] = sk;
+                if (n == 3) rowDef[rowN++] = hp_PlanDinerKitchen_ct;
+                rowDef[rowN++] = sv;
+                if (RngChance(r, 500)) { int tmp = rowDef[0]; rowDef[0] = rowDef[rowN - 1]; rowDef[rowN - 1] = tmp; }
+                int first = nEmit;
+                line = WallRow(0, 2, WM_CORNER, 0, 0, WIN_ANY, EF_MANDATORY, r);
+                if (line >= 0 && !Keep(first, true)) line = -1;
+            }
+            hp_PlanDinerKitchen_lx = RoomMidX(room);
+            hp_PlanDinerKitchen_lz = RoomMidZ(room);
+            bool haveS = line >= 0, haveV = line >= 0;
+            if (line >= 0) { hp_PlanDinerKitchen_lx = emitX[line]; hp_PlanDinerKitchen_lz = emitZ[line]; }
+            else
+            {
+                // no wall takes both: each on its own stretch
+                int e = WallKeep(sk, WM_ANY, 0, 0, WIN_ANY, EF_MANDATORY, r);
+                if (e >= 0) { haveS = true; hp_PlanDinerKitchen_lx = emitX[e]; hp_PlanDinerKitchen_lz = emitZ[e]; }
+                e = WallKeep(sv, WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_AVOID, EF_MANDATORY, r);
+                if (e >= 0) haveV = true;
+            }
+            // no wall has 1.4 m for the diner's units: the narrower domestic sink and stove
+            if (!haveS) { int e = WallKeep(Dn("k_sink"), WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, EF_MANDATORY, r); if (e >= 0) { haveS = true; hp_PlanDinerKitchen_lx = emitX[e]; hp_PlanDinerKitchen_lz = emitZ[e]; } }
+            if (!haveV) haveV = WallKeep(Dn("k_stove"), WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_AVOID, EF_MANDATORY, r) >= 0;
+            if (!haveS) MandFail(1);
+            if (!haveV) MandFail(1);
         }
-        int lx = RoomMidX(room), lz = RoomMidZ(room);
-        bool haveS = line >= 0, haveV = line >= 0;
-        if (line >= 0) { lx = emitX[line]; lz = emitZ[line]; }
-        else
+        if (Ph(1))
         {
-            // no wall takes both: each on its own stretch
-            int e = WallKeep(sk, WM_ANY, 0, 0, WIN_ANY, EF_MANDATORY, r);
-            if (e >= 0) { haveS = true; lx = emitX[e]; lz = emitZ[e]; }
-            e = WallKeep(sv, WM_NEAR, lx, lz, WIN_AVOID, EF_MANDATORY, r);
-            if (e >= 0) haveV = true;
+            uint[] r2 = SR(2);
+            // the fridge near the line if a wall has the room: these units are 1.4 m wide and up to 1.6 m deep, and a
+            // kitchen of 4 x 4 m with two doors often has no third place with its front free (the store room has one);
+            // then the narrower domestic fridge, and a narrower cabinet for the counter
+            if (WallKeep(hp_PlanDinerKitchen_fr, WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_NEVER, 0, r2) < 0 && WallKeep(hp_PlanDinerKitchen_fr, WM_ANY, 0, 0, WIN_ANY, 0, r2) < 0)
+                WallAny(WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r2, "k_fridge", null, null);
         }
-        // no wall has 1.4 m for the diner's units: the narrower domestic sink and stove
-        if (!haveS) { int e = WallKeep(Dn("k_sink"), WM_NEAR, lx, lz, WIN_ANY, EF_MANDATORY, r); if (e >= 0) { haveS = true; lx = emitX[e]; lz = emitZ[e]; } }
-        if (!haveV) haveV = WallKeep(Dn("k_stove"), WM_NEAR, lx, lz, WIN_AVOID, EF_MANDATORY, r) >= 0;
-        if (!haveS) MandFail(1);
-        if (!haveV) MandFail(1);
-        uint[] r2 = SR(2);
-        // the fridge near the line if a wall has the room: these units are 1.4 m wide and up to 1.6 m deep, and a
-        // kitchen of 4 x 4 m with two doors often has no third place with its front free (the store room has one);
-        // then the narrower domestic fridge, and a narrower cabinet for the counter
-        if (WallKeep(fr, WM_NEAR, lx, lz, WIN_NEVER, 0, r2) < 0 && WallKeep(fr, WM_ANY, 0, 0, WIN_ANY, 0, r2) < 0)
-            WallAny(WM_NEAR, lx, lz, WIN_ANY, 0, r2, "k_fridge", null, null);
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 800) && Fit(1) && WallKeep(ct, WM_NEAR, lx, lz, WIN_ANY, 0, r3) < 0)
-            WallAny(WM_NEAR, lx, lz, WIN_ANY, 0, r3, "k_counterDrawer", "k_counter", null);
-        uint[] r4 = SR(4);
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        if (RngChance(r4, 700) && Fit(2))
+        if (Ph(2))
         {
-            int first = nEmit;
-            if (GroupAt(FindGrp("crates"), GenData.A_WALL, RngBetween(r4, 2, 3), WM_NEAR, dx, dz, 0, r4)) Keep(first, false);
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 800) && Fit(1) && WallKeep(hp_PlanDinerKitchen_ct, WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r3) < 0)
+                WallAny(WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r3, "k_counterDrawer", "k_counter", null);
         }
-        uint[] r5 = SR(5);
-        if (RngChance(r5, 700) && Fit(1))
+        if (Ph(3))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("k_trashcan"), WM_NEAR, lx, lz, WIN_ANY, 0, r5) >= 0) Keep(first, false);
-        }
-        uint[] r6 = SR(6);
-        if (RngChance(r6, 380) && LooseFit(2))
-        {
-            int first = nEmit;
-            FSet(Dn("gen_mop"), Pick(r6, "s_bucket", 5, "t_bucketMetal", 5));
-            if (FormAt(GenData.GL_ROW, 70, GenData.A_WALL, WM_NEAR, dx, dz, 0, r6) >= 0 && Keep(first, false)) MarkLoose(first);
+            uint[] r4 = SR(4);
+            int dx, dz;
+            MainDoor(room, out dx, out dz);
+            if (RngChance(r4, 700) && Fit(2))
+            {
+                int first = nEmit;
+                if (GroupAt(FindGrp("crates"), GenData.A_WALL, RngBetween(r4, 2, 3), WM_NEAR, dx, dz, 0, r4)) Keep(first, false);
+            }
+            uint[] r5 = SR(5);
+            if (RngChance(r5, 700) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("k_trashcan"), WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r5) >= 0) Keep(first, false);
+            }
+            uint[] r6 = SR(6);
+            if (RngChance(r6, 380) && LooseFit(2))
+            {
+                int first = nEmit;
+                FSet(Dn("gen_mop"), Pick(r6, "s_bucket", 5, "t_bucketMetal", 5));
+                if (FormAt(GenData.GL_ROW, 70, GenData.A_WALL, WM_NEAR, dx, dz, 0, r6) >= 0 && Keep(first, false)) MarkLoose(first);
+            }
         }
     }
 
@@ -470,4 +491,10 @@ public partial class MapGenUdon
             }
         }
     }
+
+    // phase state of the split plans (Tools: autophase2)
+    int hp_PlanDinerKitchen_ct;
+    int hp_PlanDinerKitchen_fr;
+    int hp_PlanDinerKitchen_lx;
+    int hp_PlanDinerKitchen_lz;
 }

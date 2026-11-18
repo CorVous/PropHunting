@@ -53,39 +53,50 @@ public partial class MapGen
         if (Ph(0))
         {
             GenRng r = SR(1);
-            int first = nEmit;
-            if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, EF_MANDATORY, ref r) >= 0) Keep(first, true); else MandFail(1);
+            hp_PlanVestry_first = nEmit;
+            if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, EF_MANDATORY, ref r) >= 0) Keep(hp_PlanVestry_first, true); else MandFail(1);
+        }
+        if (Ph(1))
+        {
             GenRng r2 = SR(2);
-            if (Fit(2)) { first = nEmit; if (WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, 0, ref r2) >= 0) Keep(first, false); }
+            if (Fit(2)) { hp_PlanVestry_first = nEmit; if (WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, 0, ref r2) >= 0) Keep(hp_PlanVestry_first, false); }
+    
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "q_cabinet", "gk_trunk", "k_bookcaseClosed", "k_bookcase", "k_coatRack", "k_lampSquare", "gk_lantern", "hw_shrine", "q_cabinetSmall",
+        if (PhLoop(2, PoolLen(new string[] { "q_cabinet", "gk_trunk", "k_bookcaseClosed", "k_bookcase", "k_coatRack", "k_lampSquare", "gk_lantern", "hw_shrine", "q_cabinetSmall",
             "k_trashcan", "gk_urnRound" })) && !PoolStep(50, new string[] { "q_cabinet", "gk_trunk", "k_bookcaseClosed", "k_bookcase", "k_coatRack", "k_lampSquare", "gk_lantern", "hw_shrine", "q_cabinetSmall",
             "k_trashcan", "gk_urnRound" })) PhBreak();
-}
+    }
 
     // ============================================================================================ CHURCHYARD
     void PlanChurchyard()
     {
-        int room = pRoom, dx, dz;
-        FrontMarkers(30);
-        MainDoor(room, out dx, out dz);
-        GenRng rp = SR(39);
-        StonePaths(40, ref rp);
-        GenRng r = SR(1);
-        for (int k = 0; k < 2 && Fit(1); k++)
+        if (Ph(0))
         {
-            int cell = OpenSpot(1, WM_NEAR, dx, dz, 0, ref r);
-            int first = nEmit;
-            if (cell >= 0 && FreePlace(Dn("gk_lightpost"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+            int dx, dz;
+            hp_PlanChurchyard_room = pRoom;
+            FrontMarkers(30);
+            MainDoor(hp_PlanChurchyard_room, out dx, out dz);
+            GenRng rp = SR(39);
+            StonePaths(40, ref rp);
+            hp_PlanChurchyard_r = SR(1);
+            for (int k = 0; k < 2 && Fit(1); k++)
+            {
+                int cell = OpenSpot(1, WM_NEAR, dx, dz, 0, ref hp_PlanChurchyard_r);
+                int first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("gk_lightpost"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+            }
         }
-        GenRng r2 = SR(2);
-        if (r2.Chance(600) && Fit(2)) { int first = nEmit; if (PlaceGroup(GenData.FindGrp("graves"), room, GenData.A_OUT_OPEN, 3, 0, ref r2)) Keep(first, false); }
-        int trees = TreeCount(room, ref r);
-        for (int t = 0; t < trees; t++) LawnTree(60 + t);
-        FillFromPool(50, new string[] { "gk_benchOld", "k_bench", "hk_bench", "gk_urnRound", "gk_urnSquare", "gk_cross", "f_hedge", "n_bushLarge", "ck_trash", "gk_lightpostDouble" });
-        ClearBans();
-        Borders(30, 3, true);
+        if (Ph(1))
+        {
+            GenRng r2 = SR(2);
+            if (r2.Chance(600) && Fit(2)) { int first = nEmit; if (PlaceGroup(GenData.FindGrp("graves"), hp_PlanChurchyard_room, GenData.A_OUT_OPEN, 3, 0, ref r2)) Keep(first, false); }
+            int trees = TreeCount(hp_PlanChurchyard_room, ref hp_PlanChurchyard_r);
+            for (int t = 0; t < trees; t++) LawnTree(60 + t);
+            FillFromPool(50, new string[] { "gk_benchOld", "k_bench", "hk_bench", "gk_urnRound", "gk_urnSquare", "gk_cross", "f_hedge", "n_bushLarge", "ck_trash", "gk_lightpostDouble" });
+            ClearBans();
+            Borders(30, 3, true);
+        }
     }
 
     // ============================================================================================ GRAVEYARD
@@ -127,4 +138,9 @@ public partial class MapGen
             "gk_lantern", "gk_crossWood", "gk_crossColumn", "n_bushLarge", "hk_bench", "m_wheelbarrow" };
         if (PhLoop(3, pool.Length) && !PoolStep(50, pool)) PhBreak();
     }
+
+    // phase state of the split plans (Tools: autophase2)
+    int hp_PlanVestry_first;
+    int hp_PlanChurchyard_room;
+    GenRng hp_PlanChurchyard_r;
 }

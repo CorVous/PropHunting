@@ -83,53 +83,68 @@ public partial class MapGenUdon
     // only fails when rooms do not connect. Repair: remove the last object placed on the
     // room's floor that is not one of its mandatory pieces (a whole group at once), else the last mandatory one,
     // and re-run, up to 10 times; then the seed is re-rolled (attempt + 1, still deterministic).
-    bool Validate()
+    // In steps (Cor: build freezes): the flood in chunks, the rooms' reach a few thousand cells a step, a
+    // repair and the flood again. The same checks and repairs in the same order. vPhase 0 starts it; true when done,
+    // vFailed when the seed must be re-rolled.
+    int vPhase, vRepair, vRoom;
+    bool vFailed;
+
+    bool ValidateStep()
     {
-        for (int repair = 0; repair <= 10; repair++)
+        if (vPhase == 0) { FloodBegin(); vPhase = 1; vRoom = 0; return false; }
+        if (vPhase == 1) { if (FloodRun(FS_CHUNK)) vPhase = 2; return false; }
+        int cells = 0, bad = -1;
+        while (vRoom < nRooms && bad < 0 && cells < FS_CHUNK)
         {
-            Flood();
-            int bad = -1;
-            for (int r = 0; r < nRooms && bad < 0; r++)
+            int r = vRoom++;
+            int s = roomCellStart[r], n = roomCellCount[r], free = 0, ok = 0;
+            for (int k = s; k < s + n; k++)
             {
-                int s = roomCellStart[r], n = roomCellCount[r], free = 0, ok = 0;
-                for (int k = s; k < s + n; k++)
-                {
-                    int i = roomCells[k];
-                    if (SolidAt(i)) continue;
-                    free++;
-                    if (reach[i] != 0) ok++;
-                }
-                if (free - ok > SealedAllowance(r)) bad = r;
+                int i = roomCells[k];
+                if (SolidAt(i)) continue;
+                free++;
+                if (reach[i] != 0) ok++;
             }
-            if (bad < 0) return true;
-            int victim = -1;
-            for (int pass = 0; pass < 2 && victim < 0; pass++)
-                for (int e = nEmit - 1; e >= 0 && victim < 0; e--)
-                {
-                    if (emitRoom[e] != bad || emitParent[e] >= 0 || (emitFlags[e] & EF_REMOVED) != 0) continue;
-                    if (Has(emitDef[e], GenData.FL_FLAT) || Has(emitDef[e], GenData.FL_DECOR)) continue;
-                    if (pass == 0 && (emitFlags[e] & EF_MANDATORY) != 0) continue;
-                    victim = e;
-                }
-            if (victim < 0) return false;
-                for (int z = roomZ1[bad] + 1; z >= roomZ0[bad] - 1; z--)
-                {
-                    string line = "    ";
-                    for (int x = roomX0[bad] - 1; x <= roomX1[bad] + 1; x++)
-                    {
-                        if (x < 0 || z < 0 || x >= IW || z >= IH) { line += ' '; continue; }
-                        int i = z * IW + x;
-                        char c = (tags[i] & GenData.T_FLOOR) == 0 ? ' ' : (solid[i] > 0 ? '#' : (reach[i] != 0 ? '.' : 'o'));
-                        if (innerRoom[i] != bad && c == '.') c = ',';
-                        if (innerRoom[i] != bad && c == '#') c = '+';
-                        line += c;
-                    }
-                }
-            Remove(victim);
-            statRepairs++;
+            cells += n;
+            if (free - ok > SealedAllowance(r)) bad = r;
         }
+        if (bad < 0 && vRoom < nRooms) return false;
+        if (bad < 0) return true;
+        if (vRepair >= 10 || !RepairRoom(bad)) { vFailed = true; return true; }
+        vRepair++; vPhase = 0;
         return false;
     }
+
+    bool RepairRoom(int bad)
+    {
+        int victim = -1;
+        for (int pass = 0; pass < 2 && victim < 0; pass++)
+            for (int e = nEmit - 1; e >= 0 && victim < 0; e--)
+            {
+                if (emitRoom[e] != bad || emitParent[e] >= 0 || (emitFlags[e] & EF_REMOVED) != 0) continue;
+                if (Has(emitDef[e], GenData.FL_FLAT) || Has(emitDef[e], GenData.FL_DECOR)) continue;
+                if (pass == 0 && (emitFlags[e] & EF_MANDATORY) != 0) continue;
+                victim = e;
+            }
+        if (victim < 0) return false;
+            for (int z = roomZ1[bad] + 1; z >= roomZ0[bad] - 1; z--)
+            {
+                string line = "    ";
+                for (int x = roomX0[bad] - 1; x <= roomX1[bad] + 1; x++)
+                {
+                    if (x < 0 || z < 0 || x >= IW || z >= IH) { line += ' '; continue; }
+                    int i = z * IW + x;
+                    char c = (tags[i] & GenData.T_FLOOR) == 0 ? ' ' : (solid[i] > 0 ? '#' : (reach[i] != 0 ? '.' : 'o'));
+                    if (innerRoom[i] != bad && c == '.') c = ',';
+                    if (innerRoom[i] != bad && c == '#') c = '+';
+                    line += c;
+                }
+            }
+        Remove(victim);
+        statRepairs++;
+        return true;
+    }
+
 
     // a member of a prop group takes the whole group with it
     [UdonSharp.RecursiveMethod]

@@ -14,40 +14,61 @@ public partial class MapGen
             int dx, dz;
             MainDoor(room, out dx, out dz);
             GenRng r = SR(1);
-            int first = nEmit;
-            int wb = WallPlace(Dn("s_workbench"), WM_FAR, dx, dz, WIN_PREFER, EF_MANDATORY, ref r);
-            if (wb < 0 || !Keep(first, true)) { wb = -1; MandFail(1); }
+            hp_PlanFarmWork_first = nEmit;
+            hp_PlanFarmWork_wb = WallPlace(Dn("s_workbench"), WM_FAR, dx, dz, WIN_PREFER, EF_MANDATORY, ref r);
+            if (hp_PlanFarmWork_wb < 0 || !Keep(hp_PlanFarmWork_first, true)) { hp_PlanFarmWork_wb = -1; MandFail(1); }
+        }
+        if (Ph(1))
+        {
             GenRng r2 = SR(2);
             if (Fit(1))
             {
                 int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r2);
-                first = nEmit;
-                if (cell >= 0 && FreePlace(Dn("g_anvil"), cell, r2.Range(4) * 90, 1, 0, H_FREE) >= 0) Keep(first, false);
+                hp_PlanFarmWork_first = nEmit;
+                if (cell >= 0 && FreePlace(Dn("g_anvil"), cell, r2.Range(4) * 90, 1, 0, H_FREE) >= 0) Keep(hp_PlanFarmWork_first, false);
             }
+        }
+        if (Ph(2))
+        {
             GenRng r3 = SR(3);
-            if (r3.Chance(700) && Fit(1)) { first = nEmit; if (WallPlace(Dn("g_grindstone"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(first, false); }
-            string[] rows = { "handtools", "smallTools", "tyres", "fuel", "boxes" };
-            int[] chance = { 950, 800, 650, 500, 400 };
-            for (int k = 0; k < rows.Length; k++)
+            if (r3.Chance(700) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Dn("g_grindstone"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(hp_PlanFarmWork_first, false); }
+            hp_PlanFarmWork_rows = new string[] { "handtools", "smallTools", "tyres", "fuel", "boxes" };
+            hp_PlanFarmWork_chance = new int[] { 950, 800, 650, 500, 400 };
+        }
+        if (PhLoop(3, 100000))
+        {
+            int k = planIter;
+            if (!(k < hp_PlanFarmWork_rows.Length)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
             {
                 GenRng rk = SR(4 + k);
-                if (!rk.Chance(chance[k]) || !Fit(2)) continue;
-                first = nEmit;
-                int g = GenData.FindGrp(rows[k]);
-                bool ok = k < 2 && wb >= 0 ? GroupBeside(g, wb, rk.Between(2, 3), 0, ref rk) : false;
+                if (!rk.Chance(hp_PlanFarmWork_chance[k]) || !Fit(2)) continue;
+                hp_PlanFarmWork_first = nEmit;
+                int g = GenData.FindGrp(hp_PlanFarmWork_rows[k]);
+                bool ok = k < 2 && hp_PlanFarmWork_wb >= 0 ? GroupBeside(g, hp_PlanFarmWork_wb, rk.Between(2, 3), 0, ref rk) : false;
                 if (!ok) ok = PlaceGroup(g, room, GenData.A_WALL, rk.Between(2, 3), 0, ref rk);
-                if (ok) Keep(first, false);
+                if (ok) Keep(hp_PlanFarmWork_first, false);
             }
+        }
+        if (Ph(4))
+        {
             GenRng r9 = SR(9);
-            if (r9.Chance(650) && Fit(1)) { first = nEmit; if (WallPlace(Pick(ref r9, "c_tractorWheel", 5, "f_wheel", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r9) >= 0) Keep(first, false); }
+            if (r9.Chance(650) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Pick(ref r9, "c_tractorWheel", 5, "f_wheel", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r9) >= 0) Keep(hp_PlanFarmWork_first, false); }
+        }
+        if (Ph(5))
+        {
             GenRng r10 = SR(10);
-            if (r10.Chance(550) && Fit(1)) { first = nEmit; if (WallPlace(Dn("gen_rack"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r10) >= 0) Keep(first, false); }
+            if (r10.Chance(550) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Dn("gen_rack"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r10) >= 0) Keep(hp_PlanFarmWork_first, false); }
+        }
+        if (Ph(6))
+        {
             GenRng r11 = SR(11);
-            if (r11.Chance(400) && Fit(1)) { first = nEmit; if (WallPlace(Pick(ref r11, "w_planks", 4, "w_logs", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(first, false); }
+            if (r11.Chance(400) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Pick(ref r11, "w_planks", 4, "w_logs", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(hp_PlanFarmWork_first, false); }
+    
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) && !PoolStep(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) PhBreak();
-}
+        if (PhLoop(7, PoolLen(new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) && !PoolStep(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) PhBreak();
+    }
 
     // ============================================================================================ SKATE CORNER
     // A paved corner of the park with ramps: a half-pipe or a ramp at one end, a rail and a box in the middle, a
@@ -406,4 +427,10 @@ public partial class MapGen
         int st = WallPlace(Dn(r.Chance(500) ? "f_stallGreen" : "f_stallRed"), WM_FAR, dx, dz, WIN_ANY, 0, ref r);
         if (st >= 0 && Keep(first, false) && Fit(1)) { first = nEmit; if (RelBeside(Dn(r.Chance(500) ? "f_stallBench" : "f_stallStool"), st, r.Chance(500) ? 1 : -1, 150, 0, ref r) >= 0) Keep(first, false); }
     }
+
+    // phase state of the split plans (Tools: autophase2)
+    int hp_PlanFarmWork_first;
+    int hp_PlanFarmWork_wb;
+    string[] hp_PlanFarmWork_rows;
+    int[] hp_PlanFarmWork_chance;
 }

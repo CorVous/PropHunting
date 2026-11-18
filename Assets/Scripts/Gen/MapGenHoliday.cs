@@ -111,6 +111,51 @@ public partial class MapGen
         roomFloorTarget[room] = saved > roomFloor[room] ? saved : roomFloor[room];
     }
 
+    // ThemeDecor a few tries a step (Cor: build freezes); true when done. tdK = -1 starts it.
+    int tdK = -1, tdSaved, tdMost, tdP0, tdAdded;
+    GenRng tdRng;
+
+    bool ThemeDecorStep()
+    {
+        int room = pRoom;
+        bool building = GenData.IsBuilding(roomZone[room]);
+        string[] pool = mapTheme == GenData.THEME_SPACE ? (building ? SpaceIn : SpaceOut) : (building ? MedievalIn : MedievalOut);
+        if (tdK < 0)
+        {
+            tdSaved = roomFloorTarget[room];
+            tdMost = !building && AreaM2(room) >= 24 ? 3 : 2;   // a large outdoor area takes one more
+            roomFloorTarget[room] = roomFloor[room] + tdMost;
+            tdRng = SR(75);
+            tdP0 = tdRng.Range(pool.Length); tdAdded = 0; tdK = 0;
+            return false;
+        }
+        int plot = roomPlot[room];
+        for (int tries = 0; tries < 3; tries++)
+        {
+            int k = tdK;
+            if (!(k < 2 * pool.Length && tdAdded < tdMost && Fit(1)))
+            {
+                roomFloorTarget[room] = tdSaved > roomFloor[room] ? tdSaved : roomFloor[room];
+                tdK = -1;
+                return true;
+            }
+            tdK++;
+            int def = GenData.FindDef(pool[(tdP0 + k) % pool.Length]);
+            if (CountInRoom(def, room) > 0 || (k < pool.Length && plot >= 0 && InPlot(def, plot))) continue;
+            int first = nEmit, e;
+            if (GenData.defAnchor[def] == GenData.A_WALL || GenData.defAnchor[def] == GenData.A_CORNER || GenData.defAnchor[def] == GenData.A_OUT_EDGE || Has(def, GenData.FL_LOOSE))
+                e = WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, ref tdRng);
+            else
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref tdRng);
+                e = cell >= 0 ? FreePlace(def, cell, tdRng.Range(4) * 90, 0, 0, H_FREE) : -1;
+            }
+            if (e >= 0 && Keep(first, false)) tdAdded++;
+            return false;   // one placement a step
+        }
+        return false;
+    }
+
     bool InPlot(int def, int plot)
     {
         for (int e = 0; e < nEmit; e++)

@@ -27,56 +27,87 @@ public partial class MapGenUdon
     void PlanTeen()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int bed = CornerBed(Pick(r, "k_bedSingle", 6, "q_bed", 4), r);
-        int bx = bed >= 0 ? emitX[bed] : RoomMidX(room), bz = bed >= 0 ? emitZ[bed] : RoomMidZ(room);
-        uint[] r2 = SR(2);
-        if (Fit(2))
+        if (Ph(0))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("k_desk"), WM_FAR, bx, bz, WIN_PREFER, 0, r2) >= 0) Keep(first, false);
+            uint[] r = SR(1);
+            hp_PlanTeen_bed = CornerBed(Pick(r, "k_bedSingle", 6, "q_bed", 4), r);
+            hp_PlanTeen_bx = hp_PlanTeen_bed >= 0 ? emitX[hp_PlanTeen_bed] : RoomMidX(room);
+            hp_PlanTeen_bz = hp_PlanTeen_bed >= 0 ? emitZ[hp_PlanTeen_bed] : RoomMidZ(room);
         }
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 800) && Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            int g = WallPlace(Dn(RngChance(r3, 500) ? "mb_guitarA" : "mb_guitarB"), WM_ANY, 0, 0, WIN_ANY, 0, r3);
-            if (g >= 0 && Keep(first, false) && RngChance(r3, 550) && Fit(1)) { first = nEmit; if (RelBeside(Dn("mb_guitarCase"), g, 0, 80, 0, r3) >= 0) Keep(first, false); }
+            uint[] r2 = SR(2);
+            if (Fit(2))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("k_desk"), WM_FAR, hp_PlanTeen_bx, hp_PlanTeen_bz, WIN_PREFER, 0, r2) >= 0) Keep(first, false);
+            }
         }
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 750) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("comics"), room, GenData.A_WALL, RngBetween(r4, 2, 3), 0, r4)) Keep(first, false); }
-        uint[] r5 = SR(5);
-        if (RngChance(r5, 650) && LooseFit(2))
+        if (Ph(2))
         {
-            int first = nEmit;
-            FSet(Dn("sk_board"), Dn(RngChance(r5, 500) ? "mb_helmet" : "mb_skates"));
-            if (FormAt(GenData.GL_ROW, 120, GenData.A_WALL, WM_ANY, 0, 0, 0, r5) >= 0 && Keep(first, false)) MarkLoose(first);
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 800) && Fit(1))
+            {
+                int first = nEmit;
+                int g = WallPlace(Dn(RngChance(r3, 500) ? "mb_guitarA" : "mb_guitarB"), WM_ANY, 0, 0, WIN_ANY, 0, r3);
+                if (g >= 0 && Keep(first, false) && RngChance(r3, 550) && Fit(1)) { first = nEmit; if (RelBeside(Dn("mb_guitarCase"), g, 0, 80, 0, r3) >= 0) Keep(first, false); }
+            }
         }
-        uint[] r6 = SR(6);
-        if (RngChance(r6, 600) && Fit(1))
+        if (Ph(3))
         {
-            int first = nEmit;
-            int seat = WallPlace(Dn(RngChance(r6, 550) ? "hb_armchairBlue" : "k_loungeChair"), WM_ANY, 0, 0, WIN_AVOID, 0, r6);
-            if (seat >= 0 && Keep(first, false) && RngChance(r6, 450) && Fit(1)) { first = nEmit; if (RelBeside(Dn("k_speaker"), seat, 0, 120, 0, r6) >= 0) Keep(first, false); }
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 750) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("comics"), room, GenData.A_WALL, RngBetween(r4, 2, 3), 0, r4)) Keep(first, false); }
         }
-        uint[] r7 = SR(7);
-        if (RngChance(r7, 650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, r7) >= 0) Keep(first, false); }
-        uint[] r8 = SR(8);
-        if (RngChance(r8, 500) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("balls"), room, GenData.A_WALL, 2, 0, r8)) Keep(first, false); }
-        uint[] r9 = SR(9);
-        if (RngChance(r9, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_bookcaseLow"), WM_ANY, 0, 0, WIN_AVOID, 0, r9) >= 0) Keep(first, false); }
-        uint[] r10 = SR(10);
-        if (RngChance(r10, 550) && Fit(1))
+        if (Ph(4))
         {
-            int cell = OpenSpot(2, WM_NEAR, bx, bz, 0, r10);
-            if (cell >= 0) FreePlace(Dn(RngChance(r10, 500) ? "k_rug" : "q_rug"), cell, RngRange(r10, 2) * 90, 0, 0, H_FREE);
+            uint[] r5 = SR(5);
+            if (RngChance(r5, 650) && LooseFit(2))
+            {
+                int first = nEmit;
+                FSet(Dn("sk_board"), Dn(RngChance(r5, 500) ? "mb_helmet" : "mb_skates"));
+                if (FormAt(GenData.GL_ROW, 120, GenData.A_WALL, WM_ANY, 0, 0, 0, r5) >= 0 && Keep(first, false)) MarkLoose(first);
+            }
         }
-        if (bed >= 0)
+        if (Ph(5))
         {
-            uint[] r11 = SR(11);
-            if (RngChance(r11, 450) && Fit(1)) { int first = nEmit; if (GroupBeside(FindGrp("plush"), bed, 1, 0, r11)) Keep(first, false); }
+            uint[] r6 = SR(6);
+            if (RngChance(r6, 600) && Fit(1))
+            {
+                int first = nEmit;
+                int seat = WallPlace(Dn(RngChance(r6, 550) ? "hb_armchairBlue" : "k_loungeChair"), WM_ANY, 0, 0, WIN_AVOID, 0, r6);
+                if (seat >= 0 && Keep(first, false) && RngChance(r6, 450) && Fit(1)) { first = nEmit; if (RelBeside(Dn("k_speaker"), seat, 0, 120, 0, r6) >= 0) Keep(first, false); }
+            }
         }
-        Extras(20, 500, "ck_lampFloor", "wk_trashcan", "ck_plant");
+        if (Ph(6))
+        {
+            uint[] r7 = SR(7);
+            if (RngChance(r7, 650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, r7) >= 0) Keep(first, false); }
+        }
+        if (Ph(7))
+        {
+            uint[] r8 = SR(8);
+            if (RngChance(r8, 500) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("balls"), room, GenData.A_WALL, 2, 0, r8)) Keep(first, false); }
+        }
+        if (Ph(8))
+        {
+            uint[] r9 = SR(9);
+            if (RngChance(r9, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_bookcaseLow"), WM_ANY, 0, 0, WIN_AVOID, 0, r9) >= 0) Keep(first, false); }
+        }
+        if (Ph(9))
+        {
+            uint[] r10 = SR(10);
+            if (RngChance(r10, 550) && Fit(1))
+            {
+                int cell = OpenSpot(2, WM_NEAR, hp_PlanTeen_bx, hp_PlanTeen_bz, 0, r10);
+                if (cell >= 0) FreePlace(Dn(RngChance(r10, 500) ? "k_rug" : "q_rug"), cell, RngRange(r10, 2) * 90, 0, 0, H_FREE);
+            }
+            if (hp_PlanTeen_bed >= 0)
+            {
+                uint[] r11 = SR(11);
+                if (RngChance(r11, 450) && Fit(1)) { int first = nEmit; if (GroupBeside(FindGrp("plush"), hp_PlanTeen_bed, 1, 0, r11)) Keep(first, false); }
+            }
+            Extras(20, 500, "ck_lampFloor", "wk_trashcan", "ck_plant");
+        }
     }
 
     // ============================================================================================ PLAYROOM
@@ -166,35 +197,54 @@ public partial class MapGenUdon
     void PlanBoxRoom()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int first = nEmit;
-        if (PlaceGroup(FindGrp("trunks"), room, GenData.A_WALL, Fit(3) ? 3 : 2, EF_MANDATORY, r)) Keep(first, true); else MandFail(1);
-        string[] rows = { "oldBoxes", "frames", "cardboard", "comics", "oldBoxes" };
-        int[] chance = { 900, 850, 650, 500, 500 };
-        for (int k = 0; k < rows.Length; k++)
+        if (Ph(0))
         {
-            uint[] rk = SR(2 + k);
-            if (!RngChance(rk, chance[k]) || !Fit(2)) continue;
-            first = nEmit;
-            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
+            uint[] r = SR(1);
+            hp_PlanBoxRoom_first = nEmit;
+            if (PlaceGroup(FindGrp("trunks"), room, GenData.A_WALL, Fit(3) ? 3 : 2, EF_MANDATORY, r)) Keep(hp_PlanBoxRoom_first, true); else MandFail(1);
+            hp_PlanBoxRoom_rows = new string[] { "oldBoxes", "frames", "cardboard", "comics", "oldBoxes" };
+            hp_PlanBoxRoom_chance = new int[] { 900, 850, 650, 500, 500 };
         }
-        string[] one = { "mb_mirror", "mb_sled", "mb_guitarCase", "gen_wardrobe", "q_cabinet", "q_armchair", "k_bookcaseLow", "hb_stool" };
-        int[] ch = { 700, 550, 500, 450, 450, 400, 400, 300 };
-        for (int k = 0; k < one.Length; k++)
+        if (PhLoop(1, 100000))
         {
-            uint[] rk = SR(10 + k);
-            if (!RngChance(rk, ch[k]) || !Fit(1)) continue;
-            first = nEmit;
-            if (WallPlace(Dn(one[k]), WM_ANY, 0, 0, WIN_ANY, 0, rk) >= 0) Keep(first, false);
+            int k = planIter;
+            if (!(k < hp_PlanBoxRoom_rows.Length)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
+            {
+                uint[] rk = SR(2 + k);
+                if (!RngChance(rk, hp_PlanBoxRoom_chance[k]) || !Fit(2)) continue;
+                hp_PlanBoxRoom_first = nEmit;
+                if (PlaceGroup(FindGrp(hp_PlanBoxRoom_rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(hp_PlanBoxRoom_first, false);
+            }
         }
-        uint[] r20 = SR(20);
-        if (RngChance(r20, 500) && LooseFit(2))
+        if (Ph(2))
         {
-            first = nEmit;
-            FSet(Dn("mb_skates"), Dn(RngChance(r20, 500) ? "mb_helmet" : "mb_mimic"));
-            if (FormAt(GenData.GL_ROW, 100, GenData.A_WALL, WM_ANY, 0, 0, 0, r20) >= 0 && Keep(first, false)) MarkLoose(first);
+            hp_PlanBoxRoom_one = new string[] { "mb_mirror", "mb_sled", "mb_guitarCase", "gen_wardrobe", "q_cabinet", "q_armchair", "k_bookcaseLow", "hb_stool" };
+            hp_PlanBoxRoom_ch = new int[] { 700, 550, 500, 450, 450, 400, 400, 300 };
         }
-        Extras(30, 600, "cq_lampStanding", "ck_lampFloor", "cs_chest");
+        if (PhLoop(3, 100000))
+        {
+            int k = planIter;
+            if (!(k < hp_PlanBoxRoom_one.Length)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
+            {
+                uint[] rk = SR(10 + k);
+                if (!RngChance(rk, hp_PlanBoxRoom_ch[k]) || !Fit(1)) continue;
+                hp_PlanBoxRoom_first = nEmit;
+                if (WallPlace(Dn(hp_PlanBoxRoom_one[k]), WM_ANY, 0, 0, WIN_ANY, 0, rk) >= 0) Keep(hp_PlanBoxRoom_first, false);
+            }
+        }
+        if (Ph(4))
+        {
+            uint[] r20 = SR(20);
+            if (RngChance(r20, 500) && LooseFit(2))
+            {
+                hp_PlanBoxRoom_first = nEmit;
+                FSet(Dn("mb_skates"), Dn(RngChance(r20, 500) ? "mb_helmet" : "mb_mimic"));
+                if (FormAt(GenData.GL_ROW, 100, GenData.A_WALL, WM_ANY, 0, 0, 0, r20) >= 0 && Keep(hp_PlanBoxRoom_first, false)) MarkLoose(hp_PlanBoxRoom_first);
+            }
+            Extras(30, 600, "cq_lampStanding", "ck_lampFloor", "cs_chest");
+        }
     }
 
     // ============================================================================================ PANTRY
@@ -238,4 +288,14 @@ public partial class MapGenUdon
             if (RngChance(r11, 400) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("cleaning"), room, GenData.A_WALL, 2, 0, r11)) Keep(first, false); }
         }
     }
+
+    // phase state of the split plans (Tools: autophase2)
+    int hp_PlanTeen_bed;
+    int hp_PlanTeen_bx;
+    int hp_PlanTeen_bz;
+    int hp_PlanBoxRoom_first;
+    string[] hp_PlanBoxRoom_rows;
+    int[] hp_PlanBoxRoom_chance;
+    string[] hp_PlanBoxRoom_one;
+    int[] hp_PlanBoxRoom_ch;
 }

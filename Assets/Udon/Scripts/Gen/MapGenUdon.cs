@@ -154,7 +154,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         seed = seedValue; size = sizeBucket;
         density = densityIndex < 0 || densityIndex >= DensityPercent.Length ? 0 : densityIndex;
         attempt = 0; done = false; failed = false; failReason = "";
-        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; ftmK = -1;
+        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; ftmK = -1; tdK = -1;
         Alloc(SizeGrid[size], SizeGrid[size]);
         menu = new bool[nDefs]; defCopies = new int[nDefs];
         int roll = RngRange(Rng(ST_SCENERY, 9, 9), 1000);
@@ -206,6 +206,10 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
                 for (int i = 0; i < statTypeMandFail.Length; i++) statTypeMandFail[i] = 0;
                 statRepairs = 0; statMandatoryFail = 0; statGroups = 0; statWalkRejects = 0; statLeakComedic = 0; statLeakPlausible = 0; statLoose = 0;
                 if (!Layout()) { Retry("layout"); break; }
+                stage = 9; progressPermille = 60;
+                break;
+            case 9:
+                PlaceSite(layRng);   // the site onto the grid, and its levels: a step of its own (Cor: build freezes)
                 stage = 1; progressPermille = 80;
                 break;
             // stage 1 in three steps, and Finish in three (Cor: build freezes): the same work in the same order
@@ -216,6 +220,9 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
                 break;
             case 11:
                 if (!PlaceStairs()) { Retry("stairs"); break; }
+                stage = 13;
+                break;
+            case 13:
                 if (!ValidateSite()) { Retry("layout tests"); break; }
                 stage = 12; progressPermille = 120; btPhase = 0; btCursor = 0;
                 break;
@@ -235,10 +242,11 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
             case 3:
                 if (cursor >= 0) { lkPhase = 0; cursor = -1; }   // a few attempts a step (Cor: build freezes)
                 if (!PlaceLeaksStep()) break;
-                stage = 5; progressPermille = 850;
+                stage = 5; progressPermille = 850; vPhase = 0; vRepair = 0; vFailed = false;
                 break;
             case 5:
-                if (!Validate()) { Retry("unreachable rooms"); break; }
+                if (!ValidateStep()) break;
+                if (vFailed) { Retry("unreachable rooms"); break; }
                 stage = 6; progressPermille = 940;
                 break;
             case 6:
@@ -264,7 +272,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
             failReason = "no valid map after 12 attempts (" + why + ")";
             return;
         }
-        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; ftmK = -1;
+        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; ftmK = -1; tdK = -1;
     }
 
     // The layout stages draw from their own version, so the buildings of a seed survive a change of the prop

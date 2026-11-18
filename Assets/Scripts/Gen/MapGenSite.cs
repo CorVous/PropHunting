@@ -480,8 +480,11 @@ public partial class MapGen
         for (int k = 0; k < nPlots; k++) Gates(k, ref rng);
 
         // (6) turn and mirror the whole site, and take it onto the outer grid
-        return PlaceSite(ref rng);
+        layRng = rng;   // PlaceSite goes on with this stream, a step later (MapGen.Step, stage 9)
+        return true;
     }
+
+    GenRng layRng;
 
     // one of the plot kinds that are not houses, by weight, not one the map has already
     int DrawPlotKind(int[] kinds, int nk, ref GenRng rng)

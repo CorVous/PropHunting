@@ -63,7 +63,7 @@ def table_fields():
 
 
 RECURSIVE = ["Remove", "RemoveOne"]   # found by a call-graph check (WallPlace and StampObject only call their own overloads)
-GLOBAL_RNG = {"planR"}   # rng fields declared in one file and used in others (MapGenPlace.planR)
+GLOBAL_RNG = {"planR", "layRng"}   # rng fields declared in one file and used in others (MapGenPlace.planR, MapGenSite.layRng)
 
 
 def convert(text, fields, used):

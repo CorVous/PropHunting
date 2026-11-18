@@ -109,21 +109,28 @@ public partial class MapGen
                 if (a >= mid - 1 && a <= mid) tags[i] |= GenData.T_PATH;
             }
             RoomWalkable(room);
+        }
+        if (Ph(1))
+        {
             GenRng r = SR(1);
-            int first = nEmit;
-            if (WallPlace(Dn(r.Chance(500) ? "f_cart" : "m_wheelbarrow"), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0 && Keep(first, false) && Fit(2))
+            hp_PlanZooWalk_first = nEmit;
+            if (WallPlace(Dn(r.Chance(500) ? "f_cart" : "m_wheelbarrow"), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0 && Keep(hp_PlanZooWalk_first, false) && Fit(2))
             {
-                first = nEmit;
-                if (GroupAt(GenData.FindGrp(r.Chance(500) ? "hay" : "buckets"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r)) Keep(first, false);
+                hp_PlanZooWalk_first = nEmit;
+                if (GroupAt(GenData.FindGrp(r.Chance(500) ? "hay" : "buckets"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r)) Keep(hp_PlanZooWalk_first, false);
             }
+        }
+        if (Ph(2))
+        {
             GenRng r2 = SR(2);
-            if (r2.Chance(600) && Fit(1)) { first = nEmit; if (WallPlace(Dn(r2.Chance(500) ? "ck_food" : "ck_drinks"), WM_ANY, 0, 0, WIN_ANY, 0, ref r2) >= 0) Keep(first, false); }
+            if (r2.Chance(600) && Fit(1)) { hp_PlanZooWalk_first = nEmit; if (WallPlace(Dn(r2.Chance(500) ? "ck_food" : "ck_drinks"), WM_ANY, 0, 0, WIN_ANY, 0, ref r2) >= 0) Keep(hp_PlanZooWalk_first, false); }
+    
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
+        if (PhLoop(3, PoolLen(new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
             "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" })) && !PoolStep(50, new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
             "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" })) PhBreak();
-}
+    }
 
     // ============================================================================================ ENCLOSURES
     // One part of the world each: its beasts on the open ground, the water they need, what they climb on and shelter
@@ -205,20 +212,25 @@ public partial class MapGen
         if (Ph(0))
         {
             GenRng r = SR(1);
-            int first = nEmit;
-            if (PlaceGroup(GenData.FindGrp("hay"), room, GenData.A_WALL, 3, EF_MANDATORY, ref r)) Keep(first, true); else MandFail(1);
-            string[] rows = { "buckets", "sacks", "crates", "tools", "barrels" };
-            for (int k = 0; k < rows.Length; k++)
+            hp_PlanKeeper_first = nEmit;
+            if (PlaceGroup(GenData.FindGrp("hay"), room, GenData.A_WALL, 3, EF_MANDATORY, ref r)) Keep(hp_PlanKeeper_first, true); else MandFail(1);
+            hp_PlanKeeper_rows = new string[] { "buckets", "sacks", "crates", "tools", "barrels" };
+        }
+        if (PhLoop(1, 100000))
+        {
+            int k = planIter;
+            if (!(k < hp_PlanKeeper_rows.Length)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
             {
                 GenRng rk = SR(2 + k);
                 if (!rk.Chance(k < 2 ? 850 : 550) || !Fit(2)) continue;
-                first = nEmit;
-                if (PlaceGroup(GenData.FindGrp(rows[k]), room, GenData.A_WALL, 2, 0, ref rk)) Keep(first, false);
+                hp_PlanKeeper_first = nEmit;
+                if (PlaceGroup(GenData.FindGrp(hp_PlanKeeper_rows[k]), room, GenData.A_WALL, 2, 0, ref rk)) Keep(hp_PlanKeeper_first, false);
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) && !PoolStep(50, new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) PhBreak();
-}
+        if (PhLoop(2, PoolLen(new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) && !PoolStep(50, new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) PhBreak();
+    }
 
     // ============================================================================================ CABIN ROOM
     // One room for living: the wood stove against a wall with the log basket beside it and an armchair on a rug in
@@ -331,18 +343,25 @@ public partial class MapGen
         {
             GenRng r = SR(1);
             int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r);
-            int first = nEmit;
+            hp_PlanWoodyard_first = nEmit;
             int block = cell >= 0 ? FreePlace(Dn("s_block"), cell, r.Range(360), 0, 0, H_FREE) : -1;
-            if (block < 0 || !Keep(first, true)) { block = -1; MandFail(1); }
-            if (block >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn(r.Chance(500) ? "s_axe" : "s_axeB"), block, r.Chance(500) ? 1 : -1, 60, 0, ref r) >= 0) Keep(first, false); }
+            if (block < 0 || !Keep(hp_PlanWoodyard_first, true)) { block = -1; MandFail(1); }
+            if (block >= 0 && Fit(1)) { hp_PlanWoodyard_first = nEmit; if (RelBeside(Dn(r.Chance(500) ? "s_axe" : "s_axeB"), block, r.Chance(500) ? 1 : -1, 60, 0, ref r) >= 0) Keep(hp_PlanWoodyard_first, false); }
+        }
+        if (Ph(1))
+        {
             GenRng r2 = SR(2);
-            if (Fit(2)) { first = nEmit; if (PlaceGroup(GenData.FindGrp("woodpile"), room, GenData.A_WALL, 3, 0, ref r2)) Keep(first, false); }
+            if (Fit(2)) { hp_PlanWoodyard_first = nEmit; if (PlaceGroup(GenData.FindGrp("woodpile"), room, GenData.A_WALL, 3, 0, ref r2)) Keep(hp_PlanWoodyard_first, false); }
+        }
+        if (Ph(2))
+        {
             GenRng r3 = SR(3);
-            if (r3.Chance(650) && Fit(2)) { first = nEmit; if (PlaceGroup(GenData.FindGrp("tools"), room, GenData.A_WALL, 2, 0, ref r3)) Keep(first, false); }
+            if (r3.Chance(650) && Fit(2)) { hp_PlanWoodyard_first = nEmit; if (PlaceGroup(GenData.FindGrp("tools"), room, GenData.A_WALL, 2, 0, ref r3)) Keep(hp_PlanWoodyard_first, false); }
+    
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) && !PoolStep(50, new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) PhBreak();
-}
+        if (PhLoop(3, PoolLen(new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) && !PoolStep(50, new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) PhBreak();
+    }
 
     // ============================================================================================ CAMPGROUND
     // The fire ring with its seats and wood pile, the spit and the fish stand by the fire, tents round it with
@@ -385,4 +404,10 @@ public partial class MapGen
         string[] pool = { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" };
         if (PhLoop(4, pool.Length) && !PoolStep(50, pool)) PhBreak();
     }
+
+    // phase state of the split plans (Tools: autophase2)
+    int hp_PlanZooWalk_first;
+    int hp_PlanKeeper_first;
+    string[] hp_PlanKeeper_rows;
+    int hp_PlanWoodyard_first;
 }

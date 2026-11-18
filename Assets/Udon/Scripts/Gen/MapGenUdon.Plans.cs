@@ -298,37 +298,43 @@ public partial class MapGenUdon
     void PlanDining()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        // a narrow table in a room of one cell, where a square one leaves no way round it
-        int table = AreaM2(room) >= 24 ? Pick(r, "k_table", 5, "q_table", 5) : Dn("k_table");
-        int yaw = RoomLongAxis(room) == 0 ? 0 : 90;
-        int first0 = nEmit;
-        int t = CentrePiece(table, yaw, true, 2, 1, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r);
-        if (t >= 0)
+        if (Ph(0))
         {
-            // In a small room the walkway takes one side: the table is tried one cell off the middle each way, and
-            // stands where it keeps the most chairs (report 15, K3: a seat with its back to a wall needs less room).
-            int bestSeats = SeatsOf(t), bestX = emitX[t], bestZ = emitZ[t], tyaw = emitYaw[t];
-            int k = 0;
-            while (k < 4 && bestSeats < 4)
+            uint[] r = SR(1);
+            // a narrow table in a room of one cell, where a square one leaves no way round it
+            int table = AreaM2(room) >= 24 ? Pick(r, "k_table", 5, "q_table", 5) : Dn("k_table");
+            int yaw = RoomLongAxis(room) == 0 ? 0 : 90;
+            int first0 = nEmit;
+            int t = CentrePiece(table, yaw, true, 2, 1, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r);
+            if (t >= 0)
             {
-                int nx = bestX + DX[k] * GenData.INNER_MM, nz = bestZ + DZ[k] * GenData.INNER_MM;
-                TakeBack(first0);
-                first0 = nEmit;
-                int alt = FreePlaceAt(table, nx, nz, tyaw, 1, EF_MANDATORY, H_FREE);
-                if (alt >= 0 && Keep(first0, true) && SeatsOf(alt) > bestSeats) { bestSeats = SeatsOf(alt); bestX = nx; bestZ = nz; k = 0; t = alt; continue; }
-                if (alt >= 0) TakeBack(first0);
-                first0 = nEmit;
-                t = FreePlaceAt(table, bestX, bestZ, tyaw, 1, EF_MANDATORY, H_FREE);
-                if (t < 0 || !Keep(first0, true)) { t = -1; break; }
-                k++;
+                // In a small room the walkway takes one side: the table is tried one cell off the middle each way, and
+                // stands where it keeps the most chairs (report 15, K3: a seat with its back to a wall needs less room).
+                int bestSeats = SeatsOf(t), bestX = emitX[t], bestZ = emitZ[t], tyaw = emitYaw[t];
+                int k = 0;
+                while (k < 4 && bestSeats < 4)
+                {
+                    int nx = bestX + DX[k] * GenData.INNER_MM, nz = bestZ + DZ[k] * GenData.INNER_MM;
+                    TakeBack(first0);
+                    first0 = nEmit;
+                    int alt = FreePlaceAt(table, nx, nz, tyaw, 1, EF_MANDATORY, H_FREE);
+                    if (alt >= 0 && Keep(first0, true) && SeatsOf(alt) > bestSeats) { bestSeats = SeatsOf(alt); bestX = nx; bestZ = nz; k = 0; t = alt; continue; }
+                    if (alt >= 0) TakeBack(first0);
+                    first0 = nEmit;
+                    t = FreePlaceAt(table, bestX, bestZ, tyaw, 1, EF_MANDATORY, H_FREE);
+                    if (t < 0 || !Keep(first0, true)) { t = -1; break; }
+                    k++;
+                }
             }
+            if (t < 0) MandFail(1);
         }
-        if (t < 0) MandFail(1);
-        // the sideboard in the middle of a wall: the widest that fits
-        uint[] r2 = SR(2);
-        if (RngChance(r2, 900) && Fit(1)) WallAny(WM_CENTRE, 0, 0, WIN_AVOID, 0, r2, "q_cabinet", "k_sideTable", "k_bookcaseLow");
-        Extras(20, 750, "ck_plant", "cq_lampStanding", "wk_bookcaseLow", "cq_cactus", "ck_lampFloor");
+        if (Ph(1))
+        {
+            // the sideboard in the middle of a wall: the widest that fits
+            uint[] r2 = SR(2);
+            if (RngChance(r2, 900) && Fit(1)) WallAny(WM_CENTRE, 0, 0, WIN_AVOID, 0, r2, "q_cabinet", "k_sideTable", "k_bookcaseLow");
+            Extras(20, 750, "ck_plant", "cq_lampStanding", "wk_bookcaseLow", "cq_cactus", "ck_lampFloor");
+        }
     }
 
     // ============================================================================================ KITCHEN
@@ -705,66 +711,84 @@ public partial class MapGenUdon
     void PlanOffice(bool warehouse)
     {
         int room = pRoom, area = AreaM2(room);
-        uint[] r = SR(1);
-        int first0 = nEmit;
-        int desk = WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, EF_MANDATORY, r);
-        if (desk >= 0 && !Keep(first0, true)) desk = -1;
-        if (desk < 0) MandFail(1);
-        uint[] r2 = SR(2);
-        if (desk >= 0 && RngChance(r2, 800) && Fit(1))
+        if (Ph(0))
         {
-            int first = nEmit;
-            if (RelBeside(Dn("k_trashcan"), desk, 0, 70, 0, r2) >= 0) Keep(first, false);
+            uint[] r = SR(1);
+            int first0 = nEmit;
+            hp_PlanOffice_desk = WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, EF_MANDATORY, r);
+            if (hp_PlanOffice_desk >= 0 && !Keep(first0, true)) hp_PlanOffice_desk = -1;
+            if (hp_PlanOffice_desk < 0) MandFail(1);
         }
-        uint[] r3 = SR(3);
-        int shelf = -1;
-        if (Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            rowN = Fit(2) && RngChance(r3, 600) ? 2 : 1;
-            for (int i = 0; i < rowN; i++) rowDef[i] = Dn("k_bookcase");
-            shelf = WallRow(0, 1, WM_CENTRE, 0, 0, WIN_AVOID, 0, r3);
-            if (shelf >= 0 && !Keep(first, false)) shelf = -1;
-        }
-        uint[] r4 = SR(4);
-        if (shelf >= 0 && RngChance(r4, warehouse ? 600 : 420) && Fit(2))
-        {
-            int first = nEmit;
-            if (GroupBeside(FindGrp("cardboard"), shelf, 2, 0, r4) || GroupAt(FindGrp("cardboard"), GenData.A_WALL, 2, WM_NEAR, emitX[shelf], emitZ[shelf], 0, r4)) Keep(first, false);
-        }
-        uint[] r5 = SR(5);
-        if (desk >= 0 && area >= 16 && RngChance(r5, warehouse ? 350 : 250) && Fit(2))
-        {
-            int first = nEmit;
-            if (WallPlace(Dn("k_desk"), WM_FAR, emitX[desk], emitZ[desk], WIN_PREFER, 0, r5) >= 0) Keep(first, false);
-        }
-        uint[] r6 = SR(6);
-        if (warehouse)
-        {
-            // the break table: a small round table with chairs in the open part
-            if (RngChance(r6, 450) && Fit(3))
-            {
-                CentrePiece(Dn("r_tableRound"), 0, false, 2, 1, WM_ANY, 0, 0, 0, 0, r6);
-            }
-            uint[] r7 = SR(7);
-            if (RngChance(r7, 350) && Fit(1))
+            uint[] r2 = SR(2);
+            if (hp_PlanOffice_desk >= 0 && RngChance(r2, 800) && Fit(1))
             {
                 int first = nEmit;
-                if (WallPlace(Dn("s_workbench"), WM_ANY, 0, 0, WIN_ANY, 0, r7) >= 0) Keep(first, false);
+                if (RelBeside(Dn("k_trashcan"), hp_PlanOffice_desk, 0, 70, 0, r2) >= 0) Keep(first, false);
             }
         }
-        else if (RngChance(r6, 450) && Fit(2))
+        if (Ph(2))
         {
-            // the visitor's seat: an armchair in a corner, a small table beside it
-            int first = nEmit;
-            int chair = CornerPlace(Dn("q_armchair"), WM_FAR, desk >= 0 ? emitX[desk] : 0, desk >= 0 ? emitZ[desk] : 0, true, 0, r6);
-            if (chair >= 0 && Keep(first, false) && Fit(1))
+            uint[] r3 = SR(3);
+            hp_PlanOffice_shelf = -1;
+            if (Fit(1))
             {
-                first = nEmit;
-                if (RelBeside(Dn("q_tableSmall"), chair, 0, 60, 0, r6) >= 0) Keep(first, false);
+                int first = nEmit;
+                rowN = Fit(2) && RngChance(r3, 600) ? 2 : 1;
+                for (int i = 0; i < rowN; i++) rowDef[i] = Dn("k_bookcase");
+                hp_PlanOffice_shelf = WallRow(0, 1, WM_CENTRE, 0, 0, WIN_AVOID, 0, r3);
+                if (hp_PlanOffice_shelf >= 0 && !Keep(first, false)) hp_PlanOffice_shelf = -1;
             }
         }
-        Extras(20, 650, "ck_plant", "wq_cabinet", "ck_lampFloor", "wk_bookcaseLow", "wk_sideTable");
+        if (Ph(3))
+        {
+            uint[] r4 = SR(4);
+            if (hp_PlanOffice_shelf >= 0 && RngChance(r4, warehouse ? 600 : 420) && Fit(2))
+            {
+                int first = nEmit;
+                if (GroupBeside(FindGrp("cardboard"), hp_PlanOffice_shelf, 2, 0, r4) || GroupAt(FindGrp("cardboard"), GenData.A_WALL, 2, WM_NEAR, emitX[hp_PlanOffice_shelf], emitZ[hp_PlanOffice_shelf], 0, r4)) Keep(first, false);
+            }
+        }
+        if (Ph(4))
+        {
+            uint[] r5 = SR(5);
+            if (hp_PlanOffice_desk >= 0 && area >= 16 && RngChance(r5, warehouse ? 350 : 250) && Fit(2))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("k_desk"), WM_FAR, emitX[hp_PlanOffice_desk], emitZ[hp_PlanOffice_desk], WIN_PREFER, 0, r5) >= 0) Keep(first, false);
+            }
+        }
+        if (Ph(5))
+        {
+            uint[] r6 = SR(6);
+            if (warehouse)
+            {
+                // the break table: a small round table with chairs in the open part
+                if (RngChance(r6, 450) && Fit(3))
+                {
+                    CentrePiece(Dn("r_tableRound"), 0, false, 2, 1, WM_ANY, 0, 0, 0, 0, r6);
+                }
+                uint[] r7 = SR(7);
+                if (RngChance(r7, 350) && Fit(1))
+                {
+                    int first = nEmit;
+                    if (WallPlace(Dn("s_workbench"), WM_ANY, 0, 0, WIN_ANY, 0, r7) >= 0) Keep(first, false);
+                }
+            }
+            else if (RngChance(r6, 450) && Fit(2))
+            {
+                // the visitor's seat: an armchair in a corner, a small table beside it
+                int first = nEmit;
+                int chair = CornerPlace(Dn("q_armchair"), WM_FAR, hp_PlanOffice_desk >= 0 ? emitX[hp_PlanOffice_desk] : 0, hp_PlanOffice_desk >= 0 ? emitZ[hp_PlanOffice_desk] : 0, true, 0, r6);
+                if (chair >= 0 && Keep(first, false) && Fit(1))
+                {
+                    first = nEmit;
+                    if (RelBeside(Dn("q_tableSmall"), chair, 0, 60, 0, r6) >= 0) Keep(first, false);
+                }
+            }
+            Extras(20, 650, "ck_plant", "wq_cabinet", "ck_lampFloor", "wk_bookcaseLow", "wk_sideTable");
+        }
     }
 
     // ============================================================================================ HALL
@@ -902,4 +926,8 @@ public partial class MapGenUdon
             if (FormAt(GenData.GL_ROW, 70, GenData.A_WALL, WM_NEAR, dx, dz, 0, r8) >= 0 && Keep(first, false)) MarkLoose(first);
         }
     }
+
+    // phase state of the split plans (Tools: autophase2)
+    int hp_PlanOffice_desk;
+    int hp_PlanOffice_shelf;
 }
