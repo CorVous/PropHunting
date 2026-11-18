@@ -1203,29 +1203,55 @@ public partial class MapGenUdon
         }
         if (Ph(7))
         {
-            int shed = hq_PlanGarden_shed;
             // the water point: a tap at the fence, the can and the buckets beside it
             uint[] r2 = SR(2);
             int tap = -1;
+            hq_PlanGarden_r2 = r2;
+            hq_PlanGarden_tap = tap;
+        }
+        if (Ph(8))
+        {
+            int shed = hq_PlanGarden_shed;
+            uint[] r2 = hq_PlanGarden_r2;
+            int tap = hq_PlanGarden_tap;
+            int first = nEmit;
+            tap = WallPlace(Dn("gen_tap"), shed >= 0 ? WM_NEAR : WM_ANY, shed >= 0 ? emitX[shed] : 0, shed >= 0 ? emitZ[shed] : 0, WIN_ANY, 0, r2);
+            hq_PlanGarden_shed = shed;
+            hq_PlanGarden_r2 = r2;
+            hq_PlanGarden_tap = tap;
+            hq_PlanGarden_first = first;
+        }
+        if (Ph(9))
+        {
+            int tap = hq_PlanGarden_tap;
+            int first = hq_PlanGarden_first;
+            if (tap >= 0 && !Keep(first, false)) tap = -1;
+            hq_PlanGarden_tap = tap;
+            hq_PlanGarden_first = first;
+        }
+        if (Ph(10))
+        {
+            uint[] r2 = hq_PlanGarden_r2;
+            int tap = hq_PlanGarden_tap;
+            int first = hq_PlanGarden_first;
+            if (tap >= 0 && Fit(2))
             {
-                int first = nEmit;
-                tap = WallPlace(Dn("gen_tap"), shed >= 0 ? WM_NEAR : WM_ANY, shed >= 0 ? emitX[shed] : 0, shed >= 0 ? emitZ[shed] : 0, WIN_ANY, 0, r2);
-                if (tap >= 0 && !Keep(first, false)) tap = -1;
-                if (tap >= 0 && Fit(2))
-                {
-                    first = nEmit;
-                    if (GroupBeside(FindGrp("watering"), tap, RngBetween(r2, 2, 3), 0, r2)) Keep(first, false);
-                }
+                first = nEmit;
+                if (GroupBeside(FindGrp("watering"), tap, RngBetween(r2, 2, 3), 0, r2)) Keep(first, false);
             }
+            hq_PlanGarden_r2 = r2;
+            hq_PlanGarden_tap = tap;
+            hq_PlanGarden_first = first;
+        }
+        if (Ph(11))
+        {
             // the vegetable plot: a bed of soil in the open, two rows, one crop to a row
             uint[] r3 = SR(3);
             hq_PlanGarden_sel3 = 0;
             if (Fit(6) && RngChance(r3, 800)) hq_PlanGarden_sel3 = 1;
-            hq_PlanGarden_shed = shed;
-            hq_PlanGarden_tap = tap;
             hq_PlanGarden_r3 = r3;
         }
-        if (Ph(8))
+        if (Ph(12))
         {
             if (hq_PlanGarden_sel3 == 1)
             {
@@ -1237,7 +1263,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_cell = cell;
             }
         }
-        if (PhLoop(9, 100000))
+        if (PhLoop(13, 100000))
         {
             if (!(hq_PlanGarden_sel3 == 1 && hq_PlanGarden_sel4 == 1)) PhBreak();
             else
@@ -1251,7 +1277,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_cell = cell;
             }
         }
-        if (Ph(10))
+        if (Ph(14))
         {
             // tools leaning at the fence near the water point
             uint[] r4 = SR(4);
@@ -1259,7 +1285,7 @@ public partial class MapGenUdon
             if (RngChance(r4, 750) && Fit(2)) hq_PlanGarden_sel5 = 1;
             hq_PlanGarden_r4 = r4;
         }
-        if (Ph(11))
+        if (Ph(15))
         {
             if (hq_PlanGarden_sel5 == 1)
             {
@@ -1273,7 +1299,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(12))
+        if (Ph(16))
         {
             if (hq_PlanGarden_sel5 == 1)
             {
@@ -1286,7 +1312,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(13))
+        if (Ph(17))
         {
             if (hq_PlanGarden_sel5 == 1)
             {
@@ -1297,18 +1323,18 @@ public partial class MapGenUdon
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(14))
+        if (Ph(18))
         {
             DoorSides(50);
         }
-        if (Ph(15))
+        if (Ph(19))
         {
             uint[] r5 = SR(5);
             int trees = TreeCount(room, r5);
             hq_PlanGarden_r5 = r5;
             hq_PlanGarden_trees = trees;
         }
-        if (PhLoop(16, 100000))
+        if (PhLoop(20, 100000))
         {
             int trees = hq_PlanGarden_trees;
             if (!PhSubActive())
@@ -1326,14 +1352,14 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(17))
+        if (Ph(21))
         {
             uint[] r5 = hq_PlanGarden_r5;
             hq_PlanGarden_sel6 = 0;
             if (RngChance(r5, 450)) hq_PlanGarden_sel6 = 1;
             hq_PlanGarden_r5 = r5;
         }
-        if (PhLoop(18, 100000))
+        if (PhLoop(22, 100000))
         {
             if (!(hq_PlanGarden_sel6 == 1)) PhBreak();
             else
@@ -1343,7 +1369,7 @@ public partial class MapGenUdon
                 if (fin) {  PhBreak(); }
             }
         }
-        if (Ph(19))
+        if (Ph(23))
         {
             uint[] r7 = SR(7);
             if (RngChance(r7, 500) && Fit(2))
@@ -1354,18 +1380,18 @@ public partial class MapGenUdon
             // the beds along the fences
             ClearBans();
         }
-        if (PhLoop(20, 100000))
+        if (PhLoop(24, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 8; hq_Borders_soil = true; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(21))
+        if (Ph(25))
         {
             uint[] r8 = SR(8);
             hq_PlanGarden_r8 = r8;
         }
-        if (PhLoop(22, 100000))
+        if (PhLoop(26, 100000))
         {
             if (!PhSubActive())
             {
@@ -4214,6 +4240,7 @@ public partial class MapGenUdon
     int hq_PlanGarden_k;
     bool hq_PlanGarden_ok;
     uint[] hq_PlanGarden_r;
+    uint[] hq_PlanGarden_r2;
     uint[] hq_PlanGarden_r3;
     uint[] hq_PlanGarden_r4;
     uint[] hq_PlanGarden_r5;

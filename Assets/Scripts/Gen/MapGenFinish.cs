@@ -258,7 +258,7 @@ public partial class MapGen
     int fsPhase, fsCursor, fsNc;
     uint fsHash;
     GenRng fsRng;
-    const int FS_CHUNK = 3000;
+    const int FS_CHUNK = 1200;   // cells a step (Cor: under 60 ms a frame on a Quest too)
 
     bool FinishStep()
     {

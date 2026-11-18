@@ -237,74 +237,287 @@ public partial class MapGen
     // =====================================================================================================
     bool LayoutSite()
     {
-        GenRng rng = Rng(ST_LAYOUT, 0, 0);
-        if (cvZone == null) { cvZone = new int[CV * CV]; cvInst = new int[CV * CV]; cvRoom = new int[CV * CV]; cvPlace = new int[CV * CV]; cvPlot = new int[CV * CV]; }
-        for (int i = 0; i < CV * CV; i++) { cvZone[i] = GenData.Z_NONE; cvInst[i] = -1; cvRoom[i] = -1; cvPlace[i] = PL_NONE; cvPlot[i] = -1; }
-        nInst = 0; nSd = 0; nPlots = 0;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); LayoutSite_Body(); fin = PhAdvance(); PhPop(); }
+        return hq_LayoutSite_ret;
+    }
 
-        // the hunter release, where the lane begins
-        int rel = NewInst(GenData.Z_RELEASE);
-        siteType[rel * 26] = GenData.R_RELEASE;
-        Put(CO, 0, GenData.Z_RELEASE, rel, 0, PL_NONE, -1);
-
-        // (1) the plots of the map's size (layout 4: a mix drawn per map, never two of one kind but houses), the
-        // commercial ones near the road's start more often than not, a farm at the far end, towards the wood
-        string prog = GenData.SizePlots[size];
-        int[] kinds = new int[16];
-        int nk = 0;
-        for (int i = 0; i < prog.Length; i++)
+    // LayoutSite in phases, a step a call (autophase4); LayoutSite() above runs them to the end
+    void LayoutSite_Body()
+    {
+        if (Ph(0))
         {
-            char ch = prog[i];
-            int z = GenData.Z_HOUSE;
-            if (ch != 'H' && !(ch == '*' && rng.Chance(GenData.PLOT_ANY_HOUSE))) z = DrawPlotKind(kinds, nk, ref rng);
-            kinds[nk++] = z;
+            GenRng rng = Rng(ST_LAYOUT, 0, 0);
+            if (cvZone == null) { cvZone = new int[CV * CV]; cvInst = new int[CV * CV]; cvRoom = new int[CV * CV]; cvPlace = new int[CV * CV]; cvPlot = new int[CV * CV]; }
+            for (int i = 0; i < CV * CV; i++) { cvZone[i] = GenData.Z_NONE; cvInst[i] = -1; cvRoom[i] = -1; cvPlace[i] = PL_NONE; cvPlot[i] = -1; }
+            nInst = 0; nSd = 0; nPlots = 0;
+
+            // the hunter release, where the lane begins
+            int rel = NewInst(GenData.Z_RELEASE);
+            siteType[rel * 26] = GenData.R_RELEASE;
+            Put(CO, 0, GenData.Z_RELEASE, rel, 0, PL_NONE, -1);
+
+            // (1) the plots of the map's size (layout 4: a mix drawn per map, never two of one kind but houses), the
+            // commercial ones near the road's start more often than not, a farm at the far end, towards the wood
+            string prog = GenData.SizePlots[size];
+            int[] kinds = new int[16];
+            int nk = 0;
+            hq_LayoutSite_rng = rng;
+            hq_LayoutSite_prog = prog;
+            hq_LayoutSite_kinds = kinds;
+            hq_LayoutSite_nk = nk;
         }
-        Shuffle(kinds, nk, ref rng);
-        bool comFirst = rng.Chance(600);
+        if (PhLoop(1, 100000))
         {
-            // shops at the road's start, houses, then the farm and the park towards the wood
-            int w = 0;
-            for (int pass = 0; pass < 3; pass++)
-                for (int i = 0; i < nk; i++)
+            GenRng rng = hq_LayoutSite_rng;
+            string prog = hq_LayoutSite_prog;
+            int[] kinds = hq_LayoutSite_kinds;
+            int nk = hq_LayoutSite_nk;
+            int i = planIter;
+            if (!(i < prog.Length)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            {
+                char ch = prog[i];
+                int z = GenData.Z_HOUSE;
+                if (ch != 'H' && !(ch == '*' && rng.Chance(GenData.PLOT_ANY_HOUSE))) z = DrawPlotKind(kinds, nk, ref rng);
+                kinds[nk++] = z;
+            }
+            hq_LayoutSite_rng = rng;
+            hq_LayoutSite_prog = prog;
+            hq_LayoutSite_kinds = kinds;
+            hq_LayoutSite_nk = nk;
+        }
+        if (Ph(2))
+        {
+            GenRng rng = hq_LayoutSite_rng;
+            int[] kinds = hq_LayoutSite_kinds;
+            int nk = hq_LayoutSite_nk;
+            Shuffle(kinds, nk, ref rng);
+            bool comFirst = rng.Chance(600);
+            {
+                // shops at the road's start, houses, then the farm and the park towards the wood
+                int w = 0;
+                for (int pass = 0; pass < 3; pass++)
+                    for (int i = 0; i < nk; i++)
+                    {
+                        int z = kinds[i];
+                        int rank = (z == GenData.Z_BARN || z == GenData.Z_PARK || z == GenData.Z_ZOO || z == GenData.Z_CABIN || z == GenData.Z_CHAPEL) ? 2 : (z != GenData.Z_HOUSE && comFirst ? 0 : 1);
+                        if (rank == pass) cand[w++] = z;
+                    }
+                for (int i = 0; i < nk; i++) kinds[i] = cand[i];
+            }
+
+            // (2) the shape of the site (Cor: maps should not all look alike): a straight lane, a lane with a bend, a T at
+            // its end, or a cul-de-sac with a plot across its end. Each lane piece is a segment with its own frame; the
+            // plots of a segment are laid out in the canonical frame and turned onto the canvas (Canon).
+            siteShape = SHAPE_STRAIGHT;
+            int shapeRoll = rng.Range(100);
+            if (nk >= 4 && shapeRoll < 14) siteShape = SHAPE_CROSS;
+            else if (nk >= 3 && shapeRoll < 28) siteShape = SHAPE_SQUARE;
+            else if (nk >= 4 && shapeRoll < 42) siteShape = SHAPE_U;
+            else if (nk >= 3 && shapeRoll < 56) siteShape = SHAPE_T;
+            else if (nk >= 2 && shapeRoll < 74) siteShape = SHAPE_BEND;
+            else if (nk >= 2 && shapeRoll < 88) siteShape = SHAPE_CUL;
+            if (forceShape >= 0) siteShape = forceShape;   // test aid
+            int bendDir = rng.Chance(500) ? 1 : 3;
+            // which plots go on which segment
+            int n0 = nk;
+            if (siteShape == SHAPE_BEND) n0 = (nk + 1) / 2;
+            else if (siteShape == SHAPE_T) n0 = nk - 2 * ((nk - 1) / 2) > 0 ? nk - 2 * ((nk - 1) / 2) : 1;
+            else if (siteShape == SHAPE_CUL) n0 = nk - 1;
+            else if (siteShape == SHAPE_SQUARE) n0 = nk - 2 * ((nk - 1) / 2) > 0 ? nk - 2 * ((nk - 1) / 2) : 1;
+            else if (siteShape == SHAPE_U) n0 = nk - (nk / 3 > 1 ? nk / 3 : 1);   // the back lane: a third of the plots, on one side
+            else if (siteShape == SHAPE_CROSS) n0 = nk - 3 * ((nk - 1) / 3) > 0 ? nk - 3 * ((nk - 1) / 3) : 1;
+            int perArm = siteShape == SHAPE_CROSS ? (nk - n0) / 3 : 0;
+            int crossFar = 0;   // the crossroads: how deep the side arms' plots reach past the crossing
+            nLane = 1; laneOX[0] = CO; laneOY[0] = 0; laneRot[0] = 0;
+            int offL = 1, offR = 1;
+            bool touchL = false, touchR = false;
+            int lastL = -1, lastR = -1;
+            int seg = 0;
+            int dmax0L = 0, dmax0R = 0;
+            hq_LayoutSite_rng = rng;
+            hq_LayoutSite_kinds = kinds;
+            hq_LayoutSite_nk = nk;
+            hq_LayoutSite_bendDir = bendDir;
+            hq_LayoutSite_n0 = n0;
+            hq_LayoutSite_perArm = perArm;
+            hq_LayoutSite_crossFar = crossFar;
+            hq_LayoutSite_offL = offL;
+            hq_LayoutSite_offR = offR;
+            hq_LayoutSite_touchL = touchL;
+            hq_LayoutSite_touchR = touchR;
+            hq_LayoutSite_lastL = lastL;
+            hq_LayoutSite_lastR = lastR;
+            hq_LayoutSite_seg = seg;
+            hq_LayoutSite_dmax0L = dmax0L;
+            hq_LayoutSite_dmax0R = dmax0R;
+        }
+        if (PhLoop(3, 100000))
+        {
+            int nk = hq_LayoutSite_nk;
+            if (!PhSubActive())
+            {
+                int i = planIter;
+                if (!(i < nk)) PhBreak();
+                else { hq_LayoutSite_i = i; PhSubBegin(); }
+            }
+            hq_LayoutSite_nk = nk;
+            if (PhSubActive())
+            {
+                PhPush(); LayoutSite_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(4))
+        {
+            int offL = hq_LayoutSite_offL;
+            int offR = hq_LayoutSite_offR;
+            int lastL = hq_LayoutSite_lastL;
+            int lastR = hq_LayoutSite_lastR;
+            int seg = hq_LayoutSite_seg;
+            if (nPlots == 0) { hq_LayoutSite_ret = false; hq_LayoutSite_offL = offL; hq_LayoutSite_offR = offR; hq_LayoutSite_lastL = lastL; hq_LayoutSite_lastR = lastR; hq_LayoutSite_seg = seg; PhEnd(); return; }
+            if (siteShape == SHAPE_STRAIGHT)
+            {
+                // the last plot on each side keeps a side yard toward the wood at the lane's end
+                if (lastL >= 0 && plotSR[lastL] == 0) { plotSR[lastL] = 1; plotAlong[lastL]++; offL++; }
+                if (lastR >= 0 && plotSR[lastR] == 0) { plotSR[lastR] = 1; plotAlong[lastR]++; offR++; }
+                laneLen[0] = offL > offR ? offL : offR;
+            }
+            else if (siteShape == SHAPE_CUL)
+            {
+                // the plot across the end: centred on the lane, its front to the lane's last cell
+                int ek = nPlots - 1;
+                if (plotSR[ek] == 0) { plotSR[ek] = 1; plotAlong[ek]++; }
+                plotY0[ek] = 0;
+                laneOX[1] = CO - plotAlong[ek] / 2;
+                laneOY[1] = laneEnd0;
+                laneLen[1] = 0;
+            }
+            else FinishSegment(seg, offL, offR, lastL, lastR);
+            hq_LayoutSite_offL = offL;
+            hq_LayoutSite_offR = offR;
+            hq_LayoutSite_lastL = lastL;
+            hq_LayoutSite_lastR = lastR;
+            hq_LayoutSite_seg = seg;
+        }
+        if (PhLoop(5, 100000))
+        {
+            int k = planIter;
+            if (!(k < nPlots)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            {
+                if (!PlotFits(k)) { hq_LayoutSite_ret = false; PhEnd(); return; }
+            }
+        }
+        // @cut
+        if (PhLoop(6, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < nPlots)) PhBreak();
+                else { hq_LayoutSite_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); LayoutSite_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(7))
+        {
+            // @cut
+
+            // (3) the lanes: from the release, then each further segment from the corner
+            laneEnd = laneLen[0];
+            siteInstLane = NewInst(GenData.Z_LAWN);
+            siteType[siteInstLane * 26] = GenData.R_LANE; sitePlace[siteInstLane * 26] = PL_LANE;
+            int laneTo = siteShape == SHAPE_STRAIGHT ? laneEnd : laneEnd + 1;   // a bent lane includes its corner cell
+            for (int y = 1; y < laneTo; y++) Put(CO, y, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+            // a cul-de-sac's turning head: the lane widens along the whole front of the plot across its end
+            if (siteShape == SHAPE_CUL)
+            {
+                int ek = nPlots - 1;
+                for (int x = laneOX[1]; x < laneOX[1] + plotAlong[ek]; x++)
+                    if (x != CO && Free(x, laneEnd)) Put(x, laneEnd, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+            }
+            for (int s = 1; s < nLane; s++)
+                for (int y = 1; y < laneLen[s]; y++)
                 {
-                    int z = kinds[i];
-                    int rank = (z == GenData.Z_BARN || z == GenData.Z_PARK || z == GenData.Z_ZOO || z == GenData.Z_CABIN || z == GenData.Z_CHAPEL) ? 2 : (z != GenData.Z_HOUSE && comFirst ? 0 : 1);
-                    if (rank == pass) cand[w++] = z;
+                    int x, yy;
+                    Canon(s, CO, y, out x, out yy);
+                    if (!Free(x, yy)) { if (CvZone(x, yy) == GenData.Z_LAWN && cvInst[yy * CV + x] == siteInstLane) continue; { hq_LayoutSite_ret = false; PhEnd(); return; } }
+                    Put(x, yy, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
                 }
-            for (int i = 0; i < nk; i++) kinds[i] = cand[i];
+            // the village square: three by three around the junction
+            if (siteShape == SHAPE_SQUARE)
+                for (int y = laneEnd0; y <= laneEnd0 + 2; y++)
+                    for (int x = CO - 1; x <= CO + 1; x++)
+                    {
+                        if (Free(x, y)) Put(x, y, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
+                        else if (!(CvZone(x, y) == GenData.Z_LAWN && cvInst[y * CV + x] == siteInstLane)) { hq_LayoutSite_ret = false; PhEnd(); return; }
+                    }
+            Sd(CO, 0, 0, SD_OPEN);
         }
-
-        // (2) the shape of the site (Cor: maps should not all look alike): a straight lane, a lane with a bend, a T at
-        // its end, or a cul-de-sac with a plot across its end. Each lane piece is a segment with its own frame; the
-        // plots of a segment are laid out in the canonical frame and turned onto the canvas (Canon).
-        siteShape = SHAPE_STRAIGHT;
-        int shapeRoll = rng.Range(100);
-        if (nk >= 4 && shapeRoll < 14) siteShape = SHAPE_CROSS;
-        else if (nk >= 3 && shapeRoll < 28) siteShape = SHAPE_SQUARE;
-        else if (nk >= 4 && shapeRoll < 42) siteShape = SHAPE_U;
-        else if (nk >= 3 && shapeRoll < 56) siteShape = SHAPE_T;
-        else if (nk >= 2 && shapeRoll < 74) siteShape = SHAPE_BEND;
-        else if (nk >= 2 && shapeRoll < 88) siteShape = SHAPE_CUL;
-        if (forceShape >= 0) siteShape = forceShape;   // test aid
-        int bendDir = rng.Chance(500) ? 1 : 3;
-        // which plots go on which segment
-        int n0 = nk;
-        if (siteShape == SHAPE_BEND) n0 = (nk + 1) / 2;
-        else if (siteShape == SHAPE_T) n0 = nk - 2 * ((nk - 1) / 2) > 0 ? nk - 2 * ((nk - 1) / 2) : 1;
-        else if (siteShape == SHAPE_CUL) n0 = nk - 1;
-        else if (siteShape == SHAPE_SQUARE) n0 = nk - 2 * ((nk - 1) / 2) > 0 ? nk - 2 * ((nk - 1) / 2) : 1;
-        else if (siteShape == SHAPE_U) n0 = nk - (nk / 3 > 1 ? nk / 3 : 1);   // the back lane: a third of the plots, on one side
-        else if (siteShape == SHAPE_CROSS) n0 = nk - 3 * ((nk - 1) / 3) > 0 ? nk - 3 * ((nk - 1) / 3) : 1;
-        int perArm = siteShape == SHAPE_CROSS ? (nk - n0) / 3 : 0;
-        int crossFar = 0;   // the crossroads: how deep the side arms' plots reach past the crossing
-        nLane = 1; laneOX[0] = CO; laneOY[0] = 0; laneRot[0] = 0;
-        int offL = 1, offR = 1;
-        bool touchL = false, touchR = false;
-        int lastL = -1, lastR = -1;
-        int seg = 0;
-        int dmax0L = 0, dmax0R = 0;
-        for (int i = 0; i < nk; i++)
+        if (Ph(8))
         {
+            // @cut
+            SplitLane();
+        }
+        if (Ph(9))
+        {
+            GenRng rng = hq_LayoutSite_rng;
+            int offL = hq_LayoutSite_offL;
+            int offR = hq_LayoutSite_offR;
+
+            // (4) the wood
+            // @cut
+            if (!LayoutWood(offL, offR, ref rng)) { hq_LayoutSite_ret = false; hq_LayoutSite_rng = rng; hq_LayoutSite_offL = offL; hq_LayoutSite_offR = offR; PhEnd(); return; }
+            hq_LayoutSite_rng = rng;
+            hq_LayoutSite_offL = offL;
+            hq_LayoutSite_offR = offR;
+        }
+        if (Ph(10))
+        {
+            GenRng rng = hq_LayoutSite_rng;
+
+            // (5) gates: a house's front path meets the lane; a shop's front is open to the lane; some back gardens
+            // have a gate into the wood
+            // @cut
+            for (int k = 0; k < nPlots; k++) Gates(k, ref rng);
+
+            // (6) turn and mirror the whole site, and take it onto the outer grid
+            layRng = rng;   // PlaceSite goes on with this stream, a step later (MapGen.Step, stage 9)
+            { hq_LayoutSite_ret = true; hq_LayoutSite_rng = rng; PhEnd(); return; }
+            hq_LayoutSite_rng = rng;
+        }
+    }
+    void LayoutSite_L1()
+    {
+        if (Ph(0))
+        {
+            int[] kinds = hq_LayoutSite_kinds;
+            int nk = hq_LayoutSite_nk;
+            int bendDir = hq_LayoutSite_bendDir;
+            int n0 = hq_LayoutSite_n0;
+            int perArm = hq_LayoutSite_perArm;
+            int crossFar = hq_LayoutSite_crossFar;
+            int offL = hq_LayoutSite_offL;
+            int offR = hq_LayoutSite_offR;
+            bool touchL = hq_LayoutSite_touchL;
+            bool touchR = hq_LayoutSite_touchR;
+            int lastL = hq_LayoutSite_lastL;
+            int lastR = hq_LayoutSite_lastR;
+            int seg = hq_LayoutSite_seg;
+            int dmax0L = hq_LayoutSite_dmax0L;
+            int dmax0R = hq_LayoutSite_dmax0R;
+            int i = hq_LayoutSite_i;
             if (i == n0 && siteShape != SHAPE_STRAIGHT)
             {
                 // seg 0 is done: its lane ends where the next segment (or the cul-de-sac) begins
@@ -359,19 +572,87 @@ public partial class MapGen
             int k = nPlots;
             plotSeg[k] = seg;
             bool park = kinds[i] == GenData.Z_PARK || kinds[i] == GenData.Z_ZOO;   // no building (revision 12: the zoo too)
+            hq_LayoutSite_kinds = kinds;
+            hq_LayoutSite_nk = nk;
+            hq_LayoutSite_bendDir = bendDir;
+            hq_LayoutSite_n0 = n0;
+            hq_LayoutSite_perArm = perArm;
+            hq_LayoutSite_crossFar = crossFar;
+            hq_LayoutSite_offL = offL;
+            hq_LayoutSite_offR = offR;
+            hq_LayoutSite_touchL = touchL;
+            hq_LayoutSite_touchR = touchR;
+            hq_LayoutSite_lastL = lastL;
+            hq_LayoutSite_lastR = lastR;
+            hq_LayoutSite_seg = seg;
+            hq_LayoutSite_dmax0L = dmax0L;
+            hq_LayoutSite_dmax0R = dmax0R;
+            hq_LayoutSite_k = k;
+            hq_LayoutSite_park = park;
+        }
+        if (Ph(1))
+        {
+            GenRng rng = hq_LayoutSite_rng;
+            int[] kinds = hq_LayoutSite_kinds;
+            int nk = hq_LayoutSite_nk;
+            int i = hq_LayoutSite_i;
+            bool park = hq_LayoutSite_park;
             int p = park ? -1 : PickPlan(kinds[i], ref rng);
-            if (p < 0 && !park) continue;
+            if (p < 0 && !park) { hq_LayoutSite_rng = rng; hq_LayoutSite_kinds = kinds; hq_LayoutSite_nk = nk; hq_LayoutSite_park = park; hq_LayoutSite_p = p; PhEnd(); return; }
             // evolution step 3: one plot's building takes another plan of its kind (the main draw stays as it was,
             // so the other plots keep theirs)
-            if (!park && evo >= 3 && i == (int)(GenRng.Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk)
+            hq_LayoutSite_sel1 = 0;
+            if (!park && evo >= 3 && i == (int)(GenRng.Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk) hq_LayoutSite_sel1 = 1;
+            hq_LayoutSite_rng = rng;
+            hq_LayoutSite_kinds = kinds;
+            hq_LayoutSite_nk = nk;
+            hq_LayoutSite_park = park;
+            hq_LayoutSite_p = p;
+        }
+        if (Ph(2))
+        {
+            if (hq_LayoutSite_sel1 == 1)
             {
                 GenRng alt = Rng(ST_LAYOUT, 7, 3);
-                for (int tries = 0; tries < 8; tries++)
+                hq_LayoutSite_alt = alt;
+            }
+        }
+        if (PhLoop(3, 100000))
+        {
+            if (!(hq_LayoutSite_sel1 == 1)) PhBreak();
+            else
+            {
+                int[] kinds = hq_LayoutSite_kinds;
+                int i = hq_LayoutSite_i;
+                int p = hq_LayoutSite_p;
+                GenRng alt = hq_LayoutSite_alt;
+                int tries = planIter;
+                if (!(tries < 8)) PhBreak();
+                else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
                 {
                     int q = PickPlan(kinds[i], ref alt);
-                    if (q >= 0 && q != p) { p = q; break; }
+                    if (q >= 0 && q != p) { p = q; { PhBreak(); break; } }
                 }
+                hq_LayoutSite_kinds = kinds;
+                hq_LayoutSite_p = p;
+                hq_LayoutSite_alt = alt;
             }
+        }
+        if (Ph(4))
+        {
+            GenRng rng = hq_LayoutSite_rng;
+            int[] kinds = hq_LayoutSite_kinds;
+            int offL = hq_LayoutSite_offL;
+            int offR = hq_LayoutSite_offR;
+            bool touchL = hq_LayoutSite_touchL;
+            bool touchR = hq_LayoutSite_touchR;
+            int lastL = hq_LayoutSite_lastL;
+            int lastR = hq_LayoutSite_lastR;
+            int seg = hq_LayoutSite_seg;
+            int i = hq_LayoutSite_i;
+            int k = hq_LayoutSite_k;
+            bool park = hq_LayoutSite_park;
+            int p = hq_LayoutSite_p;
             nPlots++;
             plotZone[k] = kinds[i]; plotPlan[k] = p; plotMir[k] = rng.Chance(500) ? 1 : 0;
             int side = offL < offR ? -1 : (offR < offL ? 1 : (rng.Chance(500) ? -1 : 1));
@@ -416,73 +697,34 @@ public partial class MapGen
             plotDepth[k] = plotSet[k] + d + plotBack[k];
             if (side < 0) { offL += plotAlong[k]; touchL = plotSR[k] == 0; lastL = k; }
             else { offR += plotAlong[k]; touchR = plotSR[k] == 0; lastR = k; }
+            hq_LayoutSite_rng = rng;
+            hq_LayoutSite_kinds = kinds;
+            hq_LayoutSite_offL = offL;
+            hq_LayoutSite_offR = offR;
+            hq_LayoutSite_touchL = touchL;
+            hq_LayoutSite_touchR = touchR;
+            hq_LayoutSite_lastL = lastL;
+            hq_LayoutSite_lastR = lastR;
+            hq_LayoutSite_seg = seg;
+            hq_LayoutSite_k = k;
+            hq_LayoutSite_park = park;
+            hq_LayoutSite_p = p;
         }
-        if (nPlots == 0) return false;
-        if (siteShape == SHAPE_STRAIGHT)
-        {
-            // the last plot on each side keeps a side yard toward the wood at the lane's end
-            if (lastL >= 0 && plotSR[lastL] == 0) { plotSR[lastL] = 1; plotAlong[lastL]++; offL++; }
-            if (lastR >= 0 && plotSR[lastR] == 0) { plotSR[lastR] = 1; plotAlong[lastR]++; offR++; }
-            laneLen[0] = offL > offR ? offL : offR;
-        }
-        else if (siteShape == SHAPE_CUL)
-        {
-            // the plot across the end: centred on the lane, its front to the lane's last cell
-            int ek = nPlots - 1;
-            if (plotSR[ek] == 0) { plotSR[ek] = 1; plotAlong[ek]++; }
-            plotY0[ek] = 0;
-            laneOX[1] = CO - plotAlong[ek] / 2;
-            laneOY[1] = laneEnd0;
-            laneLen[1] = 0;
-        }
-        else FinishSegment(seg, offL, offR, lastL, lastR);
-        for (int k = 0; k < nPlots; k++)
-            if (!PlotFits(k)) return false;
-        for (int k = 0; k < nPlots; k++) StampPlot(k, ref rng);
-
-        // (3) the lanes: from the release, then each further segment from the corner
-        laneEnd = laneLen[0];
-        siteInstLane = NewInst(GenData.Z_LAWN);
-        siteType[siteInstLane * 26] = GenData.R_LANE; sitePlace[siteInstLane * 26] = PL_LANE;
-        int laneTo = siteShape == SHAPE_STRAIGHT ? laneEnd : laneEnd + 1;   // a bent lane includes its corner cell
-        for (int y = 1; y < laneTo; y++) Put(CO, y, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
-        // a cul-de-sac's turning head: the lane widens along the whole front of the plot across its end
-        if (siteShape == SHAPE_CUL)
-        {
-            int ek = nPlots - 1;
-            for (int x = laneOX[1]; x < laneOX[1] + plotAlong[ek]; x++)
-                if (x != CO && Free(x, laneEnd)) Put(x, laneEnd, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
-        }
-        for (int s = 1; s < nLane; s++)
-            for (int y = 1; y < laneLen[s]; y++)
-            {
-                int x, yy;
-                Canon(s, CO, y, out x, out yy);
-                if (!Free(x, yy)) { if (CvZone(x, yy) == GenData.Z_LAWN && cvInst[yy * CV + x] == siteInstLane) continue; return false; }
-                Put(x, yy, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
-            }
-        // the village square: three by three around the junction
-        if (siteShape == SHAPE_SQUARE)
-            for (int y = laneEnd0; y <= laneEnd0 + 2; y++)
-                for (int x = CO - 1; x <= CO + 1; x++)
-                {
-                    if (Free(x, y)) Put(x, y, GenData.Z_LAWN, siteInstLane, 0, PL_LANE, -1);
-                    else if (!(CvZone(x, y) == GenData.Z_LAWN && cvInst[y * CV + x] == siteInstLane)) return false;
-                }
-        Sd(CO, 0, 0, SD_OPEN);
-        SplitLane();
-
-        // (4) the wood
-        if (!LayoutWood(offL, offR, ref rng)) return false;
-
-        // (5) gates: a house's front path meets the lane; a shop's front is open to the lane; some back gardens
-        // have a gate into the wood
-        for (int k = 0; k < nPlots; k++) Gates(k, ref rng);
-
-        // (6) turn and mirror the whole site, and take it onto the outer grid
-        layRng = rng;   // PlaceSite goes on with this stream, a step later (MapGen.Step, stage 9)
-        return true;
     }
+
+    void LayoutSite_L2()
+    {
+        if (PhLoop(0, 100000))
+        {
+            GenRng rng = hq_LayoutSite_rng;
+            int k = hq_LayoutSite_k;
+            if (planIter == 0) { hq_StampPlot_k = k; hq_StampPlot_rng = rng; PhSubReset(); }
+            PhPush(); StampPlot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { rng = hq_StampPlot_rng; PhBreak(); }
+            hq_LayoutSite_rng = rng;
+        }
+    }
+
 
     GenRng layRng;
 
@@ -515,87 +757,125 @@ public partial class MapGen
 
     void StampPlot(int k, ref GenRng rng)
     {
-        int p = plotPlan[k], zone = plotZone[k];
-        if (p < 0 && zone == GenData.Z_ZOO)
+        hq_StampPlot_k = k;
+        hq_StampPlot_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); StampPlot_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_StampPlot_rng;
+    }
+
+    // StampPlot in phases, a step a call (autophase4); StampPlot() above runs them to the end
+    void StampPlot_Body()
+    {
+        if (Ph(0))
         {
-            // revision 12, the zoo: the plaza along the lane and the keepers' walk up the middle are one outdoor
-            // instance (TypeYard types them); every other cell is an enclosure, an instance of its own, so a fence
-            // stands round it, with a gate onto the walk. One of them is the keepers' yard.
-            plotInstB[k] = -1;
-            int zi = NewInst(GenData.Z_LAWN);
-            plotInstY[k] = zi;
-            int[] enc = { GenData.R_ENC_FARM, GenData.R_ENC_SAVANNA, GenData.R_ENC_ARCTIC, GenData.R_ENC_WOODS, GenData.R_ENC_JUNGLE, GenData.R_AVIARY };
-            Shuffle(enc, enc.Length, ref rng);
-            // the enclosure columns either side of the walk; a side yard the site added (the last plot's, towards the
-            // wood) is more of the walk
-            int walkU = plotSL[k] + 1;
-            int slots = 2 * (plotDepth[k] - 1), keeper = rng.Range(slots), ne = 0, slot = 0;
+            int k = hq_StampPlot_k;
+            GenRng rng = hq_StampPlot_rng;
+            int p = plotPlan[k], zone = plotZone[k];
+            if (p < 0 && zone == GenData.Z_ZOO)
+            {
+                // revision 12, the zoo: the plaza along the lane and the keepers' walk up the middle are one outdoor
+                // instance (TypeYard types them); every other cell is an enclosure, an instance of its own, so a fence
+                // stands round it, with a gate onto the walk. One of them is the keepers' yard.
+                plotInstB[k] = -1;
+                int zi = NewInst(GenData.Z_LAWN);
+                plotInstY[k] = zi;
+                int[] enc = { GenData.R_ENC_FARM, GenData.R_ENC_SAVANNA, GenData.R_ENC_ARCTIC, GenData.R_ENC_WOODS, GenData.R_ENC_JUNGLE, GenData.R_AVIARY };
+                Shuffle(enc, enc.Length, ref rng);
+                // the enclosure columns either side of the walk; a side yard the site added (the last plot's, towards the
+                // wood) is more of the walk
+                int walkU = plotSL[k] + 1;
+                int slots = 2 * (plotDepth[k] - 1), keeper = rng.Range(slots), ne = 0, slot = 0;
+                for (int u = 0; u < plotAlong[k]; u++)
+                    for (int v = 0; v < plotDepth[k]; v++)
+                    {
+                        int x, y;
+                        PlotXY(k, u, v, out x, out y);
+                        if (v == 0 || u == walkU || u < walkU - 1 || u > walkU + 1) { Put(x, y, GenData.Z_LAWN, zi, -1, v == 0 ? PL_FRONT : PL_BACK, k); continue; }
+                        int ei = NewInst(GenData.Z_LAWN);
+                        Put(x, y, GenData.Z_LAWN, ei, 0, PL_BACK, k);
+                        siteType[ei * 26] = slot++ == keeper && slots >= 4 ? GenData.R_KEEPER : enc[ne++ % enc.Length]; sitePlace[ei * 26] = PL_BACK;
+                        // the gate onto the walk
+                        int wx, wy;
+                        PlotXY(k, walkU, v, out wx, out wy);
+                        for (int dd = 0; dd < 4; dd++) if (x + DX[dd] == wx && y + DZ[dd] == wy) Sd(x, y, dd, SD_OPEN);
+                    }
+                TypeYard(k, ref rng);
+                { hq_StampPlot_k = k; hq_StampPlot_rng = rng; hq_StampPlot_p = p; hq_StampPlot_zone = zone; PhEnd(); return; }
+            }
+            hq_StampPlot_k = k;
+            hq_StampPlot_rng = rng;
+            hq_StampPlot_p = p;
+            hq_StampPlot_zone = zone;
+        }
+        if (Ph(1))
+        {
+            int k = hq_StampPlot_k;
+            GenRng rng = hq_StampPlot_rng;
+            int p = hq_StampPlot_p;
+            int zone = hq_StampPlot_zone;
+            if (p < 0)
+            {
+                // a park: no building, every cell of the plot is the park (TypeYard)
+                plotInstB[k] = -1;
+                int pi = NewInst(GenData.Z_LAWN);
+                plotInstY[k] = pi;
+                for (int u = 0; u < plotAlong[k]; u++)
+                    for (int v = 0; v < plotDepth[k]; v++)
+                    {
+                        int x, y;
+                        PlotXY(k, u, v, out x, out y);
+                        Put(x, y, GenData.Z_LAWN, pi, -1, v == 0 ? PL_FRONT : PL_BACK, k);
+                    }
+                TypeYard(k, ref rng);
+                { hq_StampPlot_k = k; hq_StampPlot_rng = rng; hq_StampPlot_p = p; hq_StampPlot_zone = zone; PhEnd(); return; }
+            }
+            int bi = NewInst(zone), yi = NewInst(GenData.Z_LAWN);
+            plotInstB[k] = bi; plotInstY[k] = yi;
+            for (int r = 0; r < PlRooms(p); r++) { siteType[bi * 26 + r] = PlRole(p, r); sitePlace[bi * 26 + r] = PL_BUILDING; }
+            if (zone == GenData.Z_HOUSE)
+            {
+                // revision 11: a kids' room is a kids' room, a playroom or a teen's room; a second bedroom is now and then
+                // a teen's room or the box room (the first bedroom stays, so a house always has one)
+                int beds = 0;
+                for (int r = 0; r < PlRooms(p); r++)
+                {
+                    int t = PlRole(p, r), roll = rng.Range(1000);
+                    if (t == GenData.R_KIDS) siteType[bi * 26 + r] = roll < 350 ? GenData.R_KIDS : (roll < 700 ? GenData.R_PLAYROOM : GenData.R_TEEN);
+                    else if (t == GenData.R_BEDROOM && beds++ > 0) siteType[bi * 26 + r] = roll < 220 ? GenData.R_TEEN : (roll < 440 ? GenData.R_BOXROOM : GenData.R_BEDROOM);
+                }
+            }
+            int w = PlW(p) * PS, d = PlD(p) * PS;
             for (int u = 0; u < plotAlong[k]; u++)
                 for (int v = 0; v < plotDepth[k]; v++)
                 {
                     int x, y;
                     PlotXY(k, u, v, out x, out y);
-                    if (v == 0 || u == walkU || u < walkU - 1 || u > walkU + 1) { Put(x, y, GenData.Z_LAWN, zi, -1, v == 0 ? PL_FRONT : PL_BACK, k); continue; }
-                    int ei = NewInst(GenData.Z_LAWN);
-                    Put(x, y, GenData.Z_LAWN, ei, 0, PL_BACK, k);
-                    siteType[ei * 26] = slot++ == keeper && slots >= 4 ? GenData.R_KEEPER : enc[ne++ % enc.Length]; sitePlace[ei * 26] = PL_BACK;
-                    // the gate onto the walk
-                    int wx, wy;
-                    PlotXY(k, walkU, v, out wx, out wy);
-                    for (int dd = 0; dd < 4; dd++) if (x + DX[dd] == wx && y + DZ[dd] == wy) Sd(x, y, dd, SD_OPEN);
+                    int px = u - plotSL[k], py = v - plotSet[k];
+                    if (plotMir[k] != 0) px = w - 1 - px;
+                    int room = (px >= 0 && px < w && py >= 0 && py < d) ? PlCell(p, px / PS, py / PS) : -1;
+                    if (room >= 0) { Put(x, y, zone, bi, room, PL_BUILDING, k); continue; }
+                    int place = v < plotSet[k] ? PL_FRONT : (v >= plotSet[k] + d ? PL_BACK : ((u < plotSL[k] || u >= plotSL[k] + w) ? PL_SIDE : PL_BACK));
+                    Put(x, y, GenData.Z_LAWN, yi, -1, place, k);
                 }
-            TypeYard(k, ref rng);
-            return;
+            // the plan's doors: interior ones, then the front door and the back (service) door
+            for (int i = 0; i < PlDoors(p); i++) PlanDoor(k, PlDoor(p, i), SD_DOOR);
+            PlanDoor(k, PlFront(p), SD_FRONT);
+            PlanDoor(k, PlBack(p), SD_BACK);
+            hq_StampPlot_k = k;
+            hq_StampPlot_rng = rng;
+            hq_StampPlot_p = p;
+            hq_StampPlot_zone = zone;
         }
-        if (p < 0)
+        if (Ph(2))
         {
-            // a park: no building, every cell of the plot is the park (TypeYard)
-            plotInstB[k] = -1;
-            int pi = NewInst(GenData.Z_LAWN);
-            plotInstY[k] = pi;
-            for (int u = 0; u < plotAlong[k]; u++)
-                for (int v = 0; v < plotDepth[k]; v++)
-                {
-                    int x, y;
-                    PlotXY(k, u, v, out x, out y);
-                    Put(x, y, GenData.Z_LAWN, pi, -1, v == 0 ? PL_FRONT : PL_BACK, k);
-                }
+            int k = hq_StampPlot_k;
+            GenRng rng = hq_StampPlot_rng;
             TypeYard(k, ref rng);
-            return;
+            hq_StampPlot_k = k;
+            hq_StampPlot_rng = rng;
         }
-        int bi = NewInst(zone), yi = NewInst(GenData.Z_LAWN);
-        plotInstB[k] = bi; plotInstY[k] = yi;
-        for (int r = 0; r < PlRooms(p); r++) { siteType[bi * 26 + r] = PlRole(p, r); sitePlace[bi * 26 + r] = PL_BUILDING; }
-        if (zone == GenData.Z_HOUSE)
-        {
-            // revision 11: a kids' room is a kids' room, a playroom or a teen's room; a second bedroom is now and then
-            // a teen's room or the box room (the first bedroom stays, so a house always has one)
-            int beds = 0;
-            for (int r = 0; r < PlRooms(p); r++)
-            {
-                int t = PlRole(p, r), roll = rng.Range(1000);
-                if (t == GenData.R_KIDS) siteType[bi * 26 + r] = roll < 350 ? GenData.R_KIDS : (roll < 700 ? GenData.R_PLAYROOM : GenData.R_TEEN);
-                else if (t == GenData.R_BEDROOM && beds++ > 0) siteType[bi * 26 + r] = roll < 220 ? GenData.R_TEEN : (roll < 440 ? GenData.R_BOXROOM : GenData.R_BEDROOM);
-            }
-        }
-        int w = PlW(p) * PS, d = PlD(p) * PS;
-        for (int u = 0; u < plotAlong[k]; u++)
-            for (int v = 0; v < plotDepth[k]; v++)
-            {
-                int x, y;
-                PlotXY(k, u, v, out x, out y);
-                int px = u - plotSL[k], py = v - plotSet[k];
-                if (plotMir[k] != 0) px = w - 1 - px;
-                int room = (px >= 0 && px < w && py >= 0 && py < d) ? PlCell(p, px / PS, py / PS) : -1;
-                if (room >= 0) { Put(x, y, zone, bi, room, PL_BUILDING, k); continue; }
-                int place = v < plotSet[k] ? PL_FRONT : (v >= plotSet[k] + d ? PL_BACK : ((u < plotSL[k] || u >= plotSL[k] + w) ? PL_SIDE : PL_BACK));
-                Put(x, y, GenData.Z_LAWN, yi, -1, place, k);
-            }
-        // the plan's doors: interior ones, then the front door and the back (service) door
-        for (int i = 0; i < PlDoors(p); i++) PlanDoor(k, PlDoor(p, i), SD_DOOR);
-        PlanDoor(k, PlFront(p), SD_FRONT);
-        PlanDoor(k, PlBack(p), SD_BACK);
-        TypeYard(k, ref rng);
     }
 
     int[] plotBodyD = new int[16];   // the depth of each plot's body (its building, or all of a park)
@@ -1122,4 +1402,34 @@ public partial class MapGen
             if (!has && wall >= 0) SetEdge(wall / 4 % W, wall / 4 / W, wall % 4, GenData.E_WINDOW, 2);
         }
     }
+
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    GenRng hq_LayoutSite_alt;
+    int hq_LayoutSite_bendDir;
+    int hq_LayoutSite_crossFar;
+    int hq_LayoutSite_dmax0L;
+    int hq_LayoutSite_dmax0R;
+    int hq_LayoutSite_i;
+    int hq_LayoutSite_k;
+    int[] hq_LayoutSite_kinds;
+    int hq_LayoutSite_lastL;
+    int hq_LayoutSite_lastR;
+    int hq_LayoutSite_n0;
+    int hq_LayoutSite_nk;
+    int hq_LayoutSite_offL;
+    int hq_LayoutSite_offR;
+    int hq_LayoutSite_p;
+    bool hq_LayoutSite_park;
+    int hq_LayoutSite_perArm;
+    string hq_LayoutSite_prog;
+    bool hq_LayoutSite_ret;
+    GenRng hq_LayoutSite_rng;
+    int hq_LayoutSite_seg;
+    int hq_LayoutSite_sel1;
+    bool hq_LayoutSite_touchL;
+    bool hq_LayoutSite_touchR;
+    int hq_StampPlot_k;
+    int hq_StampPlot_p;
+    GenRng hq_StampPlot_rng;
+    int hq_StampPlot_zone;
 }
