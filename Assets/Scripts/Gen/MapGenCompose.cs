@@ -115,10 +115,11 @@ public partial class MapGen
                 if ((t & GenData.T_FLOOR) == 0) return false;
                 if (outdoor && (t & GenData.T_OUTDOOR) == 0) return false;
                 if ((t & GenData.T_WALL_ANY) == 0) continue;
-                if ((t & GenData.T_WALL_N) != 0 && maxZ > (z + 1) * GenData.INNER_MM - GenData.WALL_HALF_MM) return false;
-                if ((t & GenData.T_WALL_S) != 0 && minZ < z * GenData.INNER_MM + GenData.WALL_HALF_MM) return false;
-                if ((t & GenData.T_WALL_E) != 0 && maxX > (x + 1) * GenData.INNER_MM - GenData.WALL_HALF_MM) return false;
-                if ((t & GenData.T_WALL_W) != 0 && minX < x * GenData.INNER_MM + GenData.WALL_HALF_MM) return false;
+                int ti = z * IW + x;
+                if ((t & GenData.T_WALL_N) != 0 && maxZ > (z + 1) * GenData.INNER_MM - WallFace(ti, 0)) return false;
+                if ((t & GenData.T_WALL_S) != 0 && minZ < z * GenData.INNER_MM + WallFace(ti, 2)) return false;
+                if ((t & GenData.T_WALL_E) != 0 && maxX > (x + 1) * GenData.INNER_MM - WallFace(ti, 1)) return false;
+                if ((t & GenData.T_WALL_W) != 0 && minX < x * GenData.INNER_MM + WallFace(ti, 3)) return false;
             }
         return true;
     }
@@ -342,8 +343,7 @@ public partial class MapGen
     {
         int best = -2000000000;
         bool found = false;
-        int cell = GenData.INNER_MM, off = GenData.WALL_HALF_MM + 20;
-        int nd = FloorDiv(off + depMm - SOLID_TOL - 1, cell) + 1;
+        int cell = GenData.INNER_MM;
         for (int s = 0; s < nSeg; s++)
         {
             if (segBan[s]) continue;
@@ -352,6 +352,10 @@ public partial class MapGen
             // the usable stretch: a real corner at an end costs the wall's thickness
             int iLow = (alongX ? line : segA0[s]) * IW + (alongX ? segA0[s] : line);
             int iHigh = (alongX ? line : segA1[s]) * IW + (alongX ? segA1[s] : line);
+            // the wall's face on this stretch (the deeper of its two ends)
+            int fLow = WallFace(iLow, d), fHigh = WallFace(iHigh, d);
+            int off = (fLow > fHigh ? fLow : fHigh) + 20;
+            int nd = FloorDiv(off + depMm - SOLID_TOL - 1, cell) + 1;
             bool cornerLow = (tags[iLow] & WallBit(alongX ? 3 : 2)) != 0, cornerHigh = (tags[iHigh] & WallBit(alongX ? 1 : 0)) != 0;
             int lo = segA0[s] * cell + (cornerLow ? off : 0), hi = (segA1[s] + 1) * cell - (cornerHigh ? off : 0);
             if (hi - lo < lenMm) continue;
@@ -685,9 +689,9 @@ public partial class MapGen
             }
             int hx, hz;
             FullHalf(def, yaw, out hx, out hz);
-            int gap = GenData.WALL_HALF_MM + 30;
-            int px = ww ? cx * GenData.INNER_MM + gap + hx : (cx + 1) * GenData.INNER_MM - gap - hx;
-            int pz = ws ? cz * GenData.INNER_MM + gap + hz : (cz + 1) * GenData.INNER_MM - gap - hz;
+            int gapX = WallFace(cz * IW + cx, ww ? 3 : 1) + 30, gapZ = WallFace(cz * IW + cx, ws ? 2 : 0) + 30;
+            int px = ww ? cx * GenData.INNER_MM + gapX + hx : (cx + 1) * GenData.INNER_MM - gapX - hx;
+            int pz = ws ? cz * GenData.INNER_MM + gapZ + hz : (cz + 1) * GenData.INNER_MM - gapZ - hz;
             int e = StampAt(def, room, px, pz, yaw, flags, -1, H_WALL, true);
             if (e >= 0) return e;
         }

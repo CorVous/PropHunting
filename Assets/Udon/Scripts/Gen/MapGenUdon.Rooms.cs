@@ -128,6 +128,21 @@ public partial class MapGenUdon
     // =====================================================================================================
     // Inner grid tags (04 section 4.2), derived instead of painted
     // =====================================================================================================
+    // How far the face of the wall on side d of inner cell i is from the cell's edge (mm): half the wall's
+    // thickness, and, seen from outdoors against a building, the facade the builder puts in front of that wall
+    // (MapBuilderUdon.Facade: 0.2 m in a town, 0.15 m in a village, 0.3 m on a space base, and its posts).
+    // Things outdoors keep off that face (Cor: crates stood in a house's outer wall). A log cabin has no facade.
+    int WallFace(int i, int d)
+    {
+        int r = innerRoom[i];
+        if (r < 0 || IsBuilding(roomZone[r])) return GenData.WALL_HALF_MM;
+        int ix = i % IW + DX[d], iz = i / IW + DZ[d];
+        if (ix < 0 || iz < 0 || ix >= IW || iz >= IH) return GenData.WALL_HALF_MM;
+        int rn = innerRoom[iz * IW + ix];
+        if (rn < 0 || !IsBuilding(roomZone[rn]) || roomZone[rn] == GenData.Z_CABIN) return GenData.WALL_HALF_MM;
+        return GenData.WALL_HALF_MM + (mapTheme == GenData.THEME_SPACE ? 360 : (mapTheme == GenData.THEME_MEDIEVAL ? 210 : 260));
+    }
+
     public int WallBit(int dir)
     {
         return dir == 0 ? GenData.T_WALL_N : (dir == 1 ? GenData.T_WALL_E : (dir == 2 ? GenData.T_WALL_S : GenData.T_WALL_W));

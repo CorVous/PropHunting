@@ -239,7 +239,7 @@ public partial class MapGen
                     int wd = (d0 + di) & 3;
                     if ((t & WallBit(wd)) == 0) continue;
                     int rot = (wd + 2) & 3;
-                    int off = GenData.WALL_HALF_MM + 20;
+                    int off = WallFace(cz * IW + cx, wd) + 20;
                     int back = wd == 2 ? cz * GenData.INNER_MM + off : (wd == 0 ? (cz + 1) * GenData.INNER_MM - off
                         : (wd == 3 ? cx * GenData.INNER_MM + off : (cx + 1) * GenData.INNER_MM - off));
                     for (int oi = 0; oi < cells; oi++)

@@ -29,7 +29,7 @@ public partial class MapGen
         for (int k = 0; k < 80; k++)
         {
             int edge = rot == 0 ? (cz + 1) * GenData.INNER_MM : (rot == 2 ? cz * GenData.INNER_MM : (rot == 1 ? (cx + 1) * GenData.INNER_MM : cx * GenData.INNER_MM));
-            if ((tags[cz * IW + cx] & WallBit(rot)) != 0) return Abs(edge - coord) - GenData.WALL_HALF_MM;
+            if ((tags[cz * IW + cx] & WallBit(rot)) != 0) return Abs(edge - coord) - WallFace(cz * IW + cx, rot);
             int nx = cx + DX[rot], nz = cz + DZ[rot];
             if (nx < 0 || nz < 0 || nx >= IW || nz >= IH || innerRoom[nz * IW + nx] != room) return Abs(edge - coord);
             cx = nx; cz = nz;

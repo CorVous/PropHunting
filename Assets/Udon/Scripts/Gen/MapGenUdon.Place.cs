@@ -335,7 +335,7 @@ public partial class MapGenUdon
                         int halfAlong = (wd == 0 || wd == 2) ? fhx : fhz, halfDeep = (wd == 0 || wd == 2) ? fhz : fhx;
                         int slack = span * GenData.INNER_MM / 2 - halfAlong - 20;
                         int jit = Jitter(rng, Min(slack < 0 ? 0 : slack, defJitPos[def] * 10));
-                        int off = GenData.WALL_HALF_MM + 20 + halfDeep;
+                        int off = WallFace((wd == 0 ? z0 + gd - 1 : z0) * IW + (wd == 1 ? x0 + gw - 1 : x0), wd) + 20 + halfDeep;
                         if (wd == 2) { pz = z0 * GenData.INNER_MM + off; px += jit; }
                         else if (wd == 0) { pz = (z0 + gd) * GenData.INNER_MM - off; px += jit; }
                         else if (wd == 3) { px = x0 * GenData.INNER_MM + off; pz += jit; }
@@ -366,9 +366,10 @@ public partial class MapGenUdon
                 int cyaw = rot * 90 + sign * turn;
                 int ex, ez;
                 FullHalf(def, cyaw, out ex, out ez);
-                int gap = GenData.WALL_HALF_MM + 30;
-                int px = wx == 3 ? x0 * GenData.INNER_MM + gap + ex : (x0 + gw) * GenData.INNER_MM - gap - ex;
-                int pz = wz == 2 ? z0 * GenData.INNER_MM + gap + ez : (z0 + gd) * GenData.INNER_MM - gap - ez;
+                int ci = (wz == 2 ? z0 : z0 + gd - 1) * IW + (wx == 3 ? x0 : x0 + gw - 1);
+                int gapX = WallFace(ci, wx) + 30, gapZ = WallFace(ci, wz) + 30;
+                int px = wx == 3 ? x0 * GenData.INNER_MM + gapX + ex : (x0 + gw) * GenData.INNER_MM - gapX - ex;
+                int pz = wz == 2 ? z0 * GenData.INNER_MM + gapZ + ez : (z0 + gd) * GenData.INNER_MM - gapZ - ez;
                 curHost = H_WALL;
                 int placed = StampObject(def, room, x0, z0, gw, gd, rot, px, pz, cyaw, flags);
                 if (placed >= 0) return placed;
