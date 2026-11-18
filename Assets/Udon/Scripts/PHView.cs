@@ -37,7 +37,6 @@ public class PHView : UdonSharpBehaviour
     public Camera pipCam;
     public Transform vrPanel;          // the grabbable third-person panel (VRCPickup)
     public VRCPickup vrPanelPickup;
-    public LayerMask pipBlockers = 1 << 11;
     public Transform gun;              // right hand
     public Transform beam;
     public MeshRenderer beamRenderer;
@@ -377,7 +376,8 @@ public class PHView : UdonSharpBehaviour
         nPieces++;
     }
 
-    // behind the prop, looking at it; pulled in front of walls and ceilings
+    // behind the prop, looking at it, at full distance whatever is in the way (Cor: free flying); where a wall hides the
+    // prop, the prop's material draws it through the wall (PropLitSelf.shader)
     void PlaceCamera(PHSlot s)
     {
         float h = game.gen.defSy[s.def] / 1000f;
@@ -388,10 +388,6 @@ public class PHView : UdonSharpBehaviour
         back.Normalize();
         float dist = Mathf.Clamp(2.2f + h, 2.2f, 5f);
         Vector3 want = target + back * dist + Vector3.up * (0.8f + h * 0.5f);
-        Vector3 dir = want - target;
-        RaycastHit r;
-        if (Physics.Raycast(target, dir.normalized, out r, dir.magnitude, pipBlockers, QueryTriggerInteraction.Ignore))
-            want = target + dir.normalized * Mathf.Max(0.3f, r.distance - 0.15f);
         pipCam.transform.SetPositionAndRotation(want, Quaternion.LookRotation(target - want, Vector3.up));
     }
 
