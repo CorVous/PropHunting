@@ -1947,9 +1947,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
             {
                 float a = (spin + k * 90f) * Mathf.Deg2Rad;
                 Vector3 dirS = right * Mathf.Cos(a) + Vector3.up * Mathf.Sin(a), nrm = Vector3.Cross(dirS, toMap).normalized;
-                Vector3 p0 = hub + dirS * 0.6f - nrm * 0.05f, p1 = hub + dirS * 0.6f + nrm * 0.75f, p2 = hub + dirS * 7.5f + nrm * 0.75f, p3 = hub + dirS * 7.5f - nrm * 0.05f;
+                // the cloth begins where the spar ends, and the spar stands a little proud of it: the two lay in one
+                // plane and overlapped, which flickered (Cor: z-fighting)
+                Vector3 p0 = hub + dirS * 0.6f + nrm * 0.12f, p1 = hub + dirS * 0.6f + nrm * 0.75f, p2 = hub + dirS * 7.5f + nrm * 0.75f, p3 = hub + dirS * 7.5f + nrm * 0.12f;
                 WQuad(p0, p1, p2, p3, C(226, 216, 196));
-                WQuad(hub - nrm * 0.12f, hub + nrm * 0.12f, hub + dirS * 7.6f + nrm * 0.12f, hub + dirS * 7.6f - nrm * 0.12f, C(96, 70, 48));
+                Vector3 proud = toMap * 0.04f;
+                WQuad(hub - nrm * 0.12f + proud, hub + nrm * 0.12f + proud, hub + dirS * 7.6f + nrm * 0.12f + proud, hub + dirS * 7.6f - nrm * 0.12f + proud, C(96, 70, 48));
             }
             return;
         }
