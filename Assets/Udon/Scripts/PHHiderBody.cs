@@ -396,9 +396,11 @@ public class PHHiderBody : UdonSharpBehaviour
         // were not turned, and short sweeps miss the walls (a prop facing east or west walked through them)
         Quaternion q = Quaternion.Euler(0f, yaw + 0.1f, 0f);
         bool any = Physics.BoxCast(c, h, dir, out r, q, dist + GAP, mask, QueryTriggerInteraction.Ignore);
-        if (any && Fitted())
+        if (Fitted() && (any || Physics.CheckBox(c, h, q, mask, QueryTriggerInteraction.Ignore)))
         {
-            // the box around the prop meets something: what its own boxes meet, the nearest
+            // the box around the prop meets something, or already holds something (a cast does not see what it starts
+            // in: an open box's flaps over a crate let its walls walk into the crate, and through a bookcase): what its
+            // own boxes meet, the nearest
             any = false;
             float best = 1e9f;
             for (int i = 0; i < nBox; i++)
@@ -447,7 +449,7 @@ public class PHHiderBody : UdonSharpBehaviour
         RaycastHit r;
         Quaternion q = Rot();
         bool any = Physics.BoxCast(c, h, Vector3.down, out r, q, dist + RAISE, mask, QueryTriggerInteraction.Ignore);
-        if (any && Fitted())
+        if (Fitted() && (any || Physics.CheckBox(c, h, q, mask, QueryTriggerInteraction.Ignore)))   // (as SweepH)
         {
             any = false;
             float best = 1e9f;
@@ -477,8 +479,9 @@ public class PHHiderBody : UdonSharpBehaviour
         Vector3 c = from + Vector3.up * (half.y + RAISE * 0.5f);
         RaycastHit r;
         Quaternion q = Rot();
-        if (!Physics.BoxCast(c, h, Vector3.up, out r, q, dist + GAP, mask, QueryTriggerInteraction.Ignore)) return dist;
-        if (!Fitted()) return Mathf.Max(0f, r.distance - GAP);
+        bool any = Physics.BoxCast(c, h, Vector3.up, out r, q, dist + GAP, mask, QueryTriggerInteraction.Ignore);
+        if (!Fitted()) return any ? Mathf.Max(0f, r.distance - GAP) : dist;
+        if (!any && !Physics.CheckBox(c, h, q, mask, QueryTriggerInteraction.Ignore)) return dist;   // (as SweepH)
         float best = dist + GAP;
         for (int i = 0; i < nBox; i++)
         {
