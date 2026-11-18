@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 21;   // 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 22;   // 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -1395,7 +1395,22 @@ public static partial class GenData
     static void TTwin(int theme, string a, string b) { defThemeTwin[FindDef(a) * 3 + theme] = FindDef(b); }
 
     // the theme twins: filled in GenThemes.cs (one table per theme)
-    static void BuildThemeTwins() { BuildSpaceTwins(); BuildMedievalTwins(); ThemeCaps(); }
+    static void BuildThemeTwins() { BuildSpaceTwins(); BuildMedievalTwins(); ThemeCaps(); BareTops(); }
+
+    // Cor (playtest): nothing is put on a chest or a trunk (it looks odd, and they open), and nothing more on a
+    // piece whose model already carries its things (the "decorated" tables, cabinets, boxes, barrels and kegs).
+    // Such a def keeps no slots at all. Beds keep theirs (a decorated bed is a made bed).
+    static void BareTops()
+    {
+        for (int d = 0; d < nDefs; d++)
+        {
+            if (defSlotCount[d] == 0) continue;
+            string m = GenModels.Name[defModel[d]].ToLower();
+            bool chest = (m.Contains("chest") || m.Contains("trunk")) && !m.Contains("tree");
+            bool laid = m.Contains("decorated") && !m.Contains("bed");
+            if (chest || laid) defSlotCount[d] = 0;
+        }
+    }
 
     static void BuildTwins()
     {

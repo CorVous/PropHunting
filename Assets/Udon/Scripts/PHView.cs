@@ -17,7 +17,7 @@ public class PHView : UdonSharpBehaviour
     public PHGame game;
     public PHLocal local;
     public Transform desktopRoot;      // head-locked, desktop only
-    public Image desktopHealth;        // fill amount = health share
+    public Image desktopHealth;        // its right edge (anchorMax.x) = health share
     public GameObject desktopHealthBar;
     public GameObject desktopPip;
     public Transform wristRoot;        // follows the left hand, VR only
@@ -64,13 +64,13 @@ public class PHView : UdonSharpBehaviour
         if (vr)
         {
             wristHealthBar.SetActive(hider);
-            if (hider) wristHealth.fillAmount = share;
+            if (hider) wristHealth.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
             if (vrPanel.gameObject.activeSelf != hider) vrPanel.gameObject.SetActive(hider);
         }
         else
         {
             desktopHealthBar.SetActive(hider);
-            if (hider) desktopHealth.fillAmount = share;
+            if (hider) desktopHealth.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
             desktopPip.SetActive(hider);
         }
         // the third-person camera renders every second frame while there is a prop to show

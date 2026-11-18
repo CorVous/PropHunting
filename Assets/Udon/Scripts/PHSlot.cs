@@ -267,6 +267,7 @@ public class PHSlot : UdonSharpBehaviour
                 {
                     Transform[] parts = proxy.GetComponentsInChildren<Transform>(true);
                     for (int i = 0; i < parts.Length; i++) parts[i].gameObject.layer = HIDER_SELF;
+                    game.builder.SelfOnly(proxy, want);   // ...and the shader keeps it out of any other camera too
                 }
             }
         }

@@ -432,7 +432,7 @@ public static partial class GenData
         Twins(M, "q_couch", "md_trestle", "k_designSofa", "md_trestle", "k_benchCushion", "md_trestle", "k_bookcaseClosed", "md_trunkLarge", "k_bookcaseWide", "md_boxStacked",
             "w_palletLoaded", "md_boxStackedP", "q_cabinet", "md_chestGold", "k_tvCabinet", "md_chestGold", "k_bedsideDrawer", "md_trunkMed", "q_bedside", "md_trunkMed",
             "q_sideTable", "md_tableDecoB", "q_tableLow", "md_tableMedDeco", "w_boxC", "md_trunkSmallB", "s_box", "md_trunkSmallB",
-            "w_barrel", "=dg_barrel", "w_barrelB", "md_barrelLarge", "w_barrelC", "md_barrelStack", "c_cone", "md_torchStand", "gen_mailbox", "md_banner", "n_sign", "md_bannerGreen",
+            "w_barrel", "=dg_barrel", "w_barrelB", "md_barrelLarge", "w_barrelC", "md_barrelStack", "c_cone", "md_torchStand", "gen_mailbox", "=n_sign",
             "gen_toolwall", "md_swordWall", "ma_vending", "md_coinsM", "n_treeFat", "md_treeRound", "n_rockSmallC", "md_rockSmall",
             "k_microwave", "md_plateStack", "k_toaster", "md_bottleLab", "k_coffeeMachine", "md_bottleBig", "f_sodaCan", "=dg_bottleB", "fk_soda", "md_bottleLab",
             "k_radio", "md_candleMelted", "mb_console", "md_coinsS", "mb_headphonesA", "=dg_bottleA", "mb_headphonesC", "md_plateFood", "mb_camera", "md_coinsS",
@@ -503,7 +503,7 @@ public static partial class GenData
         new[] { "md_cratesStack", "md_boxStackedP", "md_crates", "md_tableBare", "md_barrelStack", "md_tableLongBroken", "f_cart", "f_stallGreen", "g_hay", "md_lumber" },
         new[] { "md_drum", "md_rockSmall", "md_torchStand", "md_barrierHalf", "s_barrel", "m_bucketWater", "m_sack", "gk_urnRound", "s_logSmall", "f_stallStool", "md_target", "md_flag",
             "md_oakBarrel", "md_crateOpen", "md_arrows" },
-        new[] { "md_barrelLarge", "md_crates", "md_banner", "md_bannerGreen", "f_cart", "f_cartHigh", "f_stallRed", "g_hayBundled", "n_logStack", "md_well", "md_barrier", "md_lumber",
+        new[] { "md_barrelLarge", "md_crates", "f_cart", "f_cartHigh", "f_stallRed", "g_hayBundled", "n_logStack", "md_well", "md_barrier", "md_lumber",
             "md_tent", "md_stone" },
         new[] { "md_pine", "md_pineCrooked", "md_treeRound" } };
     static readonly string[][] SpaceFall = {

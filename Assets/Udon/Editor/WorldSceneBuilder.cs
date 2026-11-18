@@ -329,14 +329,18 @@ public static class WorldSceneBuilder
         bar = new GameObject("HealthBar");
         bar.transform.SetParent(parent, false);
         bar.layer = 5;
-        var bg = bar.AddComponent<Image>(); bg.sprite = sprite; bg.color = new Color(0f, 0f, 0f, 0.55f); bg.raycastTarget = false; bg.material = hudMat;
+        var bg = bar.AddComponent<Image>(); bg.sprite = null; bg.color = new Color(0f, 0f, 0f, 0.55f); bg.raycastTarget = false; bg.material = hudMat;
         var brt = bar.GetComponent<RectTransform>(); brt.anchoredPosition = at; brt.sizeDelta = size;
+        // the track inside the border; the fill's right edge is its anchor (PHView: anchorMax.x = the health's share)
+        var track = new GameObject("Track");
+        track.transform.SetParent(bar.transform, false);
+        track.layer = 5;
+        var trt = track.AddComponent<RectTransform>(); trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one; trt.offsetMin = new Vector2(3, 3); trt.offsetMax = new Vector2(-3, -3);
         var f = new GameObject("Fill");
-        f.transform.SetParent(bar.transform, false);
+        f.transform.SetParent(track.transform, false);
         f.layer = 5;
-        fill = f.AddComponent<Image>(); fill.sprite = sprite; fill.color = new Color(0.35f, 0.85f, 0.4f, 0.9f); fill.raycastTarget = false; fill.material = hudMat;
-        fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 1f;
-        var frt = f.GetComponent<RectTransform>(); frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one; frt.offsetMin = new Vector2(3, 3); frt.offsetMax = new Vector2(-3, -3);
+        fill = f.AddComponent<Image>(); fill.sprite = null; fill.color = new Color(0.35f, 0.85f, 0.4f, 0.9f); fill.raycastTarget = false; fill.material = hudMat;
+        var frt = f.GetComponent<RectTransform>(); frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one; frt.offsetMin = Vector2.zero; frt.offsetMax = Vector2.zero;
     }
 
     static Material Mat2(string name, Shader shader)

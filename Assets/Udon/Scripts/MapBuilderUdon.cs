@@ -155,6 +155,15 @@ public class MapBuilderUdon : UdonSharpBehaviour
             AppendPart(k0 + 1, horizontal, ex, ez, sgn, 1f, 3f, 0f, h, body, fW0, fW1, fSill, fHead);
             AppendPart(k0, horizontal, ex, ez, sgn, 3f, CELL, 0f, h, body, 0f, 0f, 0f, 0f);
         }
+        else if (type == GenData.E_DOOR && theme != GenData.THEME_SPACE)
+        {
+            // a town's or a village's door: the wall's own square doorway in its timber frame (Edge draws the frame out to the
+            // facade's face); the kit's arched door stood in front of it as a second doorway (Cor: layered)
+            float d0 = off * INNER, d1 = (off + GenData.DOOR_CELLS) * INNER, dh = GenData.DOOR_HEIGHT_MM / 1000f;
+            if (d0 > 0.01f) AppendPart(k0, horizontal, ex, ez, sgn, 0f, d0, 0f, h, body, 0f, 0f, 0f, 0f);
+            if (dh < h - 0.01f) AppendPart(k0, horizontal, ex, ez, sgn, d0, d1, dh, h, body, 0f, 0f, 0f, 0f);
+            if (d1 < CELL - 0.01f) AppendPart(k0, horizontal, ex, ez, sgn, d1, CELL, 0f, h, body, 0f, 0f, 0f, 0f);
+        }
         else if (type == GenData.E_DOOR && HasFacade(k0 + 2))
         {
             Vector4 op = partOpening[k0 + 2];
@@ -1291,6 +1300,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (IsBuilding(zoneA) != IsBuilding(zoneB))
             {
                 float sd = IsBuilding(zoneA) ? 1f : -1f;
+                if (facade && theme != GenData.THEME_SPACE)
+                {
+                    // the door's frame out to the facade's face: it closes the gap between the wall and the facade
+                    TrimOut(horizontal, ex, ez, d0 - 0.08f, d0 + e, 0f, dh - e, frame, sd);
+                    TrimOut(horizontal, ex, ez, d1 - e, d1 + 0.08f, 0f, dh - e, frame, sd);
+                    TrimOut(horizontal, ex, ez, d0 - 0.08f, d1 + 0.08f, dh - e, dh + 0.08f, frame, sd);
+                }
                 Porch(horizontal, ex, ez, d1 + 0.3f, dh, sd);
                 Awning(horizontal, ex, ez, d0, d1, dh, sd, IsBuilding(zoneA) ? cellA : cellB);
             }
@@ -1469,16 +1485,33 @@ public class MapBuilderUdon : UdonSharpBehaviour
         else Collider(new Vector3(ex - 0.12f, 0, ez - 0.1f), new Vector3(ex + 0.12f, 6f, ez + CELL + 0.1f));
         if (kind == 1 && decorPrefabs != null && DECOR_HEDGE < decorPrefabs.Length && decorPrefabs[DECOR_HEDGE] != null)
         {
-            for (int q = 0; q < 2; q++)
+            int n = hedgeLen > 0.1f ? Mathf.Clamp(Mathf.RoundToInt(CELL / hedgeLen), 2, 6) : 2;
+            for (int q = 0; q < n; q++)
             {
-                float a = CELL * (0.25f + 0.5f * q);
+                float a = CELL * (q + 0.5f) / n;
                 GameObject h = PlaceDecor(DECOR_HEDGE, horizontal ? new Vector3(ex + a, 0f, ez) : new Vector3(ex, 0f, ez + a), horizontal ? 0f : 90f);
-                if (h != null)
+                if (h == null) continue;
+                Collider[] cs = h.GetComponentsInChildren<Collider>(true);
+                for (int i = 0; i < cs.Length; i++) cs[i].enabled = false;
+                if (hedgeLen <= 0.1f)
                 {
-                    Collider[] cs = h.GetComponentsInChildren<Collider>(true);
-                    for (int i = 0; i < cs.Length; i++) cs[i].enabled = false;
-                    TintHedge(h);
+                    // the first hedge of all: its length along the boundary says how many fill a cell
+                    MeshRenderer mr = h.GetComponentInChildren<MeshRenderer>();
+                    if (mr != null) hedgeLen = horizontal ? mr.bounds.size.x : mr.bounds.size.z;
+                    if (hedgeLen > 0.1f)
+                    {
+                        n = Mathf.Clamp(Mathf.RoundToInt(CELL / hedgeLen), 2, 6);
+                        a = CELL * 0.5f / n;
+                        h.transform.position = (horizontal ? new Vector3(ex + a, 0f, ez) : new Vector3(ex, 0f, ez + a)) + lv;
+                    }
                 }
+                if (hedgeLen > 0.1f)
+                {
+                    Vector3 hs = h.transform.localScale;
+                    hs.x *= (CELL / n + 0.04f) / hedgeLen;
+                    h.transform.localScale = hs;
+                }
+                TintHedge(h);
             }
             return;
         }
@@ -1496,6 +1529,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Box(B_WALLS, new Vector3(ex - 0.16f, 0.62f, ez - 0.15f), new Vector3(ex + 0.16f, 0.7f, ez + CELL + 0.15f), cap, FACE_ALL);
         }
     }
+
+    float hedgeLen;   // the hedge model's length along a boundary, as placed (measured on the first one)
 
     // a hedge in the map's greens
     void TintHedge(GameObject h)
@@ -1536,6 +1571,21 @@ public class MapBuilderUdon : UdonSharpBehaviour
         tintBlock.SetColor("_Color", c);
         MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
         for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(tintBlock);
+    }
+
+    // A hider's own prop (PHSlot): its tint as TintProp gave it, and the mark that keeps it out of every view but
+    // the third-person one (PropLit's _PipOnly)
+    MaterialPropertyBlock selfBlock;
+    public void SelfOnly(GameObject go, int def)
+    {
+        if (go == null) return;
+        if (selfBlock == null) selfBlock = new MaterialPropertyBlock();
+        Color c = Color.white;
+        if (defTint != null && def >= 0 && def < defTint.Length && defTint[def].a > 0f) c = defTint[def];
+        selfBlock.SetColor("_Color", c);
+        selfBlock.SetFloat("_PipOnly", 1f);
+        MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
+        for (int i = 0; i < rs.Length; i++) rs[i].SetPropertyBlock(selfBlock);
     }
 
     // the average of a model's vertex colours that pass the test (green-ish: g over r), 0 alpha when none
@@ -2076,12 +2126,27 @@ public class MapBuilderUdon : UdonSharpBehaviour
     }
 
     // a lantern on the outside wall beside a door: `a` metres along the edge, `side` +1/-1 the outside's direction
+    // a frame piece on the outside of a wall that has a facade: from the wall's face to just past the facade's
+    void TrimOut(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, Color32 col, float side)
+    {
+        int faces = y0 <= 0f ? FACE_ALL & ~FACE_YN : FACE_ALL;
+        float n0 = WALL_HALF, n1 = WALL_HALF + facadeDepth + 0.03f;
+        float lo = side > 0 ? n0 : -n1, hi = side > 0 ? n1 : -n0;
+        if (horizontal) Box(B_WALLS, new Vector3(ex + a0, y0, ez + lo), new Vector3(ex + a1, y1, ez + hi), col, faces);
+        else Box(B_WALLS, new Vector3(ex + lo, y0, ez + a0), new Vector3(ex + hi, y1, ez + a1), col, faces);
+    }
+
     void Porch(bool horizontal, float ex, float ez, float a, float doorTop, float side)
     {
         if (a > CELL - 0.2f) return;
         float yaw = horizontal ? (side > 0 ? 0f : 180f) : (side > 0 ? 90f : -90f);
         float fd = WALL_HALF + facadeDepth;
-        Vector3 at = horizontal ? new Vector3(ex + a, doorTop - 0.05f, ez + side * fd) : new Vector3(ex + side * fd, doorTop - 0.05f, ez + a);
+        // the light (a village's torch) hangs below the door's awning and clear of its end, not in it (Cor: the torch
+        // clipped the beam)
+        float py = theme != GenData.THEME_SPACE ? doorTop - 0.35f : doorTop - 0.05f;
+        if (theme != GenData.THEME_SPACE) a = Mathf.Min(a + 0.15f, CELL - 0.2f);
+        if (a > CELL - 0.2f) return;
+        Vector3 at = horizontal ? new Vector3(ex + a, py, ez + side * fd) : new Vector3(ex + side * fd, py, ez + a);
         if (PlaceFixture(1, at, yaw, LK_PORCH)) return;
         float y0 = doorTop - 0.25f, y1 = doorTop + 0.15f;
         float n0 = WALL_HALF, n1 = WALL_HALF + 0.05f, g1 = WALL_HALF + 0.2f;
@@ -2150,17 +2215,23 @@ public class MapBuilderUdon : UdonSharpBehaviour
             for (int q = 0; q < ns; q++) if (Mathf.Abs(sx[q] - x) <= 2 && Mathf.Abs(sz[q] - z) <= 2) { near = true; break; }
             if (near) continue;
             int side = -1;
-            for (int d = 0; d < 4; d++)
-            {
-                int nx = x + DX[d], nz = z + DZ[d];
-                if (!InGrid(nx, nz)) { side = d; break; }
-                int rn = cellRoom[nz * W + nx];
-                if (rn < 0 || rn >= nr || roomType[rn] != GenData.R_LANE) { side = d; break; }
-            }
+            bool atHouse = false;
+            // first a side that is open ground (a garden, a yard, the map's edge), then a building's wall
+            for (int pass = 0; pass < 2 && side < 0; pass++)
+                for (int d = 0; d < 4; d++)
+                {
+                    int nx = x + DX[d], nz = z + DZ[d];
+                    bool house = InGrid(nx, nz) && IsBuilding(cellZone[nz * W + nx]);
+                    if (house != (pass == 1)) continue;
+                    if (!InGrid(nx, nz)) { side = d; break; }
+                    int rn = cellRoom[nz * W + nx];
+                    if (rn < 0 || rn >= nr || roomType[rn] != GenData.R_LANE) { side = d; atHouse = house; break; }
+                }
             if (side < 0) continue;
             float cx = (x + 0.5f) * CELL, cz = (z + 0.5f) * CELL;
             float dx = DX[side], dz = DZ[side];
-            float px = cx + dx * (CELL * 0.5f - 0.35f), pz = cz + dz * (CELL * 0.5f - 0.35f);
+            float inset = atHouse ? 1.0f : 0.35f;   // clear of the eaves (0.35 m past the wall) and the lamp's own head
+            float px = cx + dx * (CELL * 0.5f - inset), pz = cz + dz * (CELL * 0.5f - inset);
             Vector3 mn = new Vector3(px - 0.07f, 0f, pz - 0.07f), mx = new Vector3(px + 0.07f, 4.5f, pz + 0.07f);
             Collider(mn, mx);
             sx[ns] = x; sz[ns] = z; ns++;
