@@ -74,6 +74,8 @@ public class PHView : UdonSharpBehaviour
     float miniFit = 1f;
     Vector3 miniBase = Vector3.one;
     int legendMode = -1;
+    const float HUD_DIST = 0.5f;   // metres from the screen's camera to the desktop canvas
+    bool hudLogged;
     float legendSince;
     int outlineDef = -2, outlineSerial = -1;
     // the footprint of the prop's own boxes: their edges cut the ground plan into cells, the covered ones marked,
@@ -436,15 +438,41 @@ public class PHView : UdonSharpBehaviour
         }
         if (!vr)
         {
-            VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
             // The canvas fills the screen, 900 units high whatever the field of view and as wide as the screen is,
-            // so what is anchored to a corner sits in the screen's corner (Cor: the controls ran into VRChat's own)
-            float fov = 60f, aspect = 16f / 9f;
+            // so what is anchored to a corner sits in the screen's corner (Cor: the controls ran into VRChat's own).
+            // Placed from the screen's own camera (the head's tracking data where there is none); its size and its
+            // distance come from HUD_DIST alone. Where the camera's numbers are missing or make no sense, the fixed
+            // layout of before (a 1600 x 900 canvas 0.36 m high at 0.5 m: inside any screen) instead.
+            VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+            Vector3 eye = head.position;
+            Quaternion look = head.rotation;
+            float fov = 0f, aspect = 0f;
+            int pw = 0, ph = 0;
+            bool fromCam = false;
             VRCCameraSettings cam = VRCCameraSettings.ScreenCamera;
-            if (cam != null) { fov = cam.FieldOfView; aspect = cam.Aspect; }
-            desktopRoot.localScale = Vector3.one * (Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) / 900f);   // 0.5 m ahead
-            if (desktopCanvas != null && Mathf.Abs(desktopCanvas.sizeDelta.x - 900f * aspect) > 0.5f) desktopCanvas.sizeDelta = new Vector2(900f * aspect, 900f);
-            desktopRoot.SetPositionAndRotation(head.position + head.rotation * new Vector3(0f, 0f, 0.5f), head.rotation);
+            if (cam != null)
+            {
+                fov = cam.FieldOfView;
+                pw = cam.PixelWidth; ph = cam.PixelHeight;
+                aspect = pw > 0 && ph > 0 ? (float)pw / ph : cam.Aspect;
+                Vector3 cp = cam.Position;
+                if (cp.sqrMagnitude > 1e-6f && (cp - eye).sqrMagnitude < 4f) { eye = cp; look = cam.Rotation; fromCam = true; }
+            }
+            bool sane = fov >= 20f && fov <= 120f && aspect >= 1f && aspect <= 4f;
+            float scale = sane ? 2f * HUD_DIST * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) / 900f : HUD_DIST * 0.0008f;
+            float width = sane ? 900f * aspect : 1600f;
+            desktopRoot.localScale = Vector3.one * scale;
+            if (desktopCanvas != null && Mathf.Abs(desktopCanvas.sizeDelta.x - width) > 0.5f) desktopCanvas.sizeDelta = new Vector2(width, 900f);
+            desktopRoot.SetPositionAndRotation(eye + look * new Vector3(0f, 0f, HUD_DIST), look);
+            // once, a little after the start, what the screen camera said (evidence in the VRChat log)
+            if (!hudLogged && Time.timeSinceLevelLoad > 5f)
+            {
+                hudLogged = true;
+                Debug.Log("[prophunt] hud cam=" + (cam != null) + " fov=" + fov + " aspect=" + aspect + " px=" + pw + "x" + ph
+                    + (cam != null ? " camAspect=" + cam.Aspect + " near=" + cam.NearClipPlane + " camToHead=" + (cam.Position - head.position).magnitude : "")
+                    + " fromCam=" + fromCam + " sane=" + sane + " canvas=" + (desktopCanvas != null ? desktopCanvas.sizeDelta.ToString() : "none")
+                    + " pivot=" + (desktopCanvas != null ? desktopCanvas.pivot.ToString() : "") + " scale=" + scale + " eyeHeight=" + me.GetAvatarEyeHeightAsMeters());
+            }
             return;
         }
         float sc = AvatarScale();

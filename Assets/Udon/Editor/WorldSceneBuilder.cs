@@ -297,7 +297,7 @@ public static class WorldSceneBuilder
         var raw = pip.AddComponent<RawImage>(); raw.texture = rt; raw.raycastTarget = false; raw.material = hudMat;
         var prt = pip.GetComponent<RectTransform>();   // the bottom right corner
         prt.anchorMin = new Vector2(1f, 0f); prt.anchorMax = new Vector2(1f, 0f); prt.pivot = new Vector2(1f, 0f);
-        prt.anchoredPosition = new Vector2(-12f, 12f); prt.sizeDelta = new Vector2(270f, 180f);
+        prt.anchoredPosition = new Vector2(-24f, 24f); prt.sizeDelta = new Vector2(270f, 180f);   // a margin inside the screen's edge
         view.desktopPip = pip;
         view.desktopRoot = desk.transform;
 
@@ -391,7 +391,7 @@ public static class WorldSceneBuilder
         var li = lg.AddComponent<RawImage>(); li.raycastTarget = false; li.material = hudMat;
         var lrt = lg.GetComponent<RectTransform>();
         lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.zero; lrt.pivot = Vector2.zero;
-        lrt.anchoredPosition = new Vector2(12f, 12f); lrt.sizeDelta = new Vector2(420f, 80f);
+        lrt.anchoredPosition = new Vector2(24f, 24f); lrt.sizeDelta = new Vector2(420f, 80f);
         view.legend = li;
         view.legendHider = LegendTexture("LegendHider");
         view.legendHiderShort = LegendTexture("LegendHiderShort");
