@@ -1489,7 +1489,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             for (int q = 0; q < n; q++)
             {
                 float a = CELL * (q + 0.5f) / n;
-                GameObject h = PlaceDecor(DECOR_HEDGE, horizontal ? new Vector3(ex + a, 0f, ez) : new Vector3(ex, 0f, ez + a), horizontal ? 0f : 90f);
+                // the hedge model is long along its own z: turned to run along the boundary (Cor: they stood across it)
+                GameObject h = PlaceDecor(DECOR_HEDGE, horizontal ? new Vector3(ex + a, 0f, ez) : new Vector3(ex, 0f, ez + a), horizontal ? 90f : 0f);
                 if (h == null) continue;
                 Collider[] cs = h.GetComponentsInChildren<Collider>(true);
                 for (int i = 0; i < cs.Length; i++) cs[i].enabled = false;
@@ -1508,7 +1509,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 if (hedgeLen > 0.1f)
                 {
                     Vector3 hs = h.transform.localScale;
-                    hs.x *= (CELL / n + 0.04f) / hedgeLen;
+                    hs.z *= (CELL / n + 0.04f) / hedgeLen;
                     h.transform.localScale = hs;
                 }
                 TintHedge(h);
