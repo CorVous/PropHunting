@@ -412,6 +412,18 @@ public class PHHiderBody : UdonSharpBehaviour
         return any;
     }
 
+    // Is the way on blocked, by more than a step? A thing low enough to step onto (a door mat, a rug, a threshold)
+    // is no wall: the sweep is tried again raised by the step, where the ceiling allows. Without this a mat in a
+    // doorway stopped big props: the look for a way through counted it as a wall (Cor: squished objects could not
+    // step onto mats in front of doorways). The move itself still steps up as ever (SlideMove).
+    bool BlockedOn(Vector3 from, Vector3 dir, float dist)
+    {
+        if (!SweepH(from, dir, dist)) return false;
+        float up = CeilingAbove(from, stepHeight);
+        if (up < 0.01f) return true;
+        return SweepH(from + Vector3.up * up, dir, dist);
+    }
+
     float groundY;
     Vector3 groundN;
 
@@ -597,7 +609,7 @@ public class PHHiderBody : UdonSharpBehaviour
                         float off = ((k + 1) / 2) * 0.16f * ((k & 1) == 1 ? 1f : -1f);   // 0, then 0.16, 0.32, 0.48 to either side
                         if (off != 0f && SweepH(start, off > 0f ? along : -along, Mathf.Abs(off))) continue;
                         Vector3 from = start + along * off;
-                        if (SweepH(from, -n, SQUEEZE_PASS)) continue;
+                        if (BlockedOn(from, -n, SQUEEZE_PASS)) continue;
                         if (!GapAhead(from, -n, along)) continue;   // a way past a thing on one side is no gap: walk round it
                         narrow = true; narrowSince = Time.time; squeezeAxis = -n;
                         Shift(from);
@@ -752,7 +764,7 @@ public class PHHiderBody : UdonSharpBehaviour
             float off = ((k + 1) / 2) * 0.08f;
             Vector3 s = (k & 1) == 1 ? side : -side;
             if (SweepH(start, s, off)) continue;                 // no room to step aside that far
-            if (SweepH(start + s * off, dir, 0.3f)) continue;    // nor a clear way on from there
+            if (BlockedOn(start + s * off, dir, 0.3f)) continue; // nor a clear way on from there
             pos = start;
             SlideMove(s * Mathf.Min(len, off), step);
             return;
