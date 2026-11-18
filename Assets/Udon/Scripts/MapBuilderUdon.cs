@@ -1539,12 +1539,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void Boundary(bool horizontal, float ex, float ez, int cellA, int cellB)
     {
-        if (theme == GenData.THEME_SPACE || cellA < 0 || cellB < 0) { Fence(horizontal, ex, ez); return; }
+        // Inside the map a fence, a hedge or a low wall stops what is as high as it is drawn: a hider's prop can hop
+        // over it (Cor). The map's own edge and the hunters' release pen keep a wall 6 m high.
+        bool keepIn = cellA < 0 || cellB < 0 || cellZone[cellA] == GenData.Z_RELEASE || cellZone[cellB] == GenData.Z_RELEASE;
+        if (theme == GenData.THEME_SPACE || cellA < 0 || cellB < 0) { Fence(horizontal, ex, ez, keepIn ? 6f : FENCE_TOP); return; }
         int kind = BoundaryKind(cellA, cellB);   // 0 fence, 1 hedge, 2 low wall, 3 open
         if (kind == 3) return;   // open: no fence, no collider
-        if (kind == 0) { Fence(horizontal, ex, ez); return; }
-        if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.12f), new Vector3(ex + CELL + 0.1f, 6f, ez + 0.12f));
-        else Collider(new Vector3(ex - 0.12f, 0, ez - 0.1f), new Vector3(ex + 0.12f, 6f, ez + CELL + 0.1f));
+        if (kind == 0) { Fence(horizontal, ex, ez, keepIn ? 6f : FENCE_TOP); return; }
+        float top = keepIn ? 6f : (kind == 2 ? 0.7f : 0.8f);
+        if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.12f), new Vector3(ex + CELL + 0.1f, top, ez + 0.12f));
+        else Collider(new Vector3(ex - 0.12f, 0, ez - 0.1f), new Vector3(ex + 0.12f, top, ez + CELL + 0.1f));
         if (kind == 1 && decorPrefabs != null && DECOR_HEDGE < decorPrefabs.Length && decorPrefabs[DECOR_HEDGE] != null)
         {
             // the row's ends: on unbroken where the next stretch is hedge too; short of a building (and its facade);
@@ -1620,7 +1624,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
         Tint(h, new Color(Mathf.Clamp(want.r / 255f / Mathf.Max(0.05f, avg.r), 0.3f, 1.6f), Mathf.Clamp(want.g / 255f / Mathf.Max(0.05f, avg.g), 0.3f, 1.6f), Mathf.Clamp(want.b / 255f / Mathf.Max(0.05f, avg.b), 0.3f, 1.6f), 1f));
     }
 
-    void Fence(bool horizontal, float ex, float ez)
+    const float FENCE_TOP = 1.05f;   // a fence is drawn 1.1 m high; a hop of 1.15 m clears it (PHHiderBody.hopHeight)
+
+    void Fence(bool horizontal, float ex, float ez, float top)
     {
         GameObject go = Instantiate(theme == GenData.THEME_SPACE && railPrefab != null ? railPrefab : fencePrefab);
         Transform t = go.transform;
@@ -1629,8 +1635,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         t.rotation = Quaternion.Euler(0, horizontal ? 0 : 90, 0);
         t.localScale = new Vector3((CELL + 0.1f) / fenceModelSize.x, 1.1f / fenceModelSize.y, 0.16f / fenceModelSize.z);
         if (theme != GenData.THEME_SPACE) Tint(go, FenceTint());
-        if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.08f), new Vector3(ex + CELL + 0.1f, 6f, ez + 0.08f));
-        else Collider(new Vector3(ex - 0.08f, 0, ez - 0.1f), new Vector3(ex + 0.08f, 6f, ez + CELL + 0.1f));
+        if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.08f), new Vector3(ex + CELL + 0.1f, top, ez + 0.08f));
+        else Collider(new Vector3(ex - 0.08f, 0, ez - 0.1f), new Vector3(ex + 0.08f, top, ez + CELL + 0.1f));
     }
 
     bool Bld(int x, int z) { return InGrid(x, z) && IsBuilding(cellZone[z * W + x]); }

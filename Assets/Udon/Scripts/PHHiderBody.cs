@@ -24,7 +24,7 @@ public class PHHiderBody : UdonSharpBehaviour
 
     // ---- Balance.cs
     readonly float[] hiderRun = { 3.2f, 3.6f, 2.8f, 2.2f };
-    readonly float[] hopHeight = { 1.0f, 0.8f, 0.55f, 0.4f };   // every prop hops (Cor); the big ones less
+    readonly float[] hopHeight = { 1.3f, 1.25f, 1.15f, 0.8f };   // every prop hops (Cor), a little higher, over a fence (1.05 m, MapBuilderUdon.FENCE_TOP) but for the very largest
     public const float DESKTOP_WALK = 0.55f, LEDGE = 0.35f, LEDGE_TIME = 0.15f, GRAVITY = 9.81f, MAX_FALL = 12f, SKIN = 0.02f;
     const float GAP = 0.005f, RAISE = 0.03f;
 
