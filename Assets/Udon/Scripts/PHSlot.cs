@@ -255,7 +255,13 @@ public class PHSlot : UdonSharpBehaviour
             {
                 proxy = Instantiate(game.builder.propPrefabs[want]);
                 game.builder.TintProp(proxy, want);   // the map's foliage colour, as the props it hides among
-                proxy.transform.SetParent(proxyRoot, true);
+                if (squashRig != null)
+                {
+                    squashRig.SetPositionAndRotation(propPos, Quaternion.identity);
+                    squashRig.localScale = Vector3.one;
+                    proxy.transform.SetParent(squashRig, true);
+                }
+                else proxy.transform.SetParent(proxyRoot, true);
                 proxy.transform.position = propPos;
                 proxy.name = "Hider" + index;
                 shownPos = propPos; shownYaw = propYaw;
@@ -289,19 +295,31 @@ public class PHSlot : UdonSharpBehaviour
         if ((propPos - shownPos).sqrMagnitude > 25f) k = 1f;
         shownPos = Vector3.Lerp(shownPos, propPos, k);
         shownYaw = Mathf.LerpAngle(shownYaw, propYaw, k);
-        proxy.transform.SetPositionAndRotation(shownPos, Quaternion.Euler(0f, shownYaw, 0f));
+        if (squashRig != null)
+        {
+            // the rig at the prop's place, the prop turned inside it (local: the rig may be squashed)
+            squashRig.position = shownPos;
+            proxy.transform.localPosition = Vector3.zero;
+            proxy.transform.localRotation = Quaternion.Euler(0f, shownYaw, 0f);
+        }
+        else proxy.transform.SetPositionAndRotation(shownPos, Quaternion.Euler(0f, shownYaw, 0f));
         if (proxyShade != null && Time.time >= shadeNext) { shadeNext = Time.time + 0.15f; ShadeCheck(); }
         Squash();
     }
 
     // A big prop squeezes through a doorway (PHHiderBody moves it as a narrower box there). What everyone sees (Cor:
-    // a bouncy squeeze, only visually): where the walls to its sides are closer than it is wide, the prop is squashed
-    // across to fit between them and stretched the other way, on a spring that overshoots a little; clear of the
-    // walls it springs back. Measured on each client against the architecture's collider: nothing is synced.
+    // a bouncy squeeze, only visually): where there is something on both sides closer than the prop is wide, it is
+    // squashed across that gap and stretched along it, on a spring that overshoots a little; clear of the gap it
+    // springs back. The gap's direction is the building's (walls run along the world's x and z), not the prop's:
+    // the prop hangs in a rig that keeps the world's axes and is turned inside it, so it narrows across the opening
+    // whatever way it faces (Cor). The gap is looked for all along the prop, from before its front to past its
+    // back, so it is one squeeze from the front going in until the back is out. Measured on each client against the
+    // architecture's collider: nothing is synced.
+    public Transform squashRig;
     Vector3 proxyScale = Vector3.one, proxyHalf;
     float squashX = 1f, squashZ = 1f, squashVX, squashVZ, wantX = 1f, wantZ = 1f, squashNext;
 
-    // how far the architecture is from the prop's middle along dir, at most reach
+    // how far the architecture is from a place along dir, at most reach
     float WallAt(Vector3 from, Vector3 dir, float reach)
     {
         Collider arch = game.builder.collisionCollider;
@@ -311,55 +329,51 @@ public class PHSlot : UdonSharpBehaviour
         return reach;
     }
 
-    // The room there is for the prop across (along 'across', its half width there 'half'), the least of: at its
-    // middle, and past its front and its back by about its own half width and a little (along 'along', its half length 'reach'), so it is
-    // already squashed when its front comes to a doorway (Cor: or it starts clipping). An end is only measured
-    // where nothing stands between the middle and it (a wall beside the prop is not a doorway ahead of it).
+    // The narrowest gap across the prop (along 'across', the prop's half width that way 'half'), 2 * half when
+    // there is none: looked for at its middle and every 0.2 m (a wall's thickness) along 'along' to both ends
+    // (half length 'reach') and on past each end by about the prop's own half width (per object: the wider it
+    // is, the sooner it starts), as far as the way there is clear. Only something on both sides is a gap.
     float GapAcross(Vector3 mid, Vector3 across, Vector3 along, float half, float reach)
     {
-        float gap = WallAt(mid, across, half) + WallAt(mid, -across, half);
-        for (int side = -1; side <= 1; side += 2)
+        float gap = 2f * half;
+        float far = reach + 0.1f + 1.1f * half;
+        float clearA = WallAt(mid, along, far), clearB = WallAt(mid, -along, far);
+        float look = half + 0.03f;
+        for (float o = -clearB; o <= clearA + 0.001f; o += 0.2f)
         {
-            Vector3 dir = along * side;
-            // how far ahead it looks is the prop's own (Cor: per object, not one distance): the wider it is across,
-            // the more it has to give and the sooner it starts. Places 0.2 m apart (a wall is 0.2 m thick: one of
-            // them is in the doorway when it is near)
-            int looks = Mathf.Clamp(Mathf.CeilToInt((0.1f + 1.1f * half) / 0.2f), 1, 8);
-            for (int k = 0; k < looks; k++)
-            {
-                float ahead = reach + 0.1f + 0.2f * k;
-                if (WallAt(mid, dir, ahead) < ahead - 0.001f) break;
-                Vector3 at = mid + dir * ahead;
-                // only a gap counts there: a wall on both sides. (A wall on one side of a place beside the prop is the
-                // wall the doorway is in: the prop squashed along its way instead of across it, Cor)
-                float ga = WallAt(at, across, half), gb = WallAt(at, -across, half);
-                if (ga < half - 0.001f && gb < half - 0.001f && ga + gb < gap) gap = ga + gb;
-            }
+            Vector3 at = mid + along * o;
+            float ga = WallAt(at, across, look);
+            if (ga >= look - 0.001f) continue;
+            float gb = WallAt(at, -across, look);
+            if (gb >= look - 0.001f) continue;
+            if (ga + gb < gap) gap = ga + gb;
         }
         return gap;
     }
 
     void Squash()
     {
+        if (squashRig == null) return;
         if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f) return;   // it never squeezes (PHHiderBody.SQUEEZE_HALF)
         if (Time.time >= squashNext)
         {
             squashNext = Time.time + 0.08f;
-            Quaternion q = Quaternion.Euler(0f, shownYaw, 0f);
+            // the prop's half extents along the world's x and z, as it is turned
+            float rad = shownYaw * Mathf.Deg2Rad, c = Mathf.Abs(Mathf.Cos(rad)), sn = Mathf.Abs(Mathf.Sin(rad));
+            float ex = c * proxyHalf.x + sn * proxyHalf.z, ez = sn * proxyHalf.x + c * proxyHalf.z;
             Vector3 mid = shownPos + Vector3.up * Mathf.Min(proxyHalf.y, 0.9f);
-            Vector3 ax = q * Vector3.right, az = q * Vector3.forward;
+            float gx = GapAcross(mid, Vector3.right, Vector3.forward, ex, ez), gz = GapAcross(mid, Vector3.forward, Vector3.right, ez, ex);
             // (a doorway's frame stands 6 cm into the opening on each side and is not in the collider)
-            float gx = GapAcross(mid, ax, az, proxyHalf.x, proxyHalf.z), gz = GapAcross(mid, az, ax, proxyHalf.z, proxyHalf.x);
-            float fx = gx < 2f * proxyHalf.x - 0.001f ? (gx - 0.14f) / (2f * proxyHalf.x) : 1f;
-            float fz = gz < 2f * proxyHalf.z - 0.001f ? (gz - 0.14f) / (2f * proxyHalf.z) : 1f;
-            fx = Mathf.Clamp(fx, 0.35f, 1f); fz = Mathf.Clamp(fz, 0.35f, 1f);
+            float fx = gx < 2f * ex - 0.001f ? (gx - 0.14f) / (2f * ex) : 1f;
+            float fz = gz < 2f * ez - 0.001f ? (gz - 0.14f) / (2f * ez) : 1f;
+            fx = Mathf.Clamp(fx, 0.3f, 1f); fz = Mathf.Clamp(fz, 0.3f, 1f);
             // squashed one way, it stretches the other (its volume roughly kept, to a limit)
             wantX = fx < 0.999f ? fx : Mathf.Min(1.35f, 1f / Mathf.Sqrt(fz));
             wantZ = fz < 0.999f ? fz : Mathf.Min(1.35f, 1f / Mathf.Sqrt(fx));
         }
         if (wantX == 1f && wantZ == 1f && Mathf.Abs(squashX - 1f) < 0.002f && Mathf.Abs(squashZ - 1f) < 0.002f && Mathf.Abs(squashVX) < 0.01f && Mathf.Abs(squashVZ) < 0.01f)
         {
-            if (squashX != 1f || squashZ != 1f) { squashX = 1f; squashZ = 1f; proxy.transform.localScale = proxyScale; }
+            if (squashX != 1f || squashZ != 1f) { squashX = 1f; squashZ = 1f; squashRig.localScale = Vector3.one; }
             return;
         }
         // a spring, a little under-damped: it overshoots once and settles
@@ -367,8 +381,9 @@ public class PHSlot : UdonSharpBehaviour
         squashVX += ((wantX - squashX) * 260f - squashVX * 17f) * dt; squashX += squashVX * dt;
         squashVZ += ((wantZ - squashZ) * 260f - squashVZ * 17f) * dt; squashZ += squashVZ * dt;
         squashX = Mathf.Clamp(squashX, 0.25f, 1.6f); squashZ = Mathf.Clamp(squashZ, 0.25f, 1.6f);
-        proxy.transform.localScale = new Vector3(proxyScale.x * squashX, proxyScale.y, proxyScale.z * squashZ);
+        squashRig.localScale = new Vector3(squashX, 1f, squashZ);
     }
+
 
     // A real prop has its shade patch only where it stands on a floor (not on a table or a shelf, never in the
     // air). A hider's prop the same, or the patch would give it away (Cor): what is right under it decides.

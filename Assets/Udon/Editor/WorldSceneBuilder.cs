@@ -168,6 +168,10 @@ public static class WorldSceneBuilder
             st.stationExitPlayerLocation = go.transform;
             var slot = go.AddUdonSharpComponent<PHSlot>();
             slot.game = game; slot.index = i; slot.station = st; slot.proxyRoot = hidersRoot;
+            // the prop hangs in a rig that keeps the world's axes: squashed across a doorway whatever way the prop faces
+            var rigGo = new GameObject("Hider" + i);
+            rigGo.transform.SetParent(hidersRoot, false);
+            slot.squashRig = rigGo.transform;
             var voiceGo = new GameObject("Voice");
             voiceGo.transform.SetParent(gameGo.transform, false);
             voiceGo.name = "Voice" + i;
