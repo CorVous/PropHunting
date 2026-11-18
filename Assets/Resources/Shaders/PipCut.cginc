@@ -1,8 +1,9 @@
 // The prop viewer's cutout (Cor: "a stylized cutout in the geometry so you can see the prop in full, along with the
 // things around it"). Only in the third-person view (the one 384 pixels wide, as _PipOnly), whatever lies between that
 // camera and the hider's own prop is cut away: a hole along the line from the camera to the prop, a little wider near
-// the camera, with a bubbly edge (Cor: "a bit more of a bubbly/fractal hole instead of just a porthole") and a thin rim
-// in the ground outline's teal. A prop in the way (PropLitFade, _Fade) is not cut but drawn see-through, a screen-door
+// the camera, made of bubbles fixed in the world (Cor: "a bit more of a bubbly/fractal hole instead of just a porthole",
+// then bubbles that swell in place rather than a cutout dragged around) and a thin rim in the ground outline's teal.
+// A prop in the way (PropLitFade, _Fade) is not cut but drawn see-through, a screen-door
 // dither over the same shape (Cor: "fade nearby props instead of cutting them").
 // PHView sets the globals every frame while hiding (radius 0 otherwise). Not cut: the hider's own prop (callers skip
 // _PipOnly materials), anything at or behind the prop, and anything at or below the floor it stands on (the ground
@@ -13,46 +14,73 @@
 float4 _UdonPHCut;        // xyz: the own prop's centre; w: the hole's radius there (0: no hole)
 float4 _UdonPHCutFloor;   // x: the height of the floor the prop stands on
 
-// The hole's shape, in units of its radius, in the plane across the camera-to-prop line (so it neither slides nor
-// swims as the camera or the prop moves): a core circle, a ring of big lobes on its edge, and smaller bubbles on
-// those. Lobe k of a ring of n sits at angle k/n of a turn, its size from a hash of k; only the two lobes either side
-// of the pixel's angle are tested. Tuning: PIPCUT_CORE (the core circle; the centre is always clear to about its
-// value minus the rim), the counts n and the distance/radius pairs in PipCutShape.
-#define PIPCUT_CORE 0.85
-#define PIPCUT_RIM 0.07
+// The hole's shape (Cor: "set location of bubbles expanding and overlapping with a noise texture", so it does not look
+// like a cutout dragged around): bubbles sit at fixed places in the WORLD, one in each cell of a jittered 3D grid. A
+// bubble grows while its centre is well inside the hole's region (near the camera-to-prop line) and shrinks away as the
+// region leaves it, so moving makes bubbles swell and pop where they are. A plain core around the line keeps the middle
+// open; a little world-anchored noise roughens the edge. Distances are in metres, so the rim is as thick everywhere.
+// The 2x2x2 cells around a pixel are enough while a bubble's reach (jitter + radius) stays under 1.5 cells.
+#define PIPCUT_CELL 0.45      // the grid's cell, metres
+#define PIPCUT_JITTER 0.5     // how far a bubble strays in its cell (0.5: a quarter cell either way)
+#define PIPCUT_RMAX 0.32      // the biggest bubble's radius, metres (under 0.75 of a cell)
+#define PIPCUT_RFRAC 0.6      // ...and never more than this share of the hole's radius (they grow in as it opens)
+#define PIPCUT_CORE 0.55      // the open core, as a share of the hole's radius
+#define PIPCUT_NOISE 0.03     // the edge's roughness, metres
+#define PIPCUT_RIM 0.035      // the teal rim's width, metres
 
-float PipCutHash(float k) { return frac(sin(k * 12.9898 + 4.1) * 43758.5453); }
-
-// the signed distance to one ring of lobes: centres at dist + jitter * h, radii rad + grow * h' (h, h' per lobe)
-float PipCutRing(float2 q, float ang, float n, float dist, float jitter, float rad, float grow, float seed)
+// hashes of a cell (Dave Hoskins' hash without sine): three jitters and a fourth for the size
+float4 PipCutHash4(float3 p)
 {
-    float s = ang * (n / 6.2831853);
-    float k0 = floor(s);
-    float best = 1e4;
-    for (int j = 0; j < 2; j++)
-    {
-        float k = k0 + j;
-        float kw = k - n * floor(k / n);   // the lobe's own number, the same either side of the turn's seam
-        float h = PipCutHash(kw + seed), h2 = PipCutHash(kw + seed + 31.7);
-        float a = k * (6.2831853 / n);
-        // a calm wobble: each lobe breathes a few percent, slowly
-        float r = (rad + grow * h2) * (1.0 + 0.04 * sin(_Time.y * 0.7 + kw * 1.9 + seed));
-        best = min(best, length(q - float2(cos(a), sin(a)) * (dist + jitter * h)) - r);
-    }
-    return best;
+    float4 q = frac(float4(p.xyzx) * float4(0.1031, 0.1030, 0.0973, 0.1099));
+    q += dot(q, q.wzxy + 33.33);
+    return frac((q.xxyz + q.yzzw) * q.zywx);
 }
 
-float PipCutShape(float2 q)
+// value noise, 0..1, of a world position
+float PipCutNoise(float3 p)
 {
-    float ang = atan2(q.y, q.x);
-    float d = length(q) - PIPCUT_CORE;
-    d = min(d, PipCutRing(q, ang, 7.0, 0.80, 0.05, 0.19, 0.08, 0.0));     // big lobes, out to about 1.12
-    d = min(d, PipCutRing(q, ang, 17.0, 0.87, 0.08, 0.09, 0.06, 5.3));   // small bubbles on them, out to about 1.1
-    return d;
+    float3 i = floor(p), f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float n000 = PipCutHash4(i).x, n100 = PipCutHash4(i + float3(1, 0, 0)).x;
+    float n010 = PipCutHash4(i + float3(0, 1, 0)).x, n110 = PipCutHash4(i + float3(1, 1, 0)).x;
+    float n001 = PipCutHash4(i + float3(0, 0, 1)).x, n101 = PipCutHash4(i + float3(1, 0, 1)).x;
+    float n011 = PipCutHash4(i + float3(0, 1, 1)).x, n111 = PipCutHash4(i + float3(1, 1, 1)).x;
+    return lerp(lerp(lerp(n000, n100, f.x), lerp(n010, n110, f.x), f.y), lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
+}
+
+// the hole's radius at depth t along the line (a little wider near the camera)
+float PipCutRadius(float t, float L) { return _UdonPHCut.w * lerp(1.3, 1.0, saturate(t / L)); }
+
+// signed distance (metres) to the hole's edge at world position wp: negative inside the hole
+float PipCutShape(float3 wp, float3 u, float L)
+{
+    float3 v = wp - _WorldSpaceCameraPos;
+    float t = dot(v, u);
+    float R = PipCutRadius(t, L);
+    float sd = length(v - u * t) - PIPCUT_CORE * R;   // the open core
+    float3 base = floor(wp / PIPCUT_CELL - 0.5);
+    float rmax = min(PIPCUT_RMAX, PIPCUT_RFRAC * _UdonPHCut.w);
+    for (int k = 0; k < 8; k++)
+    {
+        float3 cell = base + float3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+        float4 h = PipCutHash4(cell);
+        float3 c = (cell + 0.5 + (h.xyz - 0.5) * PIPCUT_JITTER) * PIPCUT_CELL;
+        float3 vc = c - _WorldSpaceCameraPos;
+        float tc = dot(vc, u);
+        float dc = length(vc - u * tc) / max(PipCutRadius(tc, L), 1e-4);
+        // full size well inside the region, nothing outside it; a slow, gentle breathing
+        float r = rmax * lerp(0.6, 1.0, h.w) * smoothstep(1.1, 0.55, dc) * (1.0 + 0.05 * sin(_Time.y * 0.8 + h.w * 6.2831853));
+        r *= step(0.0, tc);   // none behind the camera
+        sd = min(sd, length(wp - c) - r);
+    }
+    // roughness, fading in as the hole opens (nothing left at radius 0)
+    sd += (PipCutNoise(wp * 6.0) - 0.5) * 2.0 * PIPCUT_NOISE * saturate(_UdonPHCut.w * 2.0);
+    return sd;
 }
 
 // what lies in the hole: architecture (fade 0) is clipped and returns 1 in the rim band (draw it in PipCutRim());
-// a prop (fade 1) keeps three pixels in eight there, in a fixed 4x4 pattern, growing to all of them across the rim
+// a prop (fade 1) keeps three pixels in eight there, in a fixed 4x4 pattern, growing to all of them across the rim.
+// (Call it inside an if, never ?: or &&: its clip() must not run for what skips it.)
 half PipCut(float3 wp, float2 px, float fade)
 {
     if (_UdonPHCut.w <= 0.0 || abs(_ScreenParams.x - 384.0) > 0.5) return 0;
@@ -63,14 +91,11 @@ half PipCut(float3 wp, float2 px, float fade)
     float3 v = wp - _WorldSpaceCameraPos;
     float t = dot(v, u);
     if (t > L - 0.1) return 0;
-    float R = _UdonPHCut.w * lerp(1.3, 1.0, saturate(t / L));
-    float3 w = (v - u * t) / R;
-    if (dot(w, w) >= 1.3) return 0;   // past the farthest lobe (about 1.12)
-    // the hole's own frame: across the line, level and up
-    float3 e1 = cross(float3(0, 1, 0), u);
-    e1 = dot(e1, e1) > 1e-4 ? normalize(e1) : float3(1, 0, 0);
-    float3 e2 = cross(u, e1);
-    float s = PipCutShape(float2(dot(w, e1), dot(w, e2)));
+    // past the farthest a bubble reaches: the region's edge (1.1 R) and the biggest bubble, and the roughness
+    float far = 1.1 * PipCutRadius(t, L) + PIPCUT_RMAX + PIPCUT_NOISE;
+    float3 off = v - u * t;
+    if (dot(off, off) >= far * far) return 0;
+    float s = PipCutShape(wp, u, L);
     if (s >= 0.0) return 0;
     if (fade > 0.5)
     {
