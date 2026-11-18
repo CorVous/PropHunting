@@ -56,7 +56,7 @@ public static class LightingBuilder
         }
 
         var ph = root.AddUdonSharpComponent<PHSun>();
-        ph.builder = builder; ph.spot = spot; ph.sun = sun; ph.casterLayer = CASTER_LAYER; ph.resolutionPc = SHADOW_RES; ph.resolutionQuest = SHADOW_RES;
+        ph.builder = builder; ph.spot = spot; ph.sun = sun; ph.casterLayer = CASTER_LAYER; ph.resolutionPc = SHADOW_RES * 2; ph.resolutionQuest = SHADOW_RES;   // PC: 2048 (Cor: jagged shadow edges); Quest keeps 1024
         UdonSharpEditorUtility.CopyProxyToUdon(ph);
         Selection.activeGameObject = null;   // the next rebuild destroys it; an open inspector would throw
         return ph;

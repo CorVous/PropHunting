@@ -51,7 +51,9 @@ Shader "PropHunt/Lit"
             // the toon ramp: three flat bands with short soft edges; above full light (a bright lamp) it stays linear
             float Ramp(float x)
             {
-                return 0.5 * smoothstep(0.08, 0.14, x) + 0.5 * smoothstep(0.45, 0.52, x) + max(x - 1.0, 0.0);
+                // the edges are wide enough to hide the shadow map's pixels (Cor: the shadows looked jagged); faces are flat
+                // shaded, so the bands still read as flat on the models
+                return 0.5 * smoothstep(0.03, 0.22, x) + 0.5 * smoothstep(0.34, 0.66, x) + max(x - 1.0, 0.0);
             }
 
             // the direct light, quantised by its strength against the sun's full light on this surface
@@ -79,7 +81,7 @@ Shader "PropHunt/Lit"
                 float3 worldPos : TEXCOORD3;
                 half3 normal : TEXCOORD4;
                 UNITY_FOG_COORDS(5)
-                half2 emit : TEXCOORD6;      // x: 1 for a lamp's bulb (vertex alpha 0): drawn at full brightness; y: 1 indoors
+                half3 emit : TEXCOORD6;      // x: 1 for a lamp's bulb (vertex alpha 0): drawn at full brightness; y: 1 indoors; z: the roof's height there (0 outdoors)
             };
 
             v2f vert (appdata v)
@@ -110,7 +112,7 @@ Shader "PropHunt/Lit"
                 albedo *= lerp(0.74, 1.0, saturate(v.vertex.y * 2.2 + max(n.y, 0.0) * 2.0));
                 o.albedo = albedo;
                 o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
-                float indoor = 0.0;
+                float indoor = 0.0, roofTop = 0.0;
                 if (_UdonPHIndoorArea.z > 0.5)
                 {
                     float2 uv = o.worldPos.xz * _UdonPHIndoorArea.xy;
@@ -118,9 +120,10 @@ Shader "PropHunt/Lit"
                     {
                         float top = tex2Dlod(_UdonPHIndoor, float4(uv, 0, 0)).r * 12.75;
                         indoor = step(0.02, top) * step(o.worldPos.y, top - 0.02);
+                        roofTop = top * indoor;
                     }
                 }
-                o.emit = half2(1 - v.color.a, indoor);
+                o.emit = half3(1 - v.color.a, indoor, roofTop);
                 // indoors the sky reaches less far and what there is has bounced off walls and floors: dimmer, warmer
                 amb *= lerp(float3(1.0, 1.0, 1.0), float3(0.66, 0.60, 0.54), indoor);
                 // the wrap part of the base sun (the 0.2) stays as fill when the spot sun takes over the direct part
@@ -177,6 +180,9 @@ Shader "PropHunt/Lit"
                 if (lvOn)
                 {
                     PointLights(i.worldPos, n, spot, lamps);
+                    // under the roof's edge the shadow map lets a ragged strip of sun in along the top of the walls
+                    // (Cor: jagged shadows): no sun in the top half metre of a building's top storey
+                    if (i.emit.z > 0.01) spot *= saturate((i.emit.z - 0.5 - i.worldPos.y) * 4.0);
                     spot *= i.albedo;
                     // the lamps stay out of the toon bands: summed pools would cut each other into rings. Soft light,
                     // never blown out next to a lamp (a hot spot reads as shine)
