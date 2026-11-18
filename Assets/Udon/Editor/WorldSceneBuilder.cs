@@ -123,7 +123,9 @@ public static class WorldSceneBuilder
         // the hider's own prop and the prop pointed at are drawn with materials of their own (MapBuilderUdon.SelfOnly, Hover)
         builder.propLitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
         builder.selfMat = Variant("PropLitSelf", builder.propLitMat, "_PipOnly");
+        builder.fadeMat = Variant("PropLitFade", builder.propLitMat, "_Fade");   // a map's props: see-through in the prop viewer's cutout
         builder.hoverMat = Variant("PropLitHover", builder.propLitMat, "_Hover");
+        if (builder.hoverMat != null) { builder.hoverMat.SetFloat("_Fade", 1f); EditorUtility.SetDirty(builder.hoverMat); }   // pointed at, still a prop
         builder.shadeSelfMat = Variant("PropShadeSelf", AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropShade.mat"), "_PipOnly");
         UdonSharpEditorUtility.CopyProxyToUdon(builder);
         LightingBuilder.Build(world.transform, builder, sun);   // the map's sun shadows (Light Volumes spot, PHSun)

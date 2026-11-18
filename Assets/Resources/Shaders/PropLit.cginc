@@ -22,6 +22,7 @@ float4 _UdonPHSunArea;
 float _Toon;
 float _PipOnly;
 float _Hover;
+float _Fade;
 
 // the toon ramp: three flat bands with short soft edges; above full light (a bright lamp) it stays linear
 float Ramp(float x)
@@ -147,8 +148,8 @@ void PointLights(float3 worldPos, float3 n, out float3 sun, out float3 lamps)
 
 fixed4 frag (v2f i) : SV_Target
 {
-    // the prop viewer's cutout (PipCut.cginc); never on the hider's own prop
-    half cutRim = _PipOnly < 0.5 ? PipCut(i.worldPos, i.pos.xy) : 0;
+    // the prop viewer's cutout (PipCut.cginc): a prop in it is see-through (_Fade), the rest cut; never on the hider's own prop
+    half cutRim = _PipOnly < 0.5 ? PipCut(i.worldPos, i.pos.xy, _Fade) : 0;
     float3 c;
     float3 n = normalize(i.normal);
     bool lvOn = LightVolumesEnabled() > 0;

@@ -16,6 +16,9 @@ Shader "PropHunt/Lit"
         [HideInInspector] _PipOnly ("Third-person view only", Float) = 0
         // 1 in the material of the prop a hider points at and could become (PropLitHover, MapBuilderUdon.Hover): a warm glow, strongest at its rim
         [HideInInspector] _Hover ("Pointed at", Float) = 0
+        // 1 in the material of a map's props (PropLitFade, MapBuilderUdon.MakeProp; not the architecture or the merged scenery): in the
+        // prop viewer's cutout they are drawn see-through instead of cut away (PipCut.cginc)
+        [HideInInspector] _Fade ("See-through in the cutout", Float) = 0
     }
     SubShader
     {

@@ -1664,7 +1664,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // props vanished when pointed at): props of one model are drawn in one instanced batch, and a mark that one
     // prop's block carried reached the others in it. Another material is never in the same batch. The tint stays
     // in the block (TintProp), per instance.
-    public Material propLitMat, selfMat, hoverMat, shadeSelfMat;   // WorldSceneBuilder
+    // A map's props (MakeProp) are drawn with PropLit with _Fade set: in the prop viewer's cutout they turn see-through
+    // instead of being cut away (Cor), while the architecture and the merged scenery (PropLit itself) are cut.
+    public Material propLitMat, selfMat, hoverMat, shadeSelfMat, fadeMat;   // WorldSceneBuilder
+
+    void FadeProp(GameObject go)
+    {
+        if (go == null || fadeMat == null) return;
+        MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
+        for (int i = 0; i < rs.Length; i++) if (rs[i].sharedMaterial == propLitMat) rs[i].sharedMaterial = fadeMat;
+    }
 
     public void SelfOnly(GameObject go, int def)
     {
@@ -1680,8 +1689,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
         for (int i = 0; i < rs.Length; i++)
         {
             Material m = rs[i].sharedMaterial;
-            if (on && m == propLitMat) rs[i].sharedMaterial = hoverMat;
-            else if (!on && m == hoverMat) rs[i].sharedMaterial = propLitMat;
+            Material plain = fadeMat != null ? fadeMat : propLitMat;
+            if (on && (m == plain || m == propLitMat)) rs[i].sharedMaterial = hoverMat;
+            else if (!on && m == hoverMat) rs[i].sharedMaterial = plain;
         }
     }
 
@@ -2605,6 +2615,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (sh.name == "Shade") sh.gameObject.SetActive(false);
         }
         TintProp(go, emitDef[e]);
+        FadeProp(go);
         int def = emitDef[e];
         for (int i = 0; i < lampDefs.Length; i++)
         {

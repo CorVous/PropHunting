@@ -58,7 +58,7 @@ Shader "PropHunt/Shade"
             fixed4 frag (v2f i) : SV_Target
             {
                 // a patch on an upper floor goes with the floor in the prop viewer's cutout (PipCut.cginc); its rim stays unshaded
-                if (_PipOnly < 0.5 && PipCut(i.worldPos, i.pos.xy) > 0.5) return fixed4(1, 1, 1, 1);
+                if (_PipOnly < 0.5 && PipCut(i.worldPos, i.pos.xy, 0) > 0.5) return fixed4(1, 1, 1, 1);
                 half a = i.a * i.a * (3.0 - 2.0 * i.a);
                 fixed4 col = fixed4(lerp(float3(1, 1, 1), _Shade.rgb, a), 1);
                 UNITY_APPLY_FOG_COLOR(i.fogCoord, col, fixed4(1, 1, 1, 1));   // far off it fades out with the fog
