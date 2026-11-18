@@ -89,7 +89,19 @@ public class PHHiderBody : UdonSharpBehaviour
     public override void InputLookHorizontal(float value, UdonInputEventArgs args) { look = value; }
     public override void InputJump(bool value, UdonInputEventArgs args) { if (value) jumpPressed = true; }
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         if (!active) return;
         VRCPlayerApi me = Networking.LocalPlayer;

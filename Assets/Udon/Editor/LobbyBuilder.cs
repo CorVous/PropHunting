@@ -319,8 +319,23 @@ public static class LobbyBuilder
         return ex;
     }
 
+    // The PROFILER plaque: START PROFILING and STOP PROFILING (PHProfiler: frame times, hitches, the scripts' cost and
+    // the map builds, written to the debug log). Each player's own client; the caller lists the scripts to watch.
+    public static PHProfiler BuildProfiler(Transform lobby, PHGame game, Vector3 localPos)
+    {
+        var cv = Canvas(lobby, "ProfilerDebug", localPos, Quaternion.identity, new Vector2(300f, 250f), 0.006f, true);
+        var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
+        Txt(cv, "Label", new Vector2(0, 102), new Vector2(280, 24), "PROFILER", future, 14, C("e1cfa5"), TextAlignmentOptions.Center);
+        var prof = cv.gameObject.AddUdonSharpComponent<PHProfiler>();
+        prof.game = game;
+        prof.status = Txt(cv, "Status", new Vector2(0, -100), new Vector2(280, 24), "PROFILING OFF", future, 13, Color.white, TextAlignmentOptions.Center);
+        DebugButton(cv, game, "START PROFILING", nameof(PHProfiler.Begin), new Vector2(0, 48), C("9bd18a"), prof);
+        DebugButton(cv, game, "STOP PROFILING", nameof(PHProfiler.End), new Vector2(0, -24), C("e98a6b"), prof);
+        return prof;
+    }
+
     // a button of the DEBUG plaque that calls one of PHGame's methods (PHButton): host only, as the game checks
-    static void DebugButton(Transform cv, PHGame game, string label, string action, Vector2 at, Color colour)
+    static void DebugButton(Transform cv, PHGame game, string label, string action, Vector2 at, Color colour, UdonSharp.UdonSharpBehaviour target = null)
     {
         var bimg = Img(cv, "Button " + label, at, new Vector2(270, 64), sRound, new Color(1f, 1f, 1f, 0.01f), 3f);
         bimg.raycastTarget = true;
@@ -329,7 +344,7 @@ public static class LobbyBuilder
         Img(bimg.transform, "Face", Vector2.zero, new Vector2(270, 64), sTile, colour, 2f);
         Txt(bimg.transform, "Text", new Vector2(0, 3), new Vector2(256, 40), label, future, 16, C("1e190f"), TextAlignmentOptions.Center);
         var btn = bimg.gameObject.AddUdonSharpComponent<PHButton>();
-        btn.game = game; btn.action = action;
+        btn.game = game; btn.action = action; btn.target = target;
         UdonSharpEditorUtility.CopyProxyToUdon(btn);
         var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, udon.SendCustomEvent, nameof(PHButton.Press));

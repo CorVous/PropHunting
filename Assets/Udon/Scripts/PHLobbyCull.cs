@@ -24,7 +24,19 @@ public class PHLobbyCull : UdonSharpBehaviour
         wasC = new bool[cs.Length];
     }
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         if (Time.time < next) return;
         next = Time.time + 0.4f;

@@ -28,7 +28,19 @@ public class PHLamps : UdonSharpBehaviour
         for (int i = 0; i < pool.Length; i++) if (pool[i] != null) pool[i].gameObject.SetActive(false);
     }
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         if (builder == null || pool == null) return;
         bool b = builder.built;

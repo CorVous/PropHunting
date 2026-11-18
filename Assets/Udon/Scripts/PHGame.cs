@@ -92,7 +92,7 @@ public class PHGame : UdonSharpBehaviour
     public const float BRIEF = 8f, ROUND_END = 12f, ENDGAME_AT = 45f, LOADING_TIMEOUT = 120f;
 
     int builtRound = -1, genRound = -1;
-    bool building;
+    [System.NonSerialized] public bool building;   // a map is being generated or built
     VRCPlayerApi[] players = new VRCPlayerApi[90];
 
     public bool IsHost { get { return Networking.IsOwner(gameObject); } }
@@ -483,39 +483,80 @@ public class PHGame : UdonSharpBehaviour
     public bool logSlowSteps = false;  // profiling: name the generator steps that take a frame's time
     public float slowStepMs = 20f;     // ...and from how many milliseconds a step counts as slow
     [System.NonSerialized] public float genMs, genWorstMs;   // the last map's generation: time in steps, and its longest step
+    // ...and, while logSlowSteps is on (the profiler): the steps' count, the time per generator stage, the steps by
+    // length (under 2, 5, 10, 15, 20, 30, 50 ms, and longer), where the longest one was
+    [System.NonSerialized] public int genSteps;
+    [System.NonSerialized] public float[] genStageMs = new float[16];
+    [System.NonSerialized] public int[] genHist = new int[8];
+    [System.NonSerialized] public string genWorstAt = "";
+    System.Diagnostics.Stopwatch genWatch;
 
     void BeginMap()
     {
         genRound = round;
         building = true;
+        if (genWatch == null) genWatch = new System.Diagnostics.Stopwatch();
+        genWatch.Reset(); genWatch.Start();
         builder.Clear();
+        double clearMs = genWatch.Elapsed.TotalMilliseconds;
         gen.Begin(seed, mapSize, mapDensity, mapEvo);
-        genMs = 0f; genWorstMs = 0f;
+        // (these two are not steps: the profiler's log says what they cost)
+        if (logSlowSteps) Debug.Log("[PHProf] map begin: clearing the last map " + clearMs.ToString("0.0") + "ms, the generator's start " + (genWatch.Elapsed.TotalMilliseconds - clearMs).ToString("0.0") + "ms");
+        genMs = 0f; genWorstMs = 0f; genSteps = 0; genWorstAt = "";
+        for (int i = 0; i < genStageMs.Length; i++) genStageMs[i] = 0f;
+        for (int i = 0; i < genHist.Length; i++) genHist[i] = 0;
     }
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         if (building)
         {
             if (!builder.busy && !builder.built)
             {
                 // generation, a few steps per frame within a budget
-                float t0 = Time.realtimeSinceStartup;
+                if (genWatch == null) genWatch = new System.Diagnostics.Stopwatch();
+                genWatch.Reset(); genWatch.Start();
                 bool finished = false;
-                while (!finished && Time.realtimeSinceStartup - t0 < 0.006f)
+                double s0 = 0.0;
+                while (!finished && s0 < 6.0)
                 {
-                    float s0 = Time.realtimeSinceStartup;
-                    int st = gen.CurrentStage(), cu = gen.CurrentCursor(), ph = gen.CurrentPhase();
-                    string sub = logSlowSteps ? gen.CurrentSub() : "";
+                    int st = 0, cu = 0, ph = 0;
+                    string sub = "";
+                    if (logSlowSteps) { st = gen.CurrentStage(); cu = gen.CurrentCursor(); ph = gen.CurrentPhase(); sub = gen.CurrentSub(); }
                     finished = gen.Step();
-                    float one = (Time.realtimeSinceStartup - s0) * 1000f;
-                    genMs += one; if (one > genWorstMs) genWorstMs = one;
-                    if (logSlowSteps && one > slowStepMs) Debug.Log("[PHGame] slow generator step: stage " + st + " cursor " + cu + " phase " + ph + " sub " + sub + " " + one.ToString("0") + " ms");
+                    double s1 = genWatch.Elapsed.TotalMilliseconds;
+                    float one = (float)(s1 - s0);
+                    s0 = s1;
+                    genMs += one;
+                    if (one > genWorstMs) { genWorstMs = one; if (logSlowSteps) genWorstAt = "st" + st + "/cu" + cu + "/ph" + ph + "/sub" + sub; }
+                    if (logSlowSteps)
+                    {
+                        // for the profiler (PHProfiler): how many steps, how long, where the time went
+                        genSteps++; genStageMs[st & 15] += one;
+                        genHist[one < 2f ? 0 : (one < 5f ? 1 : (one < 10f ? 2 : (one < 15f ? 3 : (one < 20f ? 4 : (one < 30f ? 5 : (one < 50f ? 6 : 7))))))]++;
+                        if (one > slowStepMs) Debug.Log("[PHGame] slow generator step: stage " + st + " cursor " + cu + " phase " + ph + " sub " + sub + " " + one.ToString("0") + " ms");
+                    }
                 }
                 if (finished)
                 {
                     if (gen.failed) { building = false; Debug.LogError("[PHGame] map generation failed: " + gen.failReason); }
-                    else builder.BeginBuild();
+                    else
+                    {
+                        builder.BeginBuild();
+                        if (logSlowSteps) Debug.Log("[PHProf] build begin: " + (genWatch.Elapsed.TotalMilliseconds - s0).ToString("0.0") + "ms");
+                    }
                 }
             }
             else if (builder.built)

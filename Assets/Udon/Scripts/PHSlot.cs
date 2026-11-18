@@ -154,7 +154,19 @@ public class PHSlot : UdonSharpBehaviour
 
     bool emptyDone;
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         if (game == null) return;
         // an empty slot (most of the 32): parked once, then nothing each frame (Cor: profiling, the slots were half the Udon time)

@@ -205,6 +205,23 @@ public static class WorldSceneBuilder
         LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
         local.panelUiText = null; local.resultsText = null;
 
+        // the profiler (its plaque right of the panel) and the scripts it watches: every one that runs each frame
+        var prof = LobbyBuilder.BuildProfiler(lobby.transform, game, new Vector3(5.9f, 1.55f, RoomD / 2 - 0.12f));
+        {
+            string[] names = { "PHGame", "PHLocal", "PHSlot", "PHHiderBody", "PHKnock", "PHLamps", "PHLobbyCull", "PHPanel", "PHScorePad", "PHSun", "PHView", "PHDoors", "MapBuilderUdon" };
+            var list = new System.Collections.Generic.List<UdonSharp.UdonSharpBehaviour>();
+            var groups = new System.Collections.Generic.List<int>();
+            foreach (var u in Object.FindObjectsOfType<UdonSharp.UdonSharpBehaviour>(true))
+            {
+                int g = System.Array.IndexOf(names, u.GetType().Name);
+                if (g < 0) continue;
+                list.Add(u); groups.Add(g);
+            }
+            prof.scripts = list.ToArray(); prof.scriptGroup = groups.ToArray(); prof.groupNames = names;
+            UdonSharpEditorUtility.CopyProxyToUdon(prof);
+            Debug.Log("[prophunt] the profiler watches " + list.Count + " scripts");
+        }
+
         UdonSharpEditorUtility.CopyProxyToUdon(local);
         UdonSharpEditorUtility.CopyProxyToUdon(game);
         EditorSceneManager.MarkSceneDirty(world.scene);

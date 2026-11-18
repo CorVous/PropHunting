@@ -211,8 +211,13 @@ public class MapBuilderUdon : UdonSharpBehaviour
     [HideInInspector] public string phase = "";
     [HideInInspector] public double genMs, buildMs;
 
-    int stage, cursor;
+    [System.NonSerialized] public int stage, cursor;   // the build's stage and where it is in it (public: the profiler names them)
     System.Diagnostics.Stopwatch watch;
+    // for the profiler (PHProfiler): steps from this length are logged; the last build's longest step and its time per stage
+    public float slowStepMs = 20f;
+    [System.NonSerialized] public double worstStepMs;
+    [System.NonSerialized] public int worstStage, worstCursor;
+    [System.NonSerialized] public double[] stageMs = new double[32];
 
     const float CELL = 4f, INNER = 0.5f, WALL_HALF = 0.1f;
     const int FACE_XN = 1, FACE_XP = 2, FACE_YN = 4, FACE_YP = 8, FACE_ZN = 16, FACE_ZP = 32, FACE_ALL = 63;
@@ -673,7 +678,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         BufInit(B_WALLS, W * H * 40 + 64);
         BufInit(B_ROOFS, W * H * 20 + 64);
         BufInit(B_COLL, W * H * 24 + 64);
-        stage = 6; cursor = 0; built = false; failed = false; busy = true; progress = 0f; buildMs = 0;
+        stage = 6; cursor = 0; built = false; failed = false; busy = true; progress = 0f; buildMs = 0; worstStepMs = 0; worstStage = 0; worstCursor = 0;
+        for (int i = 0; i < stageMs.Length; i++) stageMs[i] = 0;
         cellColour = new Color32[IW * IH];
         phase = "Laying floors";
     }
@@ -698,7 +704,19 @@ public class MapBuilderUdon : UdonSharpBehaviour
         built = false; busy = false; stage = 0;
     }
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         if (built && nClouds > 0)
         {
@@ -719,7 +737,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             int st = stage, cu = cursor;
             if (StepOne()) { finished = true; break; }
             double one = watch.Elapsed.TotalMilliseconds - s0;
-            if (one > 20.0) Debug.Log("[MapBuilder] slow step: stage " + st + " cursor " + cu + " " + one.ToString("0") + " ms");
+            if (one > worstStepMs) { worstStepMs = one; worstStage = st; worstCursor = cu; }
+            stageMs[st & 31] += one;
+            if (one > slowStepMs) Debug.Log("[MapBuilder] slow step: stage " + st + " cursor " + cu + " " + one.ToString("0") + " ms");
         }
         watch.Stop();
         buildMs += watch.Elapsed.TotalMilliseconds;

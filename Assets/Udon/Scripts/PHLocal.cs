@@ -390,7 +390,19 @@ public class PHLocal : UdonSharpBehaviour
         return true;
     }
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         if (Input.GetKeyDown(KeyCode.T)) Taunt();
         bool eg = game.Endgame;
@@ -623,6 +635,14 @@ public class PHLocal : UdonSharpBehaviour
     }
 
     public override void PostLateUpdate()
+    {
+        if (profWatch == null) { PostLateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        PostLateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void PostLateBody()
     {
         if (hudRoot == null) return;
         VRCPlayerApi.TrackingData head = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);

@@ -43,7 +43,19 @@ public class PHView : UdonSharpBehaviour
 
     PHSlot Me() { return game.LocalSlot(); }
 
+    // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
+    [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
+    [System.NonSerialized] public double profMs;
+
     void Update()
+    {
+        if (profWatch == null) { UpdateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        UpdateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void UpdateBody()
     {
         PHSlot s = Me();
         bool hider = s != null && game.RoleOf(s.index) == PHGame.ROLE_HIDER && s.hiding && !s.caught && s.def >= 0
@@ -87,6 +99,14 @@ public class PHView : UdonSharpBehaviour
     }
 
     public override void PostLateUpdate()
+    {
+        if (profWatch == null) { PostLateBody(); return; }
+        double p0 = profWatch.Elapsed.TotalMilliseconds;
+        PostLateBody();
+        profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    void PostLateBody()
     {
         VRCPlayerApi me = Networking.LocalPlayer;
         if (!vr)

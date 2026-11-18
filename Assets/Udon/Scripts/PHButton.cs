@@ -8,6 +8,7 @@ using UnityEngine;
 public class PHButton : UdonSharpBehaviour
 {
     public PHGame game;
+    public UdonSharpBehaviour target;   // if set, the action is this script's (the profiler's buttons), not the game's
     public string action = "StartRound";
     public int arg;
 
@@ -16,6 +17,7 @@ public class PHButton : UdonSharpBehaviour
 
     public override void Interact()
     {
+        if (target != null) { target.SendCustomEvent(action); return; }
         if (game == null) return;
         game.panelArg = arg;
         game.SendCustomEvent(action);
