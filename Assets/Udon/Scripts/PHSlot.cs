@@ -311,7 +311,7 @@ public class PHSlot : UdonSharpBehaviour
     }
 
     // The room there is for the prop across (along 'across', its half width there 'half'), the least of: at its
-    // middle, and up to half a metre past its front and its back (along 'along', its half length 'reach'), so it is
+    // middle, and past its front and its back by about its own half width and a little (along 'along', its half length 'reach'), so it is
     // already squashed when its front comes to a doorway (Cor: or it starts clipping). An end is only measured
     // where nothing stands between the middle and it (a wall beside the prop is not a doorway ahead of it).
     float GapAcross(Vector3 mid, Vector3 across, Vector3 along, float half, float reach)
@@ -320,8 +320,11 @@ public class PHSlot : UdonSharpBehaviour
         for (int side = -1; side <= 1; side += 2)
         {
             Vector3 dir = along * side;
-            // three places 0.2 m apart (a wall is 0.2 m thick: one of them is in the doorway when it is near)
-            for (int k = 0; k < 3; k++)
+            // how far ahead it looks is the prop's own (Cor: per object, not one distance): the wider it is across,
+            // the more it has to give and the sooner it starts. Places 0.2 m apart (a wall is 0.2 m thick: one of
+            // them is in the doorway when it is near)
+            int looks = Mathf.Clamp(Mathf.CeilToInt((0.1f + 1.1f * half) / 0.2f), 1, 8);
+            for (int k = 0; k < looks; k++)
             {
                 float ahead = reach + 0.1f + 0.2f * k;
                 if (WallAt(mid, dir, ahead) < ahead - 0.001f) break;
