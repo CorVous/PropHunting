@@ -88,6 +88,14 @@ public class PHHiderBody : UdonSharpBehaviour
     public override void InputMoveHorizontal(float value, UdonInputEventArgs args) { moveH = value; }
     public override void InputLookHorizontal(float value, UdonInputEventArgs args) { look = value; }
     public override void InputJump(bool value, UdonInputEventArgs args) { if (value) jumpPressed = true; }
+    // VR: pushing the right stick up hops too (seated in the prop's station, some controllers' jump does nothing)
+    bool lookUpHeld;
+    public override void InputLookVertical(float value, UdonInputEventArgs args)
+    {
+        if (!Networking.LocalPlayer.IsUserInVR()) return;
+        if (value > 0.75f && !lookUpHeld) { lookUpHeld = true; jumpPressed = true; }
+        else if (value < 0.4f) lookUpHeld = false;
+    }
 
     // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
     [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;

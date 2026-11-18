@@ -31,6 +31,33 @@ public static class PropPrefabBaker
         AssetDatabase.Refresh();
         LoadModels();
         FixModels();
+        // faces of one model that lie in one plane and flicker: the smaller patch is lifted off it (ZFight)
+        float fought = 0f; int nFought = 0;
+        for (int m = 0; m < mesh.Length; m++)
+        {
+            if (mesh[m] == null) continue;
+            float a = ZFight.Declash(mesh[m]);
+            // layers of three: what was lifted may meet the next layer
+            for (int pass = 0; pass < 3 && a > 1e-4f && ZFight.Scan(mesh[m]) > 1e-4f; pass++) ZFight.Declash(mesh[m]);
+            if (a > 1e-4f) { fought += a; nFought++; bounds[m] = mesh[m].bounds; }
+        }
+        // against the floor (ZFight.ScanScene found these on every map): a model's upward faces in its base plane
+        // (the inside of an open box, a flower's leaves, a placemat) lay in the floor's plane and flickered. They sit
+        // 6 mm up; a flat thing (a rug, a carpet) has its top 10 mm up, over the base faces of what stands on it.
+        for (int m = 0; m < mesh.Length; m++)
+        {
+            if (mesh[m] == null || bounds[m].min.y > 0.002f || bounds[m].min.y < -0.002f) continue;
+            Vector3[] v = mesh[m].vertices; Vector3[] nr = mesh[m].normals;
+            bool flat = bounds[m].size.y < 0.03f, any = false;
+            for (int i = 0; i < v.Length; i++)
+            {
+                if (nr[i].y < 0.9f) continue;
+                float want = flat ? 0.010f : 0.006f;
+                if (flat ? v[i].y < want : v[i].y < 0.002f) { v[i].y = want; any = true; }
+            }
+            if (any) { mesh[m].vertices = v; mesh[m].RecalculateBounds(); bounds[m] = mesh[m].bounds; }
+        }
+        Debug.Log("[prophunt] z-fighting faces separated in " + nFought + " models (" + (fought * 1e4f).ToString("0") + " cm2)");
         Harmonise();
         MakeShade();
 
@@ -117,7 +144,8 @@ public static class PropPrefabBaker
                 if (parent[pm] != model) continue;
                 var d = new GameObject("door" + k++);
                 d.transform.SetParent(go.transform, false);
-                d.transform.localPosition = pivot[pm];
+                // a door whose face lies in the plane of its cupboard's front (the wardrobe's did) stands 3 mm proud
+                d.transform.localPosition = pivot[pm] + ZFight.PartShift(mesh[model], mesh[pm], pivot[pm]);
                 d.layer = LAYER_PROP;
                 d.AddComponent<MeshFilter>().sharedMesh = mesh[pm];
                 d.AddComponent<MeshRenderer>().sharedMaterial = mat;

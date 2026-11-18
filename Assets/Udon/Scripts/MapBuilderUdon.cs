@@ -693,6 +693,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
         phase = "Laying floors";
     }
 
+    // a mesh this builder made is destroyed with what showed it (a runtime mesh is not freed by itself: every round's
+    // ground, walls, roofs and scenery stayed in memory)
+    void DropMesh(MeshFilter f)
+    {
+        if (f == null) return;
+        Mesh m = f.sharedMesh;
+        f.sharedMesh = null;
+        if (m != null) Destroy(m);
+    }
+
     public void Clear()
     {
         if (objects != null)
@@ -703,13 +713,15 @@ public class MapBuilderUdon : UdonSharpBehaviour
         nClouds = 0;
         if (fixtureRoot != null)
             for (int i = fixtureRoot.childCount - 1; i >= 0; i--) Destroy(fixtureRoot.GetChild(i).gameObject);
-        if (groundFilter != null) groundFilter.sharedMesh = null;
-        if (wallsFilter != null) wallsFilter.sharedMesh = null;
-        if (roofsFilter != null) roofsFilter.sharedMesh = null;
-        if (sceneryFilter != null) sceneryFilter.sharedMesh = null;
-        if (tiles != null) for (int i = 1; i < tiles.Length; i++) if (tiles[i] != null) { Destroy(tiles[i]); tiles[i] = null; }
+        DropMesh(groundFilter); DropMesh(wallsFilter); DropMesh(roofsFilter); DropMesh(sceneryFilter);
+        if (tiles != null) for (int i = 1; i < tiles.Length; i++) if (tiles[i] != null) { DropMesh(tiles[i].GetComponent<MeshFilter>()); Destroy(tiles[i]); tiles[i] = null; }
         nTiles = 0;
-        if (collisionCollider != null) collisionCollider.sharedMesh = null;
+        if (collisionCollider != null)
+        {
+            Mesh cm = collisionCollider.sharedMesh;
+            collisionCollider.sharedMesh = null;
+            if (cm != null) Destroy(cm);
+        }
         built = false; busy = false; stage = 0;
     }
 
@@ -1108,7 +1120,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             float a = alongB ? am : Mathf.Lerp(a0, a1, t), b = alongB ? Mathf.Lerp(b0, b1, t) : bm, y = Mathf.Lerp(y0, y1, t);
             a = Mathf.Clamp(a, Mathf.Min(a0, a1) + 0.03f, Mathf.Max(a0, a1) - 0.03f);
             b = Mathf.Clamp(b, Mathf.Min(b0, b1) + 0.03f, Mathf.Max(b0, b1) - 0.03f);
-            SBox(B_WALLS, a - 0.025f, a + 0.025f, b - 0.025f, b + 0.025f, y, y + 0.95f, col, col);
+            SBox(B_WALLS, a - 0.025f, a + 0.025f, b - 0.025f, b + 0.025f, y + 0.003f, y + 0.95f, col, col);   // its foot just off the floor's plane (ZFight: seen from the stair below)
         }
         // the handrail (sloped with the stair), and the collider in steps where the rail climbs
         if (alongB && Mathf.Abs(y1 - y0) > 0.01f)
@@ -1401,7 +1413,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 float sgn = side == 0 ? 1f : -1f, face = WALL_HALF * sgn;
                 Color32 wc = WallColourAt(toward);
                 Color32 skirt = wc.r + wc.g + wc.b > 600 ? palWoodB : C(242, 240, 234);
-                Panel(horizontal, ex, ez, 0.0f, CELL, 0.0f, 0.12f, face, face + 0.018f * sgn, skirt);
+                Panel(horizontal, ex, ez, 0.003f, CELL - 0.003f, 0.0f, 0.12f, face, face + 0.018f * sgn, skirt);   // its ends just off the cell's edge: a wall's face can lie there (ZFight)
                 Panel(horizontal, ex, ez, 0.0f, CELL, h - 0.09f, h, face, face + 0.03f * sgn, C(246, 244, 238));
             }
             return;
@@ -1454,8 +1466,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         float lo = Mathf.Min(n0, n1), hi = Mathf.Max(n0, n1);
         bool outPlus = n1 > n0;
-        if (horizontal) Box(B_WALLS, new Vector3(ex + a0, y0, ez + lo), new Vector3(ex + a1, y1, ez + hi), col, FACE_ALL & ~(outPlus ? FACE_ZN : FACE_ZP));
-        else Box(B_WALLS, new Vector3(ex + lo, y0, ez + a0), new Vector3(ex + hi, y1, ez + a1), col, FACE_ALL & ~(outPlus ? FACE_XN : FACE_XP));
+        int faces = FACE_ALL & ~(y0 <= 0f ? FACE_YN : 0);   // on the floor: no underside (never seen; it lay in the slab's plane)
+        if (horizontal) Box(B_WALLS, new Vector3(ex + a0, y0, ez + lo), new Vector3(ex + a1, y1, ez + hi), col, faces & ~(outPlus ? FACE_ZN : FACE_ZP));
+        else Box(B_WALLS, new Vector3(ex + lo, y0, ez + a0), new Vector3(ex + hi, y1, ez + a1), col, faces & ~(outPlus ? FACE_XN : FACE_XP));
     }
 
     // Review 9: every lane was a fence corridor. A plot's side to the lane is chosen per plot: a shop, a diner or a
@@ -1542,7 +1555,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 if (hedgeLen > 0.1f)
                 {
                     Vector3 hs = h.transform.localScale;
-                    hs.z *= (run / n + 0.02f) / hedgeLen;
+                    hs.z *= (run / n) / hedgeLen;   // end to end: an overlap put two shades in one plane (ZFight)
                     h.transform.localScale = hs;
                 }
                 TintHedge(h);
@@ -1550,7 +1563,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             return;
         }
         // a low wall
-        Color32 wc = theme == GenData.THEME_MEDIEVAL ? Vary(C(146, 142, 132), (int)ex, (int)ez, 8) : Vary(C(158, 96, 78), (int)ex, (int)ez, 6);
+        // one colour along a run: the stretches overlap at their ends, and two shades in one plane flickered (ZFight)
+        Color32 wc = theme == GenData.THEME_MEDIEVAL ? C(146, 142, 132) : C(158, 96, 78);
         Color32 cap = theme == GenData.THEME_MEDIEVAL ? C(124, 120, 112) : C(196, 190, 180);
         if (horizontal)
         {
@@ -1662,7 +1676,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     public void TintProp(GameObject go, int def)
     {
         if (go == null || def < 0) return;
-        if (theme == GenData.THEME_SPACE || moodSeason == 2) return;   // the twins and autumn trees keep theirs
+        if (theme == GenData.THEME_SPACE) return;   // a space base's twins keep theirs (autumn's orange trees are not green: untouched)
         if (defTint == null || defTint.Length != propPrefabs.Length) { defTint = new Color[propPrefabs.Length]; defTintDone = new bool[propPrefabs.Length]; }
         if (!defTintDone[def])
         {
@@ -1982,7 +1996,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Prism(c, 1.2f, 0.7f, 0f, 3f, 8, C(110, 116, 128));
             Prism(c, 0.35f, 0.18f, 3f, 24f, 6, m);
             for (int k = 1; k <= 3; k++) Prism(c, 0.9f - k * 0.15f, 0.9f - k * 0.15f, 3f + k * 5f, 3.4f + k * 5f, 8, o);
-            Box(B_WALLS, c + new Vector3(-0.25f, 24f, -0.25f), c + new Vector3(0.25f, 24.5f, 0.25f), new Color32(255, 80, 60, 0), FACE_ALL);   // a red beacon, glowing
+            Box(B_WALLS, c + new Vector3(-0.25f, 24f, -0.25f), c + new Vector3(0.25f, 24.5f, 0.25f), new Color32(255, 80, 60, 0), FACE_ALL & ~FACE_YN);   // a red beacon, glowing (no underside: it lay on the mast's top)
             PlaceDecor(DECOR_DISH, c + new Vector3(0f, 17f, 0f), Rand01(9103u) * 360f);
             return;
         }

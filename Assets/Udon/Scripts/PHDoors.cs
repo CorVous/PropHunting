@@ -32,8 +32,10 @@ public class PHDoors : UdonSharpBehaviour
         count = 0;
         GameObject[] objs = game.builder.objects;
         if (objs == null) return;
+        int[] emitDef = game.gen.emitDef, defFlags = game.gen.defFlags;
         for (int e = 0; e < objs.Length && count < MAX; e++)
         {
+            if ((defFlags[emitDef[e]] & GenData.FL_OPENABLE) == 0) continue;
             if (objs[e] == null) continue;
             Transform root = objs[e].transform;
             int k = 0;

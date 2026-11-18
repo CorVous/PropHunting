@@ -147,7 +147,7 @@ public class PHView : UdonSharpBehaviour
             if (up.sqrMagnitude < 1e-6f) up = Vector3.up;
             up.Normalize();
             // the canvas's right runs along the arm; its face looks at the eyes
-            wristRoot.SetPositionAndRotation(at + up * (0.2f * len), Quaternion.LookRotation(-up, Vector3.Cross(along, -up)));
+            wristRoot.SetPositionAndRotation(at + up * (0.2f * len), Quaternion.LookRotation(-up, Vector3.Cross(-up, along)));
             wristRoot.localScale = wristBaseScale * (len / 0.25f) * 0.75f;
         }
         else
@@ -156,7 +156,7 @@ public class PHView : UdonSharpBehaviour
             wristRoot.SetPositionAndRotation(hand.position + hand.rotation * new Vector3(0f, 0.03f, -0.05f) * sc, hand.rotation * Quaternion.Euler(90f, 0f, 0f));
             wristRoot.localScale = wristBaseScale * sc;
         }
-        if (!vrPanel.gameObject.activeSelf) { panelPlaced = false; return; }
+        if (!vrPanel.gameObject.activeSelf) return;
         vrPanel.localScale = new Vector3(panelBaseScale.x * sc, panelBaseScale.y * sc, panelBaseScale.z);
         VRCPlayerApi.TrackingData origin = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Origin);
         Quaternion inv = Quaternion.Inverse(origin.rotation);

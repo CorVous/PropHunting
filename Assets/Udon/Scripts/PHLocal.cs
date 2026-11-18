@@ -279,12 +279,18 @@ public class PHLocal : UdonSharpBehaviour
         if (propLayer == layer || game.builder.objects == null) return;
         propLayer = layer;
         GameObject[] objs = game.builder.objects;
+        int[] emitDef = game.gen.emitDef, defFlags = game.gen.defFlags;
         for (int i = 0; i < objs.Length; i++)
         {
             if (objs[i] == null) continue;
             objs[i].layer = layer;
+            if ((defFlags[emitDef[i]] & GenData.FL_OPENABLE) == 0) continue;   // only openables have parts with colliders (the shade patch has none)
             Transform t = objs[i].transform;
-            for (int k = 0; k < t.childCount; k++) t.GetChild(k).gameObject.layer = layer;
+            for (int k = 0; k < t.childCount; k++)
+            {
+                Transform ch = t.GetChild(k);
+                if (ch.name != "Shade") ch.gameObject.layer = layer;
+            }
         }
     }
 
