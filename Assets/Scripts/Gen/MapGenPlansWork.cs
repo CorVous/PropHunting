@@ -172,63 +172,69 @@ public partial class MapGen
     void PlanLoading()
     {
         int room = pRoom;
-        GenRng r = SR(1);
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        int cell = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, ref r);
-        int lane = -1;
-        if (cell >= 0) lane = PalletBlock(cell, Fit(3) ? r.Between(2, 3) : 2, 1, r.Chance(500) ? 0 : 90, ref r);
-        if (lane < 0 && cell >= 0) lane = PalletBlock(cell, 1, 1, 0, ref r);
-        if (lane < 0) MandFail(1);
-        GenRng r2 = SR(2);
-        if (r2.Chance(700) && Fit(1))
+        if (Ph(0))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r2) >= 0) Keep(first, false);
-        }
-        string[] rows = { "crates", "boxes", "barrels", "sacks" };
-        int[] chance = { 800, 650, 380, 350 };
-        for (int k = 0; k < rows.Length; k++)
-        {
-            GenRng rk = SR(3 + k);
-            if (!rk.Chance(chance[k]) || !Fit(2)) continue;
-            int g = GenData.FindGrp(rows[k]), first = nEmit;
-            if (PlaceGroup(g, room, GenData.A_WALL, rk.Between(2, Fit(3) ? 3 : 2), 0, ref rk)) Keep(first, false);
-        }
-        GenRng r7 = SR(7);
-        if (r7.Chance(450) && Fit(1))
-        {
-            int first = nEmit;
-            if (WallPlace(Pick(ref r7, "s_boxLarge", 5, "w_planks", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r7) >= 0) Keep(first, false);
-        }
-        GenRng r8 = SR(8);
-        if (r8.Chance(500) && Fit(1))
-        {
-            int first = nEmit;
-            if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r8) >= 0) Keep(first, false);
-        }
-        // goods still waiting: while the dock is under its range, another row at a wall or a pallet against it (a
-        // dock whose first rows found no room otherwise ends with its staging lane alone)
-        GenRng r10 = SR(10);
-        for (int k = 0; k < 6 && Fit(2); k++)
-        {
-            int first = nEmit;
-            if (k % 2 == 0)
+            GenRng r = SR(1);
+            int dx, dz;
+            MainDoor(room, out dx, out dz);
+            int cell = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, ref r);
+            int lane = -1;
+            if (cell >= 0) lane = PalletBlock(cell, Fit(3) ? r.Between(2, 3) : 2, 1, r.Chance(500) ? 0 : 90, ref r);
+            if (lane < 0 && cell >= 0) lane = PalletBlock(cell, 1, 1, 0, ref r);
+            if (lane < 0) MandFail(1);
+            GenRng r2 = SR(2);
+            if (r2.Chance(700) && Fit(1))
             {
-                if (PlaceGroup(GenData.FindGrp(rows[r10.Range(rows.Length)]), room, GenData.A_WALL, r10.Between(2, 3), 0, ref r10)) Keep(first, false);
+                int first = nEmit;
+                if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r2) >= 0) Keep(first, false);
             }
-            else
+            string[] rows = { "crates", "boxes", "barrels", "sacks" };
+            int[] chance = { 800, 650, 380, 350 };
+            for (int k = 0; k < rows.Length; k++)
             {
-                int def = Pick(ref r10, "w_palletLoaded", 5, "w_pallet", 3, "s_boxLarge", 3);
-                if (CountInRoom(def, room) < ScaledCap(GenData.defRoomCap[def], room) && WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, ref r10) >= 0) Keep(first, false);
+                GenRng rk = SR(3 + k);
+                if (!rk.Chance(chance[k]) || !Fit(2)) continue;
+                int g = GenData.FindGrp(rows[k]), first = nEmit;
+                if (PlaceGroup(g, room, GenData.A_WALL, rk.Between(2, Fit(3) ? 3 : 2), 0, ref rk)) Keep(first, false);
+            }
+            GenRng r7 = SR(7);
+            if (r7.Chance(450) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Pick(ref r7, "s_boxLarge", 5, "w_planks", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r7) >= 0) Keep(first, false);
+            }
+            GenRng r8 = SR(8);
+            if (r8.Chance(500) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r8) >= 0) Keep(first, false);
+            }
+            // goods still waiting: while the dock is under its range, another row at a wall or a pallet against it (a
+            // dock whose first rows found no room otherwise ends with its staging lane alone)
+            GenRng r10 = SR(10);
+            for (int k = 0; k < 6 && Fit(2); k++)
+            {
+                int first = nEmit;
+                if (k % 2 == 0)
+                {
+                    if (PlaceGroup(GenData.FindGrp(rows[r10.Range(rows.Length)]), room, GenData.A_WALL, r10.Between(2, 3), 0, ref r10)) Keep(first, false);
+                }
+                else
+                {
+                    int def = Pick(ref r10, "w_palletLoaded", 5, "w_pallet", 3, "s_boxLarge", 3);
+                    if (CountInRoom(def, room) < ScaledCap(GenData.defRoomCap[def], room) && WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, ref r10) >= 0) Keep(first, false);
+                }
             }
         }
-        GenRng r9 = SR(9);
-        if (r9.Chance(300) && LooseFit(2))
+        if (Ph(1))
         {
-            int first = nEmit;
-            FSet(Dn("gen_broom"), Pick(ref r9, "s_bucket", 5, "t_bucketMetal", 5));
-            if (FormAt(GenData.GL_ROW, 70, GenData.A_WALL, WM_ANY, 0, 0, 0, ref r9) >= 0 && Keep(first, false)) MarkLoose(first);
+            GenRng r9 = SR(9);
+            if (r9.Chance(300) && LooseFit(2))
+            {
+                int first = nEmit;
+                FSet(Dn("gen_broom"), Pick(ref r9, "s_bucket", 5, "t_bucketMetal", 5));
+                if (FormAt(GenData.GL_ROW, 70, GenData.A_WALL, WM_ANY, 0, 0, 0, ref r9) >= 0 && Keep(first, false)) MarkLoose(first);
+            }
         }
     }
 
@@ -424,34 +430,43 @@ public partial class MapGen
     void PlanDinerStore()
     {
         int room = pRoom;
-        GenRng r = SR(1);
-        int first0 = nEmit;
-        rowN = Fit(4) && r.Chance(600) ? 2 : 1;
-        for (int i = 0; i < rowN; i++) rowDef[i] = Dn("gen_rackPantry");
-        int shelf = WallRow(0, 2, WM_CENTRE, 0, 0, WIN_NEVER, EF_MANDATORY, ref r);
-        if (shelf < 0) { rowN = 1; shelf = WallRow(0, 1, WM_ANY, 0, 0, WIN_NEVER, EF_MANDATORY, ref r); }
-        if (shelf >= 0 && !Keep(first0, true)) shelf = -1;
-        if (shelf < 0) MandFail(1);
-        string[] rows = { "crates", "sacks", "barrels", "boxes" };
-        int[] chance = { 950, 600, 550, 600 };
-        for (int k = 0; k < rows.Length; k++)
+        if (Ph(0))
         {
-            GenRng rk = SR(2 + k);
-            if (!rk.Chance(chance[k]) || !Fit(2)) continue;
-            int g = GenData.FindGrp(rows[k]), first = nEmit;
-            if (PlaceGroup(g, room, k <= 1 ? GenData.A_BESIDE : GenData.A_WALL, rk.Between(2, Fit(3) ? 3 : 2), 0, ref rk)) Keep(first, false);
+            GenRng r = SR(1);
+            int first0 = nEmit;
+            rowN = Fit(4) && r.Chance(600) ? 2 : 1;
+            for (int i = 0; i < rowN; i++) rowDef[i] = Dn("gen_rackPantry");
+            int shelf = WallRow(0, 2, WM_CENTRE, 0, 0, WIN_NEVER, EF_MANDATORY, ref r);
+            if (shelf < 0) { rowN = 1; shelf = WallRow(0, 1, WM_ANY, 0, 0, WIN_NEVER, EF_MANDATORY, ref r); }
+            if (shelf >= 0 && !Keep(first0, true)) shelf = -1;
+            if (shelf < 0) MandFail(1);
+            string[] rows = { "crates", "sacks", "barrels", "boxes" };
+            int[] chance = { 950, 600, 550, 600 };
+            for (int k = 0; k < rows.Length; k++)
+            {
+                GenRng rk = SR(2 + k);
+                if (!rk.Chance(chance[k]) || !Fit(2)) continue;
+                int g = GenData.FindGrp(rows[k]), first = nEmit;
+                if (PlaceGroup(g, room, k <= 1 ? GenData.A_BESIDE : GenData.A_WALL, rk.Between(2, Fit(3) ? 3 : 2), 0, ref rk)) Keep(first, false);
+            }
         }
-        GenRng r6 = SR(6);
-        if (r6.Chance(500) && Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("w_pallet"), WM_CORNER, 0, 0, WIN_ANY, 0, ref r6) >= 0) Keep(first, false);
+            GenRng r6 = SR(6);
+            if (r6.Chance(500) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("w_pallet"), WM_CORNER, 0, 0, WIN_ANY, 0, ref r6) >= 0) Keep(first, false);
+            }
         }
-        GenRng r7 = SR(7);
-        if (r7.Chance(450) && Fit(1))
+        if (Ph(2))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("r_fridge"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r7) >= 0) Keep(first, false);
+            GenRng r7 = SR(7);
+            if (r7.Chance(450) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("r_fridge"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r7) >= 0) Keep(first, false);
+            }
         }
     }
 }

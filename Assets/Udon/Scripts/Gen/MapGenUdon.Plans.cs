@@ -448,64 +448,73 @@ public partial class MapGenUdon
     void PlanKitchen()
     {
         int room = pRoom, area = AreaM2(room);
-        uint[] r = SR(1);
-        int want = area >= 28 ? 6 : (area >= 20 ? 5 : 4);
-        if (RngChance(r, 400)) want++;
-        int centres = KitchenRun(want, r);
-        if (centres < 3) MandFail(3 - centres);
-        // (c) eating in the kitchen: a table with chairs where the floor is open (a metre from the run, K2), or a
-        // breakfast bar with stools against a free wall
-        uint[] r2 = SR(2);
-        int eat = RngRange(r2, 1000);
-        if (eat < (area >= 20 ? 700 : 480) && Fit(3))
+        if (Ph(0))
         {
-            int first = nEmit;
-            int def = area >= 26 && RngChance(r2, 500) ? Dn("k_table") : Dn("r_tableRound");
-            CentrePiece(def, RoomLongAxis(room) == 0 ? 0 : 90, false, 2, 1, WM_FAR, runCx, runCz, 0, 0, r2);
+            uint[] r = SR(1);
+            int want = area >= 28 ? 6 : (area >= 20 ? 5 : 4);
+            if (RngChance(r, 400)) want++;
+            int centres = KitchenRun(want, r);
+            if (centres < 3) MandFail(3 - centres);
+            // (c) eating in the kitchen: a table with chairs where the floor is open (a metre from the run, K2), or a
+            // breakfast bar with stools against a free wall
         }
-        else if (eat < 850 && Fit(4))
+        if (Ph(1))
         {
-            int first = nEmit;
-            rowN = 2; rowDef[0] = Dn("k_bar"); rowDef[1] = Dn("k_bar");
-            int bar = WallRow(0, 2, WM_FAR, runCx, runCz, WIN_ANY, 0, r2);
-            if (bar >= 0)
+            uint[] r2 = SR(2);
+            int eat = RngRange(r2, 1000);
+            if (eat < (area >= 20 ? 700 : 480) && Fit(3))
             {
-                int stool = Dn("k_stool"), last = nEmit;
-                for (int e = bar; e < last; e++)
-                    if (emitDef[e] == rowDef[0] && emitParent[e] < 0) Rel(stool, e, 0, Sz(rowDef[0]) / 2 + 60 + Sz(stool) / 2, 180, 0);
-                Keep(first, false);
+                int first = nEmit;
+                int def = area >= 26 && RngChance(r2, 500) ? Dn("k_table") : Dn("r_tableRound");
+                CentrePiece(def, RoomLongAxis(room) == 0 ? 0 : 90, false, 2, 1, WM_FAR, runCx, runCz, 0, 0, r2);
             }
-        }
-        // the waste point: the bin at the end of the run, a box for recycling beside it
-        uint[] r3 = SR(3);
-        int bin = -1;
-        if (runLast >= 0 && RngChance(r3, 900) && Fit(1))
-        {
-            int first = nEmit;
-            bool highFirst = RngChance(r3, 500);
-            for (int k = 0; k < 2 && bin < 0; k++)
+            else if (eat < 850 && Fit(4))
             {
-                int end = RunEnd(k == 0 ? highFirst : !highFirst);
-                if (end < 0) continue;
-                bin = RelBeside(Dn("k_trashcan"), end, OutwardSide(end, runCx, runCz), 50, 0, r3);
+                int first = nEmit;
+                rowN = 2; rowDef[0] = Dn("k_bar"); rowDef[1] = Dn("k_bar");
+                int bar = WallRow(0, 2, WM_FAR, runCx, runCz, WIN_ANY, 0, r2);
+                if (bar >= 0)
+                {
+                    int stool = Dn("k_stool"), last = nEmit;
+                    for (int e = bar; e < last; e++)
+                        if (emitDef[e] == rowDef[0] && emitParent[e] < 0) Rel(stool, e, 0, Sz(rowDef[0]) / 2 + 60 + Sz(stool) / 2, 180, 0);
+                    Keep(first, false);
+                }
             }
-            if (bin < 0) bin = WallPlace(Dn("k_trashcan"), WM_NEAR, runCx, runCz, WIN_ANY, 0, r3);
-            if (bin >= 0 && !Keep(first, false)) bin = -1;
+            // the waste point: the bin at the end of the run, a box for recycling beside it
         }
-        Extras(20, 450, "ck_plant", "wq_tableSmall", "cq_cactus");
-        // (d) the pantry corner: two crates of vegetables at a wall away from the run
-        uint[] r5 = SR(5);
-        if (area >= 16 && RngChance(r5, 280) && Fit(2))
+        if (Ph(2))
         {
-            int first = nEmit;
-            if (GroupAt(FindGrp("crates"), GenData.A_WALL, 2, WM_FAR, runCx, runCz, 0, r5)) Keep(first, false);
-        }
-        // (e) loose: the recycling box beside the bin
-        uint[] r6 = SR(6);
-        if (bin >= 0 && RngChance(r6, 300) && LooseFit(1))
-        {
-            int first = nEmit;
-            if (RelBeside(Dn("k_boxOpen"), bin, 0, 40, 0, r6) >= 0 && Keep(first, false)) MarkLoose(first);
+            uint[] r3 = SR(3);
+            int bin = -1;
+            if (runLast >= 0 && RngChance(r3, 900) && Fit(1))
+            {
+                int first = nEmit;
+                bool highFirst = RngChance(r3, 500);
+                for (int k = 0; k < 2 && bin < 0; k++)
+                {
+                    int end = RunEnd(k == 0 ? highFirst : !highFirst);
+                    if (end < 0) continue;
+                    bin = RelBeside(Dn("k_trashcan"), end, OutwardSide(end, runCx, runCz), 50, 0, r3);
+                }
+                if (bin < 0) bin = WallPlace(Dn("k_trashcan"), WM_NEAR, runCx, runCz, WIN_ANY, 0, r3);
+                if (bin >= 0 && !Keep(first, false)) bin = -1;
+            }
+            Extras(20, 450, "ck_plant", "wq_tableSmall", "cq_cactus");
+            // (d) the pantry corner: two crates of vegetables at a wall away from the run
+            uint[] r5 = SR(5);
+            if (area >= 16 && RngChance(r5, 280) && Fit(2))
+            {
+                int first = nEmit;
+                if (GroupAt(FindGrp("crates"), GenData.A_WALL, 2, WM_FAR, runCx, runCz, 0, r5)) Keep(first, false);
+            }
+            // (e) loose: the recycling box beside the bin
+            uint[] r6 = SR(6);
+            if (bin >= 0 && RngChance(r6, 300) && LooseFit(1))
+            {
+                int first = nEmit;
+                if (RelBeside(Dn("k_boxOpen"), bin, 0, 40, 0, r6) >= 0 && Keep(first, false)) MarkLoose(first);
+            }
         }
     }
 
@@ -594,82 +603,100 @@ public partial class MapGenUdon
     void PlanKids()
     {
         int room = pRoom, area = AreaM2(room);
-        uint[] r = SR(1);
-        int bedDef = Pick(r, "k_bedSingle", 6, "q_bed", 4);
-        int first0 = nEmit;
-        int bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_NEVER, EF_MANDATORY, r);
-        if (bed < 0) bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, r);
-        if (bed >= 0 && !Keep(first0, true)) bed = -1;
-        if (bed < 0) MandFail(1);
-        uint[] r2 = SR(2);
-        if (bed >= 0)
+        if (Ph(0))
         {
-            // a second bed beside the first, a bedside table between them
-            int bs = Dn("k_bedside");
-            int side = RngChance(r2, 500) ? 1 : -1;
-            bool two = false;
-            if (RngChance(r2, 550) && Fit(2))
-                for (int k = 0; k < 2 && !two; k++)
-                {
-                    int s = k == 0 ? side : -side, first = nEmit;
-                    if (Rel(bedDef, bed, s * (Sx(bedDef) + Sx(bs) + 120), 0, 0, 0) >= 0)
+            uint[] r = SR(1);
+            int bedDef = Pick(r, "k_bedSingle", 6, "q_bed", 4);
+            int first0 = nEmit;
+            int bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_NEVER, EF_MANDATORY, r);
+            if (bed < 0) bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, r);
+            if (bed >= 0 && !Keep(first0, true)) bed = -1;
+            if (bed < 0) MandFail(1);
+            uint[] r2 = SR(2);
+            if (bed >= 0)
+            {
+                // a second bed beside the first, a bedside table between them
+                int bs = Dn("k_bedside");
+                int side = RngChance(r2, 500) ? 1 : -1;
+                bool two = false;
+                if (RngChance(r2, 550) && Fit(2))
+                    for (int k = 0; k < 2 && !two; k++)
                     {
-                        Rel(bs, bed, s * (Sx(bedDef) / 2 + 60 + Sx(bs) / 2), -(Sz(bedDef) - Sz(bs)) / 2, 0, 0);
-                        if (Keep(first, false)) two = true;
+                        int s = k == 0 ? side : -side, first = nEmit;
+                        if (Rel(bedDef, bed, s * (Sx(bedDef) + Sx(bs) + 120), 0, 0, 0) >= 0)
+                        {
+                            Rel(bs, bed, s * (Sx(bedDef) / 2 + 60 + Sx(bs) / 2), -(Sz(bedDef) - Sz(bs)) / 2, 0, 0);
+                            if (Keep(first, false)) two = true;
+                        }
                     }
+                if (!two && Fit(1))
+                {
+                    int first = nEmit;
+                    if (RelBeside(bs, bed, 0, 50, 0, r2) >= 0) Keep(first, false);
                 }
-            if (!two && Fit(1))
+            }
+            // the play rug in the open middle with a clump of toys on it
+        }
+        if (Ph(1))
+        {
+            uint[] r3 = SR(3);
+            if (Fit(3))
+            {
+                int cell = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, r3);
+                if (cell >= 0)
+                {
+                    int rug = FreePlace(Dn("k_rug"), cell, 0, 0, 0, H_FREE);
+                    int first = nEmit;
+                    fHost = rug >= 0 ? rug : H_FREE;
+                    bool ok = GroupAt(FindGrp("toys"), GenData.A_ANY, RngBetween(r3, 2, 3), WM_NEAR, cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, 0, r3);
+                    fHost = H_NONE;
+                    if (ok) Keep(first, false);
+                }
+            }
+        }
+        if (Ph(2))
+        {
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 800) && Fit(1))
             {
                 int first = nEmit;
-                if (RelBeside(bs, bed, 0, 50, 0, r2) >= 0) Keep(first, false);
+                if (WallPlace(Dn("k_bookcaseLow"), WM_CENTRE, 0, 0, WIN_AVOID, 0, r4) >= 0) Keep(first, false);
             }
         }
-        // the play rug in the open middle with a clump of toys on it
-        uint[] r3 = SR(3);
-        if (Fit(3))
+        if (Ph(3))
         {
-            int cell = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, r3);
-            if (cell >= 0)
+            uint[] r5 = SR(5);
+            if (RngChance(r5, 650) && Fit(1))
             {
-                int rug = FreePlace(Dn("k_rug"), cell, 0, 0, 0, H_FREE);
                 int first = nEmit;
-                fHost = rug >= 0 ? rug : H_FREE;
-                bool ok = GroupAt(FindGrp("toys"), GenData.A_ANY, RngBetween(r3, 2, 3), WM_NEAR, cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, 0, r3);
-                fHost = H_NONE;
-                if (ok) Keep(first, false);
+                if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, r5) >= 0) Keep(first, false);
             }
         }
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 800) && Fit(1))
+        if (Ph(4))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("k_bookcaseLow"), WM_CENTRE, 0, 0, WIN_AVOID, 0, r4) >= 0) Keep(first, false);
-        }
-        uint[] r5 = SR(5);
-        if (RngChance(r5, 650) && Fit(1))
-        {
-            int first = nEmit;
-            if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, r5) >= 0) Keep(first, false);
-        }
-        uint[] r6 = SR(6);
-        if (RngChance(r6, 450) && Fit(2))
-        {
-            int first = nEmit;
-            if (WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, 0, r6) >= 0) Keep(first, false);
-        }
-        // the toy box in a corner, a toy or two beside it
-        uint[] r7 = SR(7);
-        if (RngChance(r7, 600) && Fit(2))
-        {
-            int first = nEmit;
-            int box = CornerPlace(Pick(r7, "k_boxOpen", 6, "s_chest", 4), WM_ANY, 0, 0, false, 0, r7);
-            if (box >= 0 && Keep(first, false) && Fit(2) && RngChance(r7, 600))
+            uint[] r6 = SR(6);
+            if (RngChance(r6, 450) && Fit(2))
             {
-                first = nEmit;
-                if (GroupBeside(FindGrp("toys"), box, 2, 0, r7)) Keep(first, false);
+                int first = nEmit;
+                if (WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, 0, r6) >= 0) Keep(first, false);
             }
+            // the toy box in a corner, a toy or two beside it
         }
-        Extras(20, 500, "ck_lampFloor", "wq_cabinetSmall", "ck_plant");
+        if (Ph(5))
+        {
+            uint[] r7 = SR(7);
+            if (RngChance(r7, 600) && Fit(2))
+            {
+                int first = nEmit;
+                int box = CornerPlace(Pick(r7, "k_boxOpen", 6, "s_chest", 4), WM_ANY, 0, 0, false, 0, r7);
+                if (box >= 0 && Keep(first, false) && Fit(2) && RngChance(r7, 600))
+                {
+                    first = nEmit;
+                    if (GroupBeside(FindGrp("toys"), box, 2, 0, r7)) Keep(first, false);
+                }
+            }
+            Extras(20, 500, "ck_lampFloor", "wq_cabinetSmall", "ck_plant");
+        }
     }
 
     // ============================================================================================ OFFICE

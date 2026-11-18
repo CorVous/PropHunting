@@ -274,20 +274,26 @@ public partial class MapGenUdon
     void PlanBunkRoom()
     {
         int room = pRoom;
-        uint[] r = SR(1);
-        int first = nEmit;
-        int bunk = WallPlace(Dn("k_bedBunk"), WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, r);
-        if (bunk < 0 || !Keep(first, true)) { bunk = -1; MandFail(1); }
-        if (bunk >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn("k_bedsideDrawer"), bunk, 0, 50, 0, r) >= 0) Keep(first, false); }
-        uint[] r2 = SR(2);
-        if (Fit(1)) { first = nEmit; if (WallPlace(Dn(RngChance(r2, 600) ? "k_bedBunk" : "n_cot"), WM_FAR, bunk >= 0 ? emitX[bunk] : 0, bunk >= 0 ? emitZ[bunk] : 0, WIN_AVOID, 0, r2) >= 0) Keep(first, false); }
-        FillFromPool(50, new string[] { "s_chest", "dg_trunkL", "dg_trunkM", "s_bedrollPacked", "k_coatRack", "gen_wardrobe", "k_lampSquare", "hk_sledLong", "n_paddle",
-            "k_bookcaseClosed", "hk_benchShort" });
-        uint[] r3 = SR(3);
-        if (RngChance(r3, 500))
+        if (Ph(0))
         {
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r3);
-            if (cell >= 0) FreePlace(Dn("k_rug"), cell, 0, 0, 0, H_FREE);
+            uint[] r = SR(1);
+            int first = nEmit;
+            int bunk = WallPlace(Dn("k_bedBunk"), WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, r);
+            if (bunk < 0 || !Keep(first, true)) { bunk = -1; MandFail(1); }
+            if (bunk >= 0 && Fit(1)) { first = nEmit; if (RelBeside(Dn("k_bedsideDrawer"), bunk, 0, 50, 0, r) >= 0) Keep(first, false); }
+            uint[] r2 = SR(2);
+            if (Fit(1)) { first = nEmit; if (WallPlace(Dn(RngChance(r2, 600) ? "k_bedBunk" : "n_cot"), WM_FAR, bunk >= 0 ? emitX[bunk] : 0, bunk >= 0 ? emitZ[bunk] : 0, WIN_AVOID, 0, r2) >= 0) Keep(first, false); }
+            FillFromPool(50, new string[] { "s_chest", "dg_trunkL", "dg_trunkM", "s_bedrollPacked", "k_coatRack", "gen_wardrobe", "k_lampSquare", "hk_sledLong", "n_paddle",
+                "k_bookcaseClosed", "hk_benchShort" });
+        }
+        if (Ph(1))
+        {
+            uint[] r3 = SR(3);
+            if (RngChance(r3, 500))
+            {
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r3);
+                if (cell >= 0) FreePlace(Dn("k_rug"), cell, 0, 0, 0, H_FREE);
+            }
         }
     }
 
@@ -345,29 +351,39 @@ public partial class MapGenUdon
     void PlanCampsite()
     {
         int room = pRoom;
+        string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
+        // a part a step (Cor: build freezes): the fire and what is round it, each tent, each of the pool
         if (Ph(0))
         {
             uint[] r = SR(1);
             FindGates(room);   // AroundFire keeps the tents off the lines from the gates to the fire
-            int fire = FireRing(6, RoomMidX(room), RoomMidZ(room), false, r);
-            FireSeats(fire, false, 7);
+            planA = FireRing(6, RoomMidX(room), RoomMidZ(room), false, r);
+        }
+        if (Ph(1)) FireSeats(planA, false, 7);
+        if (Ph(2))
+        {
+            int fire = planA;
             if (fire >= 0)
             {
                 uint[] r2 = SR(2);
                 if (RngChance(r2, 850)) WoodPile(fire, true, r2);
                 uint[] r3 = SR(3);
                 if (Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r3, 500) ? "s_spit" : "s_fishStand"), fire, RngChance(r3, 500) ? 1 : -1, 200, 0, r3) >= 0) Keep(first, false); }
-                uint[] r4 = SR(4);
-                string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
-                int t0 = RngRange(r4, tents.Length);
-                for (int k = 0; k < 1 + AreaM2(room) / 24 && Fit(1); k++)
-                {
-                    int tent = AroundFire(Dn(tents[(t0 + k) % tents.Length]), fire, 180, 1800, 3400, 0, false, true, r4);
-                    if (tent >= 0 && Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r4, 500) ? "s_bedroll" : "s_bedrollFrame"), tent, RngChance(r4, 500) ? 1 : -1, 80, 0, r4) >= 0) Keep(first, false); }
-                }
+                planR = SR(4);
+                planB = RngRange(planR, tents.Length);
             }
         }
-        // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" })) && !PoolStep(50, new string[] { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" })) PhBreak();
-}
+        if (PhLoop(3, planA >= 0 ? 1 + AreaM2(room) / 24 : 0))
+        {
+            if (!Fit(1)) PhBreak();
+            else
+            {
+                int k = planIter;
+                int tent = AroundFire(Dn(tents[(planB + k) % tents.Length]), planA, 180, 1800, 3400, 0, false, true, planR);
+                if (tent >= 0 && Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(planR, 500) ? "s_bedroll" : "s_bedrollFrame"), tent, RngChance(planR, 500) ? 1 : -1, 80, 0, planR) >= 0) Keep(first, false); }
+            }
+        }
+        string[] pool = { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" };
+        if (PhLoop(4, pool.Length) && !PoolStep(50, pool)) PhBreak();
+    }
 }

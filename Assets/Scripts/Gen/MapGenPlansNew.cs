@@ -760,8 +760,14 @@ public partial class MapGen
                 int first = nEmit;
                 if (best >= 0 && FreePlace(Dn("f_lamp"), best, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
             }
-            int trees = TreeCount(room, ref r);
-            for (int t = 0; t < trees; t++) LawnTree(60 + t);
+            planR = r; planHX = fx; planHZ = fz;
+        }
+        // a part a step (Cor: build freezes): the fountain, the path and its lamps; the trees one a step; the rest
+        if (Ph(1)) planN = TreeCount(room, ref planR);
+        if (PhLoop(2, planN)) LawnTree(60 + planIter);
+        if (Ph(3))
+        {
+            int fx = planHX, fz = planHZ;
             GenRng r4 = SR(4);
             if (r4.Chance(500) && Fit(1))
             {
@@ -836,7 +842,7 @@ public partial class MapGen
             Borders(30, 6, true);
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "ck_bench", "k_benchCushion", "n_planter", "ck_trash", "f_lamp", "n_bushDetailed", "n_bushLarge", "f_hedge", "ck_flowers", "n_statueBlock",
+        if (PhLoop(4, PoolLen(new string[] { "ck_bench", "k_benchCushion", "n_planter", "ck_trash", "f_lamp", "n_bushDetailed", "n_bushLarge", "f_hedge", "ck_flowers", "n_statueBlock",
             "n_obelisk", "n_column", "ck_info", "r_tableRound", "f_hedgeCurve", "hk_bench", "hk_lantern", "n_statueRing", "n_columnBroken" })) && !PoolStep(50, new string[] { "ck_bench", "k_benchCushion", "n_planter", "ck_trash", "f_lamp", "n_bushDetailed", "n_bushLarge", "f_hedge", "ck_flowers", "n_statueBlock",
             "n_obelisk", "n_column", "ck_info", "r_tableRound", "f_hedgeCurve", "hk_bench", "hk_lantern", "n_statueRing", "n_columnBroken" })) PhBreak();
 }

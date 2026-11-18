@@ -148,7 +148,7 @@ public partial class MapGen
         seed = seedValue; size = sizeBucket;
         density = densityIndex < 0 || densityIndex >= GenData.DensityPercent.Length ? 0 : densityIndex;
         attempt = 0; done = false; failed = false; failReason = "";
-        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0;
+        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; ftmK = -1;
         Alloc(GenData.SizeGrid[size], GenData.SizeGrid[size]);
         menu = new bool[GenData.nDefs]; defCopies = new int[GenData.nDefs];
         int roll = Rng(ST_SCENERY, 9, 9).Range(1000);
@@ -258,7 +258,7 @@ public partial class MapGen
             failReason = "no valid map after 12 attempts (" + why + ")";
             return;
         }
-        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0;
+        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; ftmK = -1;
     }
 
     // The layout stages draw from their own version, so the buildings of a seed survive a change of the prop

@@ -10,6 +10,7 @@ public partial class MapGenUdon
     // for the bench and the progress display
     public int CurrentStage() { return stage; }
     public int CurrentCursor() { return cursor; }
+    public int CurrentPhase() { return popPhase * 100 + planPhase; }   // profiling: the room's furnishing step
 
     string RoomName(int r) { return "room type " + r; }
 

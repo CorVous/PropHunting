@@ -626,7 +626,7 @@ public partial class MapGenUdon
         if (popPhase == 10) { if (PlanStep(room)) popPhase = 1; return false; }
         if (popPhase == 1) { popPhase = 2; if (holiday != 0) HolidayDecor(); return false; }
         if (popPhase == 2) { popPhase = 3; if (mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE) ThemeDecor(); return false; }
-        if (popPhase == 3) { popPhase = 4; if (roomFloorMin[room] > 0) FillToMinimum(); return false; }
+        if (popPhase == 3) { if (roomFloorMin[room] <= 0 || FillToMinimumStep()) { popPhase = 4; ftmK = -1; } return false; }
         if (popPhase == 4)
         {
             // what sits on, in and under the furniture, thinned evenly to the room's cap

@@ -154,7 +154,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         seed = seedValue; size = sizeBucket;
         density = densityIndex < 0 || densityIndex >= DensityPercent.Length ? 0 : densityIndex;
         attempt = 0; done = false; failed = false; failReason = "";
-        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0;
+        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; ftmK = -1;
         Alloc(SizeGrid[size], SizeGrid[size]);
         menu = new bool[nDefs]; defCopies = new int[nDefs];
         int roll = RngRange(Rng(ST_SCENERY, 9, 9), 1000);
@@ -264,7 +264,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
             failReason = "no valid map after 12 attempts (" + why + ")";
             return;
         }
-        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0;
+        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; ftmK = -1;
     }
 
     // The layout stages draw from their own version, so the buildings of a seed survive a change of the prop
