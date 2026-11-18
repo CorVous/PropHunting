@@ -679,6 +679,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         emitDef = gen.emitDef; emitX = gen.emitX; emitY = gen.emitY; emitZ = gen.emitZ; emitYaw = gen.emitYaw; emitParent = gen.emitParent;
         defFlags = gen.defFlags; zoneWallMm = gen.ZoneWallMm; groundKind = gen.ground;
         LevelOffsets();
+        IndoorMap();
         objects = new GameObject[gen.nEmit];
         lightPos = new Vector3[64]; lightKind = new int[64]; lightFollow = new Transform[64]; nLights = 0;
         glow = new Color32(255, 240, 196, 0);   // alpha 0: PropHunt/Lit draws it glowing
@@ -703,8 +704,38 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (m != null) Destroy(m);
     }
 
+    // The buildings' footprints for the shader (PropLit: a dimmer, warmer light indoors, Cor): one texel a cell of
+    // the site, its red the height of the building's top there in steps of 5 cm (0: no building).
+    public Texture2D indoorTex;
+    Color32[] indoorPix;
+    int indoorId, indoorAreaId;
+
+    void IndoorMap()
+    {
+        if (indoorTex == null) return;
+        if (indoorId == 0) { indoorId = VRC.SDKBase.VRCShader.PropertyToID("_UdonPHIndoor"); indoorAreaId = VRC.SDKBase.VRCShader.PropertyToID("_UdonPHIndoorArea"); }
+        int tw = indoorTex.width, th = indoorTex.height;
+        indoorPix = new Color32[tw * th];
+        for (int c = 0; c < W * H; c++)
+        {
+            int zone = cellZone[c];
+            if (!IsBuilding(zone)) continue;
+            Vector3 o = CellOff(c);
+            int sx = (c % W) + Mathf.RoundToInt(o.x / CELL), sz = (c / W) + Mathf.RoundToInt(o.z / CELL);
+            if (sx < 0 || sz < 0 || sx >= tw || sz >= th) continue;
+            int top = Mathf.Clamp(Mathf.RoundToInt((o.y + LevelHeight(zone)) * 20f), 1, 255);
+            int k = sz * tw + sx;
+            if (top > indoorPix[k].r) indoorPix[k] = new Color32((byte)top, 0, 0, 255);
+        }
+        indoorTex.SetPixels32(indoorPix);
+        indoorTex.Apply(false);
+        VRC.SDKBase.VRCShader.SetGlobalTexture(indoorId, indoorTex);
+        VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, new Vector4(1f / (tw * CELL), 1f / (th * CELL), 1f, 0f));
+    }
+
     public void Clear()
     {
+        if (indoorAreaId != 0) VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, Vector4.zero);
         if (objects != null)
             for (int i = 0; i < objects.Length; i++) if (objects[i] != null) Destroy(objects[i]);
         objects = null;

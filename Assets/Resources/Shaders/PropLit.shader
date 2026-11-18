@@ -37,6 +37,11 @@ Shader "PropHunt/Lit"
                 UNITY_DEFINE_INSTANCED_PROP(fixed4, _Color)
             UNITY_INSTANCING_BUFFER_END(Props)
 
+            // Indoors (Cor: a separate, dimmer indoor light): MapBuilderUdon draws the buildings' footprints into a small
+            // texture, one texel a cell, its red the height of the building's top in steps of 5 cm. Under a roof the
+            // sky's ambient is dimmer and warmer and the lamps count for more.
+            sampler2D _UdonPHIndoor;
+            float4 _UdonPHIndoorArea;   // x, y: 1 / the texture's size in metres; z: 1 while a map is up
             float _UdonPHSunSpot;   // 1 once the spot sun's shadows are baked (PHSun)
             float4 _UdonPHSunArea;
             float _Toon;
@@ -74,7 +79,7 @@ Shader "PropHunt/Lit"
                 float3 worldPos : TEXCOORD3;
                 half3 normal : TEXCOORD4;
                 UNITY_FOG_COORDS(5)
-                half emit : TEXCOORD6;       // 1 for a lamp's bulb (vertex alpha 0): drawn at full brightness
+                half2 emit : TEXCOORD6;      // x: 1 for a lamp's bulb (vertex alpha 0): drawn at full brightness; y: 1 indoors
             };
 
             v2f vert (appdata v)
@@ -104,11 +109,23 @@ Shader "PropHunt/Lit"
                 // what it stands on. In the mesh's own space: a prop's base, a wall's foot.
                 albedo *= lerp(0.74, 1.0, saturate(v.vertex.y * 2.2 + max(n.y, 0.0) * 2.0));
                 o.albedo = albedo;
-                o.emit = 1 - v.color.a;
-                // the wrap part of the base sun (the 0.2) stays as fill when the spot sun takes over the direct part
-                o.ambient = albedo * (amb + _LightColor0.rgb * (d * 0.5 + 0.5) * 0.2);
-                o.sun = albedo * _LightColor0.rgb * max(0, d) * 0.8;
                 o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+                float indoor = 0.0;
+                if (_UdonPHIndoorArea.z > 0.5)
+                {
+                    float2 uv = o.worldPos.xz * _UdonPHIndoorArea.xy;
+                    if (uv.x > 0.0 && uv.y > 0.0 && uv.x < 1.0 && uv.y < 1.0)
+                    {
+                        float top = tex2Dlod(_UdonPHIndoor, float4(uv, 0, 0)).r * 12.75;
+                        indoor = step(0.02, top) * step(o.worldPos.y, top - 0.02);
+                    }
+                }
+                o.emit = half2(1 - v.color.a, indoor);
+                // indoors the sky reaches less far and what there is has bounced off walls and floors: dimmer, warmer
+                amb *= lerp(float3(1.0, 1.0, 1.0), float3(0.66, 0.60, 0.54), indoor);
+                // the wrap part of the base sun (the 0.2) stays as fill when the spot sun takes over the direct part
+                o.ambient = albedo * (amb + _LightColor0.rgb * (d * 0.5 + 0.5) * 0.2 * (1.0 - 0.6 * indoor));
+                o.sun = albedo * _LightColor0.rgb * max(0, d) * 0.8;
                 o.normal = n;
                 UNITY_TRANSFER_FOG(o, o.pos);
                 return o;
@@ -163,7 +180,7 @@ Shader "PropHunt/Lit"
                     spot *= i.albedo;
                     // the lamps stay out of the toon bands: summed pools would cut each other into rings. Soft light,
                     // never blown out next to a lamp (a hot spot reads as shine)
-                    lamps = min(i.albedo * lamps, i.albedo * 1.3);
+                    lamps = min(i.albedo * lamps * (1.0 + 0.3 * i.emit.y), i.albedo * 1.3);   // indoors the lamps do more of the work
                 }
                 if (lvOn && InBakedVolume(i.worldPos))
                 {
@@ -180,7 +197,7 @@ Shader "PropHunt/Lit"
                     c = i.ambient + Toon(lerp(spot, i.sun, smoothstep(0.5, 10.0, r)), i.albedo) + lamps;   // the base sun from 10 m past the fence, feathered (review 2)
                 }
                 else c = i.ambient + Toon(i.sun, i.albedo) + lamps;   // before the spot is baked: the base sun, the lamps on top
-                c = lerp(c, i.albedo * 1.4, i.emit);
+                c = lerp(c, i.albedo * 1.4, i.emit.x);
                 if (_Hover > 0.5)
                 {
                     float rim = 1.0 - saturate(dot(n, normalize(_WorldSpaceCameraPos - i.worldPos)));

@@ -229,7 +229,7 @@ public partial class MapGen
         return true;
     }
 
-    int StairScore(int c, int side)
+    int StairScore(int c, int side, int run)
     {
         int r = cellRoom[c], rt = roomType[r], s = 0;
         if (rt == GenData.R_HALL || rt == GenData.R_LIVING || rt == GenData.R_STORAGE) s += 30;
@@ -237,6 +237,10 @@ public partial class MapGen
         if (rt == GenData.R_BATH || rt == GenData.R_PANTRY) s -= 40;
         if (rt == GenData.R_KITCHEN || rt == GenData.R_DINER_KITCHEN) s -= 10;
         if (EdgeType(c % W, c / W, side) != GenData.E_NONE) s += 10;   // against a wall
+        // the foot of the stair: open floor before the first step. With a wall there the way onto the stair was the
+        // 0.4 m between that wall and the first step (Cor: such a tiny gap between the wall corner and the stair)
+        int foot = EdgeType(c % W, c / W, (run + 2) & 3);
+        if (foot == GenData.E_NONE) s += 60; else if (foot != GenData.E_DOOR) s -= 40;
         return s;
     }
 
@@ -265,7 +269,7 @@ public partial class MapGen
                     {
                         int side = (run + 1 + 2 * t) & 3;
                         if (!StairFits(c, run, side) || !StairFits(ch, run, side)) continue;
-                        int score = StairScore(c, side) + StairScore(ch, side) + rng.Range(10);
+                        int score = StairScore(c, side, run) + StairScore(ch, side, run) + rng.Range(10);
                         if (score > best) { best = score; bc = c; brun = run; bside = side; }
                     }
             }

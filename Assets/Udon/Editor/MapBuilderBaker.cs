@@ -21,6 +21,16 @@ public static class MapBuilderBaker
         }
         root = builder.gameObject;
         builder.gen = root.GetComponent<MapGenUdon>();
+        // the buildings' footprints for the shader (MapBuilderUdon.IndoorMap): written at runtime
+        const string indoorPath = "Assets/Udon/Generated/Indoor.asset";
+        var indoor = AssetDatabase.LoadAssetAtPath<Texture2D>(indoorPath);
+        if (indoor == null)
+        {
+            indoor = new Texture2D(64, 64, TextureFormat.RGBA32, false, true) { name = "Indoor", filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+            indoor.SetPixels32(new Color32[64 * 64]); indoor.Apply(false);
+            AssetDatabase.CreateAsset(indoor, indoorPath);
+        }
+        builder.indoorTex = indoor;
         if (builder.gen == null) builder.gen = Object.FindObjectOfType<MapGenUdon>(true);
         if (builder.gen == null) { builder.gen = root.AddUdonSharpComponent<MapGenUdon>(); MapGenTableBaker.Bake(); }
 

@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 22;   // 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 23;   // 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
