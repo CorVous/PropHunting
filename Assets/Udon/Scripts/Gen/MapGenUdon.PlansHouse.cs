@@ -19,7 +19,8 @@ public partial class MapGenUdon
     // CornerBed in phases, a step a call (autophase4); CornerBed() above runs them to the end
     void CornerBed_Body()
     {
-        if (Ph(0))
+        planMax = 4;
+        if (planPhase == 0)
         {
             int bedDef = hq_CornerBed_bedDef;
             uint[] r = hq_CornerBed_r;
@@ -31,28 +32,51 @@ public partial class MapGenUdon
             hq_CornerBed_first = first;
             hq_CornerBed_bed = bed;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int first = hq_CornerBed_first;
             int bed = hq_CornerBed_bed;
-            if (bed >= 0 && !Keep(first, true)) bed = -1;
+            if (bed >= 0 && !Keep(first, true))
+            {
+                bed = -1;
+            }
             if (bed < 0) { MandFail(1); { hq_CornerBed_ret = -1; hq_CornerBed_first = first; hq_CornerBed_bed = bed; PhEnd(); return; } }
+            hq_CornerBed_sel1 = 0;
+            if (Fit(1)) hq_CornerBed_sel1 = 1;
             hq_CornerBed_first = first;
             hq_CornerBed_bed = bed;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
-            uint[] r = hq_CornerBed_r;
-            int first = hq_CornerBed_first;
-            int bed = hq_CornerBed_bed;
-            if (Fit(1))
+            if (hq_CornerBed_sel1 == 1)
             {
+                uint[] r = hq_CornerBed_r;
+                int first = hq_CornerBed_first;
+                int bed = hq_CornerBed_bed;
                 first = nEmit;
-                if (RelBeside(Dn("k_bedside"), bed, 0, 50, 0, r) >= 0) Keep(first, false);
+                hq_CornerBed_sel2 = 0;
+                if (RelBeside(Dn("k_bedside"), bed, 0, 50, 0, r) >= 0) hq_CornerBed_sel2 = 1;
+                hq_CornerBed_r = r;
+                hq_CornerBed_first = first;
+                hq_CornerBed_bed = bed;
             }
-            { hq_CornerBed_ret = bed; hq_CornerBed_r = r; hq_CornerBed_first = first; hq_CornerBed_bed = bed; PhEnd(); return; }
-            hq_CornerBed_r = r;
-            hq_CornerBed_first = first;
+        }
+        if (planPhase == 3 && PhLoop(3, 100000))
+        {
+            if (!(hq_CornerBed_sel1 == 1 && hq_CornerBed_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_CornerBed_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_CornerBed_first = first;
+            }
+        }
+        if (planPhase == 4)
+        {
+            int bed = hq_CornerBed_bed;
+            { hq_CornerBed_ret = bed; hq_CornerBed_bed = bed; PhEnd(); return; }
             hq_CornerBed_bed = bed;
         }
     }
@@ -63,13 +87,14 @@ public partial class MapGenUdon
     // left lying: comics, skates, a skateboard and its helmet, balls; an armchair or a lounge chair with the TV.
     void PlanTeen()
     {
+        planMax = 21;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             uint[] r = SR(1);
             hq_PlanTeen_r = r;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             uint[] r = hq_PlanTeen_r;
             if (planIter == 0) { hq_CornerBed_bedDef = Pick(r, "k_bedSingle", 6, "q_bed", 4); hq_CornerBed_r = r; PhSubReset(); }
@@ -77,30 +102,52 @@ public partial class MapGenUdon
             if (fin) { r = hq_CornerBed_r; hp_PlanTeen_bed = hq_CornerBed_ret; PhBreak(); }
             hq_PlanTeen_r = r;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             hp_PlanTeen_bx = hp_PlanTeen_bed >= 0 ? emitX[hp_PlanTeen_bed] : RoomMidX(room);
             hp_PlanTeen_bz = hp_PlanTeen_bed >= 0 ? emitZ[hp_PlanTeen_bed] : RoomMidZ(room);
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             uint[] r2 = SR(2);
-            if (Fit(2))
-            {
-                int first = nEmit;
-                if (WallPlace(Dn("k_desk"), WM_FAR, hp_PlanTeen_bx, hp_PlanTeen_bz, WIN_PREFER, 0, r2) >= 0) Keep(first, false);
-            }
-        }
-        if (Ph(4))
-        {
-            uint[] r3 = SR(3);
             hq_PlanTeen_sel1 = 0;
-            if (RngChance(r3, 800) && Fit(1)) hq_PlanTeen_sel1 = 1;
-            hq_PlanTeen_r3 = r3;
+            if (Fit(2)) hq_PlanTeen_sel1 = 1;
+            hq_PlanTeen_r2 = r2;
         }
-        if (Ph(5))
+        if (planPhase == 4)
         {
             if (hq_PlanTeen_sel1 == 1)
+            {
+                uint[] r2 = hq_PlanTeen_r2;
+                int first = nEmit;
+                hq_PlanTeen_sel2 = 0;
+                if (WallPlace(Dn("k_desk"), WM_FAR, hp_PlanTeen_bx, hp_PlanTeen_bz, WIN_PREFER, 0, r2) >= 0) hq_PlanTeen_sel2 = 1;
+                hq_PlanTeen_r2 = r2;
+                hq_PlanTeen_first = first;
+            }
+        }
+        if (planPhase == 5 && PhLoop(5, 100000))
+        {
+            if (!(hq_PlanTeen_sel1 == 1 && hq_PlanTeen_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanTeen_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanTeen_first = first;
+            }
+        }
+        if (planPhase == 6)
+        {
+            uint[] r3 = SR(3);
+            hq_PlanTeen_sel3 = 0;
+            if (RngChance(r3, 800) && Fit(1)) hq_PlanTeen_sel3 = 1;
+            hq_PlanTeen_r3 = r3;
+        }
+        if (planPhase == 7)
+        {
+            if (hq_PlanTeen_sel3 == 1)
             {
                 uint[] r3 = hq_PlanTeen_r3;
                 int first = nEmit;
@@ -110,9 +157,9 @@ public partial class MapGenUdon
                 hq_PlanTeen_g = g;
             }
         }
-        if (Ph(6))
+        if (planPhase == 8)
         {
-            if (hq_PlanTeen_sel1 == 1)
+            if (hq_PlanTeen_sel3 == 1)
             {
                 uint[] r3 = hq_PlanTeen_r3;
                 int first = hq_PlanTeen_first;
@@ -123,12 +170,12 @@ public partial class MapGenUdon
                 hq_PlanTeen_g = g;
             }
         }
-        if (Ph(7))
+        if (planPhase == 9)
         {
             uint[] r4 = SR(4);
             if (RngChance(r4, 750) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("comics"), room, GenData.A_WALL, RngBetween(r4, 2, 3), 0, r4)) Keep(first, false); }
         }
-        if (Ph(8))
+        if (planPhase == 10)
         {
             uint[] r5 = SR(5);
             if (RngChance(r5, 650) && LooseFit(2))
@@ -138,16 +185,16 @@ public partial class MapGenUdon
                 if (FormAt(GenData.GL_ROW, 120, GenData.A_WALL, WM_ANY, 0, 0, 0, r5) >= 0 && Keep(first, false)) MarkLoose(first);
             }
         }
-        if (Ph(9))
+        if (planPhase == 11)
         {
             uint[] r6 = SR(6);
-            hq_PlanTeen_sel2 = 0;
-            if (RngChance(r6, 600) && Fit(1)) hq_PlanTeen_sel2 = 1;
+            hq_PlanTeen_sel4 = 0;
+            if (RngChance(r6, 600) && Fit(1)) hq_PlanTeen_sel4 = 1;
             hq_PlanTeen_r6 = r6;
         }
-        if (Ph(10))
+        if (planPhase == 12)
         {
-            if (hq_PlanTeen_sel2 == 1)
+            if (hq_PlanTeen_sel4 == 1)
             {
                 uint[] r6 = hq_PlanTeen_r6;
                 int first = nEmit;
@@ -157,9 +204,9 @@ public partial class MapGenUdon
                 hq_PlanTeen_seat = seat;
             }
         }
-        if (Ph(11))
+        if (planPhase == 13)
         {
-            if (hq_PlanTeen_sel2 == 1)
+            if (hq_PlanTeen_sel4 == 1)
             {
                 uint[] r6 = hq_PlanTeen_r6;
                 int first = hq_PlanTeen_first;
@@ -170,41 +217,45 @@ public partial class MapGenUdon
                 hq_PlanTeen_seat = seat;
             }
         }
-        if (Ph(12))
+        if (planPhase == 14)
         {
             uint[] r7 = SR(7);
             if (RngChance(r7, 650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, r7) >= 0) Keep(first, false); }
         }
-        if (Ph(13))
+        if (planPhase == 15)
         {
             uint[] r8 = SR(8);
             if (RngChance(r8, 500) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("balls"), room, GenData.A_WALL, 2, 0, r8)) Keep(first, false); }
         }
-        if (Ph(14))
+        if (planPhase == 16)
         {
             uint[] r9 = SR(9);
             if (RngChance(r9, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_bookcaseLow"), WM_ANY, 0, 0, WIN_AVOID, 0, r9) >= 0) Keep(first, false); }
         }
-        if (Ph(15))
+        if (planPhase == 17)
         {
             uint[] r10 = SR(10);
-            hq_PlanTeen_sel3 = 0;
-            if (RngChance(r10, 550) && Fit(1)) hq_PlanTeen_sel3 = 1;
+            hq_PlanTeen_sel5 = 0;
+            if (RngChance(r10, 550) && Fit(1)) hq_PlanTeen_sel5 = 1;
             hq_PlanTeen_r10 = r10;
         }
-        if (Ph(16))
+        if (planPhase == 18 && PhLoop(18, 100000))
         {
-            if (hq_PlanTeen_sel3 == 1)
+            if (!(hq_PlanTeen_sel5 == 1)) PhBreak();
+            else
             {
                 uint[] r10 = hq_PlanTeen_r10;
-                int cell = OpenSpot(2, WM_NEAR, hp_PlanTeen_bx, hp_PlanTeen_bz, 0, r10);
+                int cell = 0;
+                if (planIter == 0) { hq_OpenSpot_minClr = 2; hq_OpenSpot_mode = WM_NEAR; hq_OpenSpot_tx = hp_PlanTeen_bx; hq_OpenSpot_tz = hp_PlanTeen_bz; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r10; PhSubReset(); }
+                PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r10 = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
                 hq_PlanTeen_r10 = r10;
                 hq_PlanTeen_cell = cell;
             }
         }
-        if (Ph(17))
+        if (planPhase == 19)
         {
-            if (hq_PlanTeen_sel3 == 1)
+            if (hq_PlanTeen_sel5 == 1)
             {
                 uint[] r10 = hq_PlanTeen_r10;
                 int cell = hq_PlanTeen_cell;
@@ -213,7 +264,7 @@ public partial class MapGenUdon
                 hq_PlanTeen_cell = cell;
             }
         }
-        if (Ph(18))
+        if (planPhase == 20)
         {
             if (hp_PlanTeen_bed >= 0)
             {
@@ -221,7 +272,7 @@ public partial class MapGenUdon
                 if (RngChance(r11, 450) && Fit(1)) { int first = nEmit; if (GroupBeside(FindGrp("plush"), hp_PlanTeen_bed, 1, 0, r11)) Keep(first, false); }
             }
         }
-        if (PhLoop(19, 100000))
+        if (planPhase == 21 && PhLoop(21, 100000))
         {
             if (planIter == 0) { hq_Extras_k0 = 20; hq_Extras_chance = 500; hq_Extras_items = new string[] { "ck_lampFloor", "wk_trashcan", "ck_plant" }; PhSubReset(); }
             PhPush(); Extras_Body(); bool fin = PhAdvance(); PhPop();
@@ -235,18 +286,31 @@ public partial class MapGenUdon
     // table; a reading armchair.
     void PlanPlayroom()
     {
+        planMax = 17;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             uint[] r = SR(1);
             int mx = RoomMidX(room), mz = RoomMidZ(room);
-            int cell = OpenSpot(2, WM_NEAR, mx, mz, 0, r);
+            hq_PlanPlayroom_r = r;
+            hq_PlanPlayroom_mx = mx;
+            hq_PlanPlayroom_mz = mz;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            uint[] r = hq_PlanPlayroom_r;
+            int mx = hq_PlanPlayroom_mx;
+            int mz = hq_PlanPlayroom_mz;
+            int cell = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 2; hq_OpenSpot_mode = WM_NEAR; hq_OpenSpot_tx = mx; hq_OpenSpot_tz = mz; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
             hq_PlanPlayroom_r = r;
             hq_PlanPlayroom_mx = mx;
             hq_PlanPlayroom_mz = mz;
             hq_PlanPlayroom_cell = cell;
         }
-        if (Ph(1))
+        if (planPhase == 2)
         {
             uint[] r = hq_PlanPlayroom_r;
             int mx = hq_PlanPlayroom_mx;
@@ -266,7 +330,7 @@ public partial class MapGenUdon
             hq_PlanPlayroom_play = play;
             hq_PlanPlayroom_got = got;
         }
-        if (PhLoop(2, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             string[] play = hq_PlanPlayroom_play;
             if (!PhSubActive())
@@ -284,26 +348,51 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(3))
+        if (planPhase == 4)
         {
-            int cx = hq_PlanPlayroom_cx;
-            int cz = hq_PlanPlayroom_cz;
             int got = hq_PlanPlayroom_got;
             if (got == 0) MandFail(1);
             uint[] r5 = SR(5);
-            if (RngChance(r5, 700) && Fit(2))
+            hq_PlanPlayroom_sel1 = 0;
+            if (RngChance(r5, 700) && Fit(2)) hq_PlanPlayroom_sel1 = 1;
+            hq_PlanPlayroom_got = got;
+            hq_PlanPlayroom_r5 = r5;
+        }
+        if (planPhase == 5)
+        {
+            if (hq_PlanPlayroom_sel1 == 1)
             {
+                int cx = hq_PlanPlayroom_cx;
+                int cz = hq_PlanPlayroom_cz;
+                uint[] r5 = hq_PlanPlayroom_r5;
                 int first = nEmit;
                 FSet(Dn("hb_train"), Dn("hb_tender"));
-                if (FormAt(GenData.GL_ROW, 40, GenData.A_ANY, WM_NEAR, cx, cz, 0, r5) >= 0) Keep(first, false);
+                hq_PlanPlayroom_sel2 = 0;
+                if (FormAt(GenData.GL_ROW, 40, GenData.A_ANY, WM_NEAR, cx, cz, 0, r5) >= 0) hq_PlanPlayroom_sel2 = 1;
+                hq_PlanPlayroom_cx = cx;
+                hq_PlanPlayroom_cz = cz;
+                hq_PlanPlayroom_r5 = r5;
+                hq_PlanPlayroom_first = first;
             }
+        }
+        if (planPhase == 6 && PhLoop(6, 100000))
+        {
+            if (!(hq_PlanPlayroom_sel1 == 1 && hq_PlanPlayroom_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanPlayroom_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanPlayroom_first = first;
+            }
+        }
+        if (planPhase == 7)
+        {
             uint[] r6 = SR(6);
-            hq_PlanPlayroom_cx = cx;
-            hq_PlanPlayroom_cz = cz;
-            hq_PlanPlayroom_got = got;
             hq_PlanPlayroom_r6 = r6;
         }
-        if (PhLoop(4, 100000))
+        if (planPhase == 8 && PhLoop(8, 100000))
         {
             if (!PhSubActive())
             {
@@ -319,16 +408,16 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(5))
+        if (planPhase == 9)
         {
             uint[] r7 = SR(7);
-            hq_PlanPlayroom_sel1 = 0;
-            if (Fit(2)) hq_PlanPlayroom_sel1 = 1;
+            hq_PlanPlayroom_sel4 = 0;
+            if (Fit(2)) hq_PlanPlayroom_sel4 = 1;
             hq_PlanPlayroom_r7 = r7;
         }
-        if (Ph(6))
+        if (planPhase == 10)
         {
-            if (hq_PlanPlayroom_sel1 == 1)
+            if (hq_PlanPlayroom_sel4 == 1)
             {
                 uint[] r7 = hq_PlanPlayroom_r7;
                 int first = nEmit;
@@ -338,9 +427,9 @@ public partial class MapGenUdon
                 hq_PlanPlayroom_box = box;
             }
         }
-        if (Ph(7))
+        if (planPhase == 11)
         {
-            if (hq_PlanPlayroom_sel1 == 1)
+            if (hq_PlanPlayroom_sel4 == 1)
             {
                 uint[] r7 = hq_PlanPlayroom_r7;
                 int first = hq_PlanPlayroom_first;
@@ -351,32 +440,32 @@ public partial class MapGenUdon
                 hq_PlanPlayroom_box = box;
             }
         }
-        if (Ph(8))
+        if (planPhase == 12)
         {
             uint[] r8 = SR(8);
             if (RngChance(r8, 750) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("k_bookcaseLow"), WM_CENTRE, 0, 0, WIN_AVOID, 0, r8) >= 0) Keep(first, false); }
         }
-        if (Ph(9))
+        if (planPhase == 13)
         {
             uint[] r9 = SR(9);
             if (RngChance(r9, 600) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("balls"), room, GenData.A_WALL, 2, 0, r9)) Keep(first, false); }
         }
-        if (Ph(10))
+        if (planPhase == 14)
         {
             uint[] r10 = SR(10);
             if (RngChance(r10, 500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("hb_armchairBlue"), WM_ANY, 0, 0, WIN_PREFER, 0, r10) >= 0) Keep(first, false); }
         }
-        if (Ph(11))
+        if (planPhase == 15)
         {
             uint[] r11 = SR(11);
             if (RngChance(r11, 450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("hb_stool"), WM_ANY, 0, 0, WIN_ANY, 0, r11) >= 0) Keep(first, false); }
         }
-        if (Ph(12))
+        if (planPhase == 16)
         {
             uint[] r12 = SR(12);
             if (RngChance(r12, 400) && LooseFit(1)) { int first = nEmit; if (WallPlace(Dn("mb_skates"), WM_ANY, 0, 0, WIN_ANY, 0, r12) >= 0 && Keep(first, false)) MarkLoose(first); }
         }
-        if (PhLoop(13, 100000))
+        if (planPhase == 17 && PhLoop(17, 100000))
         {
             if (planIter == 0) { hq_Extras_k0 = 20; hq_Extras_chance = 450; hq_Extras_items = new string[] { "ck_lampFloor", "ck_plant", "wq_cabinetSmall" }; PhSubReset(); }
             PhPush(); Extras_Body(); bool fin = PhAdvance(); PhPop();
@@ -386,7 +475,8 @@ public partial class MapGenUdon
     void PlanPlayroom_L1()
     {
         int room = pRoom;
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int carpet = hq_PlanPlayroom_carpet;
             int cx = hq_PlanPlayroom_cx;
@@ -406,12 +496,15 @@ public partial class MapGenUdon
             hq_PlanPlayroom_first = first;
             hq_PlanPlayroom_ok = ok;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int got = hq_PlanPlayroom_got;
             int first = hq_PlanPlayroom_first;
             bool ok = hq_PlanPlayroom_ok;
-            if (ok && Keep(first, false)) got++;
+            if (ok && Keep(first, false))
+            {
+                got++;
+            }
             hq_PlanPlayroom_got = got;
             hq_PlanPlayroom_first = first;
             hq_PlanPlayroom_ok = ok;
@@ -421,29 +514,44 @@ public partial class MapGenUdon
     void PlanPlayroom_L2()
     {
         int room = pRoom;
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int cx = hq_PlanPlayroom_cx;
             int cz = hq_PlanPlayroom_cz;
             uint[] r6 = hq_PlanPlayroom_r6;
-            int c2 = OpenSpot(1, WM_NEAR, cx, cz, 0, r6);
-            int first = nEmit;
+            int c2 = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 1; hq_OpenSpot_mode = WM_NEAR; hq_OpenSpot_tx = cx; hq_OpenSpot_tz = cz; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r6; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r6 = hq_OpenSpot_rng; c2 = hq_OpenSpot_ret; PhBreak(); }
             hq_PlanPlayroom_cx = cx;
             hq_PlanPlayroom_cz = cz;
             hq_PlanPlayroom_r6 = r6;
             hq_PlanPlayroom_c2 = c2;
-            hq_PlanPlayroom_first = first;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             uint[] r6 = hq_PlanPlayroom_r6;
             int k = hq_PlanPlayroom_k;
             int c2 = hq_PlanPlayroom_c2;
-            int first = hq_PlanPlayroom_first;
-            if (c2 >= 0 && FreePlace(Dn(k == 0 ? "hb_footstoolG" : "hb_footstoolR"), c2, RngRange(r6, 4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+            int first = nEmit;
+            hq_PlanPlayroom_sel3 = 0;
+            if (c2 >= 0 && FreePlace(Dn(k == 0 ? "hb_footstoolG" : "hb_footstoolR"), c2, RngRange(r6, 4) * 90, 0, 0, H_FREE) >= 0) hq_PlanPlayroom_sel3 = 1;
             hq_PlanPlayroom_r6 = r6;
             hq_PlanPlayroom_c2 = c2;
             hq_PlanPlayroom_first = first;
+        }
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            if (!(hq_PlanPlayroom_sel3 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanPlayroom_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanPlayroom_first = first;
+            }
         }
     }
 
@@ -454,8 +562,9 @@ public partial class MapGenUdon
     // away, comics in their boxes, skates, a helmet, and the odd book that is not a book.
     void PlanBoxRoom()
     {
+        planMax = 5;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             uint[] r = SR(1);
             hp_PlanBoxRoom_first = nEmit;
@@ -463,36 +572,44 @@ public partial class MapGenUdon
             hp_PlanBoxRoom_rows = new string[] { "oldBoxes", "frames", "cardboard", "comics", "oldBoxes" };
             hp_PlanBoxRoom_chance = new int[] { 900, 850, 650, 500, 500 };
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
-            int k = planIter;
-            if (!(k < hp_PlanBoxRoom_rows.Length)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                uint[] rk = SR(2 + k);
-                if (!RngChance(rk, hp_PlanBoxRoom_chance[k]) || !Fit(2)) continue;
-                hp_PlanBoxRoom_first = nEmit;
-                if (PlaceGroup(FindGrp(hp_PlanBoxRoom_rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(hp_PlanBoxRoom_first, false);
+                int k = planIter;
+                if (!(k < hp_PlanBoxRoom_rows.Length)) PhBreak();
+                else { hq_PlanBoxRoom_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanBoxRoom_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             hp_PlanBoxRoom_one = new string[] { "mb_mirror", "mb_sled", "mb_guitarCase", "gen_wardrobe", "q_cabinet", "q_armchair", "k_bookcaseLow", "hb_stool" };
             hp_PlanBoxRoom_ch = new int[] { 700, 550, 500, 450, 450, 400, 400, 300 };
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
-            int k = planIter;
-            if (!(k < hp_PlanBoxRoom_one.Length)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                uint[] rk = SR(10 + k);
-                if (!RngChance(rk, hp_PlanBoxRoom_ch[k]) || !Fit(1)) continue;
-                hp_PlanBoxRoom_first = nEmit;
-                if (WallPlace(Dn(hp_PlanBoxRoom_one[k]), WM_ANY, 0, 0, WIN_ANY, 0, rk) >= 0) Keep(hp_PlanBoxRoom_first, false);
+                int k = planIter;
+                if (!(k < hp_PlanBoxRoom_one.Length)) PhBreak();
+                else { hq_PlanBoxRoom_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanBoxRoom_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             uint[] r20 = SR(20);
             if (RngChance(r20, 500) && LooseFit(2))
@@ -502,26 +619,77 @@ public partial class MapGenUdon
                 if (FormAt(GenData.GL_ROW, 100, GenData.A_WALL, WM_ANY, 0, 0, 0, r20) >= 0 && Keep(hp_PlanBoxRoom_first, false)) MarkLoose(hp_PlanBoxRoom_first);
             }
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             if (planIter == 0) { hq_Extras_k0 = 30; hq_Extras_chance = 600; hq_Extras_items = new string[] { "cq_lampStanding", "ck_lampFloor", "cs_chest" }; PhSubReset(); }
             PhPush(); Extras_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
     }
+    void PlanBoxRoom_L1()
+    {
+        int room = pRoom;
+        planMax = 1;
+        if (planPhase == 0)
+        {
+            int k = hq_PlanBoxRoom_k;
+            uint[] rk = SR(2 + k);
+            if (!RngChance(rk, hp_PlanBoxRoom_chance[k]) || !Fit(2)) { PhEnd(); return; }
+            hp_PlanBoxRoom_first = nEmit;
+            hq_PlanBoxRoom_sel1 = 0;
+            if (PlaceGroup(FindGrp(hp_PlanBoxRoom_rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) hq_PlanBoxRoom_sel1 = 1;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            if (!(hq_PlanBoxRoom_sel1 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_Keep_first = hp_PlanBoxRoom_first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+    }
+
+    void PlanBoxRoom_L2()
+    {
+        int room = pRoom;
+        planMax = 1;
+        if (planPhase == 0)
+        {
+            int k = hq_PlanBoxRoom_k;
+            uint[] rk = SR(10 + k);
+            if (!RngChance(rk, hp_PlanBoxRoom_ch[k]) || !Fit(1)) { PhEnd(); return; }
+            hp_PlanBoxRoom_first = nEmit;
+            hq_PlanBoxRoom_sel2 = 0;
+            if (WallPlace(Dn(hp_PlanBoxRoom_one[k]), WM_ANY, 0, 0, WIN_ANY, 0, rk) >= 0) hq_PlanBoxRoom_sel2 = 1;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            if (!(hq_PlanBoxRoom_sel2 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_Keep_first = hp_PlanBoxRoom_first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+    }
+
 
     // ============================================================================================ PANTRY
     // Shelves of jars, bottles and food along the walls (the slots fill them), the chest freezer, crates of
     // vegetables and sacks of flour at the foot of the shelves, a keg and small barrels, a stool to reach the top.
     void PlanPantry()
     {
+        planMax = 7;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             uint[] r = SR(1);
             hq_PlanPantry_r = r;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             uint[] r = hq_PlanPantry_r;
             bool ht1 = false;
@@ -531,7 +699,7 @@ public partial class MapGenUdon
             hq_PlanPantry_r = r;
             hq_PlanPantry_ht1 = ht1;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             bool ht1 = hq_PlanPantry_ht1;
             if (!ht1)
@@ -540,12 +708,12 @@ public partial class MapGenUdon
             }
             hq_PlanPantry_ht1 = ht1;
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             uint[] r2 = SR(2);
             if (RngChance(r2, 650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("dg_shelves"), WM_ANY, 0, 0, WIN_NEVER, 0, r2) >= 0) Keep(first, false); }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             uint[] r3 = SR(3);
             if (RngChance(r3, 650) && Fit(1)) { int first = nEmit; if (WallPlace(Dn(RngChance(r3, 550) ? "ms_freezer" : "k_fridge"), WM_ANY, 0, 0, WIN_ANY, 0, r3) >= 0) Keep(first, false); }
@@ -554,33 +722,67 @@ public partial class MapGenUdon
             hq_PlanPantry_rows = rows;
             hq_PlanPantry_chance = chance;
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             string[] rows = hq_PlanPantry_rows;
-            int[] chance = hq_PlanPantry_chance;
-            int k = planIter;
-            if (!(k < rows.Length)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                uint[] rk = SR(4 + k);
-                if (!RngChance(rk, chance[k]) || !Fit(2)) continue;
-                int first = nEmit;
-                if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) Keep(first, false);
+                int k = planIter;
+                if (!(k < rows.Length)) PhBreak();
+                else { hq_PlanPantry_k = k; PhSubBegin(); }
             }
             hq_PlanPantry_rows = rows;
-            hq_PlanPantry_chance = chance;
+            if (PhSubActive())
+            {
+                PhPush(); PlanPantry_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
-        if (Ph(6))
+        if (planPhase == 6)
         {
             uint[] r10 = SR(10);
             if (RngChance(r10, 450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("hb_stool"), WM_ANY, 0, 0, WIN_ANY, 0, r10) >= 0) Keep(first, false); }
         }
-        if (Ph(7))
+        if (planPhase == 7)
         {
             uint[] r11 = SR(11);
             if (RngChance(r11, 400) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("cleaning"), room, GenData.A_WALL, 2, 0, r11)) Keep(first, false); }
         }
     }
+    void PlanPantry_L1()
+    {
+        int room = pRoom;
+        planMax = 1;
+        if (planPhase == 0)
+        {
+            string[] rows = hq_PlanPantry_rows;
+            int[] chance = hq_PlanPantry_chance;
+            int k = hq_PlanPantry_k;
+            uint[] rk = SR(4 + k);
+            if (!RngChance(rk, chance[k]) || !Fit(2)) { hq_PlanPantry_rows = rows; hq_PlanPantry_chance = chance; PhEnd(); return; }
+            int first = nEmit;
+            hq_PlanPantry_sel1 = 0;
+            if (PlaceGroup(FindGrp(rows[k]), room, GenData.A_WALL, RngBetween(rk, 2, 3), 0, rk)) hq_PlanPantry_sel1 = 1;
+            hq_PlanPantry_rows = rows;
+            hq_PlanPantry_chance = chance;
+            hq_PlanPantry_first = first;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            if (!(hq_PlanPantry_sel1 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanPantry_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanPantry_first = first;
+            }
+        }
+    }
+
 
     // phase state of the split plans (Tools: autophase2)
     int hp_PlanTeen_bed;
@@ -598,10 +800,18 @@ public partial class MapGenUdon
     int hq_CornerBed_first;
     uint[] hq_CornerBed_r;
     int hq_CornerBed_ret;
+    int hq_CornerBed_sel1;
+    int hq_CornerBed_sel2;
+    int hq_PlanBoxRoom_k;
+    int hq_PlanBoxRoom_sel1;
+    int hq_PlanBoxRoom_sel2;
     int[] hq_PlanPantry_chance;
+    int hq_PlanPantry_first;
     bool hq_PlanPantry_ht1;
+    int hq_PlanPantry_k;
     uint[] hq_PlanPantry_r;
     string[] hq_PlanPantry_rows;
+    int hq_PlanPantry_sel1;
     int hq_PlanPlayroom_box;
     int hq_PlanPlayroom_c2;
     int hq_PlanPlayroom_carpet;
@@ -616,18 +826,25 @@ public partial class MapGenUdon
     bool hq_PlanPlayroom_ok;
     string[] hq_PlanPlayroom_play;
     uint[] hq_PlanPlayroom_r;
+    uint[] hq_PlanPlayroom_r5;
     uint[] hq_PlanPlayroom_r6;
     uint[] hq_PlanPlayroom_r7;
     int hq_PlanPlayroom_sel1;
+    int hq_PlanPlayroom_sel2;
+    int hq_PlanPlayroom_sel3;
+    int hq_PlanPlayroom_sel4;
     int hq_PlanTeen_cell;
     int hq_PlanTeen_first;
     int hq_PlanTeen_g;
     uint[] hq_PlanTeen_r;
     uint[] hq_PlanTeen_r10;
+    uint[] hq_PlanTeen_r2;
     uint[] hq_PlanTeen_r3;
     uint[] hq_PlanTeen_r6;
     int hq_PlanTeen_seat;
     int hq_PlanTeen_sel1;
     int hq_PlanTeen_sel2;
     int hq_PlanTeen_sel3;
+    int hq_PlanTeen_sel4;
+    int hq_PlanTeen_sel5;
 }

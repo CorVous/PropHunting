@@ -10,7 +10,9 @@ public partial class MapGenUdon
     // for the bench and the progress display
     public int CurrentStage() { return stage; }
     public int CurrentCursor() { return cursor; }
-    public int CurrentPhase() { return popPhase * 100 + planPhase; }   // profiling: the room's furnishing step
+    public int CurrentPhase() { return popPhase * 100 + planPhase; }
+    // where a step is, a level down (profiling): the helper's or the loop body's phase, the leaks' phase, the validation's
+    public string CurrentSub() { return (phsPhase[1] > 99999 ? -1 : phsPhase[1]) + "/" + (phsPhase[2] > 99999 ? -1 : phsPhase[2]) + " lk " + lkPhase + " v " + vPhase + " fs " + fsPhase + " bt " + btPhase; }   // profiling: the room's furnishing step
 
     string RoomName(int r) { return "room type " + r; }
 

@@ -246,7 +246,8 @@ public partial class MapGen
     // LayoutSite in phases, a step a call (autophase4); LayoutSite() above runs them to the end
     void LayoutSite_Body()
     {
-        if (Ph(0))
+        planMax = 10;
+        if (planPhase == 0)
         {
             GenRng rng = Rng(ST_LAYOUT, 0, 0);
             if (cvZone == null) { cvZone = new int[CV * CV]; cvInst = new int[CV * CV]; cvRoom = new int[CV * CV]; cvPlace = new int[CV * CV]; cvPlot = new int[CV * CV]; }
@@ -268,7 +269,7 @@ public partial class MapGen
             hq_LayoutSite_kinds = kinds;
             hq_LayoutSite_nk = nk;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             GenRng rng = hq_LayoutSite_rng;
             string prog = hq_LayoutSite_prog;
@@ -288,7 +289,7 @@ public partial class MapGen
             hq_LayoutSite_kinds = kinds;
             hq_LayoutSite_nk = nk;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             GenRng rng = hq_LayoutSite_rng;
             int[] kinds = hq_LayoutSite_kinds;
@@ -354,7 +355,7 @@ public partial class MapGen
             hq_LayoutSite_dmax0L = dmax0L;
             hq_LayoutSite_dmax0R = dmax0R;
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             int nk = hq_LayoutSite_nk;
             if (!PhSubActive())
@@ -372,7 +373,7 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             int offL = hq_LayoutSite_offL;
             int offR = hq_LayoutSite_offR;
@@ -404,7 +405,7 @@ public partial class MapGen
             hq_LayoutSite_lastR = lastR;
             hq_LayoutSite_seg = seg;
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             int k = planIter;
             if (!(k < nPlots)) PhBreak();
@@ -414,7 +415,7 @@ public partial class MapGen
             }
         }
         // @cut
-        if (PhLoop(6, 100000))
+        if (planPhase == 6 && PhLoop(6, 100000))
         {
             if (!PhSubActive())
             {
@@ -430,7 +431,7 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(7))
+        if (planPhase == 7)
         {
             // @cut
 
@@ -465,12 +466,12 @@ public partial class MapGen
                     }
             Sd(CO, 0, 0, SD_OPEN);
         }
-        if (Ph(8))
+        if (planPhase == 8)
         {
             // @cut
             SplitLane();
         }
-        if (Ph(9))
+        if (planPhase == 9)
         {
             GenRng rng = hq_LayoutSite_rng;
             int offL = hq_LayoutSite_offL;
@@ -483,7 +484,7 @@ public partial class MapGen
             hq_LayoutSite_offL = offL;
             hq_LayoutSite_offR = offR;
         }
-        if (Ph(10))
+        if (planPhase == 10)
         {
             GenRng rng = hq_LayoutSite_rng;
 
@@ -500,7 +501,8 @@ public partial class MapGen
     }
     void LayoutSite_L1()
     {
-        if (Ph(0))
+        planMax = 4;
+        if (planPhase == 0)
         {
             int[] kinds = hq_LayoutSite_kinds;
             int nk = hq_LayoutSite_nk;
@@ -590,7 +592,7 @@ public partial class MapGen
             hq_LayoutSite_k = k;
             hq_LayoutSite_park = park;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             GenRng rng = hq_LayoutSite_rng;
             int[] kinds = hq_LayoutSite_kinds;
@@ -609,7 +611,7 @@ public partial class MapGen
             hq_LayoutSite_park = park;
             hq_LayoutSite_p = p;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             if (hq_LayoutSite_sel1 == 1)
             {
@@ -617,7 +619,7 @@ public partial class MapGen
                 hq_LayoutSite_alt = alt;
             }
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             if (!(hq_LayoutSite_sel1 == 1)) PhBreak();
             else
@@ -638,7 +640,7 @@ public partial class MapGen
                 hq_LayoutSite_alt = alt;
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             GenRng rng = hq_LayoutSite_rng;
             int[] kinds = hq_LayoutSite_kinds;
@@ -714,7 +716,8 @@ public partial class MapGen
 
     void LayoutSite_L2()
     {
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             GenRng rng = hq_LayoutSite_rng;
             int k = hq_LayoutSite_k;
@@ -768,7 +771,8 @@ public partial class MapGen
     // StampPlot in phases, a step a call (autophase4); StampPlot() above runs them to the end
     void StampPlot_Body()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             int k = hq_StampPlot_k;
             GenRng rng = hq_StampPlot_rng;
@@ -809,7 +813,7 @@ public partial class MapGen
             hq_StampPlot_p = p;
             hq_StampPlot_zone = zone;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int k = hq_StampPlot_k;
             GenRng rng = hq_StampPlot_rng;
@@ -868,7 +872,7 @@ public partial class MapGen
             hq_StampPlot_p = p;
             hq_StampPlot_zone = zone;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int k = hq_StampPlot_k;
             GenRng rng = hq_StampPlot_rng;

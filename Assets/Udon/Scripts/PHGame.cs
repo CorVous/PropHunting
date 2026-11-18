@@ -463,10 +463,11 @@ public class PHGame : UdonSharpBehaviour
                 {
                     float s0 = Time.realtimeSinceStartup;
                     int st = gen.CurrentStage(), cu = gen.CurrentCursor(), ph = gen.CurrentPhase();
+                    string sub = logSlowSteps ? gen.CurrentSub() : "";
                     finished = gen.Step();
                     float one = (Time.realtimeSinceStartup - s0) * 1000f;
                     genMs += one; if (one > genWorstMs) genWorstMs = one;
-                    if (logSlowSteps && one > slowStepMs) Debug.Log("[PHGame] slow generator step: stage " + st + " cursor " + cu + " phase " + ph + " " + one.ToString("0") + " ms");
+                    if (logSlowSteps && one > slowStepMs) Debug.Log("[PHGame] slow generator step: stage " + st + " cursor " + cu + " phase " + ph + " sub " + sub + " " + one.ToString("0") + " ms");
                 }
                 if (finished)
                 {

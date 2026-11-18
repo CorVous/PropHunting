@@ -64,12 +64,13 @@ public partial class MapGen
     // StonePaths in phases, a step a call (autophase4); StonePaths() above runs them to the end
     void StonePaths_Body()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int room = pRoom;
             hq_StonePaths_room = room;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int k0 = hq_StonePaths_k0;
             int room = hq_StonePaths_room;
@@ -117,7 +118,8 @@ public partial class MapGen
     // Border in phases, a step a call (autophase4); Border() above runs them to the end
     void Border_Body()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             int maxLen = hq_Border_maxLen;
             bool soil = hq_Border_soil;
@@ -165,7 +167,7 @@ public partial class MapGen
             hq_Border_cursor = cursor;
             hq_Border_last = last;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int len = hq_Border_len;
             int start = hq_Border_start;
@@ -186,7 +188,7 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int added = hq_Border_added;
             { hq_Border_ret = added; hq_Border_added = added; PhEnd(); return; }
@@ -195,7 +197,8 @@ public partial class MapGen
     }
     void Border_L1()
     {
-        if (Ph(0))
+        planMax = 5;
+        if (planPhase == 0)
         {
             GenRng rng = hq_Border_rng;
             int last = hq_Border_last;
@@ -213,7 +216,7 @@ public partial class MapGen
             hq_Border_kind = kind;
             hq_Border_first = first;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             if (hq_Border_sel1 == 1)
             {
@@ -246,7 +249,7 @@ public partial class MapGen
                 hq_Border_pz = pz;
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             if (hq_Border_sel1 == 1)
             {
@@ -260,7 +263,10 @@ public partial class MapGen
                 int halfAlong = hq_Border_halfAlong;
                 int px = hq_Border_px;
                 int pz = hq_Border_pz;
-                if (StampAt(def, room, px, pz, yaw, 0, -1, H_WALL, false) >= 0 && Keep(first, false)) added++;
+                if (StampAt(def, room, px, pz, yaw, 0, -1, H_WALL, false) >= 0 && Keep(first, false))
+                {
+                    added++;
+                }
                 cursor += 2 * halfAlong + 250 + rng.Range(350);
                 hq_Border_rng = rng;
                 hq_Border_room = room;
@@ -274,7 +280,7 @@ public partial class MapGen
                 hq_Border_pz = pz;
             }
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             if (hq_Border_sel1 == 2)
             {
@@ -302,7 +308,7 @@ public partial class MapGen
                 hq_Border_before = before;
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             if (hq_Border_sel1 == 2)
             {
@@ -316,7 +322,10 @@ public partial class MapGen
                 int first = hq_Border_first;
                 int g = hq_Border_g;
                 int before = hq_Border_before;
-                if (StampFormation(room, rot, cursor, back + (d == 2 || d == 3 ? 40 : -40), d, 0, g, -1) >= 0 && Keep(first, false)) added += roomFloor[room] - before;
+                if (StampFormation(room, rot, cursor, back + (d == 2 || d == 3 ? 40 : -40), d, 0, g, -1) >= 0 && Keep(first, false))
+                {
+                    added += roomFloor[room] - before;
+                }
                 cursor += fLen + 250 + rng.Range(350);
                 hq_Border_rng = rng;
                 hq_Border_room = room;
@@ -330,7 +339,7 @@ public partial class MapGen
                 hq_Border_before = before;
             }
         }
-        if (Ph(5))
+        if (planPhase == 5)
         {
             int last = hq_Border_last;
             int kind = hq_Border_kind;
@@ -364,7 +373,8 @@ public partial class MapGen
     // Borders in phases, a step a call (autophase4); Borders() above runs them to the end
     void Borders_Body()
     {
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int max = hq_Borders_max;
             if (!PhSubActive())
@@ -385,7 +395,8 @@ public partial class MapGen
     }
     void Borders_L1()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             int k0 = hq_Borders_k0;
             int b = hq_Borders_b;
@@ -395,7 +406,7 @@ public partial class MapGen
             hq_Borders_r = r;
             hq_Borders_longest = longest;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             bool soil = hq_Borders_soil;
             GenRng r = hq_Borders_r;
@@ -409,7 +420,7 @@ public partial class MapGen
             hq_Borders_longest = longest;
             hq_Borders_ht1 = ht1;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int ht1 = hq_Borders_ht1;
             if (ht1 == 0)
@@ -435,48 +446,76 @@ public partial class MapGen
     // Island in phases, a step a call (autophase4); Island() above runs them to the end
     void Island_Body()
     {
-        if (Ph(0))
+        planMax = 6;
+        if (planPhase == 0)
+        {
+            if (!Fit(1)) { hq_Island_ret = false; PhEnd(); return; }
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             GenRng rng = hq_Island_rng;
-            if (!Fit(1)) { hq_Island_ret = false; hq_Island_rng = rng; PhEnd(); return; }
-            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref rng);
-            if (cell < 0) { hq_Island_ret = false; hq_Island_rng = rng; hq_Island_cell = cell; PhEnd(); return; }
-            int first = nEmit;
+            int cell = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 2; hq_OpenSpot_mode = WM_ANY; hq_OpenSpot_tx = 0; hq_OpenSpot_tz = 0; hq_OpenSpot_need = 0; hq_OpenSpot_rng = rng; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { rng = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
             hq_Island_rng = rng;
             hq_Island_cell = cell;
-            hq_Island_first = first;
         }
-        if (Ph(1))
+        if (planPhase == 2)
         {
             GenRng rng = hq_Island_rng;
             int cell = hq_Island_cell;
+            if (cell < 0) { hq_Island_ret = false; hq_Island_rng = rng; hq_Island_cell = cell; PhEnd(); return; }
+            int first = nEmit;
             int bush = FreePlace(Pick(ref rng, "n_bush", 5, "n_bushDetailed", 4), cell, rng.Range(360), 0, 0, H_NATURE);
             hq_Island_rng = rng;
             hq_Island_cell = cell;
-            hq_Island_bush = bush;
-        }
-        if (Ph(2))
-        {
-            int first = hq_Island_first;
-            int bush = hq_Island_bush;
-            if (bush < 0 || !Keep(first, false)) { hq_Island_ret = false; hq_Island_first = first; hq_Island_bush = bush; PhEnd(); return; }
             hq_Island_first = first;
             hq_Island_bush = bush;
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
-            GenRng rng = hq_Island_rng;
             int first = hq_Island_first;
             int bush = hq_Island_bush;
-            if (Fit(2))
+            if (bush < 0 || !Keep(first, false))
             {
-                first = nEmit;
-                if (GroupBeside(RocksAllowed() ? GenData.FindGrp("rocks") : FlowerGroup(ref rng), bush, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
+                { hq_Island_ret = false; hq_Island_first = first; hq_Island_bush = bush; PhEnd(); return; }
             }
-            { hq_Island_ret = true; hq_Island_rng = rng; hq_Island_first = first; hq_Island_bush = bush; PhEnd(); return; }
-            hq_Island_rng = rng;
+            hq_Island_sel1 = 0;
+            if (Fit(2)) hq_Island_sel1 = 1;
             hq_Island_first = first;
             hq_Island_bush = bush;
+        }
+        if (planPhase == 4)
+        {
+            if (hq_Island_sel1 == 1)
+            {
+                GenRng rng = hq_Island_rng;
+                int first = hq_Island_first;
+                int bush = hq_Island_bush;
+                first = nEmit;
+                hq_Island_sel2 = 0;
+                if (GroupBeside(RocksAllowed() ? GenData.FindGrp("rocks") : FlowerGroup(ref rng), bush, rng.Between(2, 3), 0, ref rng)) hq_Island_sel2 = 1;
+                hq_Island_rng = rng;
+                hq_Island_first = first;
+                hq_Island_bush = bush;
+            }
+        }
+        if (planPhase == 5 && PhLoop(5, 100000))
+        {
+            if (!(hq_Island_sel1 == 1 && hq_Island_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_Island_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_Island_first = first;
+            }
+        }
+        if (planPhase == 6)
+        {
+            { hq_Island_ret = true; PhEnd(); return; }
         }
     }
 
@@ -582,7 +621,8 @@ public partial class MapGen
     // FillOne in phases, a step a call (autophase4); FillOne() above runs them to the end
     void FillOne_Body()
     {
-        if (Ph(0))
+        planMax = 16;
+        if (planPhase == 0)
         {
             int pass = hq_FillOne_pass;
             int k = hq_FillOne_k;
@@ -600,7 +640,7 @@ public partial class MapGen
             hq_FillOne_first = first;
             hq_FillOne_how = how;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             if (hq_FillOne_sel1 == 1)
             {
@@ -611,7 +651,10 @@ public partial class MapGen
                 int how = hq_FillOne_how;
                 // a yard fills up with what a yard holds: goods in rows at the fence and the wall, a pallet
                 string[] rows = { "crates", "barrels", "boxes", "sacks" };
-                if (how < 3 && GroupAt(GenData.FindGrp(rows[(k + pass) % 4]), GenData.A_OUT_EDGE, r.Between(2, 3), WM_ANY, 0, 0, 0, ref r) && Keep(first, false)) { hq_FillOne_pass = pass; hq_FillOne_k = k; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
+                if (how < 3 && GroupAt(GenData.FindGrp(rows[(k + pass) % 4]), GenData.A_OUT_EDGE, r.Between(2, 3), WM_ANY, 0, 0, 0, ref r) && Keep(first, false))
+                {
+                    { hq_FillOne_pass = pass; hq_FillOne_k = k; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
+                }
                 first = nEmit;
                 hq_FillOne_pass = pass;
                 hq_FillOne_k = k;
@@ -620,19 +663,36 @@ public partial class MapGen
                 hq_FillOne_how = how;
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             if (hq_FillOne_sel1 == 1)
             {
                 GenRng r = hq_FillOne_r;
-                int first = hq_FillOne_first;
-                if (WallPlace(Pick(ref r, "w_pallet", 5, "w_palletLoaded", 3, "s_boxLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
-                { hq_FillOne_r = r; hq_FillOne_first = first; PhEnd(); return; }
+                hq_FillOne_sel2 = 0;
+                if (WallPlace(Pick(ref r, "w_pallet", 5, "w_palletLoaded", 3, "s_boxLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0) hq_FillOne_sel2 = 1;
                 hq_FillOne_r = r;
+            }
+        }
+        if (planPhase == 3 && PhLoop(3, 100000))
+        {
+            if (!(hq_FillOne_sel1 == 1 && hq_FillOne_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_FillOne_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
                 hq_FillOne_first = first;
             }
         }
-        if (Ph(3))
+        if (planPhase == 4)
+        {
+            if (hq_FillOne_sel1 == 1)
+            {
+                { PhEnd(); return; }
+            }
+        }
+        if (planPhase == 5)
         {
             bool forest = hq_FillOne_forest;
             int type = hq_FillOne_type;
@@ -644,7 +704,7 @@ public partial class MapGen
             hq_FillOne_r = r;
             hq_FillOne_how = how;
         }
-        if (Ph(4))
+        if (planPhase == 6)
         {
             int room = hq_FillOne_room;
             GenRng r = hq_FillOne_r;
@@ -655,16 +715,16 @@ public partial class MapGen
                 first = nEmit;
                 if (WallPlace(Pick(ref r, "n_bush", 5, "n_bushDetailed", 4, "n_bushLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0 && Keep(first, false)) { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
             }
-            hq_FillOne_sel2 = 0;
-            if (how <= 2 && roomFloor[room] + 2 <= roomFloorTarget[room]) hq_FillOne_sel2 = 1;
+            hq_FillOne_sel3 = 0;
+            if (how <= 2 && roomFloor[room] + 2 <= roomFloorTarget[room]) hq_FillOne_sel3 = 1;
             hq_FillOne_room = room;
             hq_FillOne_r = r;
             hq_FillOne_first = first;
             hq_FillOne_how = how;
         }
-        if (Ph(5))
+        if (planPhase == 7)
         {
-            if (hq_FillOne_sel2 == 1)
+            if (hq_FillOne_sel3 == 1)
             {
                 GenRng r = hq_FillOne_r;
                 int first = hq_FillOne_first;
@@ -676,34 +736,37 @@ public partial class MapGen
                 hq_FillOne_g = g;
             }
         }
-        if (Ph(6))
+        if (planPhase == 8)
         {
-            if (hq_FillOne_sel2 == 1)
+            if (hq_FillOne_sel3 == 1)
             {
                 bool forest = hq_FillOne_forest;
                 GenRng r = hq_FillOne_r;
                 int first = hq_FillOne_first;
                 int g = hq_FillOne_g;
-                if (GroupAt(g, forest ? GenData.A_SOFT : GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r) && Keep(first, false)) { hq_FillOne_forest = forest; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_g = g; PhEnd(); return; }
+                if (GroupAt(g, forest ? GenData.A_SOFT : GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r) && Keep(first, false))
+                {
+                    { hq_FillOne_forest = forest; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_g = g; PhEnd(); return; }
+                }
                 hq_FillOne_forest = forest;
                 hq_FillOne_r = r;
                 hq_FillOne_first = first;
                 hq_FillOne_g = g;
             }
         }
-        if (Ph(7))
+        if (planPhase == 9)
         {
             bool forest = hq_FillOne_forest;
             GenRng r = hq_FillOne_r;
-            hq_FillOne_sel3 = 0;
-            if (forest) hq_FillOne_sel3 = 1;
-            else if (!Island(ref r)) hq_FillOne_sel3 = 2;
+            hq_FillOne_sel4 = 0;
+            if (forest) hq_FillOne_sel4 = 1;
+            else if (!Island(ref r)) hq_FillOne_sel4 = 2;
             hq_FillOne_forest = forest;
             hq_FillOne_r = r;
         }
-        if (Ph(8))
+        if (planPhase == 10)
         {
-            if (hq_FillOne_sel3 == 1)
+            if (hq_FillOne_sel4 == 1)
             {
                 int room = hq_FillOne_room;
                 GenRng r = hq_FillOne_r;
@@ -711,7 +774,10 @@ public partial class MapGen
                 int how = hq_FillOne_how;
                 // mushrooms at the foot of a tree, a clump of flowers, a stump or a bush on open ground
                 first = nEmit;
-                if (how == 3 && roomFloor[room] + 2 <= roomFloorTarget[room] && PlaceGroup(GenData.FindGrp("mushrooms"), room, GenData.A_BESIDE, 2, 0, ref r) && Keep(first, false)) { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
+                if (how == 3 && roomFloor[room] + 2 <= roomFloorTarget[room] && PlaceGroup(GenData.FindGrp("mushrooms"), room, GenData.A_BESIDE, 2, 0, ref r) && Keep(first, false))
+                {
+                    { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
+                }
                 first = nEmit;
                 hq_FillOne_room = room;
                 hq_FillOne_r = r;
@@ -719,24 +785,27 @@ public partial class MapGen
                 hq_FillOne_how = how;
             }
         }
-        if (Ph(9))
+        if (planPhase == 11)
         {
-            if (hq_FillOne_sel3 == 1)
+            if (hq_FillOne_sel4 == 1)
             {
                 int room = hq_FillOne_room;
                 GenRng r = hq_FillOne_r;
                 int first = hq_FillOne_first;
                 int how = hq_FillOne_how;
-                if (how == 2 && roomFloor[room] + 3 <= roomFloorTarget[room] && GroupAt(FlowerGroup(ref r), GenData.A_SOFT, 3, WM_ANY, 0, 0, 0, ref r) && Keep(first, false)) { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
+                if (how == 2 && roomFloor[room] + 3 <= roomFloorTarget[room] && GroupAt(FlowerGroup(ref r), GenData.A_SOFT, 3, WM_ANY, 0, 0, 0, ref r) && Keep(first, false))
+                {
+                    { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
+                }
                 hq_FillOne_room = room;
                 hq_FillOne_r = r;
                 hq_FillOne_first = first;
                 hq_FillOne_how = how;
             }
         }
-        if (Ph(10))
+        if (planPhase == 12)
         {
-            if (hq_FillOne_sel3 == 1)
+            if (hq_FillOne_sel4 == 1)
             {
                 GenRng r = hq_FillOne_r;
                 int first = hq_FillOne_first;
@@ -747,42 +816,56 @@ public partial class MapGen
                 hq_FillOne_cell = cell;
             }
         }
-        if (Ph(11))
+        if (planPhase == 13)
         {
-            if (hq_FillOne_sel3 == 1)
+            if (hq_FillOne_sel4 == 1)
             {
                 GenRng r = hq_FillOne_r;
-                int first = hq_FillOne_first;
                 int cell = hq_FillOne_cell;
-                if (cell >= 0 && FreePlace(Pick(ref r, "n_stump", 5, "n_stumpRound", 4, "n_bush", 4), cell, r.Range(360), 0, 0, H_NATURE) >= 0) Keep(first, false);
+                hq_FillOne_sel5 = 0;
+                if (cell >= 0 && FreePlace(Pick(ref r, "n_stump", 5, "n_stumpRound", 4, "n_bush", 4), cell, r.Range(360), 0, 0, H_NATURE) >= 0) hq_FillOne_sel5 = 1;
                 hq_FillOne_r = r;
-                hq_FillOne_first = first;
                 hq_FillOne_cell = cell;
             }
         }
-        if (Ph(12))
+        if (planPhase == 14 && PhLoop(14, 100000))
         {
-            if (hq_FillOne_sel3 == 2)
+            if (!(hq_FillOne_sel4 == 1 && hq_FillOne_sel5 == 1)) PhBreak();
+            else
             {
+                int first = hq_FillOne_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_FillOne_first = first;
+            }
+        }
+        if (planPhase == 15)
+        {
+            if (hq_FillOne_sel4 == 2)
+            {
+                int room = hq_FillOne_room;
                 GenRng r = hq_FillOne_r;
                 int first = hq_FillOne_first;
                 // no open ground for an island: a pot or a small rock group wherever an edge is free
                 first = nEmit;
                 FSet(Pick(ref r, "n_potSmall", 5, "n_planter", 5));
+                hq_FillOne_sel6 = 0;
+                if (CountInRoom(fDef[0], room) < ScaledCap(GenData.defRoomCap[fDef[0]], room) && FormAt(GenData.GL_ROW, 0, GenData.A_OUT_EDGE, WM_ANY, 0, 0, 0, ref r) >= 0) hq_FillOne_sel6 = 1;
+                hq_FillOne_room = room;
                 hq_FillOne_r = r;
                 hq_FillOne_first = first;
             }
         }
-        if (Ph(13))
+        if (planPhase == 16 && PhLoop(16, 100000))
         {
-            if (hq_FillOne_sel3 == 2)
+            if (!(hq_FillOne_sel4 == 2 && hq_FillOne_sel6 == 1)) PhBreak();
+            else
             {
-                int room = hq_FillOne_room;
-                GenRng r = hq_FillOne_r;
                 int first = hq_FillOne_first;
-                if (CountInRoom(fDef[0], room) < ScaledCap(GenData.defRoomCap[fDef[0]], room) && FormAt(GenData.GL_ROW, 0, GenData.A_OUT_EDGE, WM_ANY, 0, 0, 0, ref r) >= 0) Keep(first, false);
-                hq_FillOne_room = room;
-                hq_FillOne_r = r;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
                 hq_FillOne_first = first;
             }
         }
@@ -857,37 +940,67 @@ public partial class MapGen
     // LawnTree in phases, a step a call (autophase4); LawnTree() above runs them to the end
     void LawnTree_Body()
     {
-        if (Ph(0))
+        planMax = 5;
+        if (planPhase == 0)
         {
             int k = hq_LawnTree_k;
             GenRng r = SR(k);
             osAvoid = GenData.T_COVERED | GenData.T_SOFT_GROUND | GenData.T_EARTH;
-            int cell = OpenSpot(4, WM_ANY, 0, 0, 0, ref r);
-            if (cell < 0) { hq_LawnTree_ret = -1; hq_LawnTree_k = k; hq_LawnTree_r = r; hq_LawnTree_cell = cell; PhEnd(); return; }
             hq_LawnTree_k = k;
+            hq_LawnTree_r = r;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            GenRng r = hq_LawnTree_r;
+            int cell = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 4; hq_OpenSpot_mode = WM_ANY; hq_OpenSpot_tx = 0; hq_OpenSpot_tz = 0; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
             hq_LawnTree_r = r;
             hq_LawnTree_cell = cell;
         }
-        if (Ph(1))
+        if (planPhase == 2)
         {
             GenRng r = hq_LawnTree_r;
             int cell = hq_LawnTree_cell;
+            if (cell < 0) { hq_LawnTree_ret = -1; hq_LawnTree_r = r; hq_LawnTree_cell = cell; PhEnd(); return; }
             int tree = TreeAt(Pick(ref r, "n_treeFat", 6, "n_treeOak", 4), cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, ref r);
+            hq_LawnTree_sel1 = 0;
+            if (tree >= 0 && r.Chance(550) && Fit(2) && RocksAllowed()) hq_LawnTree_sel1 = 1;
             hq_LawnTree_r = r;
             hq_LawnTree_cell = cell;
             hq_LawnTree_tree = tree;
         }
-        if (Ph(2))
+        if (planPhase == 3)
         {
-            GenRng r = hq_LawnTree_r;
-            int tree = hq_LawnTree_tree;
-            if (tree >= 0 && r.Chance(550) && Fit(2) && RocksAllowed())
+            if (hq_LawnTree_sel1 == 1)
             {
+                GenRng r = hq_LawnTree_r;
+                int tree = hq_LawnTree_tree;
                 int first = nEmit;
-                if (GroupBeside(GenData.FindGrp("rocks"), tree, r.Between(2, 3), 0, ref r)) Keep(first, false);
+                hq_LawnTree_sel2 = 0;
+                if (GroupBeside(GenData.FindGrp("rocks"), tree, r.Between(2, 3), 0, ref r)) hq_LawnTree_sel2 = 1;
+                hq_LawnTree_r = r;
+                hq_LawnTree_tree = tree;
+                hq_LawnTree_first = first;
             }
-            { hq_LawnTree_ret = tree; hq_LawnTree_r = r; hq_LawnTree_tree = tree; PhEnd(); return; }
-            hq_LawnTree_r = r;
+        }
+        if (planPhase == 4 && PhLoop(4, 100000))
+        {
+            if (!(hq_LawnTree_sel1 == 1 && hq_LawnTree_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_LawnTree_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_LawnTree_first = first;
+            }
+        }
+        if (planPhase == 5)
+        {
+            int tree = hq_LawnTree_tree;
+            { hq_LawnTree_ret = tree; hq_LawnTree_tree = tree; PhEnd(); return; }
             hq_LawnTree_tree = tree;
         }
     }
@@ -964,7 +1077,8 @@ public partial class MapGen
     // BenchAtEdge in phases, a step a call (autophase4); BenchAtEdge() above runs them to the end
     void BenchAtEdge_Body()
     {
-        if (Ph(0))
+        planMax = 3;
+        if (planPhase == 0)
         {
             int k = hq_BenchAtEdge_k;
             GenRng r = SR(k);
@@ -976,31 +1090,51 @@ public partial class MapGen
             hq_BenchAtEdge_first = first;
             hq_BenchAtEdge_bench = bench;
         }
-        if (Ph(1))
-        {
-            int first = hq_BenchAtEdge_first;
-            int bench = hq_BenchAtEdge_bench;
-            if (bench < 0 || !Keep(first, false)) { hq_BenchAtEdge_first = first; hq_BenchAtEdge_bench = bench; PhEnd(); return; }
-            int pot = Dn("n_potSmall");
-            hq_BenchAtEdge_first = first;
-            hq_BenchAtEdge_bench = bench;
-            hq_BenchAtEdge_pot = pot;
-        }
-        if (Ph(2))
+        if (planPhase == 1)
         {
             GenRng r = hq_BenchAtEdge_r;
             int first = hq_BenchAtEdge_first;
             int bench = hq_BenchAtEdge_bench;
-            int pot = hq_BenchAtEdge_pot;
-            if (r.Chance(450) && Fit(1) && CountInRoom(pot, pRoom) < ScaledCap(GenData.defRoomCap[pot], pRoom))
+            if (bench < 0 || !Keep(first, false))
             {
-                first = nEmit;
-                if (RelBeside(pot, bench, 0, 90, 0, ref r) >= 0) Keep(first, false);
+                { hq_BenchAtEdge_r = r; hq_BenchAtEdge_first = first; hq_BenchAtEdge_bench = bench; PhEnd(); return; }
             }
+            int pot = Dn("n_potSmall");
+            hq_BenchAtEdge_sel1 = 0;
+            if (r.Chance(450) && Fit(1) && CountInRoom(pot, pRoom) < ScaledCap(GenData.defRoomCap[pot], pRoom)) hq_BenchAtEdge_sel1 = 1;
             hq_BenchAtEdge_r = r;
             hq_BenchAtEdge_first = first;
             hq_BenchAtEdge_bench = bench;
             hq_BenchAtEdge_pot = pot;
+        }
+        if (planPhase == 2)
+        {
+            if (hq_BenchAtEdge_sel1 == 1)
+            {
+                GenRng r = hq_BenchAtEdge_r;
+                int first = hq_BenchAtEdge_first;
+                int bench = hq_BenchAtEdge_bench;
+                int pot = hq_BenchAtEdge_pot;
+                first = nEmit;
+                hq_BenchAtEdge_sel2 = 0;
+                if (RelBeside(pot, bench, 0, 90, 0, ref r) >= 0) hq_BenchAtEdge_sel2 = 1;
+                hq_BenchAtEdge_r = r;
+                hq_BenchAtEdge_first = first;
+                hq_BenchAtEdge_bench = bench;
+                hq_BenchAtEdge_pot = pot;
+            }
+        }
+        if (planPhase == 3 && PhLoop(3, 100000))
+        {
+            if (!(hq_BenchAtEdge_sel1 == 1 && hq_BenchAtEdge_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_BenchAtEdge_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_BenchAtEdge_first = first;
+            }
         }
     }
 
@@ -1008,74 +1142,37 @@ public partial class MapGen
     // in phases a step each (Cor: build freezes; MapGenPlace.PlanStep): the same pieces in the same order
     void PlanLawn()
     {
+        planMax = 13;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             planR = SR(1);
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = planR; PhSubReset(); }
             PhPush(); StonePaths_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) { planR = hq_StonePaths_rng; PhBreak(); }
         }
-        if (PhLoop(2, 100000))
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
             if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
             PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             DoorSides(50);
             planN = TreeCount(room, ref planR);
             if (planN < 1 && AreaM2(room) >= 30) planN = 1;
         }
-        if (PhLoop(4, planN)) LawnTree(60 + planIter);
-        if (Ph(5))
-        {
-            hq_PlanLawn_sel1 = 0;
-            if (planR.Chance(650)) hq_PlanLawn_sel1 = 1;
-        }
-        if (PhLoop(6, 100000))
-        {
-            if (!(hq_PlanLawn_sel1 == 1)) PhBreak();
-            else
-            {
-                if (planIter == 0) { hq_BenchAtEdge_k = 2; PhSubReset(); }
-                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) {  PhBreak(); }
-            }
-        }
-        if (Ph(7))
-        {
-            GenRng r3 = SR(3);
-            if (r3.Chance(350) && Fit(1))
-            {
-                int first = nEmit;
-                if (WallPlace(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(first, false);
-            }
-            // planted borders along the fences fill the rest of the budget: no lawn is left bare (G29)
-            ClearBans();
-        }
-        if (PhLoop(8, 100000))
-        {
-            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = true; PhSubReset(); }
-            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
-            if (fin) {  PhBreak(); }
-        }
-        if (Ph(9))
-        {
-            GenRng r4 = SR(4);
-            hq_PlanLawn_r4 = r4;
-        }
-        if (PhLoop(10, 100000))
+        if (planPhase == 4 && PhLoop(4, 100000))
         {
             if (!PhSubActive())
             {
-                int k = planIter;
-                if (!(k < 3 && Fit(1))) PhBreak();
-                else { hq_PlanLawn_k = k; PhSubBegin(); }
+                int lt = planIter;
+                if (!(lt < planN)) PhBreak();
+                else { hq_PlanLawn_lt = lt; PhSubBegin(); }
             }
             if (PhSubActive())
             {
@@ -1085,11 +1182,103 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
+        if (planPhase == 5)
+        {
+            hq_PlanLawn_sel1 = 0;
+            if (planR.Chance(650)) hq_PlanLawn_sel1 = 1;
+        }
+        if (planPhase == 6 && PhLoop(6, 100000))
+        {
+            if (!(hq_PlanLawn_sel1 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_BenchAtEdge_k = 2; PhSubReset(); }
+                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (planPhase == 7)
+        {
+            GenRng r3 = SR(3);
+            hq_PlanLawn_sel2 = 0;
+            if (r3.Chance(350) && Fit(1)) hq_PlanLawn_sel2 = 1;
+            hq_PlanLawn_r3 = r3;
+        }
+        if (planPhase == 8)
+        {
+            if (hq_PlanLawn_sel2 == 1)
+            {
+                GenRng r3 = hq_PlanLawn_r3;
+                int first = nEmit;
+                hq_PlanLawn_sel3 = 0;
+                if (WallPlace(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) hq_PlanLawn_sel3 = 1;
+                hq_PlanLawn_r3 = r3;
+                hq_PlanLawn_first = first;
+            }
+        }
+        if (planPhase == 9 && PhLoop(9, 100000))
+        {
+            if (!(hq_PlanLawn_sel2 == 1 && hq_PlanLawn_sel3 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanLawn_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanLawn_first = first;
+            }
+        }
+        if (planPhase == 10)
+        {
+            // planted borders along the fences fill the rest of the budget: no lawn is left bare (G29)
+            ClearBans();
+        }
+        if (planPhase == 11 && PhLoop(11, 100000))
+        {
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = true; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (planPhase == 12)
+        {
+            GenRng r4 = SR(4);
+            hq_PlanLawn_r4 = r4;
+        }
+        if (planPhase == 13 && PhLoop(13, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < 3 && Fit(1))) PhBreak();
+                else { hq_PlanLawn_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanLawn_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
     }
     void PlanLawn_L1()
     {
         int room = pRoom;
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
+        {
+            int lt = hq_PlanLawn_lt;
+            if (planIter == 0) { hq_LawnTree_k = 60 + lt; PhSubReset(); }
+            PhPush(); LawnTree_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+    }
+
+    void PlanLawn_L2()
+    {
+        int room = pRoom;
+        planMax = 1;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             GenRng r4 = hq_PlanLawn_r4;
             bool ht1 = false;
@@ -1099,7 +1288,7 @@ public partial class MapGen
             hq_PlanLawn_r4 = r4;
             hq_PlanLawn_ht1 = ht1;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             bool ht1 = hq_PlanLawn_ht1;
             if (!ht1)
@@ -1116,13 +1305,14 @@ public partial class MapGen
     // (tap, watering can, buckets); a shed with the barrow and the sacks; tools leaning at the fence; a bench.
     void PlanGarden()
     {
+        planMax = 35;
         int room = pRoom, cells = roomOuterCells[room];
-        if (Ph(0))
+        if (planPhase == 0)
         {
             GenRng r = SR(1);
             hq_PlanGarden_r = r;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             GenRng r = hq_PlanGarden_r;
             if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = r; PhSubReset(); }
@@ -1130,7 +1320,7 @@ public partial class MapGen
             if (fin) { r = hq_StonePaths_rng; PhBreak(); }
             hq_PlanGarden_r = r;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             GenRng r = hq_PlanGarden_r;
             // the shed in a corner of a larger garden, the barrow and the sacks beside it
@@ -1140,7 +1330,7 @@ public partial class MapGen
             hq_PlanGarden_r = r;
             hq_PlanGarden_shed = shed;
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             if (hq_PlanGarden_sel1 == 1)
             {
@@ -1153,54 +1343,97 @@ public partial class MapGen
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             if (hq_PlanGarden_sel1 == 1)
             {
                 int shed = hq_PlanGarden_shed;
                 int first = hq_PlanGarden_first;
-                if (shed >= 0 && !Keep(first, false)) shed = -1;
+                if (shed >= 0 && !Keep(first, false))
+                {
+                    shed = -1;
+                }
                 hq_PlanGarden_sel2 = 0;
                 if (shed >= 0) hq_PlanGarden_sel2 = 1;
                 hq_PlanGarden_shed = shed;
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(5))
+        if (planPhase == 5)
         {
             if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
             {
                 GenRng r = hq_PlanGarden_r;
+                hq_PlanGarden_sel3 = 0;
+                if (r.Chance(700) && Fit(1)) hq_PlanGarden_sel3 = 1;
+                hq_PlanGarden_r = r;
+            }
+        }
+        if (planPhase == 6)
+        {
+            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel3 == 1)
+            {
+                GenRng r = hq_PlanGarden_r;
                 int shed = hq_PlanGarden_shed;
                 int first = hq_PlanGarden_first;
-                if (r.Chance(700) && Fit(1))
-                {
-                    first = nEmit;
-                    if (RelBeside(Dn("m_wheelbarrow"), shed, 0, 150, 0, ref r) >= 0) Keep(first, false);
-                }
+                first = nEmit;
+                hq_PlanGarden_sel4 = 0;
+                if (RelBeside(Dn("m_wheelbarrow"), shed, 0, 150, 0, ref r) >= 0) hq_PlanGarden_sel4 = 1;
                 hq_PlanGarden_r = r;
                 hq_PlanGarden_shed = shed;
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(6))
+        if (planPhase == 7 && PhLoop(7, 100000))
+        {
+            if (!(hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel3 == 1 && hq_PlanGarden_sel4 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanGarden_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (planPhase == 8)
         {
             if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
             {
                 GenRng r = hq_PlanGarden_r;
+                hq_PlanGarden_sel5 = 0;
+                if (r.Chance(550) && Fit(2)) hq_PlanGarden_sel5 = 1;
+                hq_PlanGarden_r = r;
+            }
+        }
+        if (planPhase == 9)
+        {
+            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel5 == 1)
+            {
+                GenRng r = hq_PlanGarden_r;
                 int shed = hq_PlanGarden_shed;
                 int first = hq_PlanGarden_first;
-                if (r.Chance(550) && Fit(2))
-                {
-                    first = nEmit;
-                    if (GroupBeside(GenData.FindGrp("sacks"), shed, r.Between(2, 3), 0, ref r)) Keep(first, false);
-                }
+                first = nEmit;
+                hq_PlanGarden_sel6 = 0;
+                if (GroupBeside(GenData.FindGrp("sacks"), shed, r.Between(2, 3), 0, ref r)) hq_PlanGarden_sel6 = 1;
                 hq_PlanGarden_r = r;
                 hq_PlanGarden_shed = shed;
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(7))
+        if (planPhase == 10 && PhLoop(10, 100000))
+        {
+            if (!(hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel5 == 1 && hq_PlanGarden_sel6 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanGarden_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (planPhase == 11)
         {
             // the water point: a tap at the fence, the can and the buckets beside it
             GenRng r2 = SR(2);
@@ -1208,7 +1441,7 @@ public partial class MapGen
             hq_PlanGarden_r2 = r2;
             hq_PlanGarden_tap = tap;
         }
-        if (Ph(8))
+        if (planPhase == 12)
         {
             int shed = hq_PlanGarden_shed;
             GenRng r2 = hq_PlanGarden_r2;
@@ -1220,51 +1453,81 @@ public partial class MapGen
             hq_PlanGarden_tap = tap;
             hq_PlanGarden_first = first;
         }
-        if (Ph(9))
+        if (planPhase == 13)
         {
             int tap = hq_PlanGarden_tap;
             int first = hq_PlanGarden_first;
-            if (tap >= 0 && !Keep(first, false)) tap = -1;
-            hq_PlanGarden_tap = tap;
-            hq_PlanGarden_first = first;
-        }
-        if (Ph(10))
-        {
-            GenRng r2 = hq_PlanGarden_r2;
-            int tap = hq_PlanGarden_tap;
-            int first = hq_PlanGarden_first;
-            if (tap >= 0 && Fit(2))
+            if (tap >= 0 && !Keep(first, false))
             {
-                first = nEmit;
-                if (GroupBeside(GenData.FindGrp("watering"), tap, r2.Between(2, 3), 0, ref r2)) Keep(first, false);
+                tap = -1;
             }
-            hq_PlanGarden_r2 = r2;
+            hq_PlanGarden_sel7 = 0;
+            if (tap >= 0 && Fit(2)) hq_PlanGarden_sel7 = 1;
             hq_PlanGarden_tap = tap;
             hq_PlanGarden_first = first;
         }
-        if (Ph(11))
+        if (planPhase == 14)
+        {
+            if (hq_PlanGarden_sel7 == 1)
+            {
+                GenRng r2 = hq_PlanGarden_r2;
+                int tap = hq_PlanGarden_tap;
+                int first = hq_PlanGarden_first;
+                first = nEmit;
+                hq_PlanGarden_sel8 = 0;
+                if (GroupBeside(GenData.FindGrp("watering"), tap, r2.Between(2, 3), 0, ref r2)) hq_PlanGarden_sel8 = 1;
+                hq_PlanGarden_r2 = r2;
+                hq_PlanGarden_tap = tap;
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (planPhase == 15 && PhLoop(15, 100000))
+        {
+            if (!(hq_PlanGarden_sel7 == 1 && hq_PlanGarden_sel8 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanGarden_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (planPhase == 16)
         {
             // the vegetable plot: a bed of soil in the open, two rows, one crop to a row
             GenRng r3 = SR(3);
-            hq_PlanGarden_sel3 = 0;
-            if (Fit(6) && r3.Chance(800)) hq_PlanGarden_sel3 = 1;
+            hq_PlanGarden_sel9 = 0;
+            if (Fit(6) && r3.Chance(800)) hq_PlanGarden_sel9 = 1;
             hq_PlanGarden_r3 = r3;
         }
-        if (Ph(12))
+        if (planPhase == 17 && PhLoop(17, 100000))
         {
-            if (hq_PlanGarden_sel3 == 1)
+            if (!(hq_PlanGarden_sel9 == 1)) PhBreak();
+            else
             {
                 GenRng r3 = hq_PlanGarden_r3;
-                int cell = OpenSpot(4, WM_ANY, 0, 0, 0, ref r3);
-                hq_PlanGarden_sel4 = 0;
-                if (cell >= 0) hq_PlanGarden_sel4 = 1;
+                int cell = 0;
+                if (planIter == 0) { hq_OpenSpot_minClr = 4; hq_OpenSpot_mode = WM_ANY; hq_OpenSpot_tx = 0; hq_OpenSpot_tz = 0; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r3; PhSubReset(); }
+                PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r3 = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
                 hq_PlanGarden_r3 = r3;
                 hq_PlanGarden_cell = cell;
             }
         }
-        if (PhLoop(13, 100000))
+        if (planPhase == 18)
         {
-            if (!(hq_PlanGarden_sel3 == 1 && hq_PlanGarden_sel4 == 1)) PhBreak();
+            if (hq_PlanGarden_sel9 == 1)
+            {
+                int cell = hq_PlanGarden_cell;
+                hq_PlanGarden_sel10 = 0;
+                if (cell >= 0) hq_PlanGarden_sel10 = 1;
+                hq_PlanGarden_cell = cell;
+            }
+        }
+        if (planPhase == 19 && PhLoop(19, 100000))
+        {
+            if (!(hq_PlanGarden_sel9 == 1 && hq_PlanGarden_sel10 == 1)) PhBreak();
             else
             {
                 GenRng r3 = hq_PlanGarden_r3;
@@ -1276,17 +1539,17 @@ public partial class MapGen
                 hq_PlanGarden_cell = cell;
             }
         }
-        if (Ph(14))
+        if (planPhase == 20)
         {
             // tools leaning at the fence near the water point
             GenRng r4 = SR(4);
-            hq_PlanGarden_sel5 = 0;
-            if (r4.Chance(750) && Fit(2)) hq_PlanGarden_sel5 = 1;
+            hq_PlanGarden_sel11 = 0;
+            if (r4.Chance(750) && Fit(2)) hq_PlanGarden_sel11 = 1;
             hq_PlanGarden_r4 = r4;
         }
-        if (Ph(15))
+        if (planPhase == 21)
         {
-            if (hq_PlanGarden_sel5 == 1)
+            if (hq_PlanGarden_sel11 == 1)
             {
                 int shed = hq_PlanGarden_shed;
                 GenRng r4 = hq_PlanGarden_r4;
@@ -1298,42 +1561,45 @@ public partial class MapGen
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(16))
+        if (planPhase == 22)
         {
-            if (hq_PlanGarden_sel5 == 1)
+            if (hq_PlanGarden_sel11 == 1)
             {
                 int tap = hq_PlanGarden_tap;
                 GenRng r4 = hq_PlanGarden_r4;
                 bool ok = hq_PlanGarden_ok;
                 if (!ok) ok = GroupAt(GenData.FindGrp("tools"), GenData.A_OUT_EDGE, r4.Between(2, 3), tap >= 0 ? WM_NEAR : WM_ANY, tap >= 0 ? emitX[tap] : 0, tap >= 0 ? emitZ[tap] : 0, 0, ref r4);
+                hq_PlanGarden_sel12 = 0;
+                if (ok) hq_PlanGarden_sel12 = 1;
                 hq_PlanGarden_tap = tap;
                 hq_PlanGarden_r4 = r4;
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(17))
+        if (planPhase == 23 && PhLoop(23, 100000))
         {
-            if (hq_PlanGarden_sel5 == 1)
+            if (!(hq_PlanGarden_sel11 == 1 && hq_PlanGarden_sel12 == 1)) PhBreak();
+            else
             {
                 int first = hq_PlanGarden_first;
-                bool ok = hq_PlanGarden_ok;
-                if (ok) Keep(first, false);
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
                 hq_PlanGarden_first = first;
-                hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(18))
+        if (planPhase == 24)
         {
             DoorSides(50);
         }
-        if (Ph(19))
+        if (planPhase == 25)
         {
             GenRng r5 = SR(5);
             int trees = TreeCount(room, ref r5);
             hq_PlanGarden_r5 = r5;
             hq_PlanGarden_trees = trees;
         }
-        if (PhLoop(20, 100000))
+        if (planPhase == 26 && PhLoop(26, 100000))
         {
             int trees = hq_PlanGarden_trees;
             if (!PhSubActive())
@@ -1351,16 +1617,16 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(21))
+        if (planPhase == 27)
         {
             GenRng r5 = hq_PlanGarden_r5;
-            hq_PlanGarden_sel6 = 0;
-            if (r5.Chance(450)) hq_PlanGarden_sel6 = 1;
+            hq_PlanGarden_sel13 = 0;
+            if (r5.Chance(450)) hq_PlanGarden_sel13 = 1;
             hq_PlanGarden_r5 = r5;
         }
-        if (PhLoop(22, 100000))
+        if (planPhase == 28 && PhLoop(28, 100000))
         {
-            if (!(hq_PlanGarden_sel6 == 1)) PhBreak();
+            if (!(hq_PlanGarden_sel13 == 1)) PhBreak();
             else
             {
                 if (planIter == 0) { hq_BenchAtEdge_k = 6; PhSubReset(); }
@@ -1368,29 +1634,54 @@ public partial class MapGen
                 if (fin) {  PhBreak(); }
             }
         }
-        if (Ph(23))
+        if (planPhase == 29)
         {
             GenRng r7 = SR(7);
-            if (r7.Chance(500) && Fit(2))
+            hq_PlanGarden_sel14 = 0;
+            if (r7.Chance(500) && Fit(2)) hq_PlanGarden_sel14 = 1;
+            hq_PlanGarden_r7 = r7;
+        }
+        if (planPhase == 30)
+        {
+            if (hq_PlanGarden_sel14 == 1)
             {
+                GenRng r7 = hq_PlanGarden_r7;
                 int first = nEmit;
-                if (GroupAt(GenData.FindGrp("pots"), GenData.A_OUT_EDGE, r7.Between(2, 3), WM_ANY, 0, 0, 0, ref r7)) Keep(first, false);
+                hq_PlanGarden_sel15 = 0;
+                if (GroupAt(GenData.FindGrp("pots"), GenData.A_OUT_EDGE, r7.Between(2, 3), WM_ANY, 0, 0, 0, ref r7)) hq_PlanGarden_sel15 = 1;
+                hq_PlanGarden_r7 = r7;
+                hq_PlanGarden_first = first;
             }
+        }
+        if (planPhase == 31 && PhLoop(31, 100000))
+        {
+            if (!(hq_PlanGarden_sel14 == 1 && hq_PlanGarden_sel15 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanGarden_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (planPhase == 32)
+        {
             // the beds along the fences
             ClearBans();
         }
-        if (PhLoop(24, 100000))
+        if (planPhase == 33 && PhLoop(33, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 8; hq_Borders_soil = true; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(25))
+        if (planPhase == 34)
         {
             GenRng r8 = SR(8);
             hq_PlanGarden_r8 = r8;
         }
-        if (PhLoop(26, 100000))
+        if (planPhase == 35 && PhLoop(35, 100000))
         {
             if (!PhSubActive())
             {
@@ -1410,7 +1701,8 @@ public partial class MapGen
     void PlanGarden_L1()
     {
         int room = pRoom, cells = roomOuterCells[room];
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int t = hq_PlanGarden_t;
             if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
@@ -1422,7 +1714,8 @@ public partial class MapGen
     void PlanGarden_L2()
     {
         int room = pRoom, cells = roomOuterCells[room];
-        if (PhLoop(0, 100000))
+        planMax = 1;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             GenRng r8 = hq_PlanGarden_r8;
             bool ht1 = false;
@@ -1432,7 +1725,7 @@ public partial class MapGen
             hq_PlanGarden_r8 = r8;
             hq_PlanGarden_ht1 = ht1;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             bool ht1 = hq_PlanGarden_ht1;
             if (!ht1)
@@ -1458,7 +1751,8 @@ public partial class MapGen
     // VegPlot in phases, a step a call (autophase4); VegPlot() above runs them to the end
     void VegPlot_Body()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int cell = hq_VegPlot_cell;
             GenRng rng = hq_VegPlot_rng;
@@ -1485,7 +1779,7 @@ public partial class MapGen
             hq_VegPlot_mx = mx;
             hq_VegPlot_mz = mz;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (!PhSubActive())
             {
@@ -1504,7 +1798,8 @@ public partial class MapGen
     }
     void VegPlot_L1()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             GenRng rng = hq_VegPlot_rng;
             int room = hq_VegPlot_room;
@@ -1523,6 +1818,8 @@ public partial class MapGen
             fHost = H_NATURE;
             int e = StampFormation(room, rot, (alongX ? mx : mz) - fLen / 2, (alongX ? mz : mx) + across, -1, 0, g, -1);
             fHost = H_NONE;
+            hq_VegPlot_sel1 = 0;
+            if (e >= 0) hq_VegPlot_sel1 = 1;
             hq_VegPlot_rng = rng;
             hq_VegPlot_room = room;
             hq_VegPlot_alongX = alongX;
@@ -1531,15 +1828,18 @@ public partial class MapGen
             hq_VegPlot_mx = mx;
             hq_VegPlot_mz = mz;
             hq_VegPlot_first = first;
-            hq_VegPlot_e = e;
         }
-        if (Ph(1))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
-            int first = hq_VegPlot_first;
-            int e = hq_VegPlot_e;
-            if (e >= 0) Keep(first, false);
-            hq_VegPlot_first = first;
-            hq_VegPlot_e = e;
+            if (!(hq_VegPlot_sel1 == 1)) PhBreak();
+            else
+            {
+                int first = hq_VegPlot_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_VegPlot_first = first;
+            }
         }
     }
 
@@ -1549,18 +1849,19 @@ public partial class MapGen
     // is lawn with its borders.
     void PlanPatio()
     {
-        if (Ph(0))
+        planMax = 24;
+        if (planPhase == 0)
         {
             int room = pRoom;
             hq_PlanPatio_room = room;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
             PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int room = hq_PlanPatio_room;
             GenRng r = SR(1);
@@ -1601,13 +1902,13 @@ public partial class MapGen
             hq_PlanPatio_midX = midX;
             hq_PlanPatio_midZ = midZ;
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             int room = hq_PlanPatio_room;
             for (int q = 1; q < roomDoorCount[room]; q++) { GenRng rq = SR(40 + q); StonePath(room, q, 7 + rq.Range(6), ref rq); }
             hq_PlanPatio_room = room;
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             GenRng r = hq_PlanPatio_r;
             // (b) the table set on the paving
@@ -1615,7 +1916,7 @@ public partial class MapGen
             hq_PlanPatio_r = r;
             hq_PlanPatio_setDef = setDef;
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             GenRng r = hq_PlanPatio_r;
             int midX = hq_PlanPatio_midX;
@@ -1631,14 +1932,14 @@ public partial class MapGen
             hq_PlanPatio_setDef = setDef;
             hq_PlanPatio_set = set;
         }
-        if (Ph(6))
+        if (planPhase == 6)
         {
             int set = hq_PlanPatio_set;
             hq_PlanPatio_sel1 = 0;
             if (set < 0) hq_PlanPatio_sel1 = 1;
             hq_PlanPatio_set = set;
         }
-        if (PhLoop(7, 100000))
+        if (planPhase == 7 && PhLoop(7, 100000))
         {
             if (!(hq_PlanPatio_sel1 == 1)) PhBreak();
             else
@@ -1656,7 +1957,7 @@ public partial class MapGen
                 hq_PlanPatio_set = set;
             }
         }
-        if (Ph(8))
+        if (planPhase == 8)
         {
             GenRng r = hq_PlanPatio_r;
             int midX = hq_PlanPatio_midX;
@@ -1678,7 +1979,7 @@ public partial class MapGen
             hq_PlanPatio_set = set;
             hq_PlanPatio_r2 = r2;
         }
-        if (Ph(9))
+        if (planPhase == 9)
         {
             if (hq_PlanPatio_sel2 == 1)
             {
@@ -1690,36 +1991,38 @@ public partial class MapGen
                 fHost = H_FREE;
                 bool ok = GroupAt(GenData.FindGrp("loungers"), GenData.A_COVERED, 2, WM_FAR, set >= 0 ? emitX[set] : midX, set >= 0 ? emitZ[set] : midZ, 0, ref r2);
                 fHost = H_NONE;
+                hq_PlanPatio_sel3 = 0;
+                if (ok) hq_PlanPatio_sel3 = 1;
                 hq_PlanPatio_midX = midX;
                 hq_PlanPatio_midZ = midZ;
                 hq_PlanPatio_set = set;
                 hq_PlanPatio_r2 = r2;
                 hq_PlanPatio_first = first;
-                hq_PlanPatio_ok = ok;
             }
         }
-        if (Ph(10))
+        if (planPhase == 10 && PhLoop(10, 100000))
         {
-            if (hq_PlanPatio_sel2 == 1)
+            if (!(hq_PlanPatio_sel2 == 1 && hq_PlanPatio_sel3 == 1)) PhBreak();
+            else
             {
                 int first = hq_PlanPatio_first;
-                bool ok = hq_PlanPatio_ok;
-                if (ok) Keep(first, false);
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
                 hq_PlanPatio_first = first;
-                hq_PlanPatio_ok = ok;
             }
         }
-        if (Ph(11))
+        if (planPhase == 11)
         {
             GenRng r2 = hq_PlanPatio_r2;
             DoorSides(50);
-            hq_PlanPatio_sel3 = 0;
-            if (r2.Chance(550)) hq_PlanPatio_sel3 = 1;
+            hq_PlanPatio_sel4 = 0;
+            if (r2.Chance(550)) hq_PlanPatio_sel4 = 1;
             hq_PlanPatio_r2 = r2;
         }
-        if (PhLoop(12, 100000))
+        if (planPhase == 12 && PhLoop(12, 100000))
         {
-            if (!(hq_PlanPatio_sel3 == 1)) PhBreak();
+            if (!(hq_PlanPatio_sel4 == 1)) PhBreak();
             else
             {
                 if (planIter == 0) { hq_BenchAtEdge_k = 3; PhSubReset(); }
@@ -1727,33 +2030,74 @@ public partial class MapGen
                 if (fin) {  PhBreak(); }
             }
         }
-        if (Ph(13))
+        if (planPhase == 13)
         {
-            int midX = hq_PlanPatio_midX;
-            int midZ = hq_PlanPatio_midZ;
             GenRng r4 = SR(4);
-            if (r4.Chance(500) && Fit(2))
+            hq_PlanPatio_sel5 = 0;
+            if (r4.Chance(500) && Fit(2)) hq_PlanPatio_sel5 = 1;
+            hq_PlanPatio_r4 = r4;
+        }
+        if (planPhase == 14)
+        {
+            if (hq_PlanPatio_sel5 == 1)
             {
+                int midX = hq_PlanPatio_midX;
+                int midZ = hq_PlanPatio_midZ;
+                GenRng r4 = hq_PlanPatio_r4;
                 int first = nEmit;
-                if (GroupAt(GenData.FindGrp("pots"), GenData.A_OUT_EDGE, r4.Between(2, 3), WM_NEAR, midX, midZ, 0, ref r4)) Keep(first, false);
+                hq_PlanPatio_sel6 = 0;
+                if (GroupAt(GenData.FindGrp("pots"), GenData.A_OUT_EDGE, r4.Between(2, 3), WM_NEAR, midX, midZ, 0, ref r4)) hq_PlanPatio_sel6 = 1;
+                hq_PlanPatio_midX = midX;
+                hq_PlanPatio_midZ = midZ;
+                hq_PlanPatio_r4 = r4;
+                hq_PlanPatio_first = first;
             }
+        }
+        if (planPhase == 15 && PhLoop(15, 100000))
+        {
+            if (!(hq_PlanPatio_sel5 == 1 && hq_PlanPatio_sel6 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanPatio_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanPatio_first = first;
+            }
+        }
+        if (planPhase == 16)
+        {
             GenRng r5 = SR(5);
-            hq_PlanPatio_midX = midX;
-            hq_PlanPatio_midZ = midZ;
+            hq_PlanPatio_sel7 = 0;
+            if (r5.Chance(300) && Fit(1)) hq_PlanPatio_sel7 = 1;
             hq_PlanPatio_r5 = r5;
         }
-        if (Ph(14))
+        if (planPhase == 17)
         {
-            GenRng r5 = hq_PlanPatio_r5;
-            if (r5.Chance(300) && Fit(1))
+            if (hq_PlanPatio_sel7 == 1)
             {
+                GenRng r5 = hq_PlanPatio_r5;
                 int first = nEmit;
                 FSet(Dn("s_barrel"));
-                if (FormAt(GenData.GL_ROW, 0, GenData.A_BUILDING, WM_ANY, 0, 0, 0, ref r5) >= 0) Keep(first, false);
+                hq_PlanPatio_sel8 = 0;
+                if (FormAt(GenData.GL_ROW, 0, GenData.A_BUILDING, WM_ANY, 0, 0, 0, ref r5) >= 0) hq_PlanPatio_sel8 = 1;
+                hq_PlanPatio_r5 = r5;
+                hq_PlanPatio_first = first;
             }
-            hq_PlanPatio_r5 = r5;
         }
-        if (Ph(15))
+        if (planPhase == 18 && PhLoop(18, 100000))
+        {
+            if (!(hq_PlanPatio_sel7 == 1 && hq_PlanPatio_sel8 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanPatio_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanPatio_first = first;
+            }
+        }
+        if (planPhase == 19)
         {
             int room = hq_PlanPatio_room;
             GenRng r5 = hq_PlanPatio_r5;
@@ -1762,7 +2106,7 @@ public partial class MapGen
             hq_PlanPatio_r5 = r5;
             hq_PlanPatio_trees = trees;
         }
-        if (PhLoop(16, 100000))
+        if (planPhase == 20 && PhLoop(20, 100000))
         {
             int trees = hq_PlanPatio_trees;
             if (!PhSubActive())
@@ -1780,22 +2124,22 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(17))
+        if (planPhase == 21)
         {
             ClearBans();
         }
-        if (PhLoop(18, 100000))
+        if (planPhase == 22 && PhLoop(22, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = true; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(19))
+        if (planPhase == 23)
         {
             GenRng r6 = SR(6);
             hq_PlanPatio_r6 = r6;
         }
-        if (PhLoop(20, 100000))
+        if (planPhase == 24 && PhLoop(24, 100000))
         {
             if (!PhSubActive())
             {
@@ -1814,7 +2158,8 @@ public partial class MapGen
     }
     void PlanPatio_L1()
     {
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int t = hq_PlanPatio_t;
             if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
@@ -1825,7 +2170,8 @@ public partial class MapGen
 
     void PlanPatio_L2()
     {
-        if (PhLoop(0, 100000))
+        planMax = 1;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             GenRng r6 = hq_PlanPatio_r6;
             bool ht1 = false;
@@ -1835,7 +2181,7 @@ public partial class MapGen
             hq_PlanPatio_r6 = r6;
             hq_PlanPatio_ht1 = ht1;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             bool ht1 = hq_PlanPatio_ht1;
             if (!ht1)
@@ -1864,7 +2210,8 @@ public partial class MapGen
     // FrontMarkers in phases, a step a call (autophase4); FrontMarkers() above runs them to the end
     void FrontMarkers_Body()
     {
-        if (Ph(0))
+        planMax = 3;
+        if (planPhase == 0)
         {
             int room = pRoom, type = roomType[room];
             bool lane = type == GenData.R_LANE;
@@ -1875,7 +2222,7 @@ public partial class MapGen
             hq_FrontMarkers_n = n;
         }
         // doorways of this room into a building: a shop's customer door, or (from the lane) a house's front door
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int room = hq_FrontMarkers_room;
             if (!PhSubActive())
@@ -1893,14 +2240,14 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             bool lane = hq_FrontMarkers_lane;
             if (!lane) { hq_FrontMarkers_lane = lane; PhEnd(); return; }
             hq_FrontMarkers_lane = lane;
         }
         // a house's garden opens onto the lane through a gap in the fence: the mailbox beside it
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             if (!PhSubActive())
             {
@@ -1919,7 +2266,8 @@ public partial class MapGen
     }
     void FrontMarkers_L1()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int room = hq_FrontMarkers_room;
             bool lane = hq_FrontMarkers_lane;
@@ -1934,7 +2282,7 @@ public partial class MapGen
             hq_FrontMarkers_cell = cell;
             hq_FrontMarkers_zone = zone;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int k0 = hq_FrontMarkers_k0;
             int n = hq_FrontMarkers_n;
@@ -1950,7 +2298,8 @@ public partial class MapGen
 
     void FrontMarkers_L2()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int room = hq_FrontMarkers_room;
             int c = hq_FrontMarkers_c;
@@ -1960,7 +2309,7 @@ public partial class MapGen
             hq_FrontMarkers_cx = cx;
             hq_FrontMarkers_cz = cz;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int k0 = hq_FrontMarkers_k0;
             int n = hq_FrontMarkers_n;
@@ -2004,40 +2353,69 @@ public partial class MapGen
     // a shop's front, planting between the gates.
     void PlanLane()
     {
+        planMax = 11;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             int rx = (releaseX * 8 + 4) * GenData.INNER_MM, rz = (releaseZ * 8 + 4) * GenData.INNER_MM;
             GenRng r = SR(1);
             // the sign by the release, in the lane's first room only (layout 14: the lane is in rooms of six cells)
             int fx = releaseX + DX[releaseDir], fz = releaseZ + DZ[releaseDir];
             bool firstRoom = InGrid(fx, fz) && cellRoom[fz * W + fx] == room;
-            if (firstRoom && Fit(1))
+            hq_PlanLane_sel1 = 0;
+            if (firstRoom && Fit(1)) hq_PlanLane_sel1 = 1;
+            hq_PlanLane_rx = rx;
+            hq_PlanLane_rz = rz;
+            hq_PlanLane_r = r;
+        }
+        if (planPhase == 1)
+        {
+            if (hq_PlanLane_sel1 == 1)
             {
+                int rx = hq_PlanLane_rx;
+                int rz = hq_PlanLane_rz;
+                GenRng r = hq_PlanLane_r;
                 int first = nEmit;
-                if (WallPlace(Dn("n_sign"), SignGap, WM_NEAR, rx, rz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
+                hq_PlanLane_sel2 = 0;
+                if (WallPlace(Dn("n_sign"), SignGap, WM_NEAR, rx, rz, WIN_ANY, 0, ref r) >= 0) hq_PlanLane_sel2 = 1;
+                hq_PlanLane_rx = rx;
+                hq_PlanLane_rz = rz;
+                hq_PlanLane_r = r;
+                hq_PlanLane_first = first;
             }
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            if (!(hq_PlanLane_sel1 == 1 && hq_PlanLane_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanLane_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanLane_first = first;
+            }
+        }
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
             PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (PhLoop(2, 100000))
+        if (planPhase == 4 && PhLoop(4, 100000))
         {
             if (planIter == 0) { hq_BenchAtEdge_k = 2; PhSubReset(); }
             PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(3))
+        if (planPhase == 5)
         {
-            hq_PlanLane_sel1 = 0;
-            if (AreaM2(room) >= 100) hq_PlanLane_sel1 = 1;
+            hq_PlanLane_sel3 = 0;
+            if (AreaM2(room) >= 100) hq_PlanLane_sel3 = 1;
         }
-        if (PhLoop(4, 100000))
+        if (planPhase == 6 && PhLoop(6, 100000))
         {
-            if (!(hq_PlanLane_sel1 == 1)) PhBreak();
+            if (!(hq_PlanLane_sel3 == 1)) PhBreak();
             else
             {
                 if (planIter == 0) { hq_BenchAtEdge_k = 3; PhSubReset(); }
@@ -2045,17 +2423,42 @@ public partial class MapGen
                 if (fin) {  PhBreak(); }
             }
         }
-        if (Ph(5))
+        if (planPhase == 7)
         {
             GenRng r4 = SR(4);
-            if (r4.Chance(600) && Fit(1))
+            hq_PlanLane_sel4 = 0;
+            if (r4.Chance(600) && Fit(1)) hq_PlanLane_sel4 = 1;
+            hq_PlanLane_r4 = r4;
+        }
+        if (planPhase == 8)
+        {
+            if (hq_PlanLane_sel4 == 1)
             {
+                GenRng r4 = hq_PlanLane_r4;
                 int first = nEmit;
-                if (WallPlace(Dn("k_trashcan"), WM_ANY, 0, 0, WIN_ANY, 0, ref r4) >= 0) Keep(first, false);
+                hq_PlanLane_sel5 = 0;
+                if (WallPlace(Dn("k_trashcan"), WM_ANY, 0, 0, WIN_ANY, 0, ref r4) >= 0) hq_PlanLane_sel5 = 1;
+                hq_PlanLane_r4 = r4;
+                hq_PlanLane_first = first;
             }
+        }
+        if (planPhase == 9 && PhLoop(9, 100000))
+        {
+            if (!(hq_PlanLane_sel4 == 1 && hq_PlanLane_sel5 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanLane_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanLane_first = first;
+            }
+        }
+        if (planPhase == 10)
+        {
             ClearBans();
         }
-        if (PhLoop(6, 100000))
+        if (planPhase == 11 && PhLoop(11, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = false; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
@@ -2069,20 +2472,21 @@ public partial class MapGen
     // hand truck and the dumpster (or a bin) by the door. The way from the door to the gates stays open.
     void PlanYard()
     {
-        if (Ph(0))
+        planMax = 16;
+        if (planPhase == 0)
         {
             int room = pRoom, dx = 0, dz = 0;
             hq_PlanYard_room = room;
             hq_PlanYard_dx = dx;
             hq_PlanYard_dz = dz;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
             PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int room = hq_PlanYard_room;
             int dx = hq_PlanYard_dx;
@@ -2091,96 +2495,224 @@ public partial class MapGen
             bool diner = false;
             for (int k = 0; k < roomDoorCount[room]; k++) if (DoorZone(room, k) == GenData.Z_DINER) diner = true;
             GenRng r = SR(1);
+            hq_PlanYard_sel1 = 0;
+            if (!diner && Fit(2)) hq_PlanYard_sel1 = 1;
             hq_PlanYard_room = room;
             hq_PlanYard_dx = dx;
             hq_PlanYard_dz = dz;
             hq_PlanYard_diner = diner;
             hq_PlanYard_r = r;
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
-            int dx = hq_PlanYard_dx;
-            int dz = hq_PlanYard_dz;
-            bool diner = hq_PlanYard_diner;
-            GenRng r = hq_PlanYard_r;
-            if (!diner && Fit(2))
+            if (hq_PlanYard_sel1 == 1)
             {
+                int dx = hq_PlanYard_dx;
+                int dz = hq_PlanYard_dz;
+                GenRng r = hq_PlanYard_r;
                 // pallets side by side against the building beside the dock door
                 int first = nEmit;
                 FSet(Dn("w_pallet"), Dn(r.Chance(500) ? "w_palletLoaded" : "w_pallet"));
-                if (FormAt(GenData.GL_ROW, 100, GenData.A_BUILDING, WM_NEAR, dx, dz, 0, ref r) >= 0) Keep(first, false);
+                hq_PlanYard_sel2 = 0;
+                if (FormAt(GenData.GL_ROW, 100, GenData.A_BUILDING, WM_NEAR, dx, dz, 0, ref r) >= 0) hq_PlanYard_sel2 = 1;
+                hq_PlanYard_dx = dx;
+                hq_PlanYard_dz = dz;
+                hq_PlanYard_r = r;
+                hq_PlanYard_first = first;
             }
+        }
+        if (planPhase == 4 && PhLoop(4, 100000))
+        {
+            if (!(hq_PlanYard_sel1 == 1 && hq_PlanYard_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanYard_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanYard_first = first;
+            }
+        }
+        if (planPhase == 5)
+        {
+            bool diner = hq_PlanYard_diner;
             string[] rows = diner ? new string[] { "crates", "barrels", "boxes", "sacks" } : new string[] { "crates", "barrels", "fuel", "boxes", "sacks" };
-            hq_PlanYard_dx = dx;
-            hq_PlanYard_dz = dz;
             hq_PlanYard_diner = diner;
-            hq_PlanYard_r = r;
             hq_PlanYard_rows = rows;
         }
-        if (PhLoop(4, 100000))
+        if (planPhase == 6 && PhLoop(6, 100000))
+        {
+            string[] rows = hq_PlanYard_rows;
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < rows.Length)) PhBreak();
+                else { hq_PlanYard_k = k; PhSubBegin(); }
+            }
+            hq_PlanYard_rows = rows;
+            if (PhSubActive())
+            {
+                PhPush(); PlanYard_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (planPhase == 7)
+        {
+            bool diner = hq_PlanYard_diner;
+            GenRng r8 = SR(8);
+            hq_PlanYard_sel4 = 0;
+            if (!diner && r8.Chance(700) && Fit(1)) hq_PlanYard_sel4 = 1;
+            hq_PlanYard_diner = diner;
+            hq_PlanYard_r8 = r8;
+        }
+        if (planPhase == 8)
+        {
+            if (hq_PlanYard_sel4 == 1)
+            {
+                int dx = hq_PlanYard_dx;
+                int dz = hq_PlanYard_dz;
+                GenRng r8 = hq_PlanYard_r8;
+                int first = nEmit;
+                hq_PlanYard_sel5 = 0;
+                if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r8) >= 0) hq_PlanYard_sel5 = 1;
+                hq_PlanYard_dx = dx;
+                hq_PlanYard_dz = dz;
+                hq_PlanYard_r8 = r8;
+                hq_PlanYard_first = first;
+            }
+        }
+        if (planPhase == 9 && PhLoop(9, 100000))
+        {
+            if (!(hq_PlanYard_sel4 == 1 && hq_PlanYard_sel5 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanYard_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanYard_first = first;
+            }
+        }
+        if (planPhase == 10)
+        {
+            GenRng r9 = SR(9);
+            hq_PlanYard_sel6 = 0;
+            if (r9.Chance(750) && Fit(1)) hq_PlanYard_sel6 = 1;
+            hq_PlanYard_r9 = r9;
+        }
+        if (planPhase == 11)
+        {
+            if (hq_PlanYard_sel6 == 1)
+            {
+                int dx = hq_PlanYard_dx;
+                int dz = hq_PlanYard_dz;
+                GenRng r9 = hq_PlanYard_r9;
+                // the waste: a dumpster at the fence or the wall near the door, else a bin
+                int first = nEmit;
+                hq_PlanYard_sel7 = 0;
+                if (WallPlace(Dn("gen_dumpster"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r9) < 0 || !Keep(first, false)) hq_PlanYard_sel7 = 1;
+                hq_PlanYard_dx = dx;
+                hq_PlanYard_dz = dz;
+                hq_PlanYard_r9 = r9;
+                hq_PlanYard_first = first;
+            }
+        }
+        if (planPhase == 12)
+        {
+            if (hq_PlanYard_sel6 == 1 && hq_PlanYard_sel7 == 1)
+            {
+                int dx = hq_PlanYard_dx;
+                int dz = hq_PlanYard_dz;
+                GenRng r9 = hq_PlanYard_r9;
+                int first = hq_PlanYard_first;
+                first = nEmit;
+                hq_PlanYard_sel8 = 0;
+                if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r9) >= 0) hq_PlanYard_sel8 = 1;
+                hq_PlanYard_dx = dx;
+                hq_PlanYard_dz = dz;
+                hq_PlanYard_r9 = r9;
+                hq_PlanYard_first = first;
+            }
+        }
+        if (planPhase == 13 && PhLoop(13, 100000))
+        {
+            if (!(hq_PlanYard_sel6 == 1 && hq_PlanYard_sel7 == 1 && hq_PlanYard_sel8 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanYard_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanYard_first = first;
+            }
+        }
+        if (planPhase == 14)
+        {
+            GenRng r10 = SR(10);
+            hq_PlanYard_sel9 = 0;
+            if (r10.Chance(450) && Fit(1)) hq_PlanYard_sel9 = 1;
+            hq_PlanYard_r10 = r10;
+        }
+        if (planPhase == 15)
+        {
+            if (hq_PlanYard_sel9 == 1)
+            {
+                GenRng r10 = hq_PlanYard_r10;
+                int first = nEmit;
+                hq_PlanYard_sel10 = 0;
+                if (WallPlace(Pick(ref r10, "s_boxLarge", 5, "w_planks", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r10) >= 0) hq_PlanYard_sel10 = 1;
+                hq_PlanYard_r10 = r10;
+                hq_PlanYard_first = first;
+            }
+        }
+        if (planPhase == 16 && PhLoop(16, 100000))
+        {
+            if (!(hq_PlanYard_sel9 == 1 && hq_PlanYard_sel10 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanYard_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanYard_first = first;
+            }
+        }
+    }
+    void PlanYard_L1()
+    {
+        planMax = 1;
+        if (planPhase == 0)
         {
             int dx = hq_PlanYard_dx;
             int dz = hq_PlanYard_dz;
             string[] rows = hq_PlanYard_rows;
-            int k = planIter;
-            if (!(k < rows.Length)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
-            {
-                GenRng rk = SR(2 + k);
-                if (!rk.Chance(k < 2 ? 800 : 500) || !Fit(2)) continue;
-                int first = nEmit;
-                if (GroupAt(GenData.FindGrp(rows[k]), GenData.A_OUT_EDGE, rk.Between(2, 3), WM_NEAR, dx, dz, 0, ref rk)) Keep(first, false);
-            }
+            int k = hq_PlanYard_k;
+            GenRng rk = SR(2 + k);
+            if (!rk.Chance(k < 2 ? 800 : 500) || !Fit(2)) { hq_PlanYard_dx = dx; hq_PlanYard_dz = dz; hq_PlanYard_rows = rows; PhEnd(); return; }
+            int first = nEmit;
+            hq_PlanYard_sel3 = 0;
+            if (GroupAt(GenData.FindGrp(rows[k]), GenData.A_OUT_EDGE, rk.Between(2, 3), WM_NEAR, dx, dz, 0, ref rk)) hq_PlanYard_sel3 = 1;
             hq_PlanYard_dx = dx;
             hq_PlanYard_dz = dz;
             hq_PlanYard_rows = rows;
+            hq_PlanYard_first = first;
         }
-        if (Ph(5))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
-            int dx = hq_PlanYard_dx;
-            int dz = hq_PlanYard_dz;
-            bool diner = hq_PlanYard_diner;
-            GenRng r8 = SR(8);
-            if (!diner && r8.Chance(700) && Fit(1))
+            if (!(hq_PlanYard_sel3 == 1)) PhBreak();
+            else
             {
-                int first = nEmit;
-                if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r8) >= 0) Keep(first, false);
-            }
-            GenRng r9 = SR(9);
-            hq_PlanYard_dx = dx;
-            hq_PlanYard_dz = dz;
-            hq_PlanYard_diner = diner;
-            hq_PlanYard_r9 = r9;
-        }
-        if (Ph(6))
-        {
-            int dx = hq_PlanYard_dx;
-            int dz = hq_PlanYard_dz;
-            GenRng r9 = hq_PlanYard_r9;
-            if (r9.Chance(750) && Fit(1))
-            {
-                // the waste: a dumpster at the fence or the wall near the door, else a bin
-                int first = nEmit;
-                if (WallPlace(Dn("gen_dumpster"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r9) < 0 || !Keep(first, false))
-                {
-                    first = nEmit;
-                    if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r9) >= 0) Keep(first, false);
-                }
-            }
-            hq_PlanYard_dx = dx;
-            hq_PlanYard_dz = dz;
-            hq_PlanYard_r9 = r9;
-        }
-        if (Ph(7))
-        {
-            GenRng r10 = SR(10);
-            if (r10.Chance(450) && Fit(1))
-            {
-                int first = nEmit;
-                if (WallPlace(Pick(ref r10, "s_boxLarge", 5, "w_planks", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r10) >= 0) Keep(first, false);
+                int first = hq_PlanYard_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanYard_first = first;
             }
         }
     }
+
 
     // ============================================================================================ FIRE PIT
     // Areas: the fire on trodden earth with its ring of seats; the wood pile and the chopping block at the edge;
@@ -2202,12 +2734,13 @@ public partial class MapGen
     // FireRing in phases, a step a call (autophase4); FireRing() above runs them to the end
     void FireRing_Body()
     {
-        if (Ph(0))
+        planMax = 4;
+        if (planPhase == 0)
         {
             int room = pRoom;
             hq_FireRing_room = room;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int tx = hq_FireRing_tx;
             int tz = hq_FireRing_tz;
@@ -2221,7 +2754,7 @@ public partial class MapGen
             hq_FireRing_rng = rng;
             hq_FireRing_fire = fire;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             bool soft = hq_FireRing_soft;
             int room = hq_FireRing_room;
@@ -2244,7 +2777,7 @@ public partial class MapGen
             hq_FireRing_room = room;
             hq_FireRing_fire = fire;
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             if (!(hq_FireRing_sel1 == 1)) PhBreak();
             else
@@ -2258,7 +2791,7 @@ public partial class MapGen
                 hq_FireRing_fire = fire;
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             int fire = hq_FireRing_fire;
             { hq_FireRing_ret = fire; hq_FireRing_fire = fire; PhEnd(); return; }
@@ -2280,41 +2813,71 @@ public partial class MapGen
     // FireGear in phases, a step a call (autophase4); FireGear() above runs them to the end
     void FireGear_Body()
     {
-        if (Ph(0))
+        planMax = 5;
+        if (planPhase == 0)
         {
-            int fire = hq_FireGear_fire;
             GenRng rng = hq_FireGear_rng;
-            if (rng.Chance(650) && Fit(2))
-            {
-                int first = nEmit;
-                if (GroupBeside(GenData.FindGrp("logpile"), fire, 2, 0, ref rng)) Keep(first, false);
-            }
             hq_FireGear_sel1 = 0;
-            if (rng.Chance(600) && Fit(1)) hq_FireGear_sel1 = 1;
-            hq_FireGear_fire = fire;
+            if (rng.Chance(650) && Fit(2)) hq_FireGear_sel1 = 1;
             hq_FireGear_rng = rng;
         }
-        if (Ph(1))
-        {
-            if (hq_FireGear_sel1 == 1)
-            {
-                GenRng rng = hq_FireGear_rng;
-                int first = nEmit;
-                FSet(Pick(ref rng, "m_bucketWater", 6, "s_bucket", 3));
-                hq_FireGear_rng = rng;
-                hq_FireGear_first = first;
-            }
-        }
-        if (Ph(2))
+        if (planPhase == 1)
         {
             if (hq_FireGear_sel1 == 1)
             {
                 int fire = hq_FireGear_fire;
                 GenRng rng = hq_FireGear_rng;
-                int first = hq_FireGear_first;
-                if (FormBeside(GenData.GL_ROW, 0, fire, 0, ref rng) >= 0) Keep(first, false);
+                int first = nEmit;
+                hq_FireGear_sel2 = 0;
+                if (GroupBeside(GenData.FindGrp("logpile"), fire, 2, 0, ref rng)) hq_FireGear_sel2 = 1;
                 hq_FireGear_fire = fire;
                 hq_FireGear_rng = rng;
+                hq_FireGear_first = first;
+            }
+        }
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            if (!(hq_FireGear_sel1 == 1 && hq_FireGear_sel2 == 1)) PhBreak();
+            else
+            {
+                int first = hq_FireGear_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_FireGear_first = first;
+            }
+        }
+        if (planPhase == 3)
+        {
+            GenRng rng = hq_FireGear_rng;
+            hq_FireGear_sel3 = 0;
+            if (rng.Chance(600) && Fit(1)) hq_FireGear_sel3 = 1;
+            hq_FireGear_rng = rng;
+        }
+        if (planPhase == 4)
+        {
+            if (hq_FireGear_sel3 == 1)
+            {
+                int fire = hq_FireGear_fire;
+                GenRng rng = hq_FireGear_rng;
+                int first = nEmit;
+                FSet(Pick(ref rng, "m_bucketWater", 6, "s_bucket", 3));
+                hq_FireGear_sel4 = 0;
+                if (FormBeside(GenData.GL_ROW, 0, fire, 0, ref rng) >= 0) hq_FireGear_sel4 = 1;
+                hq_FireGear_fire = fire;
+                hq_FireGear_rng = rng;
+                hq_FireGear_first = first;
+            }
+        }
+        if (planPhase == 5 && PhLoop(5, 100000))
+        {
+            if (!(hq_FireGear_sel3 == 1 && hq_FireGear_sel4 == 1)) PhBreak();
+            else
+            {
+                int first = hq_FireGear_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
                 hq_FireGear_first = first;
             }
         }
@@ -2344,7 +2907,8 @@ public partial class MapGen
     // AroundFire in phases, a step a call (autophase4); AroundFire() above runs them to the end
     void AroundFire_Body()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             int fire = hq_AroundFire_fire;
             GenRng rng = hq_AroundFire_rng;
@@ -2357,7 +2921,7 @@ public partial class MapGen
             hq_AroundFire_fz = fz;
             hq_AroundFire_a0 = a0;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (!PhSubActive())
             {
@@ -2373,14 +2937,15 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             { hq_AroundFire_ret = -1; PhEnd(); return; }
         }
     }
     void AroundFire_L2()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int def = hq_AroundFire_def;
             int fire = hq_AroundFire_fire;
@@ -2410,12 +2975,15 @@ public partial class MapGen
             hq_AroundFire_first = first;
             hq_AroundFire_e = e;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             bool must = hq_AroundFire_must;
             int first = hq_AroundFire_first;
             int e = hq_AroundFire_e;
-            if (e >= 0 && Keep(first, must)) { hq_AroundFire_ret = e; hq_AroundFire_must = must; hq_AroundFire_first = first; hq_AroundFire_e = e; phReturn = true; PhEnd(); return; }
+            if (e >= 0 && Keep(first, must))
+            {
+                { hq_AroundFire_ret = e; hq_AroundFire_must = must; hq_AroundFire_first = first; hq_AroundFire_e = e; phReturn = true; PhEnd(); return; }
+            }
             hq_AroundFire_must = must;
             hq_AroundFire_first = first;
             hq_AroundFire_e = e;
@@ -2424,7 +2992,8 @@ public partial class MapGen
 
     void AroundFire_L1()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int a0 = hq_AroundFire_a0;
             int k = hq_AroundFire_k;
@@ -2432,7 +3001,7 @@ public partial class MapGen
             hq_AroundFire_a0 = a0;
             hq_AroundFire_a = a;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int distMin = hq_AroundFire_distMin;
             int distMax = hq_AroundFire_distMax;
@@ -2488,7 +3057,8 @@ public partial class MapGen
     // WoodPile in phases, a step a call (autophase4); WoodPile() above runs them to the end
     void WoodPile_Body()
     {
-        if (Ph(0))
+        planMax = 10;
+        if (planPhase == 0)
         {
             bool atEdge = hq_WoodPile_atEdge;
             GenRng rng = hq_WoodPile_rng;
@@ -2504,7 +3074,7 @@ public partial class MapGen
             hq_WoodPile_stackDef = stackDef;
             hq_WoodPile_stack = stack;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (!(hq_WoodPile_sel1 == 1)) PhBreak();
             else
@@ -2522,7 +3092,7 @@ public partial class MapGen
                 hq_WoodPile_stack = stack;
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int fire = hq_WoodPile_fire;
             int stack = hq_WoodPile_stack;
@@ -2531,7 +3101,7 @@ public partial class MapGen
             hq_WoodPile_fire = fire;
             hq_WoodPile_stack = stack;
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             if (!(hq_WoodPile_sel2 == 1)) PhBreak();
             else
@@ -2549,7 +3119,7 @@ public partial class MapGen
                 hq_WoodPile_stack = stack;
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             int fire = hq_WoodPile_fire;
             int stackDef = hq_WoodPile_stackDef;
@@ -2560,7 +3130,7 @@ public partial class MapGen
             hq_WoodPile_stackDef = stackDef;
             hq_WoodPile_stack = stack;
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             if (!(hq_WoodPile_sel3 == 1)) PhBreak();
             else
@@ -2576,7 +3146,7 @@ public partial class MapGen
                 hq_WoodPile_stack = stack;
             }
         }
-        if (Ph(6))
+        if (planPhase == 6)
         {
             bool atEdge = hq_WoodPile_atEdge;
             int stack = hq_WoodPile_stack;
@@ -2585,7 +3155,7 @@ public partial class MapGen
             hq_WoodPile_atEdge = atEdge;
             hq_WoodPile_stack = stack;
         }
-        if (PhLoop(7, 100000))
+        if (planPhase == 7 && PhLoop(7, 100000))
         {
             if (!(hq_WoodPile_sel4 == 1)) PhBreak();
             else
@@ -2599,20 +3169,42 @@ public partial class MapGen
                 hq_WoodPile_stack = stack;
             }
         }
-        if (Ph(8))
+        if (planPhase == 8)
         {
             GenRng rng = hq_WoodPile_rng;
-            int first = hq_WoodPile_first;
             int stack = hq_WoodPile_stack;
-            if (stack < 0) { hq_WoodPile_rng = rng; hq_WoodPile_first = first; hq_WoodPile_stack = stack; PhEnd(); return; }
-            if (rng.Chance(750) && Fit(1))
-            {
-                first = nEmit;
-                if (RelBeside(Pick(ref rng, "n_stump", 6, "n_stumpRound", 4), stack, 0, 250, 0, ref rng) >= 0) Keep(first, false);
-            }
+            if (stack < 0) { hq_WoodPile_rng = rng; hq_WoodPile_stack = stack; PhEnd(); return; }
+            hq_WoodPile_sel5 = 0;
+            if (rng.Chance(750) && Fit(1)) hq_WoodPile_sel5 = 1;
             hq_WoodPile_rng = rng;
-            hq_WoodPile_first = first;
             hq_WoodPile_stack = stack;
+        }
+        if (planPhase == 9)
+        {
+            if (hq_WoodPile_sel5 == 1)
+            {
+                GenRng rng = hq_WoodPile_rng;
+                int first = hq_WoodPile_first;
+                int stack = hq_WoodPile_stack;
+                first = nEmit;
+                hq_WoodPile_sel6 = 0;
+                if (RelBeside(Pick(ref rng, "n_stump", 6, "n_stumpRound", 4), stack, 0, 250, 0, ref rng) >= 0) hq_WoodPile_sel6 = 1;
+                hq_WoodPile_rng = rng;
+                hq_WoodPile_first = first;
+                hq_WoodPile_stack = stack;
+            }
+        }
+        if (planPhase == 10 && PhLoop(10, 100000))
+        {
+            if (!(hq_WoodPile_sel5 == 1 && hq_WoodPile_sel6 == 1)) PhBreak();
+            else
+            {
+                int first = hq_WoodPile_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_WoodPile_first = first;
+            }
         }
     }
 
@@ -2631,7 +3223,8 @@ public partial class MapGen
     // FireSeats in phases, a step a call (autophase4); FireSeats() above runs them to the end
     void FireSeats_Body()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int fire = hq_FireSeats_fire;
             int k = hq_FireSeats_k;
@@ -2645,7 +3238,7 @@ public partial class MapGen
             hq_FireSeats_n = n;
             hq_FireSeats_s = s;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int n = hq_FireSeats_n;
             int s = hq_FireSeats_s;
@@ -2668,7 +3261,8 @@ public partial class MapGen
     }
     void FireSeats_L1()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             bool wood = hq_FireSeats_wood;
             GenRng rng = hq_FireSeats_rng;
@@ -2681,7 +3275,7 @@ public partial class MapGen
             hq_FireSeats_rel = rel;
         }
         // a log is a small loose thing: it keeps within a step of the fire (G25: nothing loose alone in the open)
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int fire = hq_FireSeats_fire;
             GenRng rng = hq_FireSeats_rng;
@@ -2697,7 +3291,7 @@ public partial class MapGen
             hq_FireSeats_rel = rel;
             hq_FireSeats_ht1 = ht1;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int s = hq_FireSeats_s;
             int ht1 = hq_FireSeats_ht1;
@@ -2713,13 +3307,14 @@ public partial class MapGen
 
     void PlanFirepit()
     {
+        planMax = 14;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             GenRng r = SR(1);
             hq_PlanFirepit_r = r;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             GenRng r = hq_PlanFirepit_r;
             if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = r; PhSubReset(); }
@@ -2727,7 +3322,7 @@ public partial class MapGen
             if (fin) { r = hq_StonePaths_rng; PhBreak(); }
             hq_PlanFirepit_r = r;
         }
-        if (PhLoop(2, 100000))
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
             GenRng r = hq_PlanFirepit_r;
             int fire = 0;
@@ -2737,7 +3332,7 @@ public partial class MapGen
             hq_PlanFirepit_r = r;
             hq_PlanFirepit_fire = fire;
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             int fire = hq_PlanFirepit_fire;
             if (planIter == 0) { hq_FireSeats_fire = fire; hq_FireSeats_wood = false; hq_FireSeats_k = 7; PhSubReset(); }
@@ -2745,14 +3340,14 @@ public partial class MapGen
             if (fin) {  PhBreak(); }
             hq_PlanFirepit_fire = fire;
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             GenRng r2 = SR(2);
             hq_PlanFirepit_sel1 = 0;
             if (r2.Chance(850)) hq_PlanFirepit_sel1 = 1;
             hq_PlanFirepit_r2 = r2;
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             if (!(hq_PlanFirepit_sel1 == 1)) PhBreak();
             else
@@ -2766,18 +3361,18 @@ public partial class MapGen
                 hq_PlanFirepit_r2 = r2;
             }
         }
-        if (Ph(6))
+        if (planPhase == 6)
         {
             DoorSides(50);
         }
-        if (Ph(7))
+        if (planPhase == 7)
         {
             GenRng r3 = SR(3);
             int trees = TreeCount(room, ref r3);
             hq_PlanFirepit_r3 = r3;
             hq_PlanFirepit_trees = trees;
         }
-        if (PhLoop(8, 100000))
+        if (planPhase == 8 && PhLoop(8, 100000))
         {
             int trees = hq_PlanFirepit_trees;
             if (!PhSubActive())
@@ -2795,14 +3390,14 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(9))
+        if (planPhase == 9)
         {
             GenRng r3 = hq_PlanFirepit_r3;
             hq_PlanFirepit_sel2 = 0;
             if (r3.Chance(350)) hq_PlanFirepit_sel2 = 1;
             hq_PlanFirepit_r3 = r3;
         }
-        if (PhLoop(10, 100000))
+        if (planPhase == 10 && PhLoop(10, 100000))
         {
             if (!(hq_PlanFirepit_sel2 == 1)) PhBreak();
             else
@@ -2812,22 +3407,22 @@ public partial class MapGen
                 if (fin) {  PhBreak(); }
             }
         }
-        if (Ph(11))
+        if (planPhase == 11)
         {
             ClearBans();
         }
-        if (PhLoop(12, 100000))
+        if (planPhase == 12 && PhLoop(12, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = false; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(13))
+        if (planPhase == 13)
         {
             GenRng r5 = SR(5);
             hq_PlanFirepit_r5 = r5;
         }
-        if (PhLoop(14, 100000))
+        if (planPhase == 14 && PhLoop(14, 100000))
         {
             if (!PhSubActive())
             {
@@ -2847,7 +3442,8 @@ public partial class MapGen
     void PlanFirepit_L1()
     {
         int room = pRoom;
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int t = hq_PlanFirepit_t;
             if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
@@ -2859,7 +3455,8 @@ public partial class MapGen
     void PlanFirepit_L2()
     {
         int room = pRoom;
-        if (PhLoop(0, 100000))
+        planMax = 1;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             GenRng r5 = hq_PlanFirepit_r5;
             bool ht1 = false;
@@ -2869,7 +3466,7 @@ public partial class MapGen
             hq_PlanFirepit_r5 = r5;
             hq_PlanFirepit_ht1 = ht1;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             bool ht1 = hq_PlanFirepit_ht1;
             if (!ht1)
@@ -2960,12 +3557,13 @@ public partial class MapGen
     // Stand in phases, a step a call (autophase4); Stand() above runs them to the end
     void Stand_Body()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             int placed = 0;
             hq_Stand_placed = placed;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int cx = hq_Stand_cx;
             int cz = hq_Stand_cz;
@@ -2992,7 +3590,7 @@ public partial class MapGen
             hq_Stand_rng = rng;
             hq_Stand_placed = placed;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int placed = hq_Stand_placed;
             { hq_Stand_ret = placed; hq_Stand_placed = placed; PhEnd(); return; }
@@ -3006,19 +3604,33 @@ public partial class MapGen
     void PlanForest(bool camp)
     {
         hq_PlanForest_camp = camp;
+        planMax = 56;
         int room = pRoom, area = AreaM2(room);
         // in three parts a step each (Cor: build freezes): the clearing and the camp, the stands of trees, the rest
-        if (Ph(0))
+        if (planPhase == 0)
         {
             GenRng r = SR(1);
-            // (a) the middle of the area and the path to it from the entrances
-            int hub = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, ref r);
+            hq_PlanForest_r = r;
+        }
+        // (a) the middle of the area and the path to it from the entrances
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            GenRng r = hq_PlanForest_r;
+            int hub = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 2; hq_OpenSpot_mode = WM_NEAR; hq_OpenSpot_tx = RoomMidX(room); hq_OpenSpot_tz = RoomMidZ(room); hq_OpenSpot_need = 0; hq_OpenSpot_rng = r; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_OpenSpot_rng; hub = hq_OpenSpot_ret; PhBreak(); }
+            hq_PlanForest_r = r;
+            hq_PlanForest_hub = hub;
+        }
+        if (planPhase == 2)
+        {
+            int hub = hq_PlanForest_hub;
             if (hub < 0) hub = roomCells[roomCellStart[room] + roomCellCount[room] / 2];
             int hubX = hub % IW * GenData.INNER_MM + 250, hubZ = hub / IW * GenData.INNER_MM + 250;
             int fire = -1, tent = -1;
             hq_PlanForest_sel1 = 0;
             if (camp) hq_PlanForest_sel1 = 1;
-            hq_PlanForest_r = r;
             hq_PlanForest_hub = hub;
             hq_PlanForest_hubX = hubX;
             hq_PlanForest_hubZ = hubZ;
@@ -3026,7 +3638,7 @@ public partial class MapGen
             hq_PlanForest_tent = tent;
         }
         // (b) the camp in its clearing: the fire in the middle, the tent facing it
-        if (PhLoop(1, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             if (!(hq_PlanForest_sel1 == 1)) PhBreak();
             else
@@ -3044,7 +3656,7 @@ public partial class MapGen
                 hq_PlanForest_fire = fire;
             }
         }
-        if (Ph(2))
+        if (planPhase == 4)
         {
             if (hq_PlanForest_sel1 == 1)
             {
@@ -3059,7 +3671,7 @@ public partial class MapGen
                 hq_PlanForest_fire = fire;
             }
         }
-        if (Ph(3))
+        if (planPhase == 5)
         {
             int fire = hq_PlanForest_fire;
             FindGates(room);
@@ -3067,7 +3679,7 @@ public partial class MapGen
             if (camp && fire >= 0) hq_PlanForest_sel2 = 1;
             hq_PlanForest_fire = fire;
         }
-        if (Ph(4))
+        if (planPhase == 6)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3078,7 +3690,7 @@ public partial class MapGen
                 hq_PlanForest_tentDef = tentDef;
             }
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 7 && PhLoop(7, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1)) PhBreak();
             else
@@ -3096,7 +3708,7 @@ public partial class MapGen
                 hq_PlanForest_tentDef = tentDef;
             }
         }
-        if (Ph(6))
+        if (planPhase == 8)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3108,7 +3720,7 @@ public partial class MapGen
                 hq_PlanForest_tentDef = tentDef;
             }
         }
-        if (PhLoop(7, 100000))
+        if (planPhase == 9 && PhLoop(9, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel3 == 1)) PhBreak();
             else
@@ -3124,7 +3736,7 @@ public partial class MapGen
                 hq_PlanForest_r2 = r2;
             }
         }
-        if (Ph(8))
+        if (planPhase == 10)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3135,7 +3747,7 @@ public partial class MapGen
                 hq_PlanForest_tent = tent;
             }
         }
-        if (PhLoop(9, 100000))
+        if (planPhase == 11 && PhLoop(11, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel4 == 1)) PhBreak();
             else
@@ -3155,7 +3767,7 @@ public partial class MapGen
                 hq_PlanForest_tentDef = tentDef;
             }
         }
-        if (Ph(10))
+        if (planPhase == 12)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3165,7 +3777,7 @@ public partial class MapGen
                 hq_PlanForest_tent = tent;
             }
         }
-        if (PhLoop(11, 100000))
+        if (planPhase == 13 && PhLoop(13, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel5 == 1)) PhBreak();
             else
@@ -3183,7 +3795,7 @@ public partial class MapGen
                 hq_PlanForest_r2 = r2;
             }
         }
-        if (Ph(12))
+        if (planPhase == 14)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3193,7 +3805,7 @@ public partial class MapGen
                 hq_PlanForest_tent = tent;
             }
         }
-        if (PhLoop(13, 100000))
+        if (planPhase == 15 && PhLoop(15, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel6 == 1)) PhBreak();
             else
@@ -3209,7 +3821,7 @@ public partial class MapGen
                 hq_PlanForest_r2 = r2;
             }
         }
-        if (Ph(14))
+        if (planPhase == 16)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3221,7 +3833,7 @@ public partial class MapGen
                 hq_PlanForest_tent = tent;
             }
         }
-        if (PhLoop(15, 100000))
+        if (planPhase == 17 && PhLoop(17, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel7 == 1)) PhBreak();
             else
@@ -3237,7 +3849,7 @@ public partial class MapGen
                 hq_PlanForest_r2 = r2;
             }
         }
-        if (Ph(16))
+        if (planPhase == 18)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3247,7 +3859,7 @@ public partial class MapGen
                 hq_PlanForest_tent = tent;
             }
         }
-        if (PhLoop(17, 100000))
+        if (planPhase == 19 && PhLoop(19, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel8 == 1)) PhBreak();
             else
@@ -3265,7 +3877,7 @@ public partial class MapGen
                 hq_PlanForest_r2 = r2;
             }
         }
-        if (Ph(18))
+        if (planPhase == 20)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3274,7 +3886,7 @@ public partial class MapGen
                 hq_PlanForest_tent = tent;
             }
         }
-        if (PhLoop(19, 100000))
+        if (planPhase == 21 && PhLoop(21, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1)) PhBreak();
             else
@@ -3286,7 +3898,7 @@ public partial class MapGen
                 hq_PlanForest_fire = fire;
             }
         }
-        if (Ph(20))
+        if (planPhase == 22)
         {
             if (hq_PlanForest_sel2 == 1)
             {
@@ -3294,7 +3906,7 @@ public partial class MapGen
                 hq_PlanForest_rgear = rgear;
             }
         }
-        if (PhLoop(21, 100000))
+        if (planPhase == 23 && PhLoop(23, 100000))
         {
             if (!(hq_PlanForest_sel2 == 1)) PhBreak();
             else
@@ -3308,7 +3920,7 @@ public partial class MapGen
                 hq_PlanForest_rgear = rgear;
             }
         }
-        if (Ph(22))
+        if (planPhase == 24)
         {
             int hub = hq_PlanForest_hub;
             int fire = hq_PlanForest_fire;
@@ -3320,7 +3932,7 @@ public partial class MapGen
             hq_PlanForest_hub = hub;
             hq_PlanForest_fire = fire;
         }
-        if (Ph(23))
+        if (planPhase == 25)
         {
             if (hq_PlanForest_sel9 == 1)
             {
@@ -3332,53 +3944,85 @@ public partial class MapGen
                 hq_PlanForest_r3 = r3;
             }
         }
-        if (Ph(24))
-        {
-            if (hq_PlanForest_sel9 == 1 && hq_PlanForest_sel10 == 1)
-            {
-                GenRng r3 = hq_PlanForest_r3;
-                // the gear beside the tent: a box or a chest with a barrel
-                int first = nEmit;
-                FSet(Pick(ref r3, "s_box", 5, "s_chest", 4), Dn("s_barrel"));
-                hq_PlanForest_r3 = r3;
-                hq_PlanForest_first = first;
-            }
-        }
-        if (Ph(25))
+        if (planPhase == 26)
         {
             if (hq_PlanForest_sel9 == 1 && hq_PlanForest_sel10 == 1)
             {
                 int tent = hq_PlanForest_tent;
                 GenRng r3 = hq_PlanForest_r3;
-                int first = hq_PlanForest_first;
-                if (FormBeside(GenData.GL_ROW, 80, tent, 0, ref r3) >= 0) Keep(first, false);
+                // the gear beside the tent: a box or a chest with a barrel
+                int first = nEmit;
+                FSet(Pick(ref r3, "s_box", 5, "s_chest", 4), Dn("s_barrel"));
+                hq_PlanForest_sel11 = 0;
+                if (FormBeside(GenData.GL_ROW, 80, tent, 0, ref r3) >= 0) hq_PlanForest_sel11 = 1;
                 hq_PlanForest_tent = tent;
                 hq_PlanForest_r3 = r3;
                 hq_PlanForest_first = first;
             }
         }
-        if (Ph(26))
+        if (planPhase == 27 && PhLoop(27, 100000))
+        {
+            if (!(hq_PlanForest_sel9 == 1 && hq_PlanForest_sel10 == 1 && hq_PlanForest_sel11 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanForest_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_first = first;
+            }
+        }
+        if (planPhase == 28)
         {
             if (hq_PlanForest_sel9 == 1)
             {
                 int tent = hq_PlanForest_tent;
                 GenRng r3 = hq_PlanForest_r3;
-                if (tent >= 0 && r3.Chance(600) && Fit(2))
-                {
-                    int first = nEmit;
-                    if (GroupBeside(GenData.FindGrp("tools"), tent, 2, 0, ref r3)) Keep(first, false);
-                }
-                GenRng r4 = SR(4);
-                hq_PlanForest_sel11 = 0;
-                if (r4.Chance(800)) hq_PlanForest_sel11 = 1;
+                hq_PlanForest_sel12 = 0;
+                if (tent >= 0 && r3.Chance(600) && Fit(2)) hq_PlanForest_sel12 = 1;
                 hq_PlanForest_tent = tent;
                 hq_PlanForest_r3 = r3;
+            }
+        }
+        if (planPhase == 29)
+        {
+            if (hq_PlanForest_sel9 == 1 && hq_PlanForest_sel12 == 1)
+            {
+                int tent = hq_PlanForest_tent;
+                GenRng r3 = hq_PlanForest_r3;
+                int first = nEmit;
+                hq_PlanForest_sel13 = 0;
+                if (GroupBeside(GenData.FindGrp("tools"), tent, 2, 0, ref r3)) hq_PlanForest_sel13 = 1;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r3 = r3;
+                hq_PlanForest_first = first;
+            }
+        }
+        if (planPhase == 30 && PhLoop(30, 100000))
+        {
+            if (!(hq_PlanForest_sel9 == 1 && hq_PlanForest_sel12 == 1 && hq_PlanForest_sel13 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanForest_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_first = first;
+            }
+        }
+        if (planPhase == 31)
+        {
+            if (hq_PlanForest_sel9 == 1)
+            {
+                GenRng r4 = SR(4);
+                hq_PlanForest_sel14 = 0;
+                if (r4.Chance(800)) hq_PlanForest_sel14 = 1;
                 hq_PlanForest_r4 = r4;
             }
         }
-        if (PhLoop(27, 100000))
+        if (planPhase == 32 && PhLoop(32, 100000))
         {
-            if (!(hq_PlanForest_sel9 == 1 && hq_PlanForest_sel11 == 1)) PhBreak();
+            if (!(hq_PlanForest_sel9 == 1 && hq_PlanForest_sel14 == 1)) PhBreak();
             else
             {
                 int fire = hq_PlanForest_fire;
@@ -3390,7 +4034,7 @@ public partial class MapGen
                 hq_PlanForest_r4 = r4;
             }
         }
-        if (Ph(28))
+        if (planPhase == 33)
         {
             int hubX = hq_PlanForest_hubX;
             int hubZ = hq_PlanForest_hubZ;
@@ -3398,7 +4042,7 @@ public partial class MapGen
             hq_PlanForest_hubX = hubX;
             hq_PlanForest_hubZ = hubZ;
         }
-        if (Ph(29))
+        if (planPhase == 34)
         {
             // (b) trees in stands, away from the path and the clearing; open ground between the stands
             GenRng rt = SR(5);
@@ -3414,7 +4058,7 @@ public partial class MapGen
             hq_PlanForest_main0 = main0;
             hq_PlanForest_left = left;
         }
-        if (PhLoop(30, 100000))
+        if (planPhase == 35 && PhLoop(35, 100000))
         {
             int stands = hq_PlanForest_stands;
             int left = hq_PlanForest_left;
@@ -3436,7 +4080,7 @@ public partial class MapGen
         }
         // crowns have to stay inside the fence (G31), so a stand near an edge comes out short: the trees still
         // missing join the stands that stand, wherever a crown has the room
-        if (PhLoop(31, 100000))
+        if (planPhase == 36 && PhLoop(36, 100000))
         {
             GenRng rt = hq_PlanForest_rt;
             int main0 = hq_PlanForest_main0;
@@ -3454,14 +4098,14 @@ public partial class MapGen
             hq_PlanForest_left = left;
         }
         // (c) undergrowth: bushes at the edge of a stand and along the fence
-        if (Ph(32))
+        if (planPhase == 37)
         {
             GenRng r6 = SR(6);
             int bushes = 1 + area / 28;
             hq_PlanForest_r6 = r6;
             hq_PlanForest_bushes = bushes;
         }
-        if (PhLoop(33, 100000))
+        if (planPhase == 38 && PhLoop(38, 100000))
         {
             int bushes = hq_PlanForest_bushes;
             if (!PhSubActive())
@@ -3479,16 +4123,16 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(34))
+        if (planPhase == 39)
         {
             GenRng r7 = SR(7);
-            hq_PlanForest_sel12 = 0;
-            if (r7.Chance(camp ? 350 : 800) && Fit(2)) hq_PlanForest_sel12 = 1;
+            hq_PlanForest_sel16 = 0;
+            if (r7.Chance(camp ? 350 : 800) && Fit(2)) hq_PlanForest_sel16 = 1;
             hq_PlanForest_r7 = r7;
         }
-        if (PhLoop(35, 100000))
+        if (planPhase == 40 && PhLoop(40, 100000))
         {
-            if (!(hq_PlanForest_sel12 == 1)) PhBreak();
+            if (!(hq_PlanForest_sel16 == 1)) PhBreak();
             else
             {
                 GenRng r7 = hq_PlanForest_r7;
@@ -3498,16 +4142,16 @@ public partial class MapGen
                 hq_PlanForest_r7 = r7;
             }
         }
-        if (Ph(36))
+        if (planPhase == 41)
         {
             GenRng r8 = SR(8);
-            hq_PlanForest_sel13 = 0;
-            if (r8.Chance(camp ? 300 : 600) && Fit(2)) hq_PlanForest_sel13 = 1;
+            hq_PlanForest_sel17 = 0;
+            if (r8.Chance(camp ? 300 : 600) && Fit(2)) hq_PlanForest_sel17 = 1;
             hq_PlanForest_r8 = r8;
         }
-        if (Ph(37))
+        if (planPhase == 42)
         {
-            if (hq_PlanForest_sel13 == 1)
+            if (hq_PlanForest_sel17 == 1)
             {
                 GenRng r8 = hq_PlanForest_r8;
                 int cell = SoftSpot(ref r8);
@@ -3517,9 +4161,9 @@ public partial class MapGen
                 hq_PlanForest_first = first;
             }
         }
-        if (Ph(38))
+        if (planPhase == 43)
         {
-            if (hq_PlanForest_sel13 == 1)
+            if (hq_PlanForest_sel17 == 1)
             {
                 GenRng r8 = hq_PlanForest_r8;
                 int cell = hq_PlanForest_cell;
@@ -3529,63 +4173,111 @@ public partial class MapGen
                 hq_PlanForest_rock = rock;
             }
         }
-        if (Ph(39))
+        if (planPhase == 44)
         {
-            if (hq_PlanForest_sel13 == 1)
+            if (hq_PlanForest_sel17 == 1)
+            {
+                int first = hq_PlanForest_first;
+                int rock = hq_PlanForest_rock;
+                hq_PlanForest_sel18 = 0;
+                if (rock >= 0 && Keep(first, false) && Fit(2)) hq_PlanForest_sel18 = 1;
+                hq_PlanForest_first = first;
+                hq_PlanForest_rock = rock;
+            }
+        }
+        if (planPhase == 45)
+        {
+            if (hq_PlanForest_sel17 == 1 && hq_PlanForest_sel18 == 1)
             {
                 GenRng r8 = hq_PlanForest_r8;
                 int first = hq_PlanForest_first;
                 int rock = hq_PlanForest_rock;
-                if (rock >= 0 && Keep(first, false) && Fit(2))
-                {
-                    first = nEmit;
-                    if (GroupBeside(GenData.FindGrp("rocks"), rock, r8.Between(2, 3), 0, ref r8)) Keep(first, false);
-                }
+                first = nEmit;
+                hq_PlanForest_sel19 = 0;
+                if (GroupBeside(GenData.FindGrp("rocks"), rock, r8.Between(2, 3), 0, ref r8)) hq_PlanForest_sel19 = 1;
                 hq_PlanForest_r8 = r8;
                 hq_PlanForest_first = first;
                 hq_PlanForest_rock = rock;
             }
         }
-        if (Ph(40))
+        if (planPhase == 46 && PhLoop(46, 100000))
+        {
+            if (!(hq_PlanForest_sel17 == 1 && hq_PlanForest_sel18 == 1 && hq_PlanForest_sel19 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanForest_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_first = first;
+            }
+        }
+        if (planPhase == 47)
         {
             GenRng r9 = SR(9);
             int clumps = camp ? 1 : 1 + area / 50;
             hq_PlanForest_r9 = r9;
             hq_PlanForest_clumps = clumps;
         }
-        if (PhLoop(41, 100000))
+        if (planPhase == 48 && PhLoop(48, 100000))
         {
-            GenRng r9 = hq_PlanForest_r9;
             int clumps = hq_PlanForest_clumps;
-            int m = planIter;
-            if (!(m < clumps && Fit(2))) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                int first = nEmit;
-                if (PlaceGroup(GenData.FindGrp("mushrooms"), room, GenData.A_BESIDE, r9.Between(2, Fit(4) ? 4 : 2), 0, ref r9)) Keep(first, false);
+                int m = planIter;
+                if (!(m < clumps && Fit(2))) PhBreak();
+                else { hq_PlanForest_m = m; PhSubBegin(); }
             }
-            hq_PlanForest_r9 = r9;
             hq_PlanForest_clumps = clumps;
+            if (PhSubActive())
+            {
+                PhPush(); PlanForest_L3(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
-        if (Ph(42))
+        if (planPhase == 49)
         {
             GenRng r10 = SR(10);
-            if (r10.Chance(600) && Fit(3))
+            hq_PlanForest_sel21 = 0;
+            if (r10.Chance(600) && Fit(3)) hq_PlanForest_sel21 = 1;
+            hq_PlanForest_r10 = r10;
+        }
+        if (planPhase == 50)
+        {
+            if (hq_PlanForest_sel21 == 1)
             {
+                GenRng r10 = hq_PlanForest_r10;
                 int first = nEmit;
-                if (GroupAt(FlowerGroup(ref r10), GenData.A_SOFT, r10.Between(3, Fit(5) ? 5 : 3), WM_NEAR, planHX, planHZ, 0, ref r10)) Keep(first, false);
+                hq_PlanForest_sel22 = 0;
+                if (GroupAt(FlowerGroup(ref r10), GenData.A_SOFT, r10.Between(3, Fit(5) ? 5 : 3), WM_NEAR, planHX, planHZ, 0, ref r10)) hq_PlanForest_sel22 = 1;
+                hq_PlanForest_r10 = r10;
+                hq_PlanForest_first = first;
             }
         }
-        if (Ph(43))
+        if (planPhase == 51 && PhLoop(51, 100000))
+        {
+            if (!(hq_PlanForest_sel21 == 1 && hq_PlanForest_sel22 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanForest_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_first = first;
+            }
+        }
+        if (planPhase == 52)
         {
             GenRng r11 = SR(11);
-            hq_PlanForest_sel14 = 0;
-            if (nGate > 0 && r11.Chance(400) && Fit(1)) hq_PlanForest_sel14 = 1;
+            hq_PlanForest_sel23 = 0;
+            if (nGate > 0 && r11.Chance(400) && Fit(1)) hq_PlanForest_sel23 = 1;
             hq_PlanForest_r11 = r11;
         }
-        if (PhLoop(44, 100000))
+        if (planPhase == 53 && PhLoop(53, 100000))
         {
-            if (!(hq_PlanForest_sel14 == 1)) PhBreak();
+            if (!(hq_PlanForest_sel23 == 1)) PhBreak();
             else
             {
                 GenRng r11 = hq_PlanForest_r11;
@@ -3595,12 +4287,12 @@ public partial class MapGen
                 hq_PlanForest_r11 = r11;
             }
         }
-        if (Ph(45))
+        if (planPhase == 54)
         {
             GenRng r12 = SR(12);
             hq_PlanForest_r12 = r12;
         }
-        if (PhLoop(46, 100000))
+        if (planPhase == 55 && PhLoop(55, 100000))
         {
             if (!PhSubActive())
             {
@@ -3610,13 +4302,13 @@ public partial class MapGen
             }
             if (PhSubActive())
             {
-                PhPush(); PlanForest_L3(); bool fin = PhAdvance(); PhPop();
+                PhPush(); PlanForest_L4(); bool fin = PhAdvance(); PhPop();
                 if (fin) PhSubEnd(); else PhStay();
                 if (phBreak) { phBreak = false; PhBreak(); }
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(47))
+        if (planPhase == 56)
         {
             GenRng r13 = SR(13);
             int type = roomType[room];
@@ -3636,7 +4328,8 @@ public partial class MapGen
     {
         bool camp = hq_PlanForest_camp;
         int room = pRoom, area = AreaM2(room);
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             GenRng rt = hq_PlanForest_rt;
             int main0 = hq_PlanForest_main0;
@@ -3670,7 +4363,7 @@ public partial class MapGen
             hq_PlanForest_accent = accent;
             hq_PlanForest_want = want;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             GenRng rt = hq_PlanForest_rt;
             int sx = hq_PlanForest_sx;
@@ -3690,7 +4383,7 @@ public partial class MapGen
             hq_PlanForest_want = want;
             hq_PlanForest_got = got;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int left = hq_PlanForest_left;
             int sx = hq_PlanForest_sx;
@@ -3709,7 +4402,8 @@ public partial class MapGen
     {
         bool camp = hq_PlanForest_camp;
         int room = pRoom, area = AreaM2(room);
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             GenRng r6 = hq_PlanForest_r6;
             int first = nEmit;
@@ -3723,17 +4417,22 @@ public partial class MapGen
                     ok = StampAt(Pick(ref r6, "n_bush", 5, "n_bushDetailed", 4), room, px, pz, r6.Range(360), 0, -1, H_NATURE, false) >= 0;
             }
             if (!ok) ok = WallPlace(Pick(ref r6, "n_bushLarge", 5, "n_bush", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r6) >= 0;
+            hq_PlanForest_sel15 = 0;
+            if (ok) hq_PlanForest_sel15 = 1;
             hq_PlanForest_r6 = r6;
             hq_PlanForest_first = first;
-            hq_PlanForest_ok = ok;
         }
-        if (Ph(1))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
-            int first = hq_PlanForest_first;
-            bool ok = hq_PlanForest_ok;
-            if (ok) Keep(first, false);
-            hq_PlanForest_first = first;
-            hq_PlanForest_ok = ok;
+            if (!(hq_PlanForest_sel15 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanForest_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_first = first;
+            }
         }
     }
 
@@ -3741,12 +4440,41 @@ public partial class MapGen
     {
         bool camp = hq_PlanForest_camp;
         int room = pRoom, area = AreaM2(room);
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
+        {
+            GenRng r9 = hq_PlanForest_r9;
+            int first = nEmit;
+            hq_PlanForest_sel20 = 0;
+            if (PlaceGroup(GenData.FindGrp("mushrooms"), room, GenData.A_BESIDE, r9.Between(2, Fit(4) ? 4 : 2), 0, ref r9)) hq_PlanForest_sel20 = 1;
+            hq_PlanForest_r9 = r9;
+            hq_PlanForest_first = first;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            if (!(hq_PlanForest_sel20 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanForest_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_first = first;
+            }
+        }
+    }
+
+    void PlanForest_L4()
+    {
+        bool camp = hq_PlanForest_camp;
+        int room = pRoom, area = AreaM2(room);
+        planMax = 1;
+        if (planPhase == 0)
         {
             GenRng r12 = hq_PlanForest_r12;
             int first = nEmit;
             int roll = r12.Range(10);
-            bool ok = false;
+            bool ok;
             if (roll < 4) ok = WallPlace(Pick(ref r12, "n_bushLarge", 5, "n_bush", 4, "n_bushDetailed", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r12) >= 0;
             else if (roll < 7 && Fit(2)) ok = GroupAt(GenData.FindGrp("rocks"), GenData.A_SOFT, r12.Between(2, 3), WM_ANY, 0, 0, 0, ref r12);
             else
@@ -3754,17 +4482,22 @@ public partial class MapGen
                 int cell = SoftSpot(ref r12);
                 ok = cell >= 0 && FreePlace(Pick(ref r12, "n_stump", 5, "n_stumpRound", 4, "n_bush", 3), cell, r12.Range(360), 0, 0, H_NATURE) >= 0;
             }
+            hq_PlanForest_sel24 = 0;
+            if (ok) hq_PlanForest_sel24 = 1;
             hq_PlanForest_r12 = r12;
             hq_PlanForest_first = first;
-            hq_PlanForest_ok = ok;
         }
-        if (Ph(1))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
-            int first = hq_PlanForest_first;
-            bool ok = hq_PlanForest_ok;
-            if (ok) Keep(first, false);
-            hq_PlanForest_first = first;
-            hq_PlanForest_ok = ok;
+            if (!(hq_PlanForest_sel24 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanForest_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_first = first;
+            }
         }
     }
 
@@ -3800,7 +4533,8 @@ public partial class MapGen
     // Signpost in phases, a step a call (autophase4); Signpost() above runs them to the end
     void Signpost_Body()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int gate = hq_Signpost_gate;
             GenRng rng = hq_Signpost_rng;
@@ -3814,7 +4548,7 @@ public partial class MapGen
             hq_Signpost_gz = gz;
             hq_Signpost_a0 = a0;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (!PhSubActive())
             {
@@ -3833,7 +4567,8 @@ public partial class MapGen
     }
     void Signpost_L4()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int room = hq_Signpost_room;
             int def = hq_Signpost_def;
@@ -3853,12 +4588,15 @@ public partial class MapGen
             hq_Signpost_first = first;
             hq_Signpost_e = e;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int room = hq_Signpost_room;
             int first = hq_Signpost_first;
             int e = hq_Signpost_e;
-            if (e >= 0 && KeepIfWalkable(room, first, false)) { hq_Signpost_room = room; hq_Signpost_first = first; hq_Signpost_e = e; phReturn = true; PhEnd(); return; }
+            if (e >= 0 && KeepIfWalkable(room, first, false))
+            {
+                { hq_Signpost_room = room; hq_Signpost_first = first; hq_Signpost_e = e; phReturn = true; PhEnd(); return; }
+            }
             hq_Signpost_room = room;
             hq_Signpost_first = first;
             hq_Signpost_e = e;
@@ -3867,7 +4605,8 @@ public partial class MapGen
 
     void Signpost_L3()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int room = hq_Signpost_room;
             int gx = hq_Signpost_gx;
@@ -3886,7 +4625,7 @@ public partial class MapGen
             hq_Signpost_x = x;
             hq_Signpost_z = z;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (!PhSubActive())
             {
@@ -3906,7 +4645,8 @@ public partial class MapGen
 
     void Signpost_L2()
     {
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int dist = hq_Signpost_dist;
             if (!PhSubActive())
@@ -3928,7 +4668,8 @@ public partial class MapGen
 
     void Signpost_L1()
     {
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int dist = hq_Signpost_dist;
             if (!PhSubActive())
@@ -3965,7 +4706,8 @@ public partial class MapGen
     // DeadWood in phases, a step a call (autophase4); DeadWood() above runs them to the end
     void DeadWood_Body()
     {
-        if (Ph(0))
+        planMax = 7;
+        if (planPhase == 0)
         {
             GenRng rng = hq_DeadWood_rng;
             int cell = SoftSpot(ref rng);
@@ -3975,7 +4717,7 @@ public partial class MapGen
             hq_DeadWood_cell = cell;
             hq_DeadWood_first = first;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             GenRng rng = hq_DeadWood_rng;
             int cell = hq_DeadWood_cell;
@@ -3986,11 +4728,14 @@ public partial class MapGen
             hq_DeadWood_logDef = logDef;
             hq_DeadWood_log = log;
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int first = hq_DeadWood_first;
             int log = hq_DeadWood_log;
-            if (log < 0 || !Keep(first, false)) { hq_DeadWood_first = first; hq_DeadWood_log = log; PhEnd(); return; }
+            if (log < 0 || !Keep(first, false))
+            {
+                { hq_DeadWood_first = first; hq_DeadWood_log = log; PhEnd(); return; }
+            }
             int stump = -1;
             hq_DeadWood_sel1 = 0;
             if (Fit(1)) hq_DeadWood_sel1 = 1;
@@ -3998,7 +4743,7 @@ public partial class MapGen
             hq_DeadWood_log = log;
             hq_DeadWood_stump = stump;
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             if (hq_DeadWood_sel1 == 1)
             {
@@ -4019,32 +4764,53 @@ public partial class MapGen
                 hq_DeadWood_stump = stump;
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             if (hq_DeadWood_sel1 == 1)
             {
                 int first = hq_DeadWood_first;
                 int stump = hq_DeadWood_stump;
-                if (stump >= 0 && !Keep(first, false)) stump = -1;
+                if (stump >= 0 && !Keep(first, false))
+                {
+                    stump = -1;
+                }
                 hq_DeadWood_first = first;
                 hq_DeadWood_stump = stump;
             }
         }
-        if (Ph(5))
+        if (planPhase == 5)
         {
-            GenRng rng = hq_DeadWood_rng;
-            int first = hq_DeadWood_first;
-            int log = hq_DeadWood_log;
-            int stump = hq_DeadWood_stump;
-            if (Fit(2))
+            hq_DeadWood_sel2 = 0;
+            if (Fit(2)) hq_DeadWood_sel2 = 1;
+        }
+        if (planPhase == 6)
+        {
+            if (hq_DeadWood_sel2 == 1)
             {
+                GenRng rng = hq_DeadWood_rng;
+                int first = hq_DeadWood_first;
+                int log = hq_DeadWood_log;
+                int stump = hq_DeadWood_stump;
                 first = nEmit;
-                if (GroupBeside(GenData.FindGrp("mushrooms"), stump >= 0 ? stump : log, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
+                hq_DeadWood_sel3 = 0;
+                if (GroupBeside(GenData.FindGrp("mushrooms"), stump >= 0 ? stump : log, rng.Between(2, 3), 0, ref rng)) hq_DeadWood_sel3 = 1;
+                hq_DeadWood_rng = rng;
+                hq_DeadWood_first = first;
+                hq_DeadWood_log = log;
+                hq_DeadWood_stump = stump;
             }
-            hq_DeadWood_rng = rng;
-            hq_DeadWood_first = first;
-            hq_DeadWood_log = log;
-            hq_DeadWood_stump = stump;
+        }
+        if (planPhase == 7 && PhLoop(7, 100000))
+        {
+            if (!(hq_DeadWood_sel2 == 1 && hq_DeadWood_sel3 == 1)) PhBreak();
+            else
+            {
+                int first = hq_DeadWood_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_DeadWood_first = first;
+            }
         }
     }
 
@@ -4074,6 +4840,8 @@ public partial class MapGen
     int hq_BenchAtEdge_k;
     int hq_BenchAtEdge_pot;
     GenRng hq_BenchAtEdge_r;
+    int hq_BenchAtEdge_sel1;
+    int hq_BenchAtEdge_sel2;
     int hq_Border_added;
     int hq_Border_back;
     int hq_Border_before;
@@ -4113,6 +4881,8 @@ public partial class MapGen
     int hq_DeadWood_logDef;
     GenRng hq_DeadWood_rng;
     int hq_DeadWood_sel1;
+    int hq_DeadWood_sel2;
+    int hq_DeadWood_sel3;
     int hq_DeadWood_stump;
     int hq_FillOne_cell;
     int hq_FillOne_first;
@@ -4126,11 +4896,17 @@ public partial class MapGen
     int hq_FillOne_sel1;
     int hq_FillOne_sel2;
     int hq_FillOne_sel3;
+    int hq_FillOne_sel4;
+    int hq_FillOne_sel5;
+    int hq_FillOne_sel6;
     int hq_FillOne_type;
     int hq_FireGear_fire;
     int hq_FireGear_first;
     GenRng hq_FireGear_rng;
     int hq_FireGear_sel1;
+    int hq_FireGear_sel2;
+    int hq_FireGear_sel3;
+    int hq_FireGear_sel4;
     int hq_FireRing_fire;
     int hq_FireRing_minClr;
     int hq_FireRing_ret;
@@ -4165,10 +4941,15 @@ public partial class MapGen
     int hq_Island_first;
     bool hq_Island_ret;
     GenRng hq_Island_rng;
+    int hq_Island_sel1;
+    int hq_Island_sel2;
     int hq_LawnTree_cell;
+    int hq_LawnTree_first;
     int hq_LawnTree_k;
     GenRng hq_LawnTree_r;
     int hq_LawnTree_ret;
+    int hq_LawnTree_sel1;
+    int hq_LawnTree_sel2;
     int hq_LawnTree_tree;
     int hq_PlanFirepit_fire;
     bool hq_PlanFirepit_ht1;
@@ -4196,9 +4977,10 @@ public partial class MapGen
     int hq_PlanForest_k;
     int hq_PlanForest_kind;
     int hq_PlanForest_left;
+    int hq_PlanForest_m;
     int hq_PlanForest_main0;
-    bool hq_PlanForest_ok;
     GenRng hq_PlanForest_r;
+    GenRng hq_PlanForest_r10;
     GenRng hq_PlanForest_r11;
     GenRng hq_PlanForest_r12;
     GenRng hq_PlanForest_r2;
@@ -4218,7 +5000,17 @@ public partial class MapGen
     int hq_PlanForest_sel12;
     int hq_PlanForest_sel13;
     int hq_PlanForest_sel14;
+    int hq_PlanForest_sel15;
+    int hq_PlanForest_sel16;
+    int hq_PlanForest_sel17;
+    int hq_PlanForest_sel18;
+    int hq_PlanForest_sel19;
     int hq_PlanForest_sel2;
+    int hq_PlanForest_sel20;
+    int hq_PlanForest_sel21;
+    int hq_PlanForest_sel22;
+    int hq_PlanForest_sel23;
+    int hq_PlanForest_sel24;
     int hq_PlanForest_sel3;
     int hq_PlanForest_sel4;
     int hq_PlanForest_sel5;
@@ -4243,36 +5035,65 @@ public partial class MapGen
     GenRng hq_PlanGarden_r3;
     GenRng hq_PlanGarden_r4;
     GenRng hq_PlanGarden_r5;
+    GenRng hq_PlanGarden_r7;
     GenRng hq_PlanGarden_r8;
     int hq_PlanGarden_sel1;
+    int hq_PlanGarden_sel10;
+    int hq_PlanGarden_sel11;
+    int hq_PlanGarden_sel12;
+    int hq_PlanGarden_sel13;
+    int hq_PlanGarden_sel14;
+    int hq_PlanGarden_sel15;
     int hq_PlanGarden_sel2;
     int hq_PlanGarden_sel3;
     int hq_PlanGarden_sel4;
     int hq_PlanGarden_sel5;
     int hq_PlanGarden_sel6;
+    int hq_PlanGarden_sel7;
+    int hq_PlanGarden_sel8;
+    int hq_PlanGarden_sel9;
     int hq_PlanGarden_shed;
     int hq_PlanGarden_t;
     int hq_PlanGarden_tap;
     int hq_PlanGarden_trees;
+    int hq_PlanLane_first;
+    GenRng hq_PlanLane_r;
+    GenRng hq_PlanLane_r4;
+    int hq_PlanLane_rx;
+    int hq_PlanLane_rz;
     int hq_PlanLane_sel1;
+    int hq_PlanLane_sel2;
+    int hq_PlanLane_sel3;
+    int hq_PlanLane_sel4;
+    int hq_PlanLane_sel5;
+    int hq_PlanLawn_first;
     bool hq_PlanLawn_ht1;
     int hq_PlanLawn_k;
+    int hq_PlanLawn_lt;
+    GenRng hq_PlanLawn_r3;
     GenRng hq_PlanLawn_r4;
     int hq_PlanLawn_sel1;
+    int hq_PlanLawn_sel2;
+    int hq_PlanLawn_sel3;
     int hq_PlanPatio_first;
     bool hq_PlanPatio_ht1;
     int hq_PlanPatio_j;
     int hq_PlanPatio_midX;
     int hq_PlanPatio_midZ;
-    bool hq_PlanPatio_ok;
     GenRng hq_PlanPatio_r;
     GenRng hq_PlanPatio_r2;
+    GenRng hq_PlanPatio_r4;
     GenRng hq_PlanPatio_r5;
     GenRng hq_PlanPatio_r6;
     int hq_PlanPatio_room;
     int hq_PlanPatio_sel1;
     int hq_PlanPatio_sel2;
     int hq_PlanPatio_sel3;
+    int hq_PlanPatio_sel4;
+    int hq_PlanPatio_sel5;
+    int hq_PlanPatio_sel6;
+    int hq_PlanPatio_sel7;
+    int hq_PlanPatio_sel8;
     int hq_PlanPatio_set;
     int hq_PlanPatio_setDef;
     int hq_PlanPatio_t;
@@ -4280,10 +5101,24 @@ public partial class MapGen
     bool hq_PlanYard_diner;
     int hq_PlanYard_dx;
     int hq_PlanYard_dz;
+    int hq_PlanYard_first;
+    int hq_PlanYard_k;
     GenRng hq_PlanYard_r;
+    GenRng hq_PlanYard_r10;
+    GenRng hq_PlanYard_r8;
     GenRng hq_PlanYard_r9;
     int hq_PlanYard_room;
     string[] hq_PlanYard_rows;
+    int hq_PlanYard_sel1;
+    int hq_PlanYard_sel10;
+    int hq_PlanYard_sel2;
+    int hq_PlanYard_sel3;
+    int hq_PlanYard_sel4;
+    int hq_PlanYard_sel5;
+    int hq_PlanYard_sel6;
+    int hq_PlanYard_sel7;
+    int hq_PlanYard_sel8;
+    int hq_PlanYard_sel9;
     int hq_Signpost_a0;
     int hq_Signpost_def;
     int hq_Signpost_dist;
@@ -4317,13 +5152,13 @@ public partial class MapGen
     int hq_VegPlot_c0;
     int hq_VegPlot_cell;
     string[] hq_VegPlot_crops;
-    int hq_VegPlot_e;
     int hq_VegPlot_first;
     int hq_VegPlot_mx;
     int hq_VegPlot_mz;
     GenRng hq_VegPlot_rng;
     int hq_VegPlot_room;
     int hq_VegPlot_row;
+    int hq_VegPlot_sel1;
     bool hq_WoodPile_atEdge;
     int hq_WoodPile_fire;
     int hq_WoodPile_first;
@@ -4332,6 +5167,8 @@ public partial class MapGen
     int hq_WoodPile_sel2;
     int hq_WoodPile_sel3;
     int hq_WoodPile_sel4;
+    int hq_WoodPile_sel5;
+    int hq_WoodPile_sel6;
     int hq_WoodPile_stack;
     int hq_WoodPile_stackDef;
 }

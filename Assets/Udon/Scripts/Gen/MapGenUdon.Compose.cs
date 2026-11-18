@@ -431,13 +431,14 @@ public partial class MapGenUdon
     // WallKeep in phases, a step a call (autophase4); WallKeep() above runs them to the end
     void WallKeep_Body()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             int nb = 0, e = -1;
             hq_WallKeep_nb = nb;
             hq_WallKeep_e = e;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int e = hq_WallKeep_e;
             if (!PhSubActive())
@@ -455,7 +456,7 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int nb = hq_WallKeep_nb;
             int e = hq_WallKeep_e;
@@ -467,7 +468,8 @@ public partial class MapGenUdon
     }
     void WallKeep_L1()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0)
         {
             int def = hq_WallKeep_def;
             int mode = hq_WallKeep_mode;
@@ -492,22 +494,35 @@ public partial class MapGenUdon
             hq_WallKeep_first = first;
             hq_WallKeep_seg = seg;
         }
-        if (Ph(1))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int flags = hq_WallKeep_flags;
+            int first = hq_WallKeep_first;
+            bool ht1 = false;
+            if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = (flags & EF_MANDATORY) != 0; PhSubReset(); }
+            PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { ht1 = hq_Keep_ret; PhBreak(); }
+            hq_WallKeep_flags = flags;
+            hq_WallKeep_first = first;
+            hq_WallKeep_ht1 = ht1;
+        }
+        if (planPhase == 2)
+        {
             int nb = hq_WallKeep_nb;
             int e = hq_WallKeep_e;
-            int first = hq_WallKeep_first;
             int seg = hq_WallKeep_seg;
-            if (Keep(first, (flags & EF_MANDATORY) != 0)) { hq_WallKeep_flags = flags; hq_WallKeep_nb = nb; hq_WallKeep_e = e; hq_WallKeep_first = first; hq_WallKeep_seg = seg; phBreak = true; PhEnd(); return; }
+            bool ht1 = hq_WallKeep_ht1;
+            if (ht1)
+            {
+                { hq_WallKeep_nb = nb; hq_WallKeep_e = e; hq_WallKeep_seg = seg; hq_WallKeep_ht1 = ht1; phBreak = true; PhEnd(); return; }
+            }
             e = -1;
-            if (segBan[seg]) { hq_WallKeep_flags = flags; hq_WallKeep_nb = nb; hq_WallKeep_e = e; hq_WallKeep_first = first; hq_WallKeep_seg = seg; phBreak = true; PhEnd(); return; }
+            if (segBan[seg]) { hq_WallKeep_nb = nb; hq_WallKeep_e = e; hq_WallKeep_seg = seg; hq_WallKeep_ht1 = ht1; phBreak = true; PhEnd(); return; }
             segBan[seg] = true; wtBan[nb++] = seg;
-            hq_WallKeep_flags = flags;
             hq_WallKeep_nb = nb;
             hq_WallKeep_e = e;
-            hq_WallKeep_first = first;
             hq_WallKeep_seg = seg;
+            hq_WallKeep_ht1 = ht1;
         }
     }
 
@@ -683,42 +698,93 @@ public partial class MapGenUdon
 
     void BuildClearance(int room)
     {
-        int s = roomCellStart[room], n = roomCellCount[room];
-        int qh = 0, qt = 0;
-        for (int k = s; k < s + n; k++)
+        hq_BuildClearance_room = room;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); BuildClearance_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // BuildClearance in phases, a step a call (autophase4); BuildClearance() above runs them to the end
+    void BuildClearance_Body()
+    {
+        planMax = 3;
+        if (planPhase == 0)
         {
-            int i = roomCells[k], t = tags[i];
-            bool blocked = occ[i] != 0 || solid[i] > 0 || reserve[i] != 0 || (t & (GenData.T_DOOR_CLEAR | GenData.T_PATH | GenData.T_NO_SPAWN | GenData.T_BLOCKED | GenData.T_SWING)) != 0;
-            if (blocked) { clr[i] = 0; continue; }
-            bool edge = (t & GenData.T_WALL_ANY) != 0;
-            int ix = i % IW, iz = i / IW;
-            for (int d = 0; d < 8 && !edge; d++)
+            int room = hq_BuildClearance_room;
+            int s = roomCellStart[room], n = roomCellCount[room];
+            int qh = 0, qt = 0;
+            hq_BuildClearance_room = room;
+            hq_BuildClearance_s = s;
+            hq_BuildClearance_n = n;
+            hq_BuildClearance_qh = qh;
+            hq_BuildClearance_qt = qt;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            int room = hq_BuildClearance_room;
+            int s = hq_BuildClearance_s;
+            int n = hq_BuildClearance_n;
+            int qt = hq_BuildClearance_qt;
+            if (planIter == 0) hq_BuildClearance_kAt = s;
+            int k = hq_BuildClearance_kAt;
+            for (int chunkN = 0; chunkN < 60; chunkN++, k += 1)   // so many rounds a step
             {
-                int jx = ix + DX8[d], jz = iz + DZ8[d];
-                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) { edge = true; break; }
-                int j = jz * IW + jx;
-                if (innerRoom[j] != room) { edge = true; break; }
-                int tj = tags[j];
-                if (occ[j] != 0 || solid[j] > 0 || reserve[j] != 0 || (tj & (GenData.T_DOOR_CLEAR | GenData.T_PATH | GenData.T_NO_SPAWN | GenData.T_BLOCKED | GenData.T_SWING)) != 0) edge = true;
+                if (!(k < s + n)) { PhBreak(); break; }
+                int i = roomCells[k], t = tags[i];
+                bool blocked = occ[i] != 0 || solid[i] > 0 || reserve[i] != 0 || (t & (GenData.T_DOOR_CLEAR | GenData.T_PATH | GenData.T_NO_SPAWN | GenData.T_BLOCKED | GenData.T_SWING)) != 0;
+                if (blocked) { clr[i] = 0; continue; }
+                bool edge = (t & GenData.T_WALL_ANY) != 0;
+                int ix = i % IW, iz = i / IW;
+                for (int d = 0; d < 8 && !edge; d++)
+                {
+                    int jx = ix + DX8[d], jz = iz + DZ8[d];
+                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) { edge = true; break; }
+                    int j = jz * IW + jx;
+                    if (innerRoom[j] != room) { edge = true; break; }
+                    int tj = tags[j];
+                    if (occ[j] != 0 || solid[j] > 0 || reserve[j] != 0 || (tj & (GenData.T_DOOR_CLEAR | GenData.T_PATH | GenData.T_NO_SPAWN | GenData.T_BLOCKED | GenData.T_SWING)) != 0) edge = true;
+                }
+                if (edge) { clr[i] = 1; queue[qt++] = i; }
+                else clr[i] = -1;
             }
-            if (edge) { clr[i] = 1; queue[qt++] = i; }
-            else clr[i] = -1;
+            hq_BuildClearance_kAt = k;
+            hq_BuildClearance_room = room;
+            hq_BuildClearance_s = s;
+            hq_BuildClearance_n = n;
+            hq_BuildClearance_qt = qt;
         }
         // steps count diagonals too, so a clearance of c means the square of 2c - 1 cells around the cell is free
-        while (qh < qt)
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
-            int i = queue[qh++];
-            int ix = i % IW, iz = i / IW;
-            for (int d = 0; d < 8; d++)
+            int room = hq_BuildClearance_room;
+            int qh = hq_BuildClearance_qh;
+            int qt = hq_BuildClearance_qt;
+            for (int chunkN = 0; chunkN < 60; chunkN++)   // so many rounds a step
             {
-                int jx = ix + DX8[d], jz = iz + DZ8[d];
-                if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
-                int j = jz * IW + jx;
-                if (innerRoom[j] != room || clr[j] != -1) continue;
-                clr[j] = clr[i] + 1; queue[qt++] = j;
+                if (!(qh < qt)) { PhBreak(); break; }
+                int i = queue[qh++];
+                int ix = i % IW, iz = i / IW;
+                for (int d = 0; d < 8; d++)
+                {
+                    int jx = ix + DX8[d], jz = iz + DZ8[d];
+                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH) continue;
+                    int j = jz * IW + jx;
+                    if (innerRoom[j] != room || clr[j] != -1) continue;
+                    clr[j] = clr[i] + 1; queue[qt++] = j;
+                }
             }
+            hq_BuildClearance_room = room;
+            hq_BuildClearance_qh = qh;
+            hq_BuildClearance_qt = qt;
         }
-        for (int k = s; k < s + n; k++) if (clr[roomCells[k]] == -1) clr[roomCells[k]] = 99;   // a room without any edge
+        if (planPhase == 3)
+        {
+            int s = hq_BuildClearance_s;
+            int n = hq_BuildClearance_n;
+            for (int k = s; k < s + n; k++) if (clr[roomCells[k]] == -1) clr[roomCells[k]] = 99;   // a room without any edge
+            hq_BuildClearance_s = s;
+            hq_BuildClearance_n = n;
+        }
     }
 
     // The cell of the room with the most clearance, at least minClr; among the open ones the nearest to (tx, tz)
@@ -732,25 +798,98 @@ public partial class MapGenUdon
 
     int OpenSpot(int minClr, int mode, int tx, int tz, int need, uint[] rng)
     {
-        int room = pRoom;
-        BuildClearance(room);
-        int s = roomCellStart[room], n = roomCellCount[room];
-        int best = -1, bestScore = -2000000000;
-        for (int k = s; k < s + n; k++)
+        hq_OpenSpot_minClr = minClr;
+        hq_OpenSpot_mode = mode;
+        hq_OpenSpot_tx = tx;
+        hq_OpenSpot_tz = tz;
+        hq_OpenSpot_need = need;
+        hq_OpenSpot_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); OpenSpot_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_OpenSpot_rng;
+        return hq_OpenSpot_ret;
+    }
+
+    // OpenSpot in phases, a step a call (autophase4); OpenSpot() above runs them to the end
+    void OpenSpot_Body()
+    {
+        planMax = 4;
+        if (planPhase == 0)
         {
-            int i = roomCells[k];
-            if (clr[i] < minClr || (need != 0 && (tags[i] & need) == 0) || (tags[i] & osAvoid) != 0) continue;
-            bool tried = false;
-            for (int q = 0; q < osTriedN && !tried; q++)
-                if (Abs(osTried[q] % IW - i % IW) <= 1 && Abs(osTried[q] / IW - i / IW) <= 1) tried = true;
-            if (tried) continue;
-            int c = clr[i] > minClr + 2 ? minClr + 2 : clr[i];   // open enough is enough: do not always sit in the exact middle
-            int dd = Abs(i % IW * GenData.INNER_MM + 250 - tx) + Abs(i / IW * GenData.INNER_MM + 250 - tz);
-            int score = c * 4000 + (mode == WM_NEAR ? -dd : (mode == WM_FAR ? dd : 0)) + RngRange(rng, mode == WM_ANY ? 6000 : 400);
-            if (score > bestScore) { bestScore = score; best = i; }
+            int room = pRoom;
+            hq_OpenSpot_room = room;
         }
-        osAvoid = 0;
-        return best;
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            int room = hq_OpenSpot_room;
+            if (planIter == 0) { hq_BuildClearance_room = room; PhSubReset(); }
+            PhPush(); BuildClearance_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+            hq_OpenSpot_room = room;
+        }
+        if (planPhase == 2)
+        {
+            int room = hq_OpenSpot_room;
+            int s = roomCellStart[room], n = roomCellCount[room];
+            int best = -1, bestScore = -2000000000;
+            hq_OpenSpot_room = room;
+            hq_OpenSpot_s = s;
+            hq_OpenSpot_n = n;
+            hq_OpenSpot_best = best;
+            hq_OpenSpot_bestScore = bestScore;
+        }
+        if (planPhase == 3 && PhLoop(3, 100000))
+        {
+            int minClr = hq_OpenSpot_minClr;
+            int mode = hq_OpenSpot_mode;
+            int tx = hq_OpenSpot_tx;
+            int tz = hq_OpenSpot_tz;
+            int need = hq_OpenSpot_need;
+            uint[] rng = hq_OpenSpot_rng;
+            int s = hq_OpenSpot_s;
+            int n = hq_OpenSpot_n;
+            int best = hq_OpenSpot_best;
+            int bestScore = hq_OpenSpot_bestScore;
+            if (planIter == 0) hq_OpenSpot_kAt = s;
+            int k = hq_OpenSpot_kAt;
+            for (int chunkN = 0; chunkN < 150; chunkN++, k += 1)   // so many rounds a step
+            {
+                if (!(k < s + n)) { PhBreak(); break; }
+                int i = roomCells[k];
+                if (clr[i] < minClr || (need != 0 && (tags[i] & need) == 0) || (tags[i] & osAvoid) != 0) continue;
+                bool tried = false;
+                for (int q = 0; q < osTriedN && !tried; q++)
+                    if (Abs(osTried[q] % IW - i % IW) <= 1 && Abs(osTried[q] / IW - i / IW) <= 1) tried = true;
+                if (tried) continue;
+                int c = clr[i] > minClr + 2 ? minClr + 2 : clr[i];   // open enough is enough: do not always sit in the exact middle
+                int dd = Abs(i % IW * GenData.INNER_MM + 250 - tx) + Abs(i / IW * GenData.INNER_MM + 250 - tz);
+                int score = c * 4000 + (mode == WM_NEAR ? -dd : (mode == WM_FAR ? dd : 0)) + RngRange(rng, mode == WM_ANY ? 6000 : 400);
+                if (score > bestScore) { bestScore = score; best = i; }
+            }
+            hq_OpenSpot_kAt = k;
+            hq_OpenSpot_minClr = minClr;
+            hq_OpenSpot_mode = mode;
+            hq_OpenSpot_tx = tx;
+            hq_OpenSpot_tz = tz;
+            hq_OpenSpot_need = need;
+            hq_OpenSpot_rng = rng;
+            hq_OpenSpot_s = s;
+            hq_OpenSpot_n = n;
+            hq_OpenSpot_best = best;
+            hq_OpenSpot_bestScore = bestScore;
+        }
+        if (planPhase == 4)
+        {
+            int minClr = hq_OpenSpot_minClr;
+            int room = hq_OpenSpot_room;
+            int best = hq_OpenSpot_best;
+            osAvoid = 0;
+            { hq_OpenSpot_ret = best; hq_OpenSpot_minClr = minClr; hq_OpenSpot_room = room; hq_OpenSpot_best = best; PhEnd(); return; }
+            hq_OpenSpot_minClr = minClr;
+            hq_OpenSpot_room = room;
+            hq_OpenSpot_best = best;
+        }
     }
 
     // A centre piece (a table with its chairs, a fire with its seats) where the room is most open: up to ten
@@ -780,7 +919,8 @@ public partial class MapGenUdon
     // CentrePiece in phases, a step a call (autophase4); CentrePiece() above runs them to the end
     void CentrePiece_Body()
     {
-        if (PhLoop(0, 100000))
+        planMax = 1;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int ringWant = hq_CentrePiece_ringWant;
             int ringMin = hq_CentrePiece_ringMin;
@@ -801,7 +941,7 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             osTriedN = 0;
             { hq_CentrePiece_ret = -1; PhEnd(); return; }
@@ -809,7 +949,8 @@ public partial class MapGenUdon
     }
     void CentrePiece_L3()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             int def = hq_CentrePiece_def;
             int yaw = hq_CentrePiece_yaw;
@@ -824,11 +965,15 @@ public partial class MapGenUdon
             hq_CentrePiece_cell = cell;
             hq_CentrePiece_e = e;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int flags = hq_CentrePiece_flags;
             int e = hq_CentrePiece_e;
-            if (e >= 0 && Keep(e, (flags & EF_MANDATORY) != 0)) { osTriedN = 0; { hq_CentrePiece_ret = e; hq_CentrePiece_flags = flags; hq_CentrePiece_e = e; phReturn = true; PhEnd(); return; } }
+            if (e >= 0 && Keep(e, (flags & EF_MANDATORY) != 0))
+            {
+                osTriedN = 0;
+                { hq_CentrePiece_ret = e; hq_CentrePiece_flags = flags; hq_CentrePiece_e = e; phReturn = true; PhEnd(); return; }
+            }
             hq_CentrePiece_flags = flags;
             hq_CentrePiece_e = e;
         }
@@ -836,15 +981,18 @@ public partial class MapGenUdon
 
     void CentrePiece_L2()
     {
-        if (Ph(0))
+        planMax = 3;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int mode = hq_CentrePiece_mode;
             int tx = hq_CentrePiece_tx;
             int tz = hq_CentrePiece_tz;
             int need = hq_CentrePiece_need;
             uint[] rng = hq_CentrePiece_rng;
-            int cell = OpenSpot(2, mode, tx, tz, need, rng);
-            if (cell < 0) { hq_CentrePiece_mode = mode; hq_CentrePiece_tx = tx; hq_CentrePiece_tz = tz; hq_CentrePiece_need = need; hq_CentrePiece_rng = rng; hq_CentrePiece_cell = cell; phBreak = true; PhEnd(); return; }
+            int cell = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 2; hq_OpenSpot_mode = mode; hq_OpenSpot_tx = tx; hq_OpenSpot_tz = tz; hq_OpenSpot_need = need; hq_OpenSpot_rng = rng; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { rng = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
             hq_CentrePiece_mode = mode;
             hq_CentrePiece_tx = tx;
             hq_CentrePiece_tz = tz;
@@ -852,7 +1000,13 @@ public partial class MapGenUdon
             hq_CentrePiece_rng = rng;
             hq_CentrePiece_cell = cell;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1)
+        {
+            int cell = hq_CentrePiece_cell;
+            if (cell < 0) { hq_CentrePiece_cell = cell; phBreak = true; PhEnd(); return; }
+            hq_CentrePiece_cell = cell;
+        }
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
             bool bothYaws = hq_CentrePiece_bothYaws;
             if (!PhSubActive())
@@ -870,7 +1024,7 @@ public partial class MapGenUdon
                 if (phReturn) { PhEnd(); return; }
             }
         }
-        if (Ph(2))
+        if (planPhase == 3)
         {
             int cell = hq_CentrePiece_cell;
             if (osTriedN < osTried.Length) osTried[osTriedN++] = cell;
@@ -880,11 +1034,12 @@ public partial class MapGenUdon
 
     void CentrePiece_L1()
     {
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0)
         {
             osTriedN = 0;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (!PhSubActive())
             {
@@ -960,11 +1115,47 @@ public partial class MapGenUdon
     // one the room cannot do without, not blocked beyond its cover limit). Returns false if it was taken back.
     bool Keep(int first, bool must)
     {
-        if (first >= nEmit) return false;
-        for (int h = first; h < nEmit; h++) FillSlots(h, 0);
-        int def = emitDef[first];
-        bool ok = KeepIfWalkable(pRoom, first, must || coverExempt);
-        return ok;
+        hq_Keep_first = first;
+        hq_Keep_must = must;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); Keep_Body(); fin = PhAdvance(); PhPop(); }
+        return hq_Keep_ret;
+    }
+
+    // Keep in phases, a step a call (autophase4); Keep() above runs them to the end
+    void Keep_Body()
+    {
+        planMax = 2;
+        if (planPhase == 0)
+        {
+            int first = hq_Keep_first;
+            if (first >= nEmit) { hq_Keep_ret = false; hq_Keep_first = first; PhEnd(); return; }
+            for (int h = first; h < nEmit; h++) FillSlots(h, 0);
+            int def = emitDef[first];
+            hq_Keep_first = first;
+            hq_Keep_def = def;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            int first = hq_Keep_first;
+            bool must = hq_Keep_must;
+            bool ok = false;
+            if (planIter == 0) { hq_KeepIfWalkable_room = pRoom; hq_KeepIfWalkable_first = first; hq_KeepIfWalkable_exempt = must || coverExempt; PhSubReset(); }
+            PhPush(); KeepIfWalkable_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { ok = hq_KeepIfWalkable_ret; PhBreak(); }
+            hq_Keep_first = first;
+            hq_Keep_must = must;
+            hq_Keep_ok = ok;
+        }
+        if (planPhase == 2)
+        {
+            int def = hq_Keep_def;
+            bool ok = hq_Keep_ok;
+            { hq_Keep_ret = ok; hq_Keep_def = def; hq_Keep_ok = ok; PhEnd(); return; }
+            hq_Keep_def = def;
+            hq_Keep_ok = ok;
+        }
     }
 
     bool coverExempt;   // FillToMinimum: an area below its minimum may pass its cover limit (never its walkway)
@@ -986,6 +1177,12 @@ public partial class MapGenUdon
     }
 
     // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_BuildClearance_kAt;
+    int hq_BuildClearance_n;
+    int hq_BuildClearance_qh;
+    int hq_BuildClearance_qt;
+    int hq_BuildClearance_room;
+    int hq_BuildClearance_s;
     int hq_CentrePiece_attempt;
     bool hq_CentrePiece_bothYaws;
     int hq_CentrePiece_cell;
@@ -1004,10 +1201,29 @@ public partial class MapGenUdon
     int hq_CentrePiece_tx;
     int hq_CentrePiece_tz;
     int hq_CentrePiece_yaw;
+    int hq_Keep_def;
+    int hq_Keep_first;
+    bool hq_Keep_must;
+    bool hq_Keep_ok;
+    bool hq_Keep_ret;
+    int hq_OpenSpot_best;
+    int hq_OpenSpot_bestScore;
+    int hq_OpenSpot_kAt;
+    int hq_OpenSpot_minClr;
+    int hq_OpenSpot_mode;
+    int hq_OpenSpot_n;
+    int hq_OpenSpot_need;
+    int hq_OpenSpot_ret;
+    uint[] hq_OpenSpot_rng;
+    int hq_OpenSpot_room;
+    int hq_OpenSpot_s;
+    int hq_OpenSpot_tx;
+    int hq_OpenSpot_tz;
     int hq_WallKeep_def;
     int hq_WallKeep_e;
     int hq_WallKeep_first;
     int hq_WallKeep_flags;
+    bool hq_WallKeep_ht1;
     int hq_WallKeep_mode;
     int hq_WallKeep_nb;
     int hq_WallKeep_ret;

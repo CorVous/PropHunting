@@ -8,8 +8,9 @@ public partial class MapGenUdon
     // ============================================================================================ NAVE
     void PlanNave()
     {
+        planMax = 6;
         int room = pRoom, dx = 0, dz = 0;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             dx = hq_PlanNave_dx;
             dz = hq_PlanNave_dz;
@@ -22,11 +23,15 @@ public partial class MapGenUdon
             hq_PlanNave_first = first;
             hq_PlanNave_altar = altar;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int first = hq_PlanNave_first;
             int altar = hq_PlanNave_altar;
-            if (altar < 0 || !Keep(first, true)) { altar = -1; MandFail(1); }
+            if (altar < 0 || !Keep(first, true))
+            {
+                altar = -1;
+                MandFail(1);
+            }
             int ax = altar >= 0 ? emitX[altar] : RoomMidX(room), az = altar >= 0 ? emitZ[altar] : RoomMidZ(room);
             // the aisle: a walkway from the door to the altar along the nave's long axis, 1 m wide
             bool alongX = RoomLongAxis(room) == 0;
@@ -41,16 +46,21 @@ public partial class MapGenUdon
             hq_PlanNave_ax = ax;
             hq_PlanNave_az = az;
         }
-        if (Ph(2))
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
-            RoomWalkable(room);
+            if (planIter == 0) { hq_RoomWalkable_room = room; PhSubReset(); }
+            PhPush(); RoomWalkable_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (planPhase == 3)
+        {
             // the pews, in rows either side of the aisle, all facing the altar
             uint[] r2 = SR(2);
             int pews = 0;
             hq_PlanNave_r2 = r2;
             hq_PlanNave_pews = pews;
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 4 && PhLoop(4, 100000))
         {
             if (!PhSubActive())
             {
@@ -66,14 +76,14 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(4))
+        if (planPhase == 5)
         {
             int pews = hq_PlanNave_pews;
             if (pews == 0) MandFail(1);
             hq_PlanNave_pews = pews;
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(5, 100000))
+        if (planPhase == 6 && PhLoop(6, 100000))
         {
             if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "hw_shrine", "hw_plaque", "gk_lanternGlass", "gk_lantern", "gk_pillarSmall", "gk_pillarSquare", "gk_urnRound", "gk_urnSquare", "k_bookcaseClosed", "k_plant", "gk_benchOld", "k_coatRack" }; PhSubReset(); }
             PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
@@ -83,36 +93,42 @@ public partial class MapGenUdon
     void PlanNave_L1()
     {
         int room = pRoom, dx = 0, dz = 0;
-        if (Ph(0))
+        planMax = 1;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
-            int first = hq_PlanNave_first;
             int ax = hq_PlanNave_ax;
             int az = hq_PlanNave_az;
             uint[] r2 = hq_PlanNave_r2;
-            int cell = OpenSpot(1, WM_FAR, ax, az, 0, r2);
-            if (cell < 0) { hq_PlanNave_first = first; hq_PlanNave_ax = ax; hq_PlanNave_az = az; hq_PlanNave_r2 = r2; hq_PlanNave_cell = cell; phBreak = true; PhEnd(); return; }
-            int px = cell % IW * GenData.INNER_MM + 250, pz = cell / IW * GenData.INNER_MM + 250;
-            int yaw = (int)(System.Math.Atan2(ax - px, az - pz) * 180 / System.Math.PI);
-            yaw = ((yaw + 45 + 360) % 360) / 90 * 90;   // square to the nave
-            first = nEmit;
-            hq_PlanNave_first = first;
+            int cell = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 1; hq_OpenSpot_mode = WM_FAR; hq_OpenSpot_tx = ax; hq_OpenSpot_tz = az; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r2; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r2 = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
             hq_PlanNave_ax = ax;
             hq_PlanNave_az = az;
             hq_PlanNave_r2 = r2;
             hq_PlanNave_cell = cell;
-            hq_PlanNave_yaw = yaw;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int first = hq_PlanNave_first;
+            int ax = hq_PlanNave_ax;
+            int az = hq_PlanNave_az;
             int pews = hq_PlanNave_pews;
             int cell = hq_PlanNave_cell;
-            int yaw = hq_PlanNave_yaw;
-            if (FreePlace(Dn("gk_pew"), cell, yaw, 0, 0, H_FREE) >= 0 && Keep(first, false)) pews++;
+            if (cell < 0) { hq_PlanNave_first = first; hq_PlanNave_ax = ax; hq_PlanNave_az = az; hq_PlanNave_pews = pews; hq_PlanNave_cell = cell; phBreak = true; PhEnd(); return; }
+            int px = cell % IW * GenData.INNER_MM + 250, pz = cell / IW * GenData.INNER_MM + 250;
+            int yaw = (int)(System.Math.Atan2(ax - px, az - pz) * 180 / System.Math.PI);
+            yaw = ((yaw + 45 + 360) % 360) / 90 * 90;   // square to the nave
+            first = nEmit;
+            if (FreePlace(Dn("gk_pew"), cell, yaw, 0, 0, H_FREE) >= 0 && Keep(first, false))
+            {
+                pews++;
+            }
             hq_PlanNave_first = first;
+            hq_PlanNave_ax = ax;
+            hq_PlanNave_az = az;
             hq_PlanNave_pews = pews;
             hq_PlanNave_cell = cell;
-            hq_PlanNave_yaw = yaw;
         }
     }
 
@@ -120,21 +136,22 @@ public partial class MapGenUdon
     // ============================================================================================ VESTRY
     void PlanVestry()
     {
+        planMax = 2;
         int room = pRoom;
-        if (Ph(0))
+        if (planPhase == 0)
         {
             uint[] r = SR(1);
             hp_PlanVestry_first = nEmit;
             if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, EF_MANDATORY, r) >= 0) Keep(hp_PlanVestry_first, true); else MandFail(1);
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             uint[] r2 = SR(2);
             if (Fit(2)) { hp_PlanVestry_first = nEmit; if (WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, 0, r2) >= 0) Keep(hp_PlanVestry_first, false); }
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(2, 100000))
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
             if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "q_cabinet", "gk_trunk", "k_bookcaseClosed", "k_bookcase", "k_coatRack", "k_lampSquare", "gk_lantern", "hw_shrine", "q_cabinetSmall", "k_trashcan", "gk_urnRound" }; PhSubReset(); }
             PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
@@ -145,20 +162,21 @@ public partial class MapGenUdon
     // ============================================================================================ CHURCHYARD
     void PlanChurchyard()
     {
-        if (Ph(0))
+        planMax = 11;
+        if (planPhase == 0)
         {
             int dx = 0, dz = 0;
             hp_PlanChurchyard_room = pRoom;
             hq_PlanChurchyard_dx = dx;
             hq_PlanChurchyard_dz = dz;
         }
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
             PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(2))
+        if (planPhase == 2)
         {
             int dx = hq_PlanChurchyard_dx;
             int dz = hq_PlanChurchyard_dz;
@@ -168,7 +186,7 @@ public partial class MapGenUdon
             hq_PlanChurchyard_dz = dz;
             hq_PlanChurchyard_rp = rp;
         }
-        if (PhLoop(3, 100000))
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
             uint[] rp = hq_PlanChurchyard_rp;
             if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = rp; PhSubReset(); }
@@ -176,11 +194,11 @@ public partial class MapGenUdon
             if (fin) { rp = hq_StonePaths_rng; PhBreak(); }
             hq_PlanChurchyard_rp = rp;
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             hp_PlanChurchyard_r = SR(1);
         }
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             if (!PhSubActive())
             {
@@ -196,17 +214,17 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(6))
+        if (planPhase == 6)
         {
             uint[] r2 = SR(2);
             if (RngChance(r2, 600) && Fit(2)) { int first = nEmit; if (PlaceGroup(FindGrp("graves"), hp_PlanChurchyard_room, GenData.A_OUT_OPEN, 3, 0, r2)) Keep(first, false); }
         }
-        if (Ph(7))
+        if (planPhase == 7)
         {
             int trees = TreeCount(hp_PlanChurchyard_room, hp_PlanChurchyard_r);
             hq_PlanChurchyard_trees = trees;
         }
-        if (PhLoop(8, 100000))
+        if (planPhase == 8 && PhLoop(8, 100000))
         {
             int trees = hq_PlanChurchyard_trees;
             if (!PhSubActive())
@@ -224,17 +242,17 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (PhLoop(9, 100000))
+        if (planPhase == 9 && PhLoop(9, 100000))
         {
             if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "gk_benchOld", "k_bench", "hk_bench", "gk_urnRound", "gk_urnSquare", "gk_cross", "f_hedge", "n_bushLarge", "ck_trash", "gk_lightpostDouble" }; PhSubReset(); }
             PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(10))
+        if (planPhase == 10)
         {
             ClearBans();
         }
-        if (PhLoop(11, 100000))
+        if (planPhase == 11 && PhLoop(11, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 30; hq_Borders_max = 3; hq_Borders_soil = true; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
@@ -243,30 +261,46 @@ public partial class MapGenUdon
     }
     void PlanChurchyard_L1()
     {
-        if (Ph(0))
+        planMax = 2;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int dx = hq_PlanChurchyard_dx;
             int dz = hq_PlanChurchyard_dz;
-            int cell = OpenSpot(1, WM_NEAR, dx, dz, 0, hp_PlanChurchyard_r);
-            int first = nEmit;
+            int cell = 0;
+            if (planIter == 0) { hq_OpenSpot_minClr = 1; hq_OpenSpot_mode = WM_NEAR; hq_OpenSpot_tx = dx; hq_OpenSpot_tz = dz; hq_OpenSpot_need = 0; hq_OpenSpot_rng = hp_PlanChurchyard_r; PhSubReset(); }
+            PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { hp_PlanChurchyard_r = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
             hq_PlanChurchyard_dx = dx;
             hq_PlanChurchyard_dz = dz;
             hq_PlanChurchyard_cell = cell;
-            hq_PlanChurchyard_first = first;
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             int cell = hq_PlanChurchyard_cell;
-            int first = hq_PlanChurchyard_first;
-            if (cell >= 0 && FreePlace(Dn("gk_lightpost"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+            int first = nEmit;
+            hq_PlanChurchyard_sel1 = 0;
+            if (cell >= 0 && FreePlace(Dn("gk_lightpost"), cell, 0, 0, 0, H_FREE) >= 0) hq_PlanChurchyard_sel1 = 1;
             hq_PlanChurchyard_cell = cell;
             hq_PlanChurchyard_first = first;
+        }
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            if (!(hq_PlanChurchyard_sel1 == 1)) PhBreak();
+            else
+            {
+                int first = hq_PlanChurchyard_first;
+                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
+                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanChurchyard_first = first;
+            }
         }
     }
 
     void PlanChurchyard_L2()
     {
-        if (PhLoop(0, 100000))
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
             int t = hq_PlanChurchyard_t;
             if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
@@ -279,6 +313,7 @@ public partial class MapGenUdon
     // ============================================================================================ GRAVEYARD
     void PlanGraveyard()
     {
+        planMax = 7;
         int room = pRoom;
         // a step a part (Cor: build freezes): each row of graves, the crypt and the dug grave, each tree, each of the pool
         // the rows of graves, a few rows of a few, then the crosses
@@ -294,7 +329,7 @@ public partial class MapGenUdon
                 if (PlaceGroup(FindGrp(k % 3 == 2 ? "crosses" : "graves"), room, GenData.A_OUT_OPEN, RngBetween(rk, 3, 4), 0, rk) && Keep(first, false)) planA++;
             }
         }
-        if (Ph(1))
+        if (planPhase == 1)
         {
             if (planA == 0) MandFail(1);
             uint[] r2 = SR(20);
@@ -304,31 +339,35 @@ public partial class MapGenUdon
             if (RngChance(r3, 450) && Fit(2)) hq_PlanGraveyard_sel1 = 1;
             hq_PlanGraveyard_r3 = r3;
         }
-        if (Ph(2))
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
-            if (hq_PlanGraveyard_sel1 == 1)
+            if (!(hq_PlanGraveyard_sel1 == 1)) PhBreak();
+            else
             {
                 uint[] r3 = hq_PlanGraveyard_r3;
-                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, r3);
-                int first = nEmit;
+                int cell = 0;
+                if (planIter == 0) { hq_OpenSpot_minClr = 2; hq_OpenSpot_mode = WM_ANY; hq_OpenSpot_tx = 0; hq_OpenSpot_tz = 0; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r3; PhSubReset(); }
+                PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r3 = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
                 hq_PlanGraveyard_r3 = r3;
                 hq_PlanGraveyard_cell = cell;
-                hq_PlanGraveyard_first = first;
             }
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             if (hq_PlanGraveyard_sel1 == 1)
             {
                 uint[] r3 = hq_PlanGraveyard_r3;
                 int cell = hq_PlanGraveyard_cell;
+                int first = nEmit;
                 int dug = cell >= 0 ? FreePlace(Dn("gk_dug"), cell, RngRange(r3, 4) * 90, 0, 0, H_FREE) : -1;
                 hq_PlanGraveyard_r3 = r3;
                 hq_PlanGraveyard_cell = cell;
+                hq_PlanGraveyard_first = first;
                 hq_PlanGraveyard_dug = dug;
             }
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             if (hq_PlanGraveyard_sel1 == 1)
             {
@@ -341,21 +380,49 @@ public partial class MapGenUdon
                 hq_PlanGraveyard_dug = dug;
             }
         }
-        if (Ph(5))
+        if (planPhase == 5)
         {
             uint[] r = SR(1);
             planN = TreeCount(room, r);
         }
-        if (PhLoop(6, planN)) LawnTree(60 + planIter);
+        if (planPhase == 6 && PhLoop(6, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int lt = planIter;
+                if (!(lt < planN)) PhBreak();
+                else { hq_PlanGraveyard_lt = lt; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanGraveyard_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
         string[] pool = { "gk_gsDebris", "gk_graveBorder", "gk_lightpost", "gk_lightpostDouble", "gk_fireBasket", "gk_benchOld", "gk_urnRound", "gk_urnSquare",
             "gk_lantern", "gk_crossWood", "gk_crossColumn", "n_bushLarge", "hk_bench", "m_wheelbarrow" };
-        if (PhLoop(7, 100000))
+        if (planPhase == 7 && PhLoop(7, 100000))
         {
             if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = pool; PhSubReset(); }
             PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
     }
+    void PlanGraveyard_L1()
+    {
+        int room = pRoom;
+        planMax = 0;
+        if (planPhase == 0 && PhLoop(0, 100000))
+        {
+            int lt = hq_PlanGraveyard_lt;
+            if (planIter == 0) { hq_LawnTree_k = 60 + lt; PhSubReset(); }
+            PhPush(); LawnTree_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+    }
+
 
     // phase state of the split plans (Tools: autophase2)
     int hp_PlanVestry_first;
@@ -369,11 +436,13 @@ public partial class MapGenUdon
     int hq_PlanChurchyard_first;
     int hq_PlanChurchyard_k;
     uint[] hq_PlanChurchyard_rp;
+    int hq_PlanChurchyard_sel1;
     int hq_PlanChurchyard_t;
     int hq_PlanChurchyard_trees;
     int hq_PlanGraveyard_cell;
     int hq_PlanGraveyard_dug;
     int hq_PlanGraveyard_first;
+    int hq_PlanGraveyard_lt;
     uint[] hq_PlanGraveyard_r3;
     int hq_PlanGraveyard_sel1;
     int hq_PlanNave_altar;
@@ -386,5 +455,4 @@ public partial class MapGenUdon
     int hq_PlanNave_k;
     int hq_PlanNave_pews;
     uint[] hq_PlanNave_r2;
-    int hq_PlanNave_yaw;
 }

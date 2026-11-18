@@ -47,14 +47,15 @@ public partial class MapGen
     // ValidateSite in phases, a step a call (autophase4); ValidateSite() above runs them to the end
     void ValidateSite_Body()
     {
-        if (Ph(0))
+        planMax = 6;
+        if (planPhase == 0)
         {
             int fail = 0;
             if (stMark == null || stMark.Length < W * H) stMark = new int[W * H];
             hq_ValidateSite_fail = fail;
         }
         // T1, T3: footprints
-        if (PhLoop(1, 100000))
+        if (planPhase == 1 && PhLoop(1, 100000))
         {
             int fail = hq_ValidateSite_fail;
             int inst = planIter;
@@ -89,7 +90,7 @@ public partial class MapGen
             hq_ValidateSite_fail = fail;
         }
         // the rooms of each building, their doors
-        if (PhLoop(2, 100000))
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
             int fail = hq_ValidateSite_fail;
             int k = planIter;
@@ -168,7 +169,7 @@ public partial class MapGen
             }
             hq_ValidateSite_fail = fail;
         }
-        if (Ph(3))
+        if (planPhase == 3)
         {
             int fail = hq_ValidateSite_fail;
             // @cut
@@ -199,7 +200,7 @@ public partial class MapGen
             }
             hq_ValidateSite_fail = fail;
         }
-        if (Ph(4))
+        if (planPhase == 4)
         {
             int fail = hq_ValidateSite_fail;
             // @cut
@@ -222,7 +223,7 @@ public partial class MapGen
         }
         // @cut
         // T11, T13: rooms
-        if (PhLoop(5, 100000))
+        if (planPhase == 5 && PhLoop(5, 100000))
         {
             int fail = hq_ValidateSite_fail;
             int r = planIter;
@@ -245,7 +246,7 @@ public partial class MapGen
             }
             hq_ValidateSite_fail = fail;
         }
-        if (Ph(6))
+        if (planPhase == 6)
         {
             int fail = hq_ValidateSite_fail;
             siteFailMask = fail;

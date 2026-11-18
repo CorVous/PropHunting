@@ -136,7 +136,7 @@ public partial class MapGenUdon
     // BuildTags in pieces (Cor: build freezes): the same work in the same order, a few outer cells or a few thousand
     // inner cells a step. True when done.
     int btPhase, btCursor, btQh, btQt;
-    const int BT_CHUNK = 3000;
+    const int BT_CHUNK = 800;
 
     void BuildTags()
     {
@@ -203,13 +203,14 @@ public partial class MapGenUdon
             int e = btCursor + 6 < W * H ? btCursor + 6 : W * H;
             for (int c = btCursor; c < e; c++) TagCell(c);
             btCursor = e;
-            if (e >= W * H) btPhase = 2;
+            if (e >= W * H) { btPhase = 2; btCursor = 0; }
             return false;
         }
         if (btPhase == 2)
         {
         // doors: keep-clear cells on both sides (two deep, one wider than the doorway), and the room door lists
-        for (int c = 0; c < W * H; c++)
+        int btE = btCursor + 100 < W * H ? btCursor + 100 : W * H;
+        for (int c = btCursor; c < btE; c++)
         {
             if (cellZone[c] == GenData.Z_NONE) continue;
             int cx = c % W, cz = c / W;
@@ -270,7 +271,13 @@ public partial class MapGenUdon
                 }
             }
         }
-        RoomEntries();
+            btCursor = btE;
+            if (btE >= W * H) btPhase = 20;
+            return false;
+        }
+        if (btPhase == 20) { RoomEntries(); btPhase = 21; return false; }
+        if (btPhase == 21)
+        {
         StairTags();   // generator 18: the stairs between levels (MapGenLevels.cs)
         // nothing spawns within 1.5 m of the release exit (04 section 4.7.2)
         {

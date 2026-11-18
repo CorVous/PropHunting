@@ -259,7 +259,10 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
                 stage = 6; progressPermille = 940;
                 break;
             case 6:
-                Finish();
+                if (!stRun) StBegin();
+                PhPush(); Finish_Body(); stFin = PhAdvance(); PhPop();
+                if (!stFin) break;
+                stRun = false;
                 stage = 7; progressPermille = 960; fsPhase = 0; fsCursor = 0;
                 break;
             case 7:

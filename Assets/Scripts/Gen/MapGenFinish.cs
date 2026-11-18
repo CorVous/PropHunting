@@ -36,8 +36,7 @@ public partial class MapGen
 
     void FloodBegin()
     {
-        int n = IW * IH;
-        for (int i = 0; i < n; i++) reach[i] = 0;
+        reach = new byte[IW * IH];   // cleared (a loop over every cell is slow in Udon)
         int start = (releaseZ * 8 + 4) * IW + releaseX * 8 + 4;
         flQh = 0; flQt = 0;
         reach[start] = 1; queue[flQt++] = start;
@@ -85,27 +84,31 @@ public partial class MapGen
     // In steps (Cor: build freezes): the flood in chunks, the rooms' reach a few thousand cells a step, a
     // repair and the flood again. The same checks and repairs in the same order. vPhase 0 starts it; true when done,
     // vFailed when the seed must be re-rolled.
-    int vPhase, vRepair, vRoom;
+    int vPhase, vRepair, vRoom, vK, vFree, vOk;
     bool vFailed;
 
     bool ValidateStep()
     {
-        if (vPhase == 0) { FloodBegin(); vPhase = 1; vRoom = 0; return false; }
+        if (vPhase == 0) { FloodBegin(); vPhase = 1; vRoom = 0; vK = 0; vFree = 0; vOk = 0; return false; }
         if (vPhase == 1) { if (FloodRun(FS_CHUNK)) vPhase = 2; return false; }
         int cells = 0, bad = -1;
-        while (vRoom < nRooms && bad < 0 && cells < FS_CHUNK)
+        while (vRoom < nRooms && bad < 0 && cells < FS_CHUNK / 4)
         {
-            int r = vRoom++;
-            int s = roomCellStart[r], n = roomCellCount[r], free = 0, ok = 0;
-            for (int k = s; k < s + n; k++)
+            int r = vRoom;
+            int s = roomCellStart[r], n = roomCellCount[r];
+            int k1 = vK + (FS_CHUNK / 4 - cells);   // this step's share of the room
+            if (k1 > n) k1 = n;
+            for (int k = s + vK; k < s + k1; k++)
             {
                 int i = roomCells[k];
                 if (SolidAt(i)) continue;
-                free++;
-                if (reach[i] != 0) ok++;
+                vFree++;
+                if (reach[i] != 0) vOk++;
             }
-            cells += n;
-            if (free - ok > SealedAllowance(r)) bad = r;
+            cells += k1 - vK; vK = k1;
+            if (vK < n) break;   // the rest of the room next step
+            if (vFree - vOk > SealedAllowance(r)) bad = r;
+            vRoom++; vK = 0; vFree = 0; vOk = 0;
         }
         if (bad < 0 && vRoom < nRooms) return false;
         if (bad < 0) return true;
@@ -180,8 +183,9 @@ public partial class MapGen
                 if (occ[i] == 0)
                     for (int o = roomEmitStart[emitRoom[e]]; o < nEmit; o++)
                     {
+                        if (x < emitRX[o] || z < emitRZ[o] || x >= emitRX[o] + emitRW[o] || z >= emitRZ[o] + emitRD[o]) continue;
                         if (o == e || (emitFlags[o] & EF_REMOVED) != 0 || (emitParent[o] >= 0 && (emitFlags[o] & EF_ADJACENT) == 0) || Has(emitDef[o], GenData.FL_FLAT) || Has(emitDef[o], GenData.FL_DECOR)) continue;
-                        if (x >= emitRX[o] && x < emitRX[o] + emitRW[o] && z >= emitRZ[o] && z < emitRZ[o] + emitRD[o]) { occ[i] = o + 1; break; }
+                        occ[i] = o + 1; break;
                     }
             }
         // children (and theirs) go with it; they always come later in the list
@@ -191,65 +195,130 @@ public partial class MapGen
 
     void Finish()
     {
-        // compact: emit indices are final from here on
-        int[] remap = new int[nEmit];
-        int m = 0;
-        for (int e = 0; e < nEmit; e++)
-        {
-            if ((emitFlags[e] & EF_REMOVED) != 0) { remap[e] = -1; continue; }
-            remap[e] = m;
-            if (m != e)
-            {
-                emitDef[m] = emitDef[e]; emitX[m] = emitX[e]; emitY[m] = emitY[e]; emitZ[m] = emitZ[e]; emitYaw[m] = emitYaw[e];
-                emitParent[m] = emitParent[e]; emitRoom[m] = emitRoom[e]; emitFlags[m] = emitFlags[e];
-                emitRX[m] = emitRX[e]; emitRZ[m] = emitRZ[e]; emitRW[m] = emitRW[e]; emitRD[m] = emitRD[e];
-                emitRot[m] = emitRot[e]; emitDepth[m] = emitDepth[e]; emitSlot[m] = emitSlot[e];
-                emitGroup[m] = emitGroup[e]; emitGrp[m] = emitGrp[e];
-                emitSet[m] = emitSet[e]; emitHost[m] = emitHost[e];
-            }
-            m++;
-        }
-        for (int e = 0; e < m; e++)
-        {
-            if (emitParent[e] >= 0) emitParent[e] = remap[emitParent[e]];
-            if (emitGroup[e] >= 0) emitGroup[e] = remap[emitGroup[e]];
-            if (emitSet[e] >= 0) emitSet[e] = remap[emitSet[e]];
-            // a host that was taken away afterwards: the object stays where it stood, against nothing in particular
-            if (emitHost[e] >= 0) emitHost[e] = remap[emitHost[e]] >= 0 ? remap[emitHost[e]] : H_FREE;
-        }
-        int n = IW * IH;
-        for (int i = 0; i < n; i++)
-        {
-            if (occ[i] > 0) occ[i] = remap[occ[i] - 1] + 1;
-            if (flatOcc[i] > 0) flatOcc[i] = remap[flatOcc[i] - 1] + 1;
-            if (reserve[i] > 0) reserve[i] = remap[reserve[i] - 1] + 1;
-        }
-        int nf = 0;
-        for (int k = 0; k < nFree; k++)
-        {
-            int h = freeHost[k] < 0 ? -1 : remap[freeHost[k]];
-            if (h >= 0) { freeHost[nf] = h; freeSlot[nf] = freeSlot[k]; nf++; }
-        }
-        nFree = nf;
-        int ns = 0;
-        for (int k = 0; k < nSockets; k++)
-        {
-            int h = remap[socketHost[k]];
-            if (h >= 0) { socketHost[ns] = h; socketSlot[ns] = socketSlot[k]; ns++; }
-        }
-        nSockets = ns;
-        nEmit = m;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); Finish_Body(); fin = PhAdvance(); PhPop(); }
+    }
 
-        // Disguises (G25): any prop on the map can be one. No copies are counted and none are ever added; only the
-        // technical exclusions stay off the list (GenData.defDisguise == 0: fixed dressing, trees, ground cover,
-        // anything longer than 2.5 m).
-        for (int d = 0; d < GenData.nDefs; d++) defCopies[d] = 0;
-        for (int e = 0; e < nEmit; e++) defCopies[emitDef[e]]++;
-        menuCount = 0;
-        for (int d = 0; d < GenData.nDefs; d++)
+    // Finish in phases, a step a call (autophase4); Finish() above runs them to the end
+    void Finish_Body()
+    {
+        planMax = 6;
+        if (planPhase == 0)
         {
-            menu[d] = GenData.defDisguise[d] > 0 && defCopies[d] > 0;
-            if (menu[d]) menuCount++;
+            // compact: emit indices are final from here on
+            int[] remap = new int[nEmit];
+            int m = 0;
+            hq_Finish_remap = remap;
+            hq_Finish_m = m;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            int[] remap = hq_Finish_remap;
+            int m = hq_Finish_m;
+            if (planIter == 0) hq_Finish_eAt = 0;
+            int e = hq_Finish_eAt;
+            for (int chunkN = 0; chunkN < 120; chunkN++, e += 1)   // so many rounds a step
+            {
+                if (!(e < nEmit)) { PhBreak(); break; }
+                if ((emitFlags[e] & EF_REMOVED) != 0) { remap[e] = -1; continue; }
+                remap[e] = m;
+                if (m != e)
+                {
+                    emitDef[m] = emitDef[e]; emitX[m] = emitX[e]; emitY[m] = emitY[e]; emitZ[m] = emitZ[e]; emitYaw[m] = emitYaw[e];
+                    emitParent[m] = emitParent[e]; emitRoom[m] = emitRoom[e]; emitFlags[m] = emitFlags[e];
+                    emitRX[m] = emitRX[e]; emitRZ[m] = emitRZ[e]; emitRW[m] = emitRW[e]; emitRD[m] = emitRD[e];
+                    emitRot[m] = emitRot[e]; emitDepth[m] = emitDepth[e]; emitSlot[m] = emitSlot[e];
+                    emitGroup[m] = emitGroup[e]; emitGrp[m] = emitGrp[e];
+                    emitSet[m] = emitSet[e]; emitHost[m] = emitHost[e];
+                }
+                m++;
+            }
+            hq_Finish_eAt = e;
+            hq_Finish_remap = remap;
+            hq_Finish_m = m;
+        }
+        // @cut
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            int[] remap = hq_Finish_remap;
+            int m = hq_Finish_m;
+            if (planIter == 0) hq_Finish_eAt = 0;
+            int e = hq_Finish_eAt;
+            for (int chunkN = 0; chunkN < 300; chunkN++, e += 1)   // so many rounds a step
+            {
+                if (!(e < m)) { PhBreak(); break; }
+                if (emitParent[e] >= 0) emitParent[e] = remap[emitParent[e]];
+                if (emitGroup[e] >= 0) emitGroup[e] = remap[emitGroup[e]];
+                if (emitSet[e] >= 0) emitSet[e] = remap[emitSet[e]];
+                // a host that was taken away afterwards: the object stays where it stood, against nothing in particular
+                if (emitHost[e] >= 0) emitHost[e] = remap[emitHost[e]] >= 0 ? remap[emitHost[e]] : H_FREE;
+            }
+            hq_Finish_eAt = e;
+            hq_Finish_remap = remap;
+            hq_Finish_m = m;
+        }
+        if (planPhase == 3)
+        {
+            // @cut
+            int n = IW * IH;
+            hq_Finish_n = n;
+        }
+        if (planPhase == 4 && PhLoop(4, 100000))
+        {
+            int[] remap = hq_Finish_remap;
+            int n = hq_Finish_n;
+            if (planIter == 0) hq_Finish_iAt = 0;
+            int i = hq_Finish_iAt;
+            for (int chunkN = 0; chunkN < 1500; chunkN++, i += 1)   // so many rounds a step
+            {
+                if (!(i < n)) { PhBreak(); break; }
+                if (occ[i] > 0) occ[i] = remap[occ[i] - 1] + 1;
+                if (flatOcc[i] > 0) flatOcc[i] = remap[flatOcc[i] - 1] + 1;
+                if (reserve[i] > 0) reserve[i] = remap[reserve[i] - 1] + 1;
+            }
+            hq_Finish_iAt = i;
+            hq_Finish_remap = remap;
+            hq_Finish_n = n;
+        }
+        if (planPhase == 5)
+        {
+            int[] remap = hq_Finish_remap;
+            int m = hq_Finish_m;
+            // @cut
+            int nf = 0;
+            for (int k = 0; k < nFree; k++)
+            {
+                int h = freeHost[k] < 0 ? -1 : remap[freeHost[k]];
+                if (h >= 0) { freeHost[nf] = h; freeSlot[nf] = freeSlot[k]; nf++; }
+            }
+            nFree = nf;
+            int ns = 0;
+            for (int k = 0; k < nSockets; k++)
+            {
+                int h = remap[socketHost[k]];
+                if (h >= 0) { socketHost[ns] = h; socketSlot[ns] = socketSlot[k]; ns++; }
+            }
+            nSockets = ns;
+            nEmit = m;
+            hq_Finish_remap = remap;
+            hq_Finish_m = m;
+        }
+        if (planPhase == 6)
+        {
+
+            // @cut
+            // Disguises (G25): any prop on the map can be one. No copies are counted and none are ever added; only the
+            // technical exclusions stay off the list (GenData.defDisguise == 0: fixed dressing, trees, ground cover,
+            // anything longer than 2.5 m).
+            for (int d = 0; d < GenData.nDefs; d++) defCopies[d] = 0;
+            for (int e = 0; e < nEmit; e++) defCopies[emitDef[e]]++;
+            menuCount = 0;
+            for (int d = 0; d < GenData.nDefs; d++)
+            {
+                menu[d] = GenData.defDisguise[d] > 0 && defCopies[d] > 0;
+                if (menu[d]) menuCount++;
+            }
         }
     }
 
@@ -275,6 +344,7 @@ public partial class MapGen
         if (fsPhase == 1)
         {
             int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
+            if (e > fsCursor + FS_CHUNK / 3) e = fsCursor + FS_CHUNK / 3;
             for (int i = fsCursor; i < e; i++) BlendGround(i);
             fsCursor = e;
             if (e >= n) { fsPhase = 2; fsCursor = 0; }
@@ -324,7 +394,13 @@ public partial class MapGen
             int t = roomType[r] & 127;
             statTypeRooms[t]++; statTypeCells[t] += roomCellCount[r];
         }
-        for (int e = 0; e < nEmit; e++)
+            fsPhase = 60; fsCursor = 0;
+            return false;
+        }
+        if (fsPhase == 60)
+        {
+        int e1 = fsCursor + 250 < nEmit ? fsCursor + 250 : nEmit;
+        for (int e = fsCursor; e < e1; e++)
         {
             int d = emitDef[e];
             if (Has(d, GenData.FL_DECOR)) { statDecor++; continue; }
@@ -337,6 +413,12 @@ public partial class MapGen
             if (OnFloor(e)) { statFloor++; statTypeFloor[t]++; statZoneFloor[z]++; }
             else { statTop++; statTypeTop[t]++; statZoneTop[z]++; }
         }
+            fsCursor = e1;
+            if (e1 >= nEmit) fsPhase = 61;
+            return false;
+        }
+        if (fsPhase == 61)
+        {
 
             // FNV-1a over everything that defines the map: the golden-seed hash of 04 section 6.3
             uint h2 = 2166136261u;
@@ -361,11 +443,15 @@ public partial class MapGen
         }
         {
             uint h2 = fsHash;
-            for (int e = 0; e < nEmit; e++)
+            if (fsPhase == 8) { fsPhase = 9; fsCursor = 0; }
+            int e1 = fsCursor + 120 < nEmit ? fsCursor + 120 : nEmit;
+            for (int e = fsCursor; e < e1; e++)
             {
                 h2 = Fnv(h2, emitDef[e]); h2 = Fnv(h2, emitX[e]); h2 = Fnv(h2, emitY[e]); h2 = Fnv(h2, emitZ[e]);
                 h2 = Fnv(h2, emitYaw[e]); h2 = Fnv(h2, emitParent[e]); h2 = Fnv(h2, emitFlags[e]);
             }
+            fsHash = h2; fsCursor = e1;
+            if (e1 < nEmit) return false;
             mapHash = h2;
             return true;
         }
@@ -394,30 +480,119 @@ public partial class MapGen
     // larger than SEALED_POCKET cells, and SealedAllowance in all.
     bool RoomWalkable(int room)
     {
-        int s = roomCellStart[room], n = roomCellCount[room];
-        BuildWide(room);
-        int start = -1, free = 0;
-        for (int k = s; k < s + n; k++)
+        hq_RoomWalkable_room = room;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); RoomWalkable_Body(); fin = PhAdvance(); PhPop(); }
+        return hq_RoomWalkable_ret;
+    }
+
+    // RoomWalkable in phases, a step a call (autophase4); RoomWalkable() above runs them to the end
+    void RoomWalkable_Body()
+    {
+        planMax = 3;
+        if (planPhase == 0)
         {
-            int i = roomCells[k];
-            if (solid[i] > 0) continue;
-            free++;
-            bool better = start < 0;
-            if (!better)
-            {
-                bool dNew = (tags[i] & GenData.T_DOOR_CLEAR) != 0, dOld = (tags[start] & GenData.T_DOOR_CLEAR) != 0;
-                better = dNew && !dOld;
-                if (!better && dNew == dOld && wideMark[start] != wideStamp && wideMark[i] == wideStamp) better = true;
-            }
-            if (better) start = i;
+            int room = hq_RoomWalkable_room;
+            int s = roomCellStart[room], n = roomCellCount[room];
+            BuildWide(room);
+            hq_RoomWalkable_room = room;
+            hq_RoomWalkable_s = s;
+            hq_RoomWalkable_n = n;
         }
-        walkBlocked = n - free;
-        if (start < 0) return false;
-        int seen = 0;
-        for (int round = 0; round < 3; round++)
+        if (planPhase == 1)
         {
+            int s = hq_RoomWalkable_s;
+            int n = hq_RoomWalkable_n;
+            // @cut
+            int start = -1, free = 0;
+            for (int k = s; k < s + n; k++)
+            {
+                int i = roomCells[k];
+                if (solid[i] > 0) continue;
+                free++;
+                bool better = start < 0;
+                if (!better)
+                {
+                    bool dNew = (tags[i] & GenData.T_DOOR_CLEAR) != 0, dOld = (tags[start] & GenData.T_DOOR_CLEAR) != 0;
+                    better = dNew && !dOld;
+                    if (!better && dNew == dOld && wideMark[start] != wideStamp && wideMark[i] == wideStamp) better = true;
+                }
+                if (better) start = i;
+            }
+            walkBlocked = n - free;
+            if (start < 0) { hq_RoomWalkable_ret = false; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_start = start; hq_RoomWalkable_free = free; PhEnd(); return; }
+            int seen = 0;
+            hq_RoomWalkable_s = s;
+            hq_RoomWalkable_n = n;
+            hq_RoomWalkable_start = start;
+            hq_RoomWalkable_free = free;
+            hq_RoomWalkable_seen = seen;
+        }
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int round = planIter;
+                if (!(round < 3)) PhBreak();
+                else { hq_RoomWalkable_round = round; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); RoomWalkable_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (planPhase == 3)
+        {
+            int room = hq_RoomWalkable_room;
+            int s = hq_RoomWalkable_s;
+            int n = hq_RoomWalkable_n;
+            int free = hq_RoomWalkable_free;
+            int seen = hq_RoomWalkable_seen;
+            // @cut
+            if (!ExitsJoined(room)) { hq_RoomWalkable_ret = false; hq_RoomWalkable_room = room; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_free = free; hq_RoomWalkable_seen = seen; PhEnd(); return; }
+            if (seen == free) { hq_RoomWalkable_ret = true; hq_RoomWalkable_room = room; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_free = free; hq_RoomWalkable_seen = seen; PhEnd(); return; }
+            if (free - seen > SealedAllowance(room)) { hq_RoomWalkable_ret = false; hq_RoomWalkable_room = room; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_free = free; hq_RoomWalkable_seen = seen; PhEnd(); return; }
+            for (int k = s; k < s + n; k++)
+            {
+                int i = roomCells[k];
+                if (solid[i] > 0 || dist[i] == walkStamp) continue;
+                if (FloodRoom(room, i, 0) > GenData.SEALED_POCKET) { hq_RoomWalkable_ret = false; hq_RoomWalkable_room = room; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_free = free; hq_RoomWalkable_seen = seen; PhEnd(); return; }
+            }
+            { hq_RoomWalkable_ret = true; hq_RoomWalkable_room = room; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_free = free; hq_RoomWalkable_seen = seen; PhEnd(); return; }
+            hq_RoomWalkable_room = room;
+            hq_RoomWalkable_s = s;
+            hq_RoomWalkable_n = n;
+            hq_RoomWalkable_free = free;
+            hq_RoomWalkable_seen = seen;
+        }
+    }
+    void RoomWalkable_L1()
+    {
+        planMax = 1;
+        if (planPhase == 0)
+        {
+            int room = hq_RoomWalkable_room;
+            int start = hq_RoomWalkable_start;
+            int seen = hq_RoomWalkable_seen;
             walkStamp++;
             seen = FloodRoom(room, start, walkNarrow ? 0 : 1);
+            hq_RoomWalkable_room = room;
+            hq_RoomWalkable_start = start;
+            hq_RoomWalkable_seen = seen;
+        }
+        if (planPhase == 1)
+        {
+            int room = hq_RoomWalkable_room;
+            int s = hq_RoomWalkable_s;
+            int n = hq_RoomWalkable_n;
+            int start = hq_RoomWalkable_start;
+            int free = hq_RoomWalkable_free;
+            int seen = hq_RoomWalkable_seen;
+            // @cut
             // the narrow leftovers that hang on the wide floor
             int qh = 0, qt = 0;
             for (int k = s; k < s + n; k++) if (dist[roomCells[k]] == walkStamp) queue[qt++] = roomCells[k];
@@ -430,7 +605,7 @@ public partial class MapGen
                 if (iz > 0) { j = i - IW; if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && wideMark[j] != wideStamp) { dist[j] = walkStamp; queue[qt++] = j; seen++; } }
                 if (ix > 0) { j = i - 1; if (innerRoom[j] == room && solid[j] <= 0 && dist[j] != walkStamp && wideMark[j] != wideStamp) { dist[j] = walkStamp; queue[qt++] = j; seen++; } }
             }
-            if (seen * 2 >= free || (tags[start] & GenData.T_DOOR_CLEAR) != 0) break;
+            if (seen * 2 >= free || (tags[start] & GenData.T_DOOR_CLEAR) != 0) { hq_RoomWalkable_room = room; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_start = start; hq_RoomWalkable_free = free; hq_RoomWalkable_seen = seen; phBreak = true; PhEnd(); return; }
             // an area without a door (outdoors) was entered in a small corner: start again in the rest of it
             int other = -1;
             for (int k = s; k < s + n && other < 0; k++)
@@ -438,20 +613,17 @@ public partial class MapGen
                 int i = roomCells[k];
                 if (solid[i] == 0 && dist[i] != walkStamp && wideMark[i] == wideStamp) other = i;
             }
-            if (other < 0) break;
+            if (other < 0) { hq_RoomWalkable_room = room; hq_RoomWalkable_s = s; hq_RoomWalkable_n = n; hq_RoomWalkable_start = start; hq_RoomWalkable_free = free; hq_RoomWalkable_seen = seen; phBreak = true; PhEnd(); return; }
             start = other;
+            hq_RoomWalkable_room = room;
+            hq_RoomWalkable_s = s;
+            hq_RoomWalkable_n = n;
+            hq_RoomWalkable_start = start;
+            hq_RoomWalkable_free = free;
+            hq_RoomWalkable_seen = seen;
         }
-        if (!ExitsJoined(room)) return false;
-        if (seen == free) return true;
-        if (free - seen > SealedAllowance(room)) return false;
-        for (int k = s; k < s + n; k++)
-        {
-            int i = roomCells[k];
-            if (solid[i] > 0 || dist[i] == walkStamp) continue;
-            if (FloodRoom(room, i, 0) > GenData.SEALED_POCKET) return false;
-        }
-        return true;
     }
+
 
     // FillToMinimum: a small outdoor area that is still below its minimum only has to stay passable (gaps of one
     // cell count): it is open to its neighbours, and the map-wide check (Validate) keeps every part reachable
@@ -601,43 +773,232 @@ public partial class MapGen
     // placed since `first` is taken away again.
     bool KeepIfWalkable(int room, int first, bool exempt)
     {
-        if (RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room])) return true;
-        // is it one chair that is in the way? Then only that one goes
-        for (int c = nEmit - 1; c > first; c--)
+        hq_KeepIfWalkable_room = room;
+        hq_KeepIfWalkable_first = first;
+        hq_KeepIfWalkable_exempt = exempt;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); KeepIfWalkable_Body(); fin = PhAdvance(); PhPop(); }
+        return hq_KeepIfWalkable_ret;
+    }
+
+    // KeepIfWalkable in phases, a step a call (autophase4); KeepIfWalkable() above runs them to the end
+    void KeepIfWalkable_Body()
+    {
+        planMax = 10;
+        if (planPhase == 0 && PhLoop(0, 100000))
         {
-            if (emitParent[c] < first || (emitFlags[c] & (EF_REMOVED | EF_ADJACENT)) != EF_ADJACENT) continue;
+            int room = hq_KeepIfWalkable_room;
+            bool ht1 = false;
+            if (planIter == 0) { hq_RoomWalkable_room = room; PhSubReset(); }
+            PhPush(); RoomWalkable_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { ht1 = hq_RoomWalkable_ret; PhBreak(); }
+            hq_KeepIfWalkable_room = room;
+            hq_KeepIfWalkable_ht1 = ht1;
+        }
+        if (planPhase == 1)
+        {
+            int room = hq_KeepIfWalkable_room;
+            bool exempt = hq_KeepIfWalkable_exempt;
+            bool ht1 = hq_KeepIfWalkable_ht1;
+            if (ht1 && (exempt || walkBlocked <= roomCoverMax[room]))
+            {
+                { hq_KeepIfWalkable_ret = true; hq_KeepIfWalkable_room = room; hq_KeepIfWalkable_exempt = exempt; hq_KeepIfWalkable_ht1 = ht1; PhEnd(); return; }
+            }
+            hq_KeepIfWalkable_room = room;
+            hq_KeepIfWalkable_exempt = exempt;
+            hq_KeepIfWalkable_ht1 = ht1;
+        }
+        // is it one chair that is in the way? Then only that one goes
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            int first = hq_KeepIfWalkable_first;
+            if (!PhSubActive())
+            {
+                if (planIter == 0) hq_KeepIfWalkable_c0 = nEmit - 1;
+                int c = hq_KeepIfWalkable_c0 - planIter;
+                if (!(c > first)) PhBreak();
+                else { hq_KeepIfWalkable_c = c; PhSubBegin(); }
+            }
+            hq_KeepIfWalkable_first = first;
+            if (PhSubActive())
+            {
+                PhPush(); KeepIfWalkable_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (planPhase == 3 && PhLoop(3, 100000))
+        {
+            int first = hq_KeepIfWalkable_first;
+            if (!PhSubActive())
+            {
+                if (planIter == 0) hq_KeepIfWalkable_c0 = nEmit - 1;
+                int c = hq_KeepIfWalkable_c0 - planIter;
+                if (!(c > first)) PhBreak();
+                else { hq_KeepIfWalkable_c = c; PhSubBegin(); }
+            }
+            hq_KeepIfWalkable_first = first;
+            if (PhSubActive())
+            {
+                PhPush(); KeepIfWalkable_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (planPhase == 4)
+        {
+            int room = hq_KeepIfWalkable_room;
+            hq_KeepIfWalkable_sel2 = 0;
+            if (TraceRoom == room) hq_KeepIfWalkable_sel2 = 1;
+            hq_KeepIfWalkable_room = room;
+        }
+        // the room as the walkway test saw it: # blocked, . free, d doorway floor, digits = cut-off pocket cells
+        if (planPhase == 5 && PhLoop(5, 100000))
+        {
+            if (!(hq_KeepIfWalkable_sel2 == 1)) PhBreak();
+            else
+            {
+                int room = hq_KeepIfWalkable_room;
+                if (planIter == 0) { hq_RoomWalkable_room = room; PhSubReset(); }
+                PhPush(); RoomWalkable_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_KeepIfWalkable_room = room;
+            }
+        }
+        if (planPhase == 6)
+        {
+            if (hq_KeepIfWalkable_sel2 == 1)
+            {
+                int room = hq_KeepIfWalkable_room;
+                for (int z = roomZ1[room]; z >= roomZ0[room]; z--)
+                {
+                    string line = "    ";
+                    for (int x = roomX0[room]; x <= roomX1[room]; x++)
+                    {
+                        int i = z * IW + x;
+                        line += innerRoom[i] != room ? ' ' : (solid[i] > 0 ? '#' : (dist[i] != walkStamp ? 'o' : ((tags[i] & GenData.T_DOOR_CLEAR) != 0 ? 'd' : '.')));
+                    }
+                    System.Console.Error.WriteLine(line);
+                }
+                hq_KeepIfWalkable_room = room;
+            }
+        }
+        if (planPhase == 7 && PhLoop(7, 100000))
+        {
+            int first = hq_KeepIfWalkable_first;
+            if (planIter == 0) hq_KeepIfWalkable_e0 = first;
+            int e = hq_KeepIfWalkable_e0 + planIter;
+            if (!(e < nEmit)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            {
+                if (emitParent[e] < 0) Remove(e);
+            }
+            hq_KeepIfWalkable_first = first;
+        }
+        if (planPhase == 8)
+        {
+            statWalkRejects++;
+        }
+        if (planPhase == 9 && PhLoop(9, 100000))
+        {
+            int room = hq_KeepIfWalkable_room;
+            if (planIter == 0) { hq_RoomWalkable_room = room; PhSubReset(); }
+            PhPush(); RoomWalkable_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+            hq_KeepIfWalkable_room = room;
+        }
+        if (planPhase == 10)
+        {
+            { hq_KeepIfWalkable_ret = false; PhEnd(); return; }
+        }
+    }
+    void KeepIfWalkable_L1()
+    {
+        planMax = 3;
+        if (planPhase == 0)
+        {
+            int room = hq_KeepIfWalkable_room;
+            int first = hq_KeepIfWalkable_first;
+            bool exempt = hq_KeepIfWalkable_exempt;
+            int c = hq_KeepIfWalkable_c;
+            if (emitParent[c] < first || (emitFlags[c] & (EF_REMOVED | EF_ADJACENT)) != EF_ADJACENT) { hq_KeepIfWalkable_room = room; hq_KeepIfWalkable_first = first; hq_KeepIfWalkable_exempt = exempt; PhEnd(); return; }
             Account(c, -1);
             bool fixedIt = RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room]);
             Account(c, 1);
-            if (fixedIt) { Remove(c); RoomWalkable(room); return true; }
+            hq_KeepIfWalkable_sel1 = 0;
+            if (fixedIt) hq_KeepIfWalkable_sel1 = 1;
+            hq_KeepIfWalkable_room = room;
+            hq_KeepIfWalkable_first = first;
+            hq_KeepIfWalkable_exempt = exempt;
         }
-        for (int c = nEmit - 1; c > first; c--)
+        if (planPhase == 1)
         {
-            if (emitParent[c] < first || (emitFlags[c] & EF_REMOVED) != 0) continue;
-            Remove(c);
-            if (RoomWalkable(room) && (exempt || walkBlocked <= roomCoverMax[room])) return true;
-        }
-        if (TraceRoom == room)
-        {
-            // the room as the walkway test saw it: # blocked, . free, d doorway floor, digits = cut-off pocket cells
-            RoomWalkable(room);
-            for (int z = roomZ1[room]; z >= roomZ0[room]; z--)
+            if (hq_KeepIfWalkable_sel1 == 1)
             {
-                string line = "    ";
-                for (int x = roomX0[room]; x <= roomX1[room]; x++)
-                {
-                    int i = z * IW + x;
-                    line += innerRoom[i] != room ? ' ' : (solid[i] > 0 ? '#' : (dist[i] != walkStamp ? 'o' : ((tags[i] & GenData.T_DOOR_CLEAR) != 0 ? 'd' : '.')));
-                }
-                System.Console.Error.WriteLine(line);
+                int c = hq_KeepIfWalkable_c;
+                Remove(c);
             }
         }
-        for (int e = first; e < nEmit; e++)
-            if (emitParent[e] < 0) Remove(e);
-        statWalkRejects++;
-        RoomWalkable(room);   // walkBlocked is the room's again, without what was taken away
-        return false;
+        if (planPhase == 2 && PhLoop(2, 100000))
+        {
+            if (!(hq_KeepIfWalkable_sel1 == 1)) PhBreak();
+            else
+            {
+                int room = hq_KeepIfWalkable_room;
+                if (planIter == 0) { hq_RoomWalkable_room = room; PhSubReset(); }
+                PhPush(); RoomWalkable_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_KeepIfWalkable_room = room;
+            }
+        }
+        if (planPhase == 3)
+        {
+            if (hq_KeepIfWalkable_sel1 == 1)
+            {
+                { hq_KeepIfWalkable_ret = true; phReturn = true; PhEnd(); return; }
+            }
+        }
     }
+
+    void KeepIfWalkable_L2()
+    {
+        planMax = 2;
+        if (planPhase == 0)
+        {
+            int first = hq_KeepIfWalkable_first;
+            int c = hq_KeepIfWalkable_c;
+            if (emitParent[c] < first || (emitFlags[c] & EF_REMOVED) != 0) { hq_KeepIfWalkable_first = first; PhEnd(); return; }
+            Remove(c);
+            hq_KeepIfWalkable_first = first;
+        }
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            int room = hq_KeepIfWalkable_room;
+            bool ht2 = false;
+            if (planIter == 0) { hq_RoomWalkable_room = room; PhSubReset(); }
+            PhPush(); RoomWalkable_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { ht2 = hq_RoomWalkable_ret; PhBreak(); }
+            hq_KeepIfWalkable_room = room;
+            hq_KeepIfWalkable_ht2 = ht2;
+        }
+        if (planPhase == 2)
+        {
+            int room = hq_KeepIfWalkable_room;
+            bool exempt = hq_KeepIfWalkable_exempt;
+            bool ht2 = hq_KeepIfWalkable_ht2;
+            if (ht2 && (exempt || walkBlocked <= roomCoverMax[room]))
+            {
+                { hq_KeepIfWalkable_ret = true; hq_KeepIfWalkable_room = room; hq_KeepIfWalkable_exempt = exempt; hq_KeepIfWalkable_ht2 = ht2; phReturn = true; PhEnd(); return; }
+            }
+            hq_KeepIfWalkable_room = room;
+            hq_KeepIfWalkable_exempt = exempt;
+            hq_KeepIfWalkable_ht2 = ht2;
+        }
+    }
+
 
     // =====================================================================================================
     // Ground (G30): what the floor of every inner cell is made of. Outdoors the kinds blend at their borders.
@@ -737,4 +1098,30 @@ public partial class MapGen
         for (int i = 0; i < 4; i++) { h ^= (u >> (i * 8)) & 0xFF; h *= 16777619u; }
         return h;
     }
+
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_Finish_eAt;
+    int hq_Finish_iAt;
+    int hq_Finish_m;
+    int hq_Finish_n;
+    int[] hq_Finish_remap;
+    int hq_KeepIfWalkable_c;
+    int hq_KeepIfWalkable_c0;
+    int hq_KeepIfWalkable_e0;
+    bool hq_KeepIfWalkable_exempt;
+    int hq_KeepIfWalkable_first;
+    bool hq_KeepIfWalkable_ht1;
+    bool hq_KeepIfWalkable_ht2;
+    bool hq_KeepIfWalkable_ret;
+    int hq_KeepIfWalkable_room;
+    int hq_KeepIfWalkable_sel1;
+    int hq_KeepIfWalkable_sel2;
+    int hq_RoomWalkable_free;
+    int hq_RoomWalkable_n;
+    bool hq_RoomWalkable_ret;
+    int hq_RoomWalkable_room;
+    int hq_RoomWalkable_round;
+    int hq_RoomWalkable_s;
+    int hq_RoomWalkable_seen;
+    int hq_RoomWalkable_start;
 }
