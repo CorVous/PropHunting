@@ -310,6 +310,29 @@ public class PHSlot : UdonSharpBehaviour
         return reach;
     }
 
+    // The room there is for the prop across (along 'across', its half width there 'half'), the least of: at its
+    // middle, and up to half a metre past its front and its back (along 'along', its half length 'reach'), so it is
+    // already squashed when its front comes to a doorway (Cor: or it starts clipping). An end is only measured
+    // where nothing stands between the middle and it (a wall beside the prop is not a doorway ahead of it).
+    float GapAcross(Vector3 mid, Vector3 across, Vector3 along, float half, float reach)
+    {
+        float gap = WallAt(mid, across, half) + WallAt(mid, -across, half);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Vector3 dir = along * side;
+            // three places 0.2 m apart (a wall is 0.2 m thick: one of them is in the doorway when it is near)
+            for (int k = 0; k < 3; k++)
+            {
+                float ahead = reach + 0.1f + 0.2f * k;
+                if (WallAt(mid, dir, ahead) < ahead - 0.001f) break;
+                Vector3 at = mid + dir * ahead;
+                float g = WallAt(at, across, half) + WallAt(at, -across, half);
+                if (g < gap) gap = g;
+            }
+        }
+        return gap;
+    }
+
     void Squash()
     {
         if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f) return;   // it never squeezes (PHHiderBody.SQUEEZE_HALF)
@@ -320,7 +343,7 @@ public class PHSlot : UdonSharpBehaviour
             Vector3 mid = shownPos + Vector3.up * Mathf.Min(proxyHalf.y, 0.9f);
             Vector3 ax = q * Vector3.right, az = q * Vector3.forward;
             // (a doorway's frame stands 6 cm into the opening on each side and is not in the collider)
-            float gx = WallAt(mid, ax, proxyHalf.x) + WallAt(mid, -ax, proxyHalf.x), gz = WallAt(mid, az, proxyHalf.z) + WallAt(mid, -az, proxyHalf.z);
+            float gx = GapAcross(mid, ax, az, proxyHalf.x, proxyHalf.z), gz = GapAcross(mid, az, ax, proxyHalf.z, proxyHalf.x);
             float fx = gx < 2f * proxyHalf.x - 0.001f ? (gx - 0.14f) / (2f * proxyHalf.x) : 1f;
             float fz = gz < 2f * proxyHalf.z - 0.001f ? (gz - 0.14f) / (2f * proxyHalf.z) : 1f;
             fx = Mathf.Clamp(fx, 0.35f, 1f); fz = Mathf.Clamp(fz, 0.35f, 1f);
