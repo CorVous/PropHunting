@@ -453,7 +453,8 @@ public static partial class GenData
             "k_counter", "md_counter", "k_counterDrawer", "md_counter", "r_counter", "md_counter", "k_bar", "md_tableLong",
             "k_sink", "md_washTub", "r_counterSink", "md_washTub", "k_bathSink", "=m_bucketWater", "k_toilet", "=m_bucketWood", "k_bathtub", "md_tub",
             "k_washer", "md_barrelStack", "k_dryer", "md_barrelStack",
-            "k_lampFloor", "md_torch", "q_lampStanding", "md_torch", "k_lampSquare", "md_torch", "k_lampTable", "md_candle", "q_lampTable", "md_candle",
+            "k_lampFloor", "=g_lantern", "q_lampStanding", "=g_lantern", "k_lampSquare", "=g_lantern",   // not the wall sconce on a stake (Cor: it does not look right on the ground)
+             "k_lampTable", "md_candle", "q_lampTable", "md_candle",
             "k_trashcan", "=m_bucketWood", "ck_trash", "=m_bucketWood", "k_speaker", "md_barrelSmall",
             "k_boxClosed", "md_box", "k_boxOpen", "=dg_boxS", "w_boxA", "=dg_boxS", "w_boxB", "md_box", "s_boxLarge", "md_boxLarge", "s_boxLargeOpen", "md_boxLarge",
             "w_fuelBarrel", "md_barrelLarge", "w_fuelBarrelB", "=dg_barrel", "w_fuelBarrelC", "=dg_barrel",
