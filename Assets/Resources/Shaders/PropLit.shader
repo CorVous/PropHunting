@@ -97,6 +97,9 @@ Shader "PropHunt/Lit"
                 #endif
                 fixed4 tint = UNITY_ACCESS_INSTANCED_PROP(Props, _Color);
                 albedo *= tint.rgb;
+                // grounding (Cor: more cohesion): an upright surface is a little darker at its foot, where it meets
+                // what it stands on. In the mesh's own space: a prop's base, a wall's foot.
+                albedo *= lerp(0.74, 1.0, saturate(v.vertex.y * 2.2 + max(n.y, 0.0) * 2.0));
                 o.albedo = albedo;
                 o.emit = 1 - v.color.a;
                 // the wrap part of the base sun (the 0.2) stays as fill when the spot sun takes over the direct part

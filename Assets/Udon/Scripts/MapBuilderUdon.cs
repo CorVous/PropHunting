@@ -244,7 +244,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     bool[] instHasUpper;
     int[] stairLowB, stairHighB, stairRunB, stairSideB;
     int nStairsB;
-    int[] cellZone, cellRoom, roomType, tags, innerRoom, emitDef, emitX, emitY, emitZ, emitYaw, defFlags, zoneWallMm;
+    int[] cellZone, cellRoom, roomType, tags, innerRoom, emitDef, emitX, emitY, emitZ, emitYaw, emitParent, defFlags, zoneWallMm;
     byte[] groundKind;
 
     // ------------------------------------------------------------------ mesh buffers (MeshBuf without a class)
@@ -676,7 +676,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         ListBuildings();
         lv = Vector3.zero;
         cellZone = gen.cellZone; cellRoom = gen.cellRoom; roomType = gen.roomType; tags = gen.tags; innerRoom = gen.innerRoom;
-        emitDef = gen.emitDef; emitX = gen.emitX; emitY = gen.emitY; emitZ = gen.emitZ; emitYaw = gen.emitYaw;
+        emitDef = gen.emitDef; emitX = gen.emitX; emitY = gen.emitY; emitZ = gen.emitZ; emitYaw = gen.emitYaw; emitParent = gen.emitParent;
         defFlags = gen.defFlags; zoneWallMm = gen.ZoneWallMm; groundKind = gen.ground;
         LevelOffsets();
         objects = new GameObject[gen.nEmit];
@@ -2549,6 +2549,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
         t.position = new Vector3(emitX[e], emitY[e], emitZ[e]) / 1000f + InnerOff(iz * IW + ix);   // upstairs or in a basement: where it belongs
         t.rotation = Quaternion.Euler(0, emitYaw[e], 0);
         objects[e] = go;
+        // the dark patch under a prop (the prefab's last child, "Shade") only where it stands on a floor
+        if (emitParent[e] >= 0 && t.childCount > 0)
+        {
+            Transform sh = t.GetChild(t.childCount - 1);
+            if (sh.name == "Shade") sh.gameObject.SetActive(false);
+        }
         TintProp(go, emitDef[e]);
         int def = emitDef[e];
         for (int i = 0; i < lampDefs.Length; i++)

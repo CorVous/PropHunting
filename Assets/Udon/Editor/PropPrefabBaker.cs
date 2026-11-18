@@ -31,6 +31,8 @@ public static class PropPrefabBaker
         AssetDatabase.Refresh();
         LoadModels();
         FixModels();
+        Harmonise();
+        MakeShade();
 
         var mat = AssetDatabase.LoadAssetAtPath<Material>(OUT + "/PropLit.mat");
         if (mat == null)
@@ -124,6 +126,24 @@ public static class PropPrefabBaker
                 bc.center = b.center;
                 bc.size = new Vector3(b.size.x, b.size.y, Mathf.Max(b.size.z, 0.03f));
             }
+        // the dark patch under it (PropShade): the last child, "Shade". Only for a thing that stands on something and
+        // has some height (not a rug, not a thing on a wall); MapBuilderUdon switches it off on a prop that stands on
+        // another (a patch would hang over a table's edge)
+        Bounds mb = bounds[model];
+        if (mb.min.y < 0.05f && mb.size.y * sc > 0.08f && (fl & GenData.FL_SCENERY) == 0)
+        {
+            var sh = new GameObject("Shade");
+            sh.transform.SetParent(go.transform, false);
+            float grow = 1.0f + Mathf.Clamp(0.25f / Mathf.Max(0.05f, Mathf.Max(mb.size.x, mb.size.z) * sc), 0.12f, 0.6f);   // a rim of about 12 cm
+            sh.transform.localPosition = new Vector3(mb.center.x, Mathf.Max(mb.min.y, 0f) + 0.012f / sc, mb.center.z);
+            sh.transform.localScale = new Vector3(mb.size.x * 0.5f * grow, 1f, mb.size.z * 0.5f * grow);
+            sh.layer = 1;   // TransparentFX: no dart, no pointer, no body meets it
+            sh.AddComponent<MeshFilter>().sharedMesh = shadeMesh;
+            var smr = sh.AddComponent<MeshRenderer>();
+            smr.sharedMaterial = shadeMat;
+            smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; smr.receiveShadows = false;
+            smr.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off; smr.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+        }
         var prefab = PrefabUtility.SaveAsPrefabAsset(go, OUT + "/Props/" + def.ToString("000") + "_" + GenData.defId[def] + ".prefab");
         UnityEngine.Object.DestroyImmediate(go);
         return prefab;
@@ -312,6 +332,69 @@ public static class PropPrefabBaker
             if (sk >= 0) skyPrefabs[sk] = prefab;
         }
         return result;
+    }
+
+    static Mesh shadeMesh;
+    static Material shadeMat;
+
+    // the patch under a prop: a flat fan of 12, radius 1, dark (alpha 1) in a wide middle and clear at the rim
+    static void MakeShade()
+    {
+        string path = OUT + "/Shade.asset", mpath = OUT + "/PropShade.mat";
+        AssetDatabase.DeleteAsset(path);
+        const int N = 12;
+        var v = new Vector3[1 + 2 * N]; var c = new Color32[1 + 2 * N]; var t = new int[N * 9];
+        v[0] = Vector3.zero; c[0] = new Color32(0, 0, 0, 255);
+        for (int i = 0; i < N; i++)
+        {
+            float a = i * Mathf.PI * 2f / N;
+            Vector3 d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            v[1 + i] = d * 0.62f; c[1 + i] = new Color32(0, 0, 0, 255);
+            v[1 + N + i] = d; c[1 + N + i] = new Color32(0, 0, 0, 0);
+            int j = (i + 1) % N, k = i * 9;
+            t[k] = 0; t[k + 1] = 1 + j; t[k + 2] = 1 + i;
+            t[k + 3] = 1 + i; t[k + 4] = 1 + j; t[k + 5] = 1 + N + j;
+            t[k + 6] = 1 + i; t[k + 7] = 1 + N + j; t[k + 8] = 1 + N + i;
+        }
+        shadeMesh = new Mesh { name = "Shade" };
+        shadeMesh.vertices = v; shadeMesh.colors32 = c; shadeMesh.triangles = t;
+        shadeMesh.RecalculateNormals(); shadeMesh.RecalculateBounds();
+        AssetDatabase.CreateAsset(shadeMesh, path);
+        shadeMat = AssetDatabase.LoadAssetAtPath<Material>(mpath);
+        if (shadeMat == null)
+        {
+            shadeMat = new Material(Shader.Find("PropHunt/Shade")) { enableInstancing = true };
+            AssetDatabase.CreateAsset(shadeMat, mpath);
+        }
+    }
+
+    // One family of colours across the packs (Cor: more cohesion between the assets). The packs disagree most on
+    // wood: one's is a saturated salmon orange, another's a dull brown, a third's nearly yellow. Every warm brown
+    // moves most of the way to one hue and into one band of saturation, keeping its lightness, so light and dark
+    // woods stay apart; and no colour anywhere is more saturated than the rest of the map can carry.
+    static void Harmonise()
+    {
+        for (int m = 0; m < mesh.Length; m++)
+        {
+            if (mesh[m] == null) continue;
+            Color32[] c = mesh[m].colors32;
+            if (c == null || c.Length == 0) continue;
+            for (int i = 0; i < c.Length; i++)
+            {
+                float h, s, val;
+                Color.RGBToHSV(c[i], out h, out s, out val);
+                float deg = h * 360f;
+                if (deg >= 8f && deg <= 44f && s >= 0.22f && s <= 0.85f && val >= 0.2f && val <= 0.97f)
+                {
+                    deg = Mathf.Lerp(deg, 25f, 0.7f);
+                    s = Mathf.Lerp(s, Mathf.Clamp(s, 0.34f, 0.52f), 0.8f);
+                }
+                else if (s > 0.72f) s = 0.72f + (s - 0.72f) * 0.4f;
+                Color o = Color.HSVToRGB(deg / 360f, s, val);
+                c[i] = new Color32((byte)Mathf.RoundToInt(o.r * 255f), (byte)Mathf.RoundToInt(o.g * 255f), (byte)Mathf.RoundToInt(o.b * 255f), c[i].a);
+            }
+            mesh[m].colors32 = c;
+        }
     }
 
     // Small corrections to the models as they come from the packs (Cor's playtest):
