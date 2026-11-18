@@ -413,6 +413,34 @@ public class PHGame : UdonSharpBehaviour
         BeginRound();
     }
 
+    // THEME: the host picks the theme of the maps to come (any, town, space base, village). A map of a chosen
+    // theme is a new one-off seed that comes out in that theme (so its code is a normal code), not one of the
+    // rotation's; Explore a new map follows the choice too.
+    [UdonSynced] public int debugTheme = -1;
+    public TMPro.TextMeshProUGUI themeLabel;
+
+    public void DebugTheme()
+    {
+        if (!IsHost) return;
+        debugTheme = debugTheme >= 2 ? -1 : debugTheme + 1;
+        ThemeLabel();
+        RequestSerialization();
+    }
+
+    void ThemeLabel()
+    {
+        if (themeLabel == null) return;
+        themeLabel.text = "THEME: " + (debugTheme == 0 ? "TOWN" : (debugTheme == 1 ? "SPACE BASE" : (debugTheme == 2 ? "VILLAGE" : "ANY")));
+    }
+
+    // a random seed whose map has the chosen theme (any seed when none is chosen)
+    public uint ThemedSeed()
+    {
+        uint s = (uint)Random.Range(1, int.MaxValue);
+        for (int k = 0; k < 300 && debugTheme >= 0 && gen.ThemeOfSeed(s, RoundSize()) != debugTheme; k++) s = (uint)Random.Range(1, int.MaxValue);
+        return s;
+    }
+
     // END ROUND: the host ends a round at once, from anywhere (a debug aid; nobody wins)
     public void DebugEnd()
     {
@@ -434,7 +462,11 @@ public class PHGame : UdonSharpBehaviour
             int st = seedTool.Decode(pendingCode, GenData.GEN_VERSION);
             if (st == PHSeed.OK || st == PHSeed.OLDER) { seed = seedTool.seed; mapSize = seedTool.size; mapDensity = seedTool.flags & 7; shared = true; }
         }
-        if (!shared)
+        if (!shared && debugTheme >= 0)
+        {
+            seed = ThemedSeed(); mapDensity = densityChoice;   // a one-off of the chosen theme (the debug THEME button)
+        }
+        else if (!shared)
         {
             int r = mapSize * ROT_PER_SIZE + rotNext[mapSize];
             if (rotSeed[r] == 0) NewMap(r);
@@ -466,7 +498,7 @@ public class PHGame : UdonSharpBehaviour
         OnPhaseChanged();
     }
 
-    public override void OnDeserialization() { OnPhaseChanged(); }
+    public override void OnDeserialization() { OnPhaseChanged(); ThemeLabel(); }
 
     int seenPhase = -1, seenRound = -1;
 

@@ -27,7 +27,7 @@ public class PHExplore : UdonSharpBehaviour
         if (sfx != null && select != null) sfx.PlayOneShot(select);
         generating = true;
         builder.Clear();
-        uint seed = (uint)Random.Range(1, int.MaxValue);
+        uint seed = game.ThemedSeed();   // of the debug THEME button's theme, if one is chosen
         game.gen.Begin(seed, game.RoundSize(), game.densityChoice, 0);
         label.text = "GENERATING...";
     }

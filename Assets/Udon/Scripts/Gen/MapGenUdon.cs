@@ -168,6 +168,18 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         if (mapTheme != GenData.THEME_NONE) { holiday = 0; if (mapTheme == GenData.THEME_SPACE) season = 0; }
     }
 
+    // the theme a seed's map comes out in (as Begin draws it): for picking a seed of a wanted theme (PHGame's debug
+    // THEME button), so the map's code still says everything
+    public int ThemeOfSeed(uint seedValue, int sizeBucket)
+    {
+        uint keep = seed;
+        int keepSize = size, keepAttempt = attempt, keepEvo = evo;
+        seed = seedValue; size = sizeBucket; attempt = 0; evo = 0;
+        int troll = RngRange(Rng(ST_SCENERY, 9, 11), 1000);
+        seed = keep; size = keepSize; attempt = keepAttempt; evo = keepEvo;
+        return troll < GenData.THEME_SPACE_PERMILLE ? GenData.THEME_SPACE : (troll < GenData.THEME_SPACE_PERMILLE + GenData.THEME_MEDIEVAL_PERMILLE ? GenData.THEME_MEDIEVAL : GenData.THEME_NONE);
+    }
+
     // the grids for a map of w x h outer cells (the site decides its box: LayoutSite)
     void Alloc(int w, int h)
     {

@@ -155,9 +155,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             AppendPart(k0 + 1, horizontal, ex, ez, sgn, 1f, 3f, 0f, h, body, fW0, fW1, fSill, fHead);
             AppendPart(k0, horizontal, ex, ez, sgn, 3f, CELL, 0f, h, body, 0f, 0f, 0f, 0f);
         }
-        else if (type == GenData.E_DOOR && theme != GenData.THEME_SPACE)
+        else if (type == GenData.E_DOOR)
         {
-            // a town's or a village's door: the wall's own square doorway in its timber frame (Edge draws the frame out to the
+            // a door, in every theme: the wall's own square doorway in its timber frame (Edge draws the frame out to the
             // facade's face); the kit's arched door stood in front of it as a second doorway (Cor: layered)
             float d0 = off * INNER, d1 = (off + GenData.DOOR_CELLS) * INNER, dh = GenData.DOOR_HEIGHT_MM / 1000f;
             if (d0 > 0.01f) AppendPart(k0, horizontal, ex, ez, sgn, 0f, d0, 0f, h, body, 0f, 0f, 0f, 0f);
@@ -1300,7 +1300,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (IsBuilding(zoneA) != IsBuilding(zoneB))
             {
                 float sd = IsBuilding(zoneA) ? 1f : -1f;
-                if (facade && theme != GenData.THEME_SPACE)
+                if (facade)
                 {
                     // the door's frame out to the facade's face: it closes the gap between the wall and the facade
                     TrimOut(horizontal, ex, ez, d0 - 0.08f, d0 + e, 0f, dh - e, frame, sd);
@@ -2146,8 +2146,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
         float fd = WALL_HALF + facadeDepth;
         // the light (a village's torch) hangs below the door's awning and clear of its end, not in it (Cor: the torch
         // clipped the beam)
-        float py = theme != GenData.THEME_SPACE ? doorTop - 0.35f : doorTop - 0.05f;
-        if (theme != GenData.THEME_SPACE) a = Mathf.Min(a + 0.15f, CELL - 0.2f);
+        float py = doorTop - 0.35f;
+        a = Mathf.Min(a + 0.15f, CELL - 0.2f);
         if (a > CELL - 0.2f) return;
         Vector3 at = horizontal ? new Vector3(ex + a, py, ez + side * fd) : new Vector3(ex + side * fd, py, ez + a);
         if (PlaceFixture(1, at, yaw, LK_PORCH)) return;
