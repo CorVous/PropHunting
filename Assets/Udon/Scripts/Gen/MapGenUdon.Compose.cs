@@ -414,21 +414,103 @@ public partial class MapGenUdon
 
     int WallKeep(int def, int mode, int tx, int tz, int win, int flags, uint[] rng)
     {
-        int nb = 0, e = -1;
-        for (int t = 0; t < 4 && e < 0; t++)
+        hq_WallKeep_def = def;
+        hq_WallKeep_mode = mode;
+        hq_WallKeep_tx = tx;
+        hq_WallKeep_tz = tz;
+        hq_WallKeep_win = win;
+        hq_WallKeep_flags = flags;
+        hq_WallKeep_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); WallKeep_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_WallKeep_rng;
+        return hq_WallKeep_ret;
+    }
+
+    // WallKeep in phases, a step a call (autophase4); WallKeep() above runs them to the end
+    void WallKeep_Body()
+    {
+        if (Ph(0))
         {
+            int nb = 0, e = -1;
+            hq_WallKeep_nb = nb;
+            hq_WallKeep_e = e;
+        }
+        if (PhLoop(1, 100000))
+        {
+            int e = hq_WallKeep_e;
+            if (!PhSubActive())
+            {
+                int t = planIter;
+                if (!(t < 4 && e < 0)) PhBreak();
+                else { hq_WallKeep_t = t; PhSubBegin(); }
+            }
+            hq_WallKeep_e = e;
+            if (PhSubActive())
+            {
+                PhPush(); WallKeep_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(2))
+        {
+            int nb = hq_WallKeep_nb;
+            int e = hq_WallKeep_e;
+            for (int k = 0; k < nb; k++) segBan[wtBan[k]] = false;
+            { hq_WallKeep_ret = e; hq_WallKeep_nb = nb; hq_WallKeep_e = e; PhEnd(); return; }
+            hq_WallKeep_nb = nb;
+            hq_WallKeep_e = e;
+        }
+    }
+    void WallKeep_L1()
+    {
+        if (Ph(0))
+        {
+            int def = hq_WallKeep_def;
+            int mode = hq_WallKeep_mode;
+            int tx = hq_WallKeep_tx;
+            int tz = hq_WallKeep_tz;
+            int win = hq_WallKeep_win;
+            int flags = hq_WallKeep_flags;
+            uint[] rng = hq_WallKeep_rng;
+            int e = hq_WallKeep_e;
             int first = nEmit;
             e = WallPlace(def, mode, tx, tz, win, flags, rng);
-            if (e < 0) break;
+            if (e < 0) { hq_WallKeep_def = def; hq_WallKeep_mode = mode; hq_WallKeep_tx = tx; hq_WallKeep_tz = tz; hq_WallKeep_win = win; hq_WallKeep_flags = flags; hq_WallKeep_rng = rng; hq_WallKeep_e = e; hq_WallKeep_first = first; phBreak = true; PhEnd(); return; }
             int seg = wrSeg;
-            if (Keep(first, (flags & EF_MANDATORY) != 0)) break;
-            e = -1;
-            if (segBan[seg]) break;
-            segBan[seg] = true; wtBan[nb++] = seg;
+            hq_WallKeep_def = def;
+            hq_WallKeep_mode = mode;
+            hq_WallKeep_tx = tx;
+            hq_WallKeep_tz = tz;
+            hq_WallKeep_win = win;
+            hq_WallKeep_flags = flags;
+            hq_WallKeep_rng = rng;
+            hq_WallKeep_e = e;
+            hq_WallKeep_first = first;
+            hq_WallKeep_seg = seg;
         }
-        for (int k = 0; k < nb; k++) segBan[wtBan[k]] = false;
-        return e;
+        if (Ph(1))
+        {
+            int flags = hq_WallKeep_flags;
+            int nb = hq_WallKeep_nb;
+            int e = hq_WallKeep_e;
+            int first = hq_WallKeep_first;
+            int seg = hq_WallKeep_seg;
+            if (Keep(first, (flags & EF_MANDATORY) != 0)) { hq_WallKeep_flags = flags; hq_WallKeep_nb = nb; hq_WallKeep_e = e; hq_WallKeep_first = first; hq_WallKeep_seg = seg; phBreak = true; PhEnd(); return; }
+            e = -1;
+            if (segBan[seg]) { hq_WallKeep_flags = flags; hq_WallKeep_nb = nb; hq_WallKeep_e = e; hq_WallKeep_first = first; hq_WallKeep_seg = seg; phBreak = true; PhEnd(); return; }
+            segBan[seg] = true; wtBan[nb++] = seg;
+            hq_WallKeep_flags = flags;
+            hq_WallKeep_nb = nb;
+            hq_WallKeep_e = e;
+            hq_WallKeep_first = first;
+            hq_WallKeep_seg = seg;
+        }
     }
+
 
     // One object with its back against a wall, facing the room. Returns the emit index or -1.
     int WallPlace(int def, int mode, int tx, int tz, int win, int flags, uint[] rng)
@@ -922,4 +1004,17 @@ public partial class MapGenUdon
     int hq_CentrePiece_tx;
     int hq_CentrePiece_tz;
     int hq_CentrePiece_yaw;
+    int hq_WallKeep_def;
+    int hq_WallKeep_e;
+    int hq_WallKeep_first;
+    int hq_WallKeep_flags;
+    int hq_WallKeep_mode;
+    int hq_WallKeep_nb;
+    int hq_WallKeep_ret;
+    uint[] hq_WallKeep_rng;
+    int hq_WallKeep_seg;
+    int hq_WallKeep_t;
+    int hq_WallKeep_tx;
+    int hq_WallKeep_tz;
+    int hq_WallKeep_win;
 }

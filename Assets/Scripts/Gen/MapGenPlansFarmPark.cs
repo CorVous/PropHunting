@@ -90,7 +90,12 @@ public partial class MapGen
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(10, PoolLen(new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) && !PoolStep(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) PhBreak();
+        if (PhLoop(10, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
     void PlanFarmWork_L1()
     {
@@ -273,7 +278,12 @@ public partial class MapGen
         if (Ph(17))
         {
             ClearBans();
-            Borders(30, 3, true);
+        }
+        if (PhLoop(18, 100000))
+        {
+            if (planIter == 0) { hq_Borders_k0 = 30; hq_Borders_max = 3; hq_Borders_soil = true; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
     }
     void PlanPlayground_L1()
@@ -334,19 +344,44 @@ public partial class MapGen
                 if (!inner || (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR)) != 0) continue;
                 tags[i] |= GenData.T_WATER; water++; cx += x; cz += z;
             }
-            if (water == 0) { MandFail(1); PondBank(room, RoomMidX(room), RoomMidZ(room)); { hq_PlanPond_water = water; PhEnd(); return; } }
-            int wx = cx * GenData.INNER_MM / water + 250, wz = cz * GenData.INNER_MM / water + 250;
-            // on the water first: the footbridge, the ducks, the lilies
-            GenRng r = SR(1);
+            hq_PlanPond_sel1 = 0;
+            if (water == 0) hq_PlanPond_sel1 = 1;
             hq_PlanPond_water = water;
-            hq_PlanPond_wx = wx;
-            hq_PlanPond_wz = wz;
+            hq_PlanPond_cx = cx;
+            hq_PlanPond_cz = cz;
         }
         if (Ph(1))
         {
+            if (hq_PlanPond_sel1 == 1)
+            {
+                MandFail(1);
+            }
+        }
+        if (PhLoop(2, 100000))
+        {
+            if (!(hq_PlanPond_sel1 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_PondBank_room = room; hq_PondBank_wx = RoomMidX(room); hq_PondBank_wz = RoomMidZ(room); PhSubReset(); }
+                PhPush(); PondBank_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanPond_sel1 == 1)
+            {
+                { PhEnd(); return; }
+            }
+        }
+        if (Ph(4))
+        {
             int water = hq_PlanPond_water;
-            int wx = hq_PlanPond_wx;
-            int wz = hq_PlanPond_wz;
+            int cx = hq_PlanPond_cx;
+            int cz = hq_PlanPond_cz;
+            int wx = cx * GenData.INNER_MM / water + 250, wz = cz * GenData.INNER_MM / water + 250;
+            // on the water first: the footbridge, the ducks, the lilies
+            GenRng r = SR(1);
             if (water >= 12 && Fit(1))
             {
                 int first = nEmit;
@@ -354,11 +389,13 @@ public partial class MapGen
             }
             GenRng r2 = SR(2);
             hq_PlanPond_water = water;
+            hq_PlanPond_cx = cx;
+            hq_PlanPond_cz = cz;
             hq_PlanPond_wx = wx;
             hq_PlanPond_wz = wz;
             hq_PlanPond_r2 = r2;
         }
-        if (Ph(2))
+        if (Ph(5))
         {
             int wx = hq_PlanPond_wx;
             int wz = hq_PlanPond_wz;
@@ -370,7 +407,7 @@ public partial class MapGen
             hq_PlanPond_r2 = r2;
             hq_PlanPond_r3 = r3;
         }
-        if (PhLoop(3, 100000))
+        if (PhLoop(6, 100000))
         {
             int wx = hq_PlanPond_wx;
             int wz = hq_PlanPond_wz;
@@ -386,13 +423,13 @@ public partial class MapGen
             hq_PlanPond_wz = wz;
             hq_PlanPond_r3 = r3;
         }
-        if (Ph(4))
+        if (Ph(7))
         {
             // then nothing else stands on the water
             for (int k = roomCellStart[room]; k < roomCellStart[room] + roomCellCount[room]; k++)
                 if ((tags[roomCells[k]] & GenData.T_WATER) != 0) tags[roomCells[k]] |= GenData.T_NO_SPAWN;
         }
-        if (PhLoop(5, 100000))
+        if (PhLoop(8, 100000))
         {
             int wx = hq_PlanPond_wx;
             int wz = hq_PlanPond_wz;
@@ -546,18 +583,33 @@ public partial class MapGen
             hq_PondBank_room = room;
             hq_PondBank_trees = trees;
         }
-        if (Ph(12))
+        if (PhLoop(12, 100000))
         {
             int trees = hq_PondBank_trees;
-            for (int t = 0; t < trees && t < 1; t++) LawnTree(60 + t);
+            if (!PhSubActive())
+            {
+                int t = planIter;
+                if (!(t < trees && t < 1)) PhBreak();
+                else { hq_PondBank_t = t; PhSubBegin(); }
+            }
+            hq_PondBank_trees = trees;
+            if (PhSubActive())
+            {
+                PhPush(); PondBank_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(13))
+        {
             // a stump with mushrooms on the bank, the bin, more planting along the fence
             GenRng r12 = SR(12);
             hq_PondBank_sel3 = 0;
             if (r12.Chance(550) && Fit(2)) hq_PondBank_sel3 = 1;
-            hq_PondBank_trees = trees;
             hq_PondBank_r12 = r12;
         }
-        if (Ph(13))
+        if (Ph(14))
         {
             if (hq_PondBank_sel3 == 1)
             {
@@ -569,7 +621,7 @@ public partial class MapGen
                 hq_PondBank_first = first;
             }
         }
-        if (Ph(14))
+        if (Ph(15))
         {
             if (hq_PondBank_sel3 == 1)
             {
@@ -581,7 +633,7 @@ public partial class MapGen
                 hq_PondBank_st = st;
             }
         }
-        if (Ph(15))
+        if (Ph(16))
         {
             if (hq_PondBank_sel3 == 1)
             {
@@ -594,7 +646,7 @@ public partial class MapGen
                 hq_PondBank_st = st;
             }
         }
-        if (Ph(16))
+        if (Ph(17))
         {
             GenRng r13 = SR(13);
             if (r13.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_trash"), WM_ANY, 0, 0, WIN_ANY, 0, ref r13) >= 0) Keep(first, false); }
@@ -604,7 +656,7 @@ public partial class MapGen
             if (r14.Chance(550) && Fit(1)) hq_PondBank_sel4 = 1;
             hq_PondBank_r14 = r14;
         }
-        if (Ph(17))
+        if (Ph(18))
         {
             if (hq_PondBank_sel4 == 1)
             {
@@ -620,7 +672,7 @@ public partial class MapGen
                 hq_PondBank_first = first;
             }
         }
-        if (Ph(18))
+        if (Ph(19))
         {
             if (hq_PondBank_sel4 == 1)
             {
@@ -633,21 +685,26 @@ public partial class MapGen
                 hq_PondBank_first = first;
             }
         }
-        if (Ph(19))
+        if (Ph(20))
         {
             GenRng r15 = SR(15);
             if (r15.Chance(450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("n_log"), WM_ANY, 0, 0, WIN_ANY, 0, ref r15) >= 0) Keep(first, false); }
         }
-        if (PhLoop(20, 100000))
+        if (PhLoop(21, 100000))
         {
             if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "n_rockLarge", "n_rockTall", "n_logLarge", "n_bushLarge", "n_bushDetailed", "ck_bench", "k_bench", "f_lamp", "n_stump", "ck_trash", "n_grassLarge", "n_log", "p_beaver", "hk_bench", "n_paddle", "s_stoneL", "s_rockFlat" }; PhSubReset(); }
             PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
         }
-        if (Ph(21))
+        if (Ph(22))
         {
             ClearBans();
-            Borders(40, 4, true);
+        }
+        if (PhLoop(23, 100000))
+        {
+            if (planIter == 0) { hq_Borders_k0 = 40; hq_Borders_max = 4; hq_Borders_soil = true; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
     }
     void PondBank_L1()
@@ -674,6 +731,17 @@ public partial class MapGen
             hq_PondBank_r9 = r9;
             hq_PondBank_cell = cell;
             hq_PondBank_first = first;
+        }
+    }
+
+    void PondBank_L2()
+    {
+        if (PhLoop(0, 100000))
+        {
+            int t = hq_PondBank_t;
+            if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
+            PhPush(); LawnTree_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
     }
 
@@ -870,7 +938,12 @@ public partial class MapGen
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(18, PoolLen(new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) && !PoolStep(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) PhBreak();
+        if (PhLoop(18, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
 }
     void PlanTerrace_L1()
     {
@@ -1151,13 +1224,39 @@ public partial class MapGen
     // the farm stand at the lane: a market stall with the produce on it (FillSlots), its bench or stool
     void FarmStand(int k0)
     {
-        GenRng r = SR(k0);
-        if (!r.Chance(750) || !Fit(1)) return;
-        int dx, dz;
-        MainDoor(pRoom, out dx, out dz);
-        int first = nEmit;
-        int st = WallPlace(Dn(r.Chance(500) ? "f_stallGreen" : "f_stallRed"), WM_FAR, dx, dz, WIN_ANY, 0, ref r);
-        if (st >= 0 && Keep(first, false) && Fit(1)) { first = nEmit; if (RelBeside(Dn(r.Chance(500) ? "f_stallBench" : "f_stallStool"), st, r.Chance(500) ? 1 : -1, 150, 0, ref r) >= 0) Keep(first, false); }
+        hq_FarmStand_k0 = k0;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); FarmStand_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // FarmStand in phases, a step a call (autophase4); FarmStand() above runs them to the end
+    void FarmStand_Body()
+    {
+        if (Ph(0))
+        {
+            int k0 = hq_FarmStand_k0;
+            GenRng r = SR(k0);
+            if (!r.Chance(750) || !Fit(1)) { hq_FarmStand_k0 = k0; hq_FarmStand_r = r; PhEnd(); return; }
+            int dx, dz;
+            MainDoor(pRoom, out dx, out dz);
+            int first = nEmit;
+            int st = WallPlace(Dn(r.Chance(500) ? "f_stallGreen" : "f_stallRed"), WM_FAR, dx, dz, WIN_ANY, 0, ref r);
+            hq_FarmStand_k0 = k0;
+            hq_FarmStand_r = r;
+            hq_FarmStand_first = first;
+            hq_FarmStand_st = st;
+        }
+        if (Ph(1))
+        {
+            GenRng r = hq_FarmStand_r;
+            int first = hq_FarmStand_first;
+            int st = hq_FarmStand_st;
+            if (st >= 0 && Keep(first, false) && Fit(1)) { first = nEmit; if (RelBeside(Dn(r.Chance(500) ? "f_stallBench" : "f_stallStool"), st, r.Chance(500) ? 1 : -1, 150, 0, ref r) >= 0) Keep(first, false); }
+            hq_FarmStand_r = r;
+            hq_FarmStand_first = first;
+            hq_FarmStand_st = st;
+        }
     }
 
     // phase state of the split plans (Tools: autophase2)
@@ -1178,6 +1277,10 @@ public partial class MapGen
     int hq_FarmAnimals_sel1;
     int hq_FarmAnimals_sel2;
     bool hq_FarmAnimals_yard;
+    int hq_FarmStand_first;
+    int hq_FarmStand_k0;
+    GenRng hq_FarmStand_r;
+    int hq_FarmStand_st;
     int hq_FillFromPool_cell;
     int hq_FillFromPool_def;
     int hq_FillFromPool_first;
@@ -1205,8 +1308,11 @@ public partial class MapGen
     GenRng hq_PlanPlayground_r6;
     int hq_PlanPlayground_s0;
     int hq_PlanPlayground_sel1;
+    int hq_PlanPond_cx;
+    int hq_PlanPond_cz;
     GenRng hq_PlanPond_r2;
     GenRng hq_PlanPond_r3;
+    int hq_PlanPond_sel1;
     int hq_PlanPond_water;
     int hq_PlanPond_wx;
     int hq_PlanPond_wz;
@@ -1245,6 +1351,7 @@ public partial class MapGen
     int hq_PondBank_sel3;
     int hq_PondBank_sel4;
     int hq_PondBank_st;
+    int hq_PondBank_t;
     int hq_PondBank_trees;
     int hq_PondBank_wx;
     int hq_PondBank_wz;

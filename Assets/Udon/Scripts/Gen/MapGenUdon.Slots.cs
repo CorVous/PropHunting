@@ -541,6 +541,8 @@ public partial class MapGenUdon
         while (!PlaceLeaksStep()) { }
     }
 
+    bool lkRun;
+
     bool PlaceLeaksStep()
     {
         if (lkPhase == 0)
@@ -552,20 +554,33 @@ public partial class MapGenUdon
             lkPlaced = 0; lkAttempts = lkTarget * 14;
             lkTotalCells = 0;
             for (int r = 0; r < nRooms; r++) if (roomZone[r] != GenData.Z_RELEASE) lkTotalCells += roomCellCount[r];
-            lkPhase = 1;
+            lkPhase = 1; lkRun = false;
             return false;
         }
-        for (int k = 0; k < 2; k++)
+        // one attempt, in its own phases (LeakAttempt_Body), a step a call
+        if (!lkRun)
         {
             if (!(lkPlaced < lkTarget && lkAttempts-- > 0)) return true;
-            LeakAttempt();
+            PhResetAll(); PhSubReset(); lkRun = true;
         }
+        PhPush(); LeakAttempt_Body(); bool fin = PhAdvance(); PhPop();
+        if (fin) lkRun = false;
         return false;
     }
 
     void LeakAttempt()
     {
-        int totalCells = lkTotalCells;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); LeakAttempt_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // LeakAttempt in phases, a step a call (autophase4); LeakAttempt() above runs them to the end
+    void LeakAttempt_Body()
+    {
+        if (Ph(0))
+        {
+            int totalCells = lkTotalCells;
 
             bool comedic = RngChance(lkRng, GenData.LEAK_COMEDIC_PERMILLE);   // D10: about 30% comedic
             // room weighted by area, at most 2 leaks per room
@@ -576,13 +591,13 @@ public partial class MapGenUdon
                 if (pick < roomCellCount[r]) { room = r; break; }
                 pick -= roomCellCount[r];
             }
-            if (room < 0 || roomLeaks[room] >= GenData.LEAK_ROOM_MAX) return;
+            if (room < 0 || roomLeaks[room] >= GenData.LEAK_ROOM_MAX) { hq_LeakAttempt_comedic = comedic; hq_LeakAttempt_room = room; PhEnd(); return; }
             int zone = roomZone[room];
             bool outdoor = !IsBuilding(zone);
             int table = FindTable(zone, roomType[room]);
             int lk = LeakKey(table, zone, outdoor, comedic);
             int total = lkTotal[lk];
-            if (total == 0) return;
+            if (total == 0) { hq_LeakAttempt_comedic = comedic; hq_LeakAttempt_room = room; hq_LeakAttempt_outdoor = outdoor; PhEnd(); return; }
             int rr = RngRange(lkRng, total), def = -1;
             int l1 = lkStart[lk] + lkCount[lk];
             for (int i = lkStart[lk]; i < l1; i++)
@@ -591,7 +606,7 @@ public partial class MapGenUdon
                 if (rr < wgt) { def = lkDef[i]; break; }
                 rr -= wgt;
             }
-            if (def < 0) return;
+            if (def < 0) { hq_LeakAttempt_comedic = comedic; hq_LeakAttempt_room = room; hq_LeakAttempt_outdoor = outdoor; hq_LeakAttempt_def = def; PhEnd(); return; }
             def = TwinIn(room, def);   // a themed map's wrong-category things are of its theme too
             int flags = EF_LEAK | (comedic ? EF_COMEDIC : 0);
             int e = -1;
@@ -611,23 +626,70 @@ public partial class MapGenUdon
                     if (e >= 0) freeHost[f] = -1;
                 }
             }
-            if (e < 0)
+            hq_LeakAttempt_sel1 = 0;
+            if (e < 0) hq_LeakAttempt_sel1 = 1;
+            hq_LeakAttempt_comedic = comedic;
+            hq_LeakAttempt_room = room;
+            hq_LeakAttempt_outdoor = outdoor;
+            hq_LeakAttempt_def = def;
+            hq_LeakAttempt_flags = flags;
+            hq_LeakAttempt_e = e;
+            hq_LeakAttempt_first = first;
+        }
+        if (Ph(1))
+        {
+            if (hq_LeakAttempt_sel1 == 1)
             {
+                int room = hq_LeakAttempt_room;
+                int def = hq_LeakAttempt_def;
                 int own = defAnchor[def];
                 // things that live on furniture and are smaller than a chair stay on furniture
-                if (own == GenData.A_SLOT_ONLY && defSizeClass[def] <= GenData.SZ_M) return;
+                if (own == GenData.A_SLOT_ONLY && defSizeClass[def] <= GenData.SZ_M) { hq_LeakAttempt_room = room; hq_LeakAttempt_def = def; PhEnd(); return; }
                 pRoom = room;
                 BuildSegs(room);
-                e = comedic ? ComedicSpot(def, room, flags, outdoor, lkRng) : DumpSpot(def, room, flags, outdoor, lkRng);
+                hq_LeakAttempt_room = room;
+                hq_LeakAttempt_def = def;
             }
-            if (e < 0) return;
+        }
+        if (Ph(2))
+        {
+            if (hq_LeakAttempt_sel1 == 1)
+            {
+                bool comedic = hq_LeakAttempt_comedic;
+                int room = hq_LeakAttempt_room;
+                bool outdoor = hq_LeakAttempt_outdoor;
+                int def = hq_LeakAttempt_def;
+                int flags = hq_LeakAttempt_flags;
+                int e = hq_LeakAttempt_e;
+                if (comedic) e = ComedicSpot(def, room, flags, outdoor, lkRng);
+            else e = DumpSpot(def, room, flags, outdoor, lkRng);
+                hq_LeakAttempt_comedic = comedic;
+                hq_LeakAttempt_room = room;
+                hq_LeakAttempt_outdoor = outdoor;
+                hq_LeakAttempt_def = def;
+                hq_LeakAttempt_flags = flags;
+                hq_LeakAttempt_e = e;
+            }
+        }
+        if (Ph(3))
+        {
+            bool comedic = hq_LeakAttempt_comedic;
+            int room = hq_LeakAttempt_room;
+            int e = hq_LeakAttempt_e;
+            int first = hq_LeakAttempt_first;
+            if (e < 0) { hq_LeakAttempt_comedic = comedic; hq_LeakAttempt_room = room; hq_LeakAttempt_e = e; hq_LeakAttempt_first = first; PhEnd(); return; }
             for (int h = first; h < nEmit; h++) FillSlots(h, 0);
-            if (emitParent[e] < 0 && !KeepIfWalkable(room, first, true)) return;
+            if (emitParent[e] < 0 && !KeepIfWalkable(room, first, true)) { hq_LeakAttempt_comedic = comedic; hq_LeakAttempt_room = room; hq_LeakAttempt_e = e; hq_LeakAttempt_first = first; PhEnd(); return; }
             roomLeaks[room]++;
             lkPlaced++;
             if (comedic) statLeakComedic++; else statLeakPlausible++;
             for (int h = first; h < nEmit; h++) FillSlots(h, 1);
-            }
+            hq_LeakAttempt_comedic = comedic;
+            hq_LeakAttempt_room = room;
+            hq_LeakAttempt_e = e;
+            hq_LeakAttempt_first = first;
+        }
+    }
 
     // locals of the split plans and helpers, kept from one phase to the next (autophase4)
     int hq_ComedicSpot_c;
@@ -647,4 +709,12 @@ public partial class MapGenUdon
     int hq_DumpSpot_ret;
     uint[] hq_DumpSpot_rng;
     int hq_DumpSpot_room;
+    bool hq_LeakAttempt_comedic;
+    int hq_LeakAttempt_def;
+    int hq_LeakAttempt_e;
+    int hq_LeakAttempt_first;
+    int hq_LeakAttempt_flags;
+    bool hq_LeakAttempt_outdoor;
+    int hq_LeakAttempt_room;
+    int hq_LeakAttempt_sel1;
 }

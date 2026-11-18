@@ -93,9 +93,12 @@ public partial class MapGenUdon
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(9, PoolLen(new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
-            "k_trashcan", "ck_bench", "k_plant" })) && !PoolStep(50, new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
-            "k_trashcan", "ck_bench", "k_plant" })) PhBreak();
+        if (PhLoop(9, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool", "k_trashcan", "ck_bench", "k_plant" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
     void PlanArcade_L1()
     {
@@ -174,7 +177,12 @@ public partial class MapGenUdon
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(7, PoolLen(new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) && !PoolStep(50, new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) PhBreak();
+        if (PhLoop(7, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // ============================================================================================ PRIZE STORE
@@ -199,7 +207,10 @@ public partial class MapGenUdon
         if (Ph(2))
         {
             bool ht1 = hq_PlanPrizeStore_ht1;
-            if (!ht1) MandFail(1);
+            if (!ht1)
+            {
+                MandFail(1);
+            }
             hp_PlanPrizeStore_rows = new string[] { "plush", "boxes", "balls", "toyCars", "boardToys", "cardboard" };
             hq_PlanPrizeStore_ht1 = ht1;
         }
@@ -216,7 +227,12 @@ public partial class MapGenUdon
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(4, PoolLen(new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) && !PoolStep(50, new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) PhBreak();
+        if (PhLoop(4, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // ============================================================================================ MIDWAY
@@ -225,11 +241,16 @@ public partial class MapGenUdon
     void PlanMidway()
     {
         int room = pRoom, dx = 0, dz = 0;
-        if (Ph(0))
+        if (PhLoop(0, 100000))
+        {
+            if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
+            PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(1))
         {
             dx = hq_PlanMidway_dx;
             dz = hq_PlanMidway_dz;
-            FrontMarkers(30);
             MainDoor(room, out dx, out dz);
             uint[] r = SR(1);
             string[] stalls = { "f_stallRed", "f_stallGreen", "ck_food", "ck_drinks", "ck_info" };
@@ -239,7 +260,7 @@ public partial class MapGenUdon
             hq_PlanMidway_stalls = stalls;
             hq_PlanMidway_s0 = s0;
         }
-        if (PhLoop(1, 100000))
+        if (PhLoop(2, 100000))
         {
             if (!PhSubActive())
             {
@@ -256,9 +277,12 @@ public partial class MapGenUdon
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(2, PoolLen(new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
-            "mb_circus", "r_tableRound", "n_planter" })) && !PoolStep(50, new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
-            "mb_circus", "r_tableRound", "n_planter" })) PhBreak();
+        if (PhLoop(3, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern", "mb_circus", "r_tableRound", "n_planter" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
 }
     void PlanMidway_L1()
     {
@@ -329,9 +353,12 @@ public partial class MapGenUdon
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(4, PoolLen(new string[] { "ck_stationFence", "ck_stationGate", "ck_trainWood", "ck_flume", "ck_monorail", "ck_trainHanging", "mb_circus", "ck_bench", "ck_trash", "f_lamp",
-            "hk_lantern", "ck_food", "ck_drinks", "c_cone", "k_bench" })) && !PoolStep(50, new string[] { "ck_stationFence", "ck_stationGate", "ck_trainWood", "ck_flume", "ck_monorail", "ck_trainHanging", "mb_circus", "ck_bench", "ck_trash", "f_lamp",
-            "hk_lantern", "ck_food", "ck_drinks", "c_cone", "k_bench" })) PhBreak();
+        if (PhLoop(4, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ck_stationFence", "ck_stationGate", "ck_trainWood", "ck_flume", "ck_monorail", "ck_trainHanging", "mb_circus", "ck_bench", "ck_trash", "f_lamp", "hk_lantern", "ck_food", "ck_drinks", "c_cone", "k_bench" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // phase state of the split plans (Tools: autophase2)

@@ -220,9 +220,11 @@ public partial class MapGen
                 if (r11.Chance(450) && Fit(1)) { int first = nEmit; if (GroupBeside(GenData.FindGrp("plush"), hp_PlanTeen_bed, 1, 0, ref r11)) Keep(first, false); }
             }
         }
-        if (Ph(19))
+        if (PhLoop(19, 100000))
         {
-            Extras(20, 500, "ck_lampFloor", "wk_trashcan", "ck_plant");
+            if (planIter == 0) { hq_Extras_k0 = 20; hq_Extras_chance = 500; hq_Extras_items = new string[] { "ck_lampFloor", "wk_trashcan", "ck_plant" }; PhSubReset(); }
+            PhPush(); Extras_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
     }
 
@@ -373,9 +375,11 @@ public partial class MapGen
             GenRng r12 = SR(12);
             if (r12.Chance(400) && LooseFit(1)) { int first = nEmit; if (WallPlace(Dn("mb_skates"), WM_ANY, 0, 0, WIN_ANY, 0, ref r12) >= 0 && Keep(first, false)) MarkLoose(first); }
         }
-        if (Ph(13))
+        if (PhLoop(13, 100000))
         {
-            Extras(20, 450, "ck_lampFloor", "ck_plant", "wq_cabinetSmall");
+            if (planIter == 0) { hq_Extras_k0 = 20; hq_Extras_chance = 450; hq_Extras_items = new string[] { "ck_lampFloor", "ck_plant", "wq_cabinetSmall" }; PhSubReset(); }
+            PhPush(); Extras_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
     }
     void PlanPlayroom_L1()
@@ -497,9 +501,11 @@ public partial class MapGen
                 if (FormAt(GenData.GL_ROW, 100, GenData.A_WALL, WM_ANY, 0, 0, 0, ref r20) >= 0 && Keep(hp_PlanBoxRoom_first, false)) MarkLoose(hp_PlanBoxRoom_first);
             }
         }
-        if (Ph(5))
+        if (PhLoop(5, 100000))
         {
-            Extras(30, 600, "cq_lampStanding", "ck_lampFloor", "cs_chest");
+            if (planIter == 0) { hq_Extras_k0 = 30; hq_Extras_chance = 600; hq_Extras_items = new string[] { "cq_lampStanding", "ck_lampFloor", "cs_chest" }; PhSubReset(); }
+            PhPush(); Extras_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
     }
 
@@ -527,7 +533,10 @@ public partial class MapGen
         if (Ph(2))
         {
             bool ht1 = hq_PlanPantry_ht1;
-            if (!ht1) MandFail(1);
+            if (!ht1)
+            {
+                MandFail(1);
+            }
             hq_PlanPantry_ht1 = ht1;
         }
         if (Ph(3))

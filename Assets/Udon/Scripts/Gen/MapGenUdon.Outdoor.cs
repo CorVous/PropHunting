@@ -54,14 +54,38 @@ public partial class MapGenUdon
     // From the front door the path runs on to the garden gate at the lane (G32); from other doors 3.5 to 6 m.
     void StonePaths(int k0, uint[] rng)
     {
-        int room = pRoom;
-        for (int k = 0; k < roomDoorCount[room]; k++)
+        hq_StonePaths_k0 = k0;
+        hq_StonePaths_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); StonePaths_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_StonePaths_rng;
+    }
+
+    // StonePaths in phases, a step a call (autophase4); StonePaths() above runs them to the end
+    void StonePaths_Body()
+    {
+        if (Ph(0))
         {
-            uint[] r = SR(k0 + k);
-            int i = roomDoorStart[room] + k, cell = roomDoors[i], d = roomDoorDir[i];
-            int ox = cell % IW + DX[d], oz = cell / IW + DZ[d];
-            bool front = ox >= 0 && oz >= 0 && ox < IW && oz < IH && IsFrontDoor(oz * IW + ox, (d + 2) & 3);
-            StonePath(room, k, front ? 24 : 7 + RngRange(r, 6), r);
+            int room = pRoom;
+            hq_StonePaths_room = room;
+        }
+        if (PhLoop(1, 100000))
+        {
+            int k0 = hq_StonePaths_k0;
+            int room = hq_StonePaths_room;
+            int k = planIter;
+            if (!(k < roomDoorCount[room])) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            {
+                uint[] r = SR(k0 + k);
+                int i = roomDoorStart[room] + k, cell = roomDoors[i], d = roomDoorDir[i];
+                int ox = cell % IW + DX[d], oz = cell / IW + DZ[d];
+                bool front = ox >= 0 && oz >= 0 && ox < IW && oz < IH && IsFrontDoor(oz * IW + ox, (d + 2) & 3);
+                StonePath(room, k, front ? 24 : 7 + RngRange(r, 6), r);
+            }
+            hq_StonePaths_k0 = k0;
+            hq_StonePaths_room = room;
         }
     }
 
@@ -78,66 +102,245 @@ public partial class MapGenUdon
     // one colour and groups of rocks side by side, with soil under it if wanted. Returns the props it added.
     int Border(int maxLen, bool soil, int mode, int tx, int tz, uint[] rng)
     {
-        int room = pRoom, added = 0;
-        int len = maxLen;
-        bool found = false;
-        for (; len >= 1500 && !found; len -= 500)
-            found = FindWallRun(room, len, 1300, 0, mode, tx, tz, WIN_ANY, rng);
-        if (!found) return 0;
-        len += 500;
-        int d = wrDir, back = wrBack, start = wrCentre - len / 2, rot = (d + 2) & 3;
-        segBan[wrSeg] = true;                       // one border to a stretch
-        if (soil)
+        hq_Border_maxLen = maxLen;
+        hq_Border_soil = soil;
+        hq_Border_mode = mode;
+        hq_Border_tx = tx;
+        hq_Border_tz = tz;
+        hq_Border_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); Border_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_Border_rng;
+        return hq_Border_ret;
+    }
+
+    // Border in phases, a step a call (autophase4); Border() above runs them to the end
+    void Border_Body()
+    {
+        if (Ph(0))
         {
-            // the bed: three cells deep along the stretch
-            bool alongX = d == 0 || d == 2;
-            int line = segLine[wrSeg];
-            for (int a = FloorDiv(start, GenData.INNER_MM); a <= FloorDiv(start + len - 1, GenData.INNER_MM); a++)
-                for (int depth = 0; depth < 3; depth++)
-                {
-                    int x = alongX ? a : (d == 3 ? line + depth : line - depth), z = alongX ? (d == 2 ? line + depth : line - depth) : a;
-                    if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
-                    int i = z * IW + x;
-                    if (innerRoom[i] == room && (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR | GenData.T_COVERED)) == 0) tags[i] |= GenData.T_SOFT_GROUND;
-                }
+            int maxLen = hq_Border_maxLen;
+            bool soil = hq_Border_soil;
+            int mode = hq_Border_mode;
+            int tx = hq_Border_tx;
+            int tz = hq_Border_tz;
+            uint[] rng = hq_Border_rng;
+            int room = pRoom, added = 0;
+            int len = maxLen;
+            bool found = false;
+            for (; len >= 1500 && !found; len -= 500)
+                found = FindWallRun(room, len, 1300, 0, mode, tx, tz, WIN_ANY, rng);
+            if (!found) { hq_Border_ret = 0; hq_Border_maxLen = maxLen; hq_Border_soil = soil; hq_Border_mode = mode; hq_Border_tx = tx; hq_Border_tz = tz; hq_Border_rng = rng; hq_Border_room = room; hq_Border_added = added; hq_Border_len = len; PhEnd(); return; }
+            len += 500;
+            int d = wrDir, back = wrBack, start = wrCentre - len / 2, rot = (d + 2) & 3;
+            segBan[wrSeg] = true;                       // one border to a stretch
+            if (soil)
+            {
+                // the bed: three cells deep along the stretch
+                bool alongX = d == 0 || d == 2;
+                int line = segLine[wrSeg];
+                for (int a = FloorDiv(start, GenData.INNER_MM); a <= FloorDiv(start + len - 1, GenData.INNER_MM); a++)
+                    for (int depth = 0; depth < 3; depth++)
+                    {
+                        int x = alongX ? a : (d == 3 ? line + depth : line - depth), z = alongX ? (d == 2 ? line + depth : line - depth) : a;
+                        if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
+                        int i = z * IW + x;
+                        if (innerRoom[i] == room && (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR | GenData.T_COVERED)) == 0) tags[i] |= GenData.T_SOFT_GROUND;
+                    }
+            }
+            int cursor = start + 100 + RngRange(rng, 200), last = -1;
+            hq_Border_maxLen = maxLen;
+            hq_Border_soil = soil;
+            hq_Border_mode = mode;
+            hq_Border_tx = tx;
+            hq_Border_tz = tz;
+            hq_Border_rng = rng;
+            hq_Border_room = room;
+            hq_Border_added = added;
+            hq_Border_len = len;
+            hq_Border_d = d;
+            hq_Border_back = back;
+            hq_Border_start = start;
+            hq_Border_rot = rot;
+            hq_Border_cursor = cursor;
+            hq_Border_last = last;
         }
-        int cursor = start + 100 + RngRange(rng, 200), last = -1;
-        while (cursor < start + len - 400 && Fit(1))
+        if (PhLoop(1, 100000))
         {
+            int len = hq_Border_len;
+            int start = hq_Border_start;
+            int cursor = hq_Border_cursor;
+            if (!PhSubActive())
+            {
+                if (!(cursor < start + len - 400 && Fit(1))) PhBreak();
+                else { PhSubBegin(); }
+            }
+            hq_Border_len = len;
+            hq_Border_start = start;
+            hq_Border_cursor = cursor;
+            if (PhSubActive())
+            {
+                PhPush(); Border_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(2))
+        {
+            int added = hq_Border_added;
+            { hq_Border_ret = added; hq_Border_added = added; PhEnd(); return; }
+            hq_Border_added = added;
+        }
+    }
+    void Border_L1()
+    {
+        if (Ph(0))
+        {
+            uint[] rng = hq_Border_rng;
+            int last = hq_Border_last;
             int kind = RngRange(rng, 10);
             kind = kind < 4 ? 0 : (kind < 8 ? 1 : 2);     // bush, drift, rocks
             if (kind == last && kind != 0) kind = 0;
             if (kind == 1 && !Fit(3)) kind = 0;
             if (kind == 2 && (!Fit(2) || !RocksAllowed())) kind = Fit(3) ? 1 : 0;
             int first = nEmit;
-            if (kind == 0)
+            hq_Border_sel1 = 0;
+            if (kind == 0) hq_Border_sel1 = 1;
+            else hq_Border_sel1 = 2;
+            hq_Border_rng = rng;
+            hq_Border_last = last;
+            hq_Border_kind = kind;
+            hq_Border_first = first;
+        }
+        if (Ph(1))
+        {
+            if (hq_Border_sel1 == 1)
             {
+                uint[] rng = hq_Border_rng;
+                int len = hq_Border_len;
+                int d = hq_Border_d;
+                int back = hq_Border_back;
+                int start = hq_Border_start;
+                int rot = hq_Border_rot;
+                int cursor = hq_Border_cursor;
                 int def = Pick(rng, "n_bushLarge", 4, "n_bush", 4, "n_bushDetailed", 3);
                 int yaw = rot * 90 + Jitter(rng, 25);
                 int hx, hz;
                 FullHalf(def, yaw, out hx, out hz);
                 int halfAlong = (d == 0 || d == 2) ? hx : hz, halfDeep = (d == 0 || d == 2) ? hz : hx;
-                if (cursor + 2 * halfAlong > start + len) break;
-                int px, pz, r2;
+                if (cursor + 2 * halfAlong > start + len) { hq_Border_rng = rng; hq_Border_len = len; hq_Border_d = d; hq_Border_back = back; hq_Border_start = start; hq_Border_rot = rot; hq_Border_cursor = cursor; hq_Border_def = def; hq_Border_yaw = yaw; hq_Border_halfAlong = halfAlong; phBreak = true; PhEnd(); return; }
+                int px = 0, pz = 0, r2;
                 WallPos(d, back, cursor + halfAlong, 2 * halfDeep + 60, out px, out pz, out r2);
+                hq_Border_rng = rng;
+                hq_Border_len = len;
+                hq_Border_d = d;
+                hq_Border_back = back;
+                hq_Border_start = start;
+                hq_Border_rot = rot;
+                hq_Border_cursor = cursor;
+                hq_Border_def = def;
+                hq_Border_yaw = yaw;
+                hq_Border_halfAlong = halfAlong;
+                hq_Border_px = px;
+                hq_Border_pz = pz;
+            }
+        }
+        if (Ph(2))
+        {
+            if (hq_Border_sel1 == 1)
+            {
+                uint[] rng = hq_Border_rng;
+                int room = hq_Border_room;
+                int added = hq_Border_added;
+                int cursor = hq_Border_cursor;
+                int first = hq_Border_first;
+                int def = hq_Border_def;
+                int yaw = hq_Border_yaw;
+                int halfAlong = hq_Border_halfAlong;
+                int px = hq_Border_px;
+                int pz = hq_Border_pz;
                 if (StampAt(def, room, px, pz, yaw, 0, -1, H_WALL, false) >= 0 && Keep(first, false)) added++;
                 cursor += 2 * halfAlong + 250 + RngRange(rng, 350);
+                hq_Border_rng = rng;
+                hq_Border_room = room;
+                hq_Border_added = added;
+                hq_Border_cursor = cursor;
+                hq_Border_first = first;
+                hq_Border_def = def;
+                hq_Border_yaw = yaw;
+                hq_Border_halfAlong = halfAlong;
+                hq_Border_px = px;
+                hq_Border_pz = pz;
             }
-            else
+        }
+        if (Ph(3))
+        {
+            if (hq_Border_sel1 == 2)
             {
+                uint[] rng = hq_Border_rng;
+                int room = hq_Border_room;
+                int len = hq_Border_len;
+                int start = hq_Border_start;
+                int cursor = hq_Border_cursor;
+                int last = hq_Border_last;
+                int kind = hq_Border_kind;
                 int g = kind == 1 ? FlowerGroup(rng) : FindGrp("rocks");
                 int n = kind == 1 ? RngBetween(rng, 3, Fit(5) ? 5 : 3) : RngBetween(rng, 2, Fit(3) ? 3 : 2);
-                if (ChooseMembers(g, room, n, rng) < 2) { cursor += 500; last = kind; continue; }
+                if (ChooseMembers(g, room, n, rng) < 2) { cursor += 500; last = kind; { hq_Border_rng = rng; hq_Border_room = room; hq_Border_len = len; hq_Border_start = start; hq_Border_cursor = cursor; hq_Border_last = last; hq_Border_kind = kind; hq_Border_g = g; PhEnd(); return; } }
                 BuildFormation(grpLayout[g], grpGapMm[g], rng);
-                if (cursor + fLen > start + len) break;
+                if (cursor + fLen > start + len) { hq_Border_rng = rng; hq_Border_room = room; hq_Border_len = len; hq_Border_start = start; hq_Border_cursor = cursor; hq_Border_last = last; hq_Border_kind = kind; hq_Border_g = g; phBreak = true; PhEnd(); return; }
                 int before = roomFloor[room];
+                hq_Border_rng = rng;
+                hq_Border_room = room;
+                hq_Border_len = len;
+                hq_Border_start = start;
+                hq_Border_cursor = cursor;
+                hq_Border_last = last;
+                hq_Border_kind = kind;
+                hq_Border_g = g;
+                hq_Border_before = before;
+            }
+        }
+        if (Ph(4))
+        {
+            if (hq_Border_sel1 == 2)
+            {
+                uint[] rng = hq_Border_rng;
+                int room = hq_Border_room;
+                int added = hq_Border_added;
+                int d = hq_Border_d;
+                int back = hq_Border_back;
+                int rot = hq_Border_rot;
+                int cursor = hq_Border_cursor;
+                int first = hq_Border_first;
+                int g = hq_Border_g;
+                int before = hq_Border_before;
                 if (StampFormation(room, rot, cursor, back + (d == 2 || d == 3 ? 40 : -40), d, 0, g, -1) >= 0 && Keep(first, false)) added += roomFloor[room] - before;
                 cursor += fLen + 250 + RngRange(rng, 350);
+                hq_Border_rng = rng;
+                hq_Border_room = room;
+                hq_Border_added = added;
+                hq_Border_d = d;
+                hq_Border_back = back;
+                hq_Border_rot = rot;
+                hq_Border_cursor = cursor;
+                hq_Border_first = first;
+                hq_Border_g = g;
+                hq_Border_before = before;
             }
-            last = kind;
         }
-        return added;
+        if (Ph(5))
+        {
+            int last = hq_Border_last;
+            int kind = hq_Border_kind;
+            last = kind;
+            hq_Border_last = last;
+            hq_Border_kind = kind;
+        }
     }
+
 
     // borders until the room's floor budget is used or no stretch is left
     // one stretch of Borders: false when it stops
@@ -151,13 +354,73 @@ public partial class MapGenUdon
 
     void Borders(int k0, int max, bool soil)
     {
-        for (int b = 0; b < max && Fit(1); b++)
+        hq_Borders_k0 = k0;
+        hq_Borders_max = max;
+        hq_Borders_soil = soil;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); Borders_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // Borders in phases, a step a call (autophase4); Borders() above runs them to the end
+    void Borders_Body()
+    {
+        if (PhLoop(0, 100000))
         {
-            uint[] r = SR(k0 + b);
-            int longest = 2500 + RngRange(r, 4) * 500;
-            if (Border(longest, soil, WM_ANY, 0, 0, r) == 0) break;
+            int max = hq_Borders_max;
+            if (!PhSubActive())
+            {
+                int b = planIter;
+                if (!(b < max && Fit(1))) PhBreak();
+                else { hq_Borders_b = b; PhSubBegin(); }
+            }
+            hq_Borders_max = max;
+            if (PhSubActive())
+            {
+                PhPush(); Borders_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
     }
+    void Borders_L1()
+    {
+        if (Ph(0))
+        {
+            int k0 = hq_Borders_k0;
+            int b = hq_Borders_b;
+            uint[] r = SR(k0 + b);
+            int longest = 2500 + RngRange(r, 4) * 500;
+            hq_Borders_k0 = k0;
+            hq_Borders_r = r;
+            hq_Borders_longest = longest;
+        }
+        if (PhLoop(1, 100000))
+        {
+            bool soil = hq_Borders_soil;
+            uint[] r = hq_Borders_r;
+            int longest = hq_Borders_longest;
+            int ht1 = 0;
+            if (planIter == 0) { hq_Border_maxLen = longest; hq_Border_soil = soil; hq_Border_mode = WM_ANY; hq_Border_tx = 0; hq_Border_tz = 0; hq_Border_rng = r; PhSubReset(); }
+            PhPush(); Border_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_Border_rng; ht1 = hq_Border_ret; PhBreak(); }
+            hq_Borders_soil = soil;
+            hq_Borders_r = r;
+            hq_Borders_longest = longest;
+            hq_Borders_ht1 = ht1;
+        }
+        if (Ph(2))
+        {
+            int ht1 = hq_Borders_ht1;
+            if (ht1 == 0)
+            {
+                { hq_Borders_ht1 = ht1; phBreak = true; PhEnd(); return; }
+            }
+            hq_Borders_ht1 = ht1;
+        }
+    }
+
 
     // A planting island for a stretch of open ground with no edge to plant along: a bush with rocks beside it.
     bool Island(uint[] rng)
@@ -309,54 +572,225 @@ public partial class MapGenUdon
     // one try of FillPass (k): FillToMinimum a try a step (Cor: build freezes)
     void FillOne(int pass, int k, bool forest)
     {
-        int room = pRoom, type = roomType[room];
+        hq_FillOne_pass = pass;
+        hq_FillOne_k = k;
+        hq_FillOne_forest = forest;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); FillOne_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // FillOne in phases, a step a call (autophase4); FillOne() above runs them to the end
+    void FillOne_Body()
+    {
+        if (Ph(0))
+        {
+            int pass = hq_FillOne_pass;
+            int k = hq_FillOne_k;
+            int room = pRoom, type = roomType[room];
             walkNarrow = k >= 8;   // first with the full walkway width, then passable is enough
             uint[] r = SR(200 + pass * 24 + k);
             int first = nEmit, how = k % 4;
-            if (type == GenData.R_YARD)
+            hq_FillOne_sel1 = 0;
+            if (type == GenData.R_YARD) hq_FillOne_sel1 = 1;
+            hq_FillOne_pass = pass;
+            hq_FillOne_k = k;
+            hq_FillOne_room = room;
+            hq_FillOne_type = type;
+            hq_FillOne_r = r;
+            hq_FillOne_first = first;
+            hq_FillOne_how = how;
+        }
+        if (Ph(1))
+        {
+            if (hq_FillOne_sel1 == 1)
             {
+                int pass = hq_FillOne_pass;
+                int k = hq_FillOne_k;
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
+                int how = hq_FillOne_how;
                 // a yard fills up with what a yard holds: goods in rows at the fence and the wall, a pallet
                 string[] rows = { "crates", "barrels", "boxes", "sacks" };
-                if (how < 3 && GroupAt(FindGrp(rows[(k + pass) % 4]), GenData.A_OUT_EDGE, RngBetween(r, 2, 3), WM_ANY, 0, 0, 0, r) && Keep(first, false)) return;
+                if (how < 3 && GroupAt(FindGrp(rows[(k + pass) % 4]), GenData.A_OUT_EDGE, RngBetween(r, 2, 3), WM_ANY, 0, 0, 0, r) && Keep(first, false)) { hq_FillOne_pass = pass; hq_FillOne_k = k; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
                 first = nEmit;
-                if (WallPlace(Pick(r, "w_pallet", 5, "w_palletLoaded", 3, "s_boxLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0) Keep(first, false);
-                return;
+                hq_FillOne_pass = pass;
+                hq_FillOne_k = k;
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+                hq_FillOne_how = how;
             }
-            if (how == 0 && !forest) { if (Border(2500, type != GenData.R_FIREPIT, WM_ANY, 0, 0, r) > 0) return; }
+        }
+        if (Ph(2))
+        {
+            if (hq_FillOne_sel1 == 1)
+            {
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
+                if (WallPlace(Pick(r, "w_pallet", 5, "w_palletLoaded", 3, "s_boxLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0) Keep(first, false);
+                { hq_FillOne_r = r; hq_FillOne_first = first; PhEnd(); return; }
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+            }
+        }
+        if (Ph(3))
+        {
+            bool forest = hq_FillOne_forest;
+            int type = hq_FillOne_type;
+            uint[] r = hq_FillOne_r;
+            int how = hq_FillOne_how;
+            if (how == 0 && !forest) { if (Border(2500, type != GenData.R_FIREPIT, WM_ANY, 0, 0, r) > 0) { hq_FillOne_forest = forest; hq_FillOne_type = type; hq_FillOne_r = r; hq_FillOne_how = how; PhEnd(); return; } }
+            hq_FillOne_forest = forest;
+            hq_FillOne_type = type;
+            hq_FillOne_r = r;
+            hq_FillOne_how = how;
+        }
+        if (Ph(4))
+        {
+            int room = hq_FillOne_room;
+            uint[] r = hq_FillOne_r;
+            int first = hq_FillOne_first;
+            int how = hq_FillOne_how;
             if (how <= 1)
             {
                 first = nEmit;
-                if (WallPlace(Pick(r, "n_bush", 5, "n_bushDetailed", 4, "n_bushLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0 && Keep(first, false)) return;
+                if (WallPlace(Pick(r, "n_bush", 5, "n_bushDetailed", 4, "n_bushLarge", 3), WM_ANY, 0, 0, WIN_ANY, 0, r) >= 0 && Keep(first, false)) { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
             }
-            if (how <= 2 && roomFloor[room] + 2 <= roomFloorTarget[room])
+            hq_FillOne_sel2 = 0;
+            if (how <= 2 && roomFloor[room] + 2 <= roomFloorTarget[room]) hq_FillOne_sel2 = 1;
+            hq_FillOne_room = room;
+            hq_FillOne_r = r;
+            hq_FillOne_first = first;
+            hq_FillOne_how = how;
+        }
+        if (Ph(5))
+        {
+            if (hq_FillOne_sel2 == 1)
             {
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
                 // rocks, or flowers once the area has its rocks
                 first = nEmit;
                 int g = RocksAllowed() ? FindGrp("rocks") : FlowerGroup(r);
-                if (GroupAt(g, forest ? GenData.A_SOFT : GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r) && Keep(first, false)) return;
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+                hq_FillOne_g = g;
             }
-            if (forest)
+        }
+        if (Ph(6))
+        {
+            if (hq_FillOne_sel2 == 1)
             {
+                bool forest = hq_FillOne_forest;
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
+                int g = hq_FillOne_g;
+                if (GroupAt(g, forest ? GenData.A_SOFT : GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, r) && Keep(first, false)) { hq_FillOne_forest = forest; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_g = g; PhEnd(); return; }
+                hq_FillOne_forest = forest;
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+                hq_FillOne_g = g;
+            }
+        }
+        if (Ph(7))
+        {
+            bool forest = hq_FillOne_forest;
+            uint[] r = hq_FillOne_r;
+            hq_FillOne_sel3 = 0;
+            if (forest) hq_FillOne_sel3 = 1;
+            else if (!Island(r)) hq_FillOne_sel3 = 2;
+            hq_FillOne_forest = forest;
+            hq_FillOne_r = r;
+        }
+        if (Ph(8))
+        {
+            if (hq_FillOne_sel3 == 1)
+            {
+                int room = hq_FillOne_room;
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
+                int how = hq_FillOne_how;
                 // mushrooms at the foot of a tree, a clump of flowers, a stump or a bush on open ground
                 first = nEmit;
-                if (how == 3 && roomFloor[room] + 2 <= roomFloorTarget[room] && PlaceGroup(FindGrp("mushrooms"), room, GenData.A_BESIDE, 2, 0, r) && Keep(first, false)) return;
+                if (how == 3 && roomFloor[room] + 2 <= roomFloorTarget[room] && PlaceGroup(FindGrp("mushrooms"), room, GenData.A_BESIDE, 2, 0, r) && Keep(first, false)) { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
                 first = nEmit;
-                if (how == 2 && roomFloor[room] + 3 <= roomFloorTarget[room] && GroupAt(FlowerGroup(r), GenData.A_SOFT, 3, WM_ANY, 0, 0, 0, r) && Keep(first, false)) return;
+                hq_FillOne_room = room;
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+                hq_FillOne_how = how;
+            }
+        }
+        if (Ph(9))
+        {
+            if (hq_FillOne_sel3 == 1)
+            {
+                int room = hq_FillOne_room;
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
+                int how = hq_FillOne_how;
+                if (how == 2 && roomFloor[room] + 3 <= roomFloorTarget[room] && GroupAt(FlowerGroup(r), GenData.A_SOFT, 3, WM_ANY, 0, 0, 0, r) && Keep(first, false)) { hq_FillOne_room = room; hq_FillOne_r = r; hq_FillOne_first = first; hq_FillOne_how = how; PhEnd(); return; }
+                hq_FillOne_room = room;
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+                hq_FillOne_how = how;
+            }
+        }
+        if (Ph(10))
+        {
+            if (hq_FillOne_sel3 == 1)
+            {
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
                 int cell = SoftSpot(1, r);
                 first = nEmit;
-                if (cell >= 0 && FreePlace(Pick(r, "n_stump", 5, "n_stumpRound", 4, "n_bush", 4), cell, RngRange(r, 360), 0, 0, H_NATURE) >= 0) Keep(first, false);
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+                hq_FillOne_cell = cell;
             }
-            else if (!Island(r))
+        }
+        if (Ph(11))
+        {
+            if (hq_FillOne_sel3 == 1)
             {
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
+                int cell = hq_FillOne_cell;
+                if (cell >= 0 && FreePlace(Pick(r, "n_stump", 5, "n_stumpRound", 4, "n_bush", 4), cell, RngRange(r, 360), 0, 0, H_NATURE) >= 0) Keep(first, false);
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+                hq_FillOne_cell = cell;
+            }
+        }
+        if (Ph(12))
+        {
+            if (hq_FillOne_sel3 == 2)
+            {
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
                 // no open ground for an island: a pot or a small rock group wherever an edge is free
                 first = nEmit;
                 FSet(Pick(r, "n_potSmall", 5, "n_planter", 5));
-                if (CountInRoom(fDef[0], room) < ScaledCap(defRoomCap[fDef[0]], room) && FormAt(GenData.GL_ROW, 0, GenData.A_OUT_EDGE, WM_ANY, 0, 0, 0, r) >= 0) Keep(first, false);
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
             }
         }
+        if (Ph(13))
+        {
+            if (hq_FillOne_sel3 == 2)
+            {
+                int room = hq_FillOne_room;
+                uint[] r = hq_FillOne_r;
+                int first = hq_FillOne_first;
+                if (CountInRoom(fDef[0], room) < ScaledCap(defRoomCap[fDef[0]], room) && FormAt(GenData.GL_ROW, 0, GenData.A_OUT_EDGE, WM_ANY, 0, 0, 0, r) >= 0) Keep(first, false);
+                hq_FillOne_room = room;
+                hq_FillOne_r = r;
+                hq_FillOne_first = first;
+            }
+        }
+    }
 
     int ftmPass, ftmK = -1, ftmSaved;
-    bool ftmForest;
+    bool ftmForest, ftmRun;
 
     // FillToMinimum a try a step; true when done. ftmK = -1 starts it.
     bool FillToMinimumStep()
@@ -368,11 +802,18 @@ public partial class MapGenUdon
             ftmSaved = roomFloorTarget[room];
             if (roomFloorTarget[room] < roomFloorMin[room] + 2) roomFloorTarget[room] = roomFloorMin[room] + 2;
             coverExempt = true;
-            ftmPass = 0; ftmK = 0;
+            ftmPass = 0; ftmK = 0; ftmRun = false;
             ClearBans();
             return false;
         }
-        if (ftmK < 24 && roomFloor[room] < roomFloorMin[room]) { FillOne(ftmPass, ftmK, ftmForest); ftmK++; return false; }
+        if (ftmRun || (ftmK < 24 && roomFloor[room] < roomFloorMin[room]))
+        {
+            // one try, in its own phases (FillOne_Body), a step a call
+            if (!ftmRun) { hq_FillOne_pass = ftmPass; hq_FillOne_k = ftmK; hq_FillOne_forest = ftmForest; PhSubReset(); ftmRun = true; }
+            PhPush(); FillOne_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { ftmRun = false; ftmK++; }
+            return false;
+        }
         bool stop = roomFloor[room] >= roomFloorMin[room] || !ftmForest || roomTrees[room] <= 1;
         if (!stop)
         {
@@ -572,22 +1013,44 @@ public partial class MapGenUdon
         if (Ph(0))
         {
             planR = SR(1);
-            StonePaths(40, planR);
-            FrontMarkers(30);
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = planR; PhSubReset(); }
+            PhPush(); StonePaths_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { planR = hq_StonePaths_rng; PhBreak(); }
+        }
+        if (PhLoop(2, 100000))
+        {
+            if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
+            PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(3))
+        {
             DoorSides(50);
             planN = TreeCount(room, planR);
             if (planN < 1 && AreaM2(room) >= 30) planN = 1;
         }
-        if (PhLoop(1, planN)) LawnTree(60 + planIter);
-        if (Ph(2))
+        if (PhLoop(4, planN)) LawnTree(60 + planIter);
+        if (Ph(5))
         {
-            if (RngChance(planR, 650)) BenchAtEdge(2);
-            uint[] r3 = SR(3);
-            hq_PlanLawn_r3 = r3;
+            hq_PlanLawn_sel1 = 0;
+            if (RngChance(planR, 650)) hq_PlanLawn_sel1 = 1;
         }
-        if (Ph(3))
+        if (PhLoop(6, 100000))
         {
-            uint[] r3 = hq_PlanLawn_r3;
+            if (!(hq_PlanLawn_sel1 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_BenchAtEdge_k = 2; PhSubReset(); }
+                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (Ph(7))
+        {
+            uint[] r3 = SR(3);
             if (RngChance(r3, 350) && Fit(1))
             {
                 int first = nEmit;
@@ -595,15 +1058,59 @@ public partial class MapGenUdon
             }
             // planted borders along the fences fill the rest of the budget: no lawn is left bare (G29)
             ClearBans();
-            hq_PlanLawn_r3 = r3;
         }
-        if (PhLoop(4, 6) && !BorderStep(10, planIter, true)) PhBreak();
-        if (Ph(5))
+        if (PhLoop(8, 100000))
+        {
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = true; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(9))
         {
             uint[] r4 = SR(4);
-            for (int k = 0; k < 3 && Fit(1); k++) if (!Island(r4)) break;
+            hq_PlanLawn_r4 = r4;
+        }
+        if (PhLoop(10, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < 3 && Fit(1))) PhBreak();
+                else { hq_PlanLawn_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanLawn_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
     }
+    void PlanLawn_L1()
+    {
+        int room = pRoom;
+        if (PhLoop(0, 100000))
+        {
+            uint[] r4 = hq_PlanLawn_r4;
+            bool ht1 = false;
+            if (planIter == 0) { hq_Island_rng = r4; PhSubReset(); }
+            PhPush(); Island_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r4 = hq_Island_rng; ht1 = hq_Island_ret; PhBreak(); }
+            hq_PlanLawn_r4 = r4;
+            hq_PlanLawn_ht1 = ht1;
+        }
+        if (Ph(1))
+        {
+            bool ht1 = hq_PlanLawn_ht1;
+            if (!ht1)
+            {
+                { hq_PlanLawn_ht1 = ht1; phBreak = true; PhEnd(); return; }
+            }
+            hq_PlanLawn_ht1 = ht1;
+        }
+    }
+
 
     // ============================================================================================ GARDEN
     // Areas: soil beds along the fences with their planting; a vegetable plot, one crop to a row; the water point
@@ -614,7 +1121,19 @@ public partial class MapGenUdon
         if (Ph(0))
         {
             uint[] r = SR(1);
-            StonePaths(40, r);
+            hq_PlanGarden_r = r;
+        }
+        if (PhLoop(1, 100000))
+        {
+            uint[] r = hq_PlanGarden_r;
+            if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = r; PhSubReset(); }
+            PhPush(); StonePaths_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_StonePaths_rng; PhBreak(); }
+            hq_PlanGarden_r = r;
+        }
+        if (Ph(2))
+        {
+            uint[] r = hq_PlanGarden_r;
             // the shed in a corner of a larger garden, the barrow and the sacks beside it
             int shed = -1;
             hq_PlanGarden_sel1 = 0;
@@ -622,7 +1141,7 @@ public partial class MapGenUdon
             hq_PlanGarden_r = r;
             hq_PlanGarden_shed = shed;
         }
-        if (Ph(1))
+        if (Ph(3))
         {
             if (hq_PlanGarden_sel1 == 1)
             {
@@ -635,7 +1154,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(2))
+        if (Ph(4))
         {
             if (hq_PlanGarden_sel1 == 1)
             {
@@ -648,7 +1167,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(3))
+        if (Ph(5))
         {
             if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
             {
@@ -665,7 +1184,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(4))
+        if (Ph(6))
         {
             if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
             {
@@ -682,7 +1201,7 @@ public partial class MapGenUdon
                 hq_PlanGarden_first = first;
             }
         }
-        if (Ph(5))
+        if (Ph(7))
         {
             int shed = hq_PlanGarden_shed;
             // the water point: a tap at the fence, the can and the buckets beside it
@@ -706,38 +1225,43 @@ public partial class MapGenUdon
             hq_PlanGarden_tap = tap;
             hq_PlanGarden_r3 = r3;
         }
-        if (Ph(6))
+        if (Ph(8))
         {
             if (hq_PlanGarden_sel3 == 1)
             {
                 uint[] r3 = hq_PlanGarden_r3;
                 int cell = OpenSpot(4, WM_ANY, 0, 0, 0, r3);
+                hq_PlanGarden_sel4 = 0;
+                if (cell >= 0) hq_PlanGarden_sel4 = 1;
                 hq_PlanGarden_r3 = r3;
                 hq_PlanGarden_cell = cell;
             }
         }
-        if (Ph(7))
+        if (PhLoop(9, 100000))
         {
-            if (hq_PlanGarden_sel3 == 1)
+            if (!(hq_PlanGarden_sel3 == 1 && hq_PlanGarden_sel4 == 1)) PhBreak();
+            else
             {
                 uint[] r3 = hq_PlanGarden_r3;
                 int cell = hq_PlanGarden_cell;
-                if (cell >= 0) VegPlot(cell, r3);
+                if (planIter == 0) { hq_VegPlot_cell = cell; hq_VegPlot_rng = r3; PhSubReset(); }
+                PhPush(); VegPlot_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r3 = hq_VegPlot_rng; PhBreak(); }
                 hq_PlanGarden_r3 = r3;
                 hq_PlanGarden_cell = cell;
             }
         }
-        if (Ph(8))
+        if (Ph(10))
         {
             // tools leaning at the fence near the water point
             uint[] r4 = SR(4);
-            hq_PlanGarden_sel4 = 0;
-            if (RngChance(r4, 750) && Fit(2)) hq_PlanGarden_sel4 = 1;
+            hq_PlanGarden_sel5 = 0;
+            if (RngChance(r4, 750) && Fit(2)) hq_PlanGarden_sel5 = 1;
             hq_PlanGarden_r4 = r4;
         }
-        if (Ph(9))
+        if (Ph(11))
         {
-            if (hq_PlanGarden_sel4 == 1)
+            if (hq_PlanGarden_sel5 == 1)
             {
                 int shed = hq_PlanGarden_shed;
                 uint[] r4 = hq_PlanGarden_r4;
@@ -749,9 +1273,9 @@ public partial class MapGenUdon
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(10))
+        if (Ph(12))
         {
-            if (hq_PlanGarden_sel4 == 1)
+            if (hq_PlanGarden_sel5 == 1)
             {
                 int tap = hq_PlanGarden_tap;
                 uint[] r4 = hq_PlanGarden_r4;
@@ -762,9 +1286,9 @@ public partial class MapGenUdon
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(11))
+        if (Ph(13))
         {
-            if (hq_PlanGarden_sel4 == 1)
+            if (hq_PlanGarden_sel5 == 1)
             {
                 int first = hq_PlanGarden_first;
                 bool ok = hq_PlanGarden_ok;
@@ -773,30 +1297,53 @@ public partial class MapGenUdon
                 hq_PlanGarden_ok = ok;
             }
         }
-        if (Ph(12))
+        if (Ph(14))
         {
             DoorSides(50);
         }
-        if (Ph(13))
+        if (Ph(15))
         {
             uint[] r5 = SR(5);
             int trees = TreeCount(room, r5);
             hq_PlanGarden_r5 = r5;
             hq_PlanGarden_trees = trees;
         }
-        if (Ph(14))
+        if (PhLoop(16, 100000))
         {
             int trees = hq_PlanGarden_trees;
-            for (int t = 0; t < trees; t++) LawnTree(60 + t);
+            if (!PhSubActive())
+            {
+                int t = planIter;
+                if (!(t < trees)) PhBreak();
+                else { hq_PlanGarden_t = t; PhSubBegin(); }
+            }
             hq_PlanGarden_trees = trees;
+            if (PhSubActive())
+            {
+                PhPush(); PlanGarden_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
-        if (Ph(15))
+        if (Ph(17))
         {
             uint[] r5 = hq_PlanGarden_r5;
-            if (RngChance(r5, 450)) BenchAtEdge(6);
+            hq_PlanGarden_sel6 = 0;
+            if (RngChance(r5, 450)) hq_PlanGarden_sel6 = 1;
             hq_PlanGarden_r5 = r5;
         }
-        if (Ph(16))
+        if (PhLoop(18, 100000))
+        {
+            if (!(hq_PlanGarden_sel6 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_BenchAtEdge_k = 6; PhSubReset(); }
+                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (Ph(19))
         {
             uint[] r7 = SR(7);
             if (RngChance(r7, 500) && Fit(2))
@@ -807,16 +1354,70 @@ public partial class MapGenUdon
             // the beds along the fences
             ClearBans();
         }
-        if (Ph(17))
+        if (PhLoop(20, 100000))
         {
-            Borders(10, 8, true);
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 8; hq_Borders_soil = true; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
-        if (Ph(18))
+        if (Ph(21))
         {
             uint[] r8 = SR(8);
-            for (int k = 0; k < 3 && Fit(1); k++) if (!Island(r8)) break;
+            hq_PlanGarden_r8 = r8;
+        }
+        if (PhLoop(22, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < 3 && Fit(1))) PhBreak();
+                else { hq_PlanGarden_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanGarden_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
     }
+    void PlanGarden_L1()
+    {
+        int room = pRoom, cells = roomOuterCells[room];
+        if (PhLoop(0, 100000))
+        {
+            int t = hq_PlanGarden_t;
+            if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
+            PhPush(); LawnTree_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+    }
+
+    void PlanGarden_L2()
+    {
+        int room = pRoom, cells = roomOuterCells[room];
+        if (PhLoop(0, 100000))
+        {
+            uint[] r8 = hq_PlanGarden_r8;
+            bool ht1 = false;
+            if (planIter == 0) { hq_Island_rng = r8; PhSubReset(); }
+            PhPush(); Island_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r8 = hq_Island_rng; ht1 = hq_Island_ret; PhBreak(); }
+            hq_PlanGarden_r8 = r8;
+            hq_PlanGarden_ht1 = ht1;
+        }
+        if (Ph(1))
+        {
+            bool ht1 = hq_PlanGarden_ht1;
+            if (!ht1)
+            {
+                { hq_PlanGarden_ht1 = ht1; phBreak = true; PhEnd(); return; }
+            }
+            hq_PlanGarden_ht1 = ht1;
+        }
+    }
+
 
     // a vegetable plot around a cell: a bed of soil 3 x 2 m with two rows of crops along it
     void VegPlot(int cell, uint[] rng)
@@ -926,7 +1527,17 @@ public partial class MapGenUdon
         if (Ph(0))
         {
             int room = pRoom;
-            FrontMarkers(30);
+            hq_PlanPatio_room = room;
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
+            PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(2))
+        {
+            int room = hq_PlanPatio_room;
             uint[] r = SR(1);
             // (a) the paving: 4 x 4 m in front of the first door, or against an edge, or in the middle
             int px0, pz0, px1, pz1;
@@ -965,13 +1576,13 @@ public partial class MapGenUdon
             hq_PlanPatio_midX = midX;
             hq_PlanPatio_midZ = midZ;
         }
-        if (Ph(1))
+        if (Ph(3))
         {
             int room = hq_PlanPatio_room;
             for (int q = 1; q < roomDoorCount[room]; q++) { uint[] rq = SR(40 + q); StonePath(room, q, 7 + RngRange(rq, 6), rq); }
             hq_PlanPatio_room = room;
         }
-        if (Ph(2))
+        if (Ph(4))
         {
             uint[] r = hq_PlanPatio_r;
             // (b) the table set on the paving
@@ -979,7 +1590,7 @@ public partial class MapGenUdon
             hq_PlanPatio_r = r;
             hq_PlanPatio_setDef = setDef;
         }
-        if (PhLoop(3, 100000))
+        if (PhLoop(5, 100000))
         {
             uint[] r = hq_PlanPatio_r;
             int midX = hq_PlanPatio_midX;
@@ -995,19 +1606,32 @@ public partial class MapGenUdon
             hq_PlanPatio_setDef = setDef;
             hq_PlanPatio_set = set;
         }
-        if (Ph(4))
+        if (Ph(6))
         {
-            uint[] r = hq_PlanPatio_r;
-            int midX = hq_PlanPatio_midX;
-            int midZ = hq_PlanPatio_midZ;
             int set = hq_PlanPatio_set;
-            if (set < 0) set = CentrePiece(Dn("r_tableRound"), 0, false, 1, 1, WM_NEAR, midX, midZ, 0, EF_MANDATORY, r);
-            hq_PlanPatio_r = r;
-            hq_PlanPatio_midX = midX;
-            hq_PlanPatio_midZ = midZ;
+            hq_PlanPatio_sel1 = 0;
+            if (set < 0) hq_PlanPatio_sel1 = 1;
             hq_PlanPatio_set = set;
         }
-        if (Ph(5))
+        if (PhLoop(7, 100000))
+        {
+            if (!(hq_PlanPatio_sel1 == 1)) PhBreak();
+            else
+            {
+                uint[] r = hq_PlanPatio_r;
+                int midX = hq_PlanPatio_midX;
+                int midZ = hq_PlanPatio_midZ;
+                int set = hq_PlanPatio_set;
+                if (planIter == 0) { hq_CentrePiece_def = Dn("r_tableRound"); hq_CentrePiece_yaw = 0; hq_CentrePiece_bothYaws = false; hq_CentrePiece_ringWant = 1; hq_CentrePiece_ringMin = 1; hq_CentrePiece_mode = WM_NEAR; hq_CentrePiece_tx = midX; hq_CentrePiece_tz = midZ; hq_CentrePiece_need = 0; hq_CentrePiece_flags = EF_MANDATORY; hq_CentrePiece_rng = r; PhSubReset(); }
+                PhPush(); CentrePiece_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r = hq_CentrePiece_rng; set = hq_CentrePiece_ret; PhBreak(); }
+                hq_PlanPatio_r = r;
+                hq_PlanPatio_midX = midX;
+                hq_PlanPatio_midZ = midZ;
+                hq_PlanPatio_set = set;
+            }
+        }
+        if (Ph(8))
         {
             uint[] r = hq_PlanPatio_r;
             int midX = hq_PlanPatio_midX;
@@ -1021,17 +1645,17 @@ public partial class MapGenUdon
             }
             // (c) loungers side by side on the paving, planters at the door, a bench against the wall
             uint[] r2 = SR(2);
-            hq_PlanPatio_sel1 = 0;
-            if (RngChance(r2, 600) && Fit(2)) hq_PlanPatio_sel1 = 1;
+            hq_PlanPatio_sel2 = 0;
+            if (RngChance(r2, 600) && Fit(2)) hq_PlanPatio_sel2 = 1;
             hq_PlanPatio_r = r;
             hq_PlanPatio_midX = midX;
             hq_PlanPatio_midZ = midZ;
             hq_PlanPatio_set = set;
             hq_PlanPatio_r2 = r2;
         }
-        if (Ph(6))
+        if (Ph(9))
         {
-            if (hq_PlanPatio_sel1 == 1)
+            if (hq_PlanPatio_sel2 == 1)
             {
                 int midX = hq_PlanPatio_midX;
                 int midZ = hq_PlanPatio_midZ;
@@ -1049,9 +1673,9 @@ public partial class MapGenUdon
                 hq_PlanPatio_ok = ok;
             }
         }
-        if (Ph(7))
+        if (Ph(10))
         {
-            if (hq_PlanPatio_sel1 == 1)
+            if (hq_PlanPatio_sel2 == 1)
             {
                 int first = hq_PlanPatio_first;
                 bool ok = hq_PlanPatio_ok;
@@ -1060,23 +1684,29 @@ public partial class MapGenUdon
                 hq_PlanPatio_ok = ok;
             }
         }
-        if (Ph(8))
-        {
-            DoorSides(50);
-        }
-        if (Ph(9))
+        if (Ph(11))
         {
             uint[] r2 = hq_PlanPatio_r2;
-            if (RngChance(r2, 550)) BenchAtEdge(3);
-            uint[] r4 = SR(4);
+            DoorSides(50);
+            hq_PlanPatio_sel3 = 0;
+            if (RngChance(r2, 550)) hq_PlanPatio_sel3 = 1;
             hq_PlanPatio_r2 = r2;
-            hq_PlanPatio_r4 = r4;
         }
-        if (Ph(10))
+        if (PhLoop(12, 100000))
+        {
+            if (!(hq_PlanPatio_sel3 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_BenchAtEdge_k = 3; PhSubReset(); }
+                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (Ph(13))
         {
             int midX = hq_PlanPatio_midX;
             int midZ = hq_PlanPatio_midZ;
-            uint[] r4 = hq_PlanPatio_r4;
+            uint[] r4 = SR(4);
             if (RngChance(r4, 500) && Fit(2))
             {
                 int first = nEmit;
@@ -1085,10 +1715,9 @@ public partial class MapGenUdon
             uint[] r5 = SR(5);
             hq_PlanPatio_midX = midX;
             hq_PlanPatio_midZ = midZ;
-            hq_PlanPatio_r4 = r4;
             hq_PlanPatio_r5 = r5;
         }
-        if (Ph(11))
+        if (Ph(14))
         {
             uint[] r5 = hq_PlanPatio_r5;
             if (RngChance(r5, 300) && Fit(1))
@@ -1099,7 +1728,7 @@ public partial class MapGenUdon
             }
             hq_PlanPatio_r5 = r5;
         }
-        if (Ph(12))
+        if (Ph(15))
         {
             int room = hq_PlanPatio_room;
             uint[] r5 = hq_PlanPatio_r5;
@@ -1108,23 +1737,90 @@ public partial class MapGenUdon
             hq_PlanPatio_r5 = r5;
             hq_PlanPatio_trees = trees;
         }
-        if (Ph(13))
+        if (PhLoop(16, 100000))
         {
             int trees = hq_PlanPatio_trees;
-            for (int t = 0; t < trees; t++) LawnTree(60 + t);
-            ClearBans();
+            if (!PhSubActive())
+            {
+                int t = planIter;
+                if (!(t < trees)) PhBreak();
+                else { hq_PlanPatio_t = t; PhSubBegin(); }
+            }
             hq_PlanPatio_trees = trees;
+            if (PhSubActive())
+            {
+                PhPush(); PlanPatio_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
-        if (Ph(14))
+        if (Ph(17))
         {
-            Borders(10, 6, true);
+            ClearBans();
         }
-        if (Ph(15))
+        if (PhLoop(18, 100000))
+        {
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = true; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(19))
         {
             uint[] r6 = SR(6);
-            for (int j = 0; j < 2 && Fit(1); j++) if (!Island(r6)) break;
+            hq_PlanPatio_r6 = r6;
+        }
+        if (PhLoop(20, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int j = planIter;
+                if (!(j < 2 && Fit(1))) PhBreak();
+                else { hq_PlanPatio_j = j; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanPatio_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
     }
+    void PlanPatio_L1()
+    {
+        if (PhLoop(0, 100000))
+        {
+            int t = hq_PlanPatio_t;
+            if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
+            PhPush(); LawnTree_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+    }
+
+    void PlanPatio_L2()
+    {
+        if (PhLoop(0, 100000))
+        {
+            uint[] r6 = hq_PlanPatio_r6;
+            bool ht1 = false;
+            if (planIter == 0) { hq_Island_rng = r6; PhSubReset(); }
+            PhPush(); Island_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r6 = hq_Island_rng; ht1 = hq_Island_ret; PhBreak(); }
+            hq_PlanPatio_r6 = r6;
+            hq_PlanPatio_ht1 = ht1;
+        }
+        if (Ph(1))
+        {
+            bool ht1 = hq_PlanPatio_ht1;
+            if (!ht1)
+            {
+                { hq_PlanPatio_ht1 = ht1; phBreak = true; PhEnd(); return; }
+            }
+            hq_PlanPatio_ht1 = ht1;
+        }
+    }
+
 
     // Markers at a plot's front (G42: a sign stands where it has a reason to, facing the people it is for). Seen
     // from the lane: a house's mailbox beside its garden gate (or beside its front door when the door opens onto the
@@ -1134,27 +1830,120 @@ public partial class MapGenUdon
     // wrong-category spawns (GenData.NoLeak).
     void FrontMarkers(int k0)
     {
-        int room = pRoom, type = roomType[room];
-        bool lane = type == GenData.R_LANE;
-        if (!lane && roomPlace[room] != PL_FRONT) return;
-        int n = 0;
-        // doorways of this room into a building: a shop's customer door, or (from the lane) a house's front door
-        for (int q = 0; q < roomDoorCount[room]; q++)
+        hq_FrontMarkers_k0 = k0;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); FrontMarkers_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // FrontMarkers in phases, a step a call (autophase4); FrontMarkers() above runs them to the end
+    void FrontMarkers_Body()
+    {
+        if (Ph(0))
         {
+            int room = pRoom, type = roomType[room];
+            bool lane = type == GenData.R_LANE;
+            if (!lane && roomPlace[room] != PL_FRONT) { hq_FrontMarkers_room = room; hq_FrontMarkers_lane = lane; PhEnd(); return; }
+            int n = 0;
+            hq_FrontMarkers_room = room;
+            hq_FrontMarkers_lane = lane;
+            hq_FrontMarkers_n = n;
+        }
+        // doorways of this room into a building: a shop's customer door, or (from the lane) a house's front door
+        if (PhLoop(1, 100000))
+        {
+            int room = hq_FrontMarkers_room;
+            if (!PhSubActive())
+            {
+                int q = planIter;
+                if (!(q < roomDoorCount[room])) PhBreak();
+                else { hq_FrontMarkers_q = q; PhSubBegin(); }
+            }
+            hq_FrontMarkers_room = room;
+            if (PhSubActive())
+            {
+                PhPush(); FrontMarkers_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(2))
+        {
+            bool lane = hq_FrontMarkers_lane;
+            if (!lane) { hq_FrontMarkers_lane = lane; PhEnd(); return; }
+            hq_FrontMarkers_lane = lane;
+        }
+        // a house's garden opens onto the lane through a gap in the fence: the mailbox beside it
+        if (PhLoop(3, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int c = planIter;
+                if (!(c < W * H)) PhBreak();
+                else { hq_FrontMarkers_c = c; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); FrontMarkers_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+    }
+    void FrontMarkers_L1()
+    {
+        if (Ph(0))
+        {
+            int room = hq_FrontMarkers_room;
+            bool lane = hq_FrontMarkers_lane;
+            int q = hq_FrontMarkers_q;
             int i = roomDoorStart[room] + q, cell = roomDoors[i], d = roomDoorDir[i];
             int ox = cell % IW + DX[d], oz = cell / IW + DZ[d];
-            if (ox < 0 || oz < 0 || ox >= IW || oz >= IH || !IsFrontDoor(oz * IW + ox, (d + 2) & 3)) continue;
+            if (ox < 0 || oz < 0 || ox >= IW || oz >= IH || !IsFrontDoor(oz * IW + ox, (d + 2) & 3)) { hq_FrontMarkers_room = room; hq_FrontMarkers_lane = lane; hq_FrontMarkers_cell = cell; PhEnd(); return; }
             int zone = roomZone[innerRoom[oz * IW + ox]];
-            if (zone == GenData.Z_HOUSE && !lane) continue;
-            Marker(zone == GenData.Z_HOUSE ? "gen_mailbox" : "n_sign", cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, k0 + n++);
+            if (zone == GenData.Z_HOUSE && !lane) { hq_FrontMarkers_room = room; hq_FrontMarkers_lane = lane; hq_FrontMarkers_cell = cell; hq_FrontMarkers_zone = zone; PhEnd(); return; }
+            hq_FrontMarkers_room = room;
+            hq_FrontMarkers_lane = lane;
+            hq_FrontMarkers_cell = cell;
+            hq_FrontMarkers_zone = zone;
         }
-        if (!lane) return;
-        // a house's garden opens onto the lane through a gap in the fence: the mailbox beside it
-        for (int c = 0; c < W * H; c++)
+        if (Ph(1))
         {
-            if (cellRoom[c] != room) continue;
+            int k0 = hq_FrontMarkers_k0;
+            int n = hq_FrontMarkers_n;
+            int cell = hq_FrontMarkers_cell;
+            int zone = hq_FrontMarkers_zone;
+            Marker(zone == GenData.Z_HOUSE ? "gen_mailbox" : "n_sign", cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, k0 + n++);
+            hq_FrontMarkers_k0 = k0;
+            hq_FrontMarkers_n = n;
+            hq_FrontMarkers_cell = cell;
+            hq_FrontMarkers_zone = zone;
+        }
+    }
+
+    void FrontMarkers_L2()
+    {
+        if (Ph(0))
+        {
+            int room = hq_FrontMarkers_room;
+            int c = hq_FrontMarkers_c;
+            if (cellRoom[c] != room) { hq_FrontMarkers_room = room; PhEnd(); return; }
             int cx = c % W, cz = c / W;
-            for (int d = 0; d < 4; d++)
+            hq_FrontMarkers_room = room;
+            hq_FrontMarkers_cx = cx;
+            hq_FrontMarkers_cz = cz;
+        }
+        if (PhLoop(1, 100000))
+        {
+            int k0 = hq_FrontMarkers_k0;
+            int n = hq_FrontMarkers_n;
+            int cx = hq_FrontMarkers_cx;
+            int cz = hq_FrontMarkers_cz;
+            int d = planIter;
+            if (!(d < 4)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 int nx = cx + DX[d], nz = cz + DZ[d];
                 if (!InGrid(nx, nz) || EdgeType(cx, cz, d) != GenData.E_NONE) continue;
@@ -1165,8 +1954,13 @@ public partial class MapGenUdon
                 int pz = cz * GenData.CELL_MM + GenData.CELL_MM / 2 + DZ[d] * (GenData.CELL_MM / 2 - 500);
                 Marker("gen_mailbox", px, pz, k0 + n++);
             }
+            hq_FrontMarkers_k0 = k0;
+            hq_FrontMarkers_n = n;
+            hq_FrontMarkers_cx = cx;
+            hq_FrontMarkers_cz = cz;
         }
     }
+
 
     // a marker by the wall or fence nearest (px, pz), its back to it and its face to the people coming (the models'
     // readable face is +z: convert_models.py turns the sign board, whose face was its back), SignGap clear of it
@@ -1188,28 +1982,60 @@ public partial class MapGenUdon
         int room = pRoom;
         if (Ph(0))
         {
-        int rx = (releaseX * 8 + 4) * GenData.INNER_MM, rz = (releaseZ * 8 + 4) * GenData.INNER_MM;
-        uint[] r = SR(1);
-        // the sign by the release, in the lane's first room only (layout 14: the lane is in rooms of six cells)
-        int fx = releaseX + DX[releaseDir], fz = releaseZ + DZ[releaseDir];
-        bool firstRoom = InGrid(fx, fz) && cellRoom[fz * W + fx] == room;
-        if (firstRoom && Fit(1))
+            int rx = (releaseX * 8 + 4) * GenData.INNER_MM, rz = (releaseZ * 8 + 4) * GenData.INNER_MM;
+            uint[] r = SR(1);
+            // the sign by the release, in the lane's first room only (layout 14: the lane is in rooms of six cells)
+            int fx = releaseX + DX[releaseDir], fz = releaseZ + DZ[releaseDir];
+            bool firstRoom = InGrid(fx, fz) && cellRoom[fz * W + fx] == room;
+            if (firstRoom && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("n_sign"), SignGap, WM_NEAR, rx, rz, WIN_ANY, 0, r) >= 0) Keep(first, false);
+            }
+        }
+        if (PhLoop(1, 100000))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("n_sign"), SignGap, WM_NEAR, rx, rz, WIN_ANY, 0, r) >= 0) Keep(first, false);
+            if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
+            PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
-        FrontMarkers(30);
-        BenchAtEdge(2);
-        if (AreaM2(room) >= 100) BenchAtEdge(3);
-        uint[] r4 = SR(4);
-        if (RngChance(r4, 600) && Fit(1))
+        if (PhLoop(2, 100000))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("k_trashcan"), WM_ANY, 0, 0, WIN_ANY, 0, r4) >= 0) Keep(first, false);
+            if (planIter == 0) { hq_BenchAtEdge_k = 2; PhSubReset(); }
+            PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
-        ClearBans();
+        if (Ph(3))
+        {
+            hq_PlanLane_sel1 = 0;
+            if (AreaM2(room) >= 100) hq_PlanLane_sel1 = 1;
         }
-        if (PhLoop(1, 6) && !BorderStep(10, planIter, false)) PhBreak();
+        if (PhLoop(4, 100000))
+        {
+            if (!(hq_PlanLane_sel1 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_BenchAtEdge_k = 3; PhSubReset(); }
+                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (Ph(5))
+        {
+            uint[] r4 = SR(4);
+            if (RngChance(r4, 600) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("k_trashcan"), WM_ANY, 0, 0, WIN_ANY, 0, r4) >= 0) Keep(first, false);
+            }
+            ClearBans();
+        }
+        if (PhLoop(6, 100000))
+        {
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = false; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // ============================================================================================ YARD
@@ -1221,17 +2047,32 @@ public partial class MapGenUdon
         if (Ph(0))
         {
             int room = pRoom, dx = 0, dz = 0;
-            FrontMarkers(30);
+            hq_PlanYard_room = room;
+            hq_PlanYard_dx = dx;
+            hq_PlanYard_dz = dz;
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
+            PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(2))
+        {
+            int room = hq_PlanYard_room;
+            int dx = hq_PlanYard_dx;
+            int dz = hq_PlanYard_dz;
             MainDoor(room, out dx, out dz);
             bool diner = false;
             for (int k = 0; k < roomDoorCount[room]; k++) if (DoorZone(room, k) == GenData.Z_DINER) diner = true;
             uint[] r = SR(1);
+            hq_PlanYard_room = room;
             hq_PlanYard_dx = dx;
             hq_PlanYard_dz = dz;
             hq_PlanYard_diner = diner;
             hq_PlanYard_r = r;
         }
-        if (Ph(1))
+        if (Ph(3))
         {
             int dx = hq_PlanYard_dx;
             int dz = hq_PlanYard_dz;
@@ -1251,7 +2092,7 @@ public partial class MapGenUdon
             hq_PlanYard_r = r;
             hq_PlanYard_rows = rows;
         }
-        if (PhLoop(2, 100000))
+        if (PhLoop(4, 100000))
         {
             int dx = hq_PlanYard_dx;
             int dz = hq_PlanYard_dz;
@@ -1269,7 +2110,7 @@ public partial class MapGenUdon
             hq_PlanYard_dz = dz;
             hq_PlanYard_rows = rows;
         }
-        if (Ph(3))
+        if (Ph(5))
         {
             int dx = hq_PlanYard_dx;
             int dz = hq_PlanYard_dz;
@@ -1286,7 +2127,7 @@ public partial class MapGenUdon
             hq_PlanYard_diner = diner;
             hq_PlanYard_r9 = r9;
         }
-        if (Ph(4))
+        if (Ph(6))
         {
             int dx = hq_PlanYard_dx;
             int dz = hq_PlanYard_dz;
@@ -1305,7 +2146,7 @@ public partial class MapGenUdon
             hq_PlanYard_dz = dz;
             hq_PlanYard_r9 = r9;
         }
-        if (Ph(5))
+        if (Ph(7))
         {
             uint[] r10 = SR(10);
             if (RngChance(r10, 450) && Fit(1))
@@ -1358,10 +2199,9 @@ public partial class MapGenUdon
         if (Ph(2))
         {
             bool soft = hq_FireRing_soft;
-            uint[] rng = hq_FireRing_rng;
             int room = hq_FireRing_room;
             int fire = hq_FireRing_fire;
-            if (fire < 0) { MandFail(1); { hq_FireRing_ret = -1; hq_FireRing_soft = soft; hq_FireRing_rng = rng; hq_FireRing_room = room; hq_FireRing_fire = fire; PhEnd(); return; } }
+            if (fire < 0) { MandFail(1); { hq_FireRing_ret = -1; hq_FireRing_soft = soft; hq_FireRing_room = room; hq_FireRing_fire = fire; PhEnd(); return; } }
             // trodden earth around the fire, about 2 m out; in a forest the clearing where no tree stands is wider
             int fx = FloorDiv(emitX[fire], GenData.INNER_MM), fz = FloorDiv(emitZ[fire], GenData.INNER_MM);
             for (int z = fz - 6; z <= fz + 6; z++)
@@ -1373,11 +2213,30 @@ public partial class MapGenUdon
                     if (dd <= (soft ? 36 : 14)) tags[z * IW + x] |= GenData.T_GLADE;
                 }
             // in the wood the tent comes first (a narrow clearing has room for little else), then the gear (PlanForest)
-            if (!soft) FireGear(fire, rng);
-            { hq_FireRing_ret = fire; hq_FireRing_soft = soft; hq_FireRing_rng = rng; hq_FireRing_room = room; hq_FireRing_fire = fire; PhEnd(); return; }
+            hq_FireRing_sel1 = 0;
+            if (!soft) hq_FireRing_sel1 = 1;
             hq_FireRing_soft = soft;
-            hq_FireRing_rng = rng;
             hq_FireRing_room = room;
+            hq_FireRing_fire = fire;
+        }
+        if (PhLoop(3, 100000))
+        {
+            if (!(hq_FireRing_sel1 == 1)) PhBreak();
+            else
+            {
+                uint[] rng = hq_FireRing_rng;
+                int fire = hq_FireRing_fire;
+                if (planIter == 0) { hq_FireGear_fire = fire; hq_FireGear_rng = rng; PhSubReset(); }
+                PhPush(); FireGear_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { rng = hq_FireGear_rng; PhBreak(); }
+                hq_FireRing_rng = rng;
+                hq_FireRing_fire = fire;
+            }
+        }
+        if (Ph(4))
+        {
+            int fire = hq_FireRing_fire;
+            { hq_FireRing_ret = fire; hq_FireRing_fire = fire; PhEnd(); return; }
             hq_FireRing_fire = fire;
         }
     }
@@ -1385,16 +2244,54 @@ public partial class MapGenUdon
     // a few logs beside the fire, and the bucket of water
     void FireGear(int fire, uint[] rng)
     {
-        if (RngChance(rng, 650) && Fit(2))
+        hq_FireGear_fire = fire;
+        hq_FireGear_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); FireGear_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_FireGear_rng;
+    }
+
+    // FireGear in phases, a step a call (autophase4); FireGear() above runs them to the end
+    void FireGear_Body()
+    {
+        if (Ph(0))
         {
-            int first = nEmit;
-            if (GroupBeside(FindGrp("logpile"), fire, 2, 0, rng)) Keep(first, false);
+            int fire = hq_FireGear_fire;
+            uint[] rng = hq_FireGear_rng;
+            if (RngChance(rng, 650) && Fit(2))
+            {
+                int first = nEmit;
+                if (GroupBeside(FindGrp("logpile"), fire, 2, 0, rng)) Keep(first, false);
+            }
+            hq_FireGear_sel1 = 0;
+            if (RngChance(rng, 600) && Fit(1)) hq_FireGear_sel1 = 1;
+            hq_FireGear_fire = fire;
+            hq_FireGear_rng = rng;
         }
-        if (RngChance(rng, 600) && Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            FSet(Pick(rng, "m_bucketWater", 6, "s_bucket", 3));
-            if (FormBeside(GenData.GL_ROW, 0, fire, 0, rng) >= 0) Keep(first, false);
+            if (hq_FireGear_sel1 == 1)
+            {
+                uint[] rng = hq_FireGear_rng;
+                int first = nEmit;
+                FSet(Pick(rng, "m_bucketWater", 6, "s_bucket", 3));
+                hq_FireGear_rng = rng;
+                hq_FireGear_first = first;
+            }
+        }
+        if (Ph(2))
+        {
+            if (hq_FireGear_sel1 == 1)
+            {
+                int fire = hq_FireGear_fire;
+                uint[] rng = hq_FireGear_rng;
+                int first = hq_FireGear_first;
+                if (FormBeside(GenData.GL_ROW, 0, fire, 0, rng) >= 0) Keep(first, false);
+                hq_FireGear_fire = fire;
+                hq_FireGear_rng = rng;
+                hq_FireGear_first = first;
+            }
         }
     }
 
@@ -1568,70 +2465,121 @@ public partial class MapGenUdon
     {
         if (Ph(0))
         {
+            bool atEdge = hq_WoodPile_atEdge;
             uint[] rng = hq_WoodPile_rng;
-            if (!Fit(1)) { hq_WoodPile_rng = rng; PhEnd(); return; }
+            if (!Fit(1)) { hq_WoodPile_atEdge = atEdge; hq_WoodPile_rng = rng; PhEnd(); return; }
             int first = nEmit;
             int stackDef = Pick(rng, "n_logStack", 6, "n_logStackLarge", 3);
             int stack = -1;
+            hq_WoodPile_sel1 = 0;
+            if (atEdge) hq_WoodPile_sel1 = 1;
+            hq_WoodPile_atEdge = atEdge;
             hq_WoodPile_rng = rng;
             hq_WoodPile_first = first;
             hq_WoodPile_stackDef = stackDef;
             hq_WoodPile_stack = stack;
         }
-        if (Ph(1))
+        if (PhLoop(1, 100000))
         {
-            int fire = hq_WoodPile_fire;
-            bool atEdge = hq_WoodPile_atEdge;
-            uint[] rng = hq_WoodPile_rng;
-            int stackDef = hq_WoodPile_stackDef;
-            int stack = hq_WoodPile_stack;
-            if (atEdge) stack = WallKeep(stackDef, fire >= 0 ? WM_NEAR : WM_ANY, fire >= 0 ? emitX[fire] : 0, fire >= 0 ? emitZ[fire] : 0, WIN_ANY, 0, rng);
-            hq_WoodPile_fire = fire;
-            hq_WoodPile_atEdge = atEdge;
-            hq_WoodPile_rng = rng;
-            hq_WoodPile_stackDef = stackDef;
-            hq_WoodPile_stack = stack;
+            if (!(hq_WoodPile_sel1 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_WoodPile_fire;
+                uint[] rng = hq_WoodPile_rng;
+                int stackDef = hq_WoodPile_stackDef;
+                int stack = hq_WoodPile_stack;
+                if (planIter == 0) { hq_WallKeep_def = stackDef; hq_WallKeep_mode = fire >= 0 ? WM_NEAR : WM_ANY; hq_WallKeep_tx = fire >= 0 ? emitX[fire] : 0; hq_WallKeep_tz = fire >= 0 ? emitZ[fire] : 0; hq_WallKeep_win = WIN_ANY; hq_WallKeep_flags = 0; hq_WallKeep_rng = rng; PhSubReset(); }
+                PhPush(); WallKeep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { rng = hq_WallKeep_rng; stack = hq_WallKeep_ret; PhBreak(); }
+                hq_WoodPile_fire = fire;
+                hq_WoodPile_rng = rng;
+                hq_WoodPile_stackDef = stackDef;
+                hq_WoodPile_stack = stack;
+            }
         }
         if (Ph(2))
         {
             int fire = hq_WoodPile_fire;
-            uint[] rng = hq_WoodPile_rng;
-            int stackDef = hq_WoodPile_stackDef;
             int stack = hq_WoodPile_stack;
-            if (stack < 0 && fire >= 0) stack = AroundFire(stackDef, fire, 90, 2700, 3600, 0, false, false, rng);
+            hq_WoodPile_sel2 = 0;
+            if (stack < 0 && fire >= 0) hq_WoodPile_sel2 = 1;
             hq_WoodPile_fire = fire;
-            hq_WoodPile_rng = rng;
-            hq_WoodPile_stackDef = stackDef;
             hq_WoodPile_stack = stack;
         }
-        if (Ph(3))
+        if (PhLoop(3, 100000))
         {
-            int fire = hq_WoodPile_fire;
-            uint[] rng = hq_WoodPile_rng;
-            int stackDef = hq_WoodPile_stackDef;
-            int stack = hq_WoodPile_stack;
-            if (stack < 0 && fire >= 0 && stackDef != Dn("n_logStack")) stack = AroundFire(Dn("n_logStack"), fire, 90, 2400, 3600, 0, false, false, rng);
-            hq_WoodPile_fire = fire;
-            hq_WoodPile_rng = rng;
-            hq_WoodPile_stackDef = stackDef;
-            hq_WoodPile_stack = stack;
+            if (!(hq_WoodPile_sel2 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_WoodPile_fire;
+                uint[] rng = hq_WoodPile_rng;
+                int stackDef = hq_WoodPile_stackDef;
+                int stack = hq_WoodPile_stack;
+                if (planIter == 0) { hq_AroundFire_def = stackDef; hq_AroundFire_fire = fire; hq_AroundFire_relYaw = 90; hq_AroundFire_distMin = 2700; hq_AroundFire_distMax = 3600; hq_AroundFire_flags = 0; hq_AroundFire_must = false; hq_AroundFire_offGates = false; hq_AroundFire_rng = rng; PhSubReset(); }
+                PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { rng = hq_AroundFire_rng; stack = hq_AroundFire_ret; PhBreak(); }
+                hq_WoodPile_fire = fire;
+                hq_WoodPile_rng = rng;
+                hq_WoodPile_stackDef = stackDef;
+                hq_WoodPile_stack = stack;
+            }
         }
         if (Ph(4))
         {
-            bool atEdge = hq_WoodPile_atEdge;
-            uint[] rng = hq_WoodPile_rng;
+            int fire = hq_WoodPile_fire;
+            int stackDef = hq_WoodPile_stackDef;
             int stack = hq_WoodPile_stack;
-            if (stack < 0 && !atEdge) stack = WallKeep(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, rng);
-            if (stack < 0) { hq_WoodPile_atEdge = atEdge; hq_WoodPile_rng = rng; hq_WoodPile_stack = stack; PhEnd(); return; }
-            hq_WoodPile_atEdge = atEdge;
-            hq_WoodPile_rng = rng;
+            hq_WoodPile_sel3 = 0;
+            if (stack < 0 && fire >= 0 && stackDef != Dn("n_logStack")) hq_WoodPile_sel3 = 1;
+            hq_WoodPile_fire = fire;
+            hq_WoodPile_stackDef = stackDef;
             hq_WoodPile_stack = stack;
         }
-        if (Ph(5))
+        if (PhLoop(5, 100000))
+        {
+            if (!(hq_WoodPile_sel3 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_WoodPile_fire;
+                uint[] rng = hq_WoodPile_rng;
+                int stack = hq_WoodPile_stack;
+                if (planIter == 0) { hq_AroundFire_def = Dn("n_logStack"); hq_AroundFire_fire = fire; hq_AroundFire_relYaw = 90; hq_AroundFire_distMin = 2400; hq_AroundFire_distMax = 3600; hq_AroundFire_flags = 0; hq_AroundFire_must = false; hq_AroundFire_offGates = false; hq_AroundFire_rng = rng; PhSubReset(); }
+                PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { rng = hq_AroundFire_rng; stack = hq_AroundFire_ret; PhBreak(); }
+                hq_WoodPile_fire = fire;
+                hq_WoodPile_rng = rng;
+                hq_WoodPile_stack = stack;
+            }
+        }
+        if (Ph(6))
+        {
+            bool atEdge = hq_WoodPile_atEdge;
+            int stack = hq_WoodPile_stack;
+            hq_WoodPile_sel4 = 0;
+            if (stack < 0 && !atEdge) hq_WoodPile_sel4 = 1;
+            hq_WoodPile_atEdge = atEdge;
+            hq_WoodPile_stack = stack;
+        }
+        if (PhLoop(7, 100000))
+        {
+            if (!(hq_WoodPile_sel4 == 1)) PhBreak();
+            else
+            {
+                uint[] rng = hq_WoodPile_rng;
+                int stack = hq_WoodPile_stack;
+                if (planIter == 0) { hq_WallKeep_def = Dn("n_logStack"); hq_WallKeep_mode = WM_ANY; hq_WallKeep_tx = 0; hq_WallKeep_tz = 0; hq_WallKeep_win = WIN_ANY; hq_WallKeep_flags = 0; hq_WallKeep_rng = rng; PhSubReset(); }
+                PhPush(); WallKeep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { rng = hq_WallKeep_rng; stack = hq_WallKeep_ret; PhBreak(); }
+                hq_WoodPile_rng = rng;
+                hq_WoodPile_stack = stack;
+            }
+        }
+        if (Ph(8))
         {
             uint[] rng = hq_WoodPile_rng;
             int first = hq_WoodPile_first;
             int stack = hq_WoodPile_stack;
+            if (stack < 0) { hq_WoodPile_rng = rng; hq_WoodPile_first = first; hq_WoodPile_stack = stack; PhEnd(); return; }
             if (RngChance(rng, 750) && Fit(1))
             {
                 first = nEmit;
@@ -1647,18 +2595,96 @@ public partial class MapGenUdon
     // bearing (a log) or standing (a stump); in a garden a bench is likeliest, in the wood logs and stumps.
     void FireSeats(int fire, bool wood, int k)
     {
-        if (fire < 0) return;
-        uint[] rng = SR(k);
-        int n = RngBetween(rng, 2, 3);
-        for (int s = 0, tries = 0; s < n && tries < 6 && Fit(1); tries++)
+        hq_FireSeats_fire = fire;
+        hq_FireSeats_wood = wood;
+        hq_FireSeats_k = k;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); FireSeats_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // FireSeats in phases, a step a call (autophase4); FireSeats() above runs them to the end
+    void FireSeats_Body()
+    {
+        if (Ph(0))
         {
-            int def = wood ? Pick(rng, "w_logA", 5, "n_stumpRound", 3, "n_stump", 2) : Pick(rng, "k_bench", 4, "w_logA", 3, "n_stumpRound", 3);
-            if (CountInRoom(def, pRoom) >= ScaledCap(defRoomCap[def], pRoom)) continue;
-            int rel = def == Dn("k_bench") ? 180 : (def == Dn("w_logA") ? 90 : 0);
-            // a log is a small loose thing: it keeps within a step of the fire (G25: nothing loose alone in the open)
-            if (AroundFire(def, fire, rel, 1300, def == Dn("w_logA") ? 1600 : 1900, 0, false, false, rng) >= 0) s++;
+            int fire = hq_FireSeats_fire;
+            int k = hq_FireSeats_k;
+            if (fire < 0) { hq_FireSeats_fire = fire; hq_FireSeats_k = k; PhEnd(); return; }
+            uint[] rng = SR(k);
+            int n = RngBetween(rng, 2, 3);
+            int s = 0;
+            hq_FireSeats_fire = fire;
+            hq_FireSeats_k = k;
+            hq_FireSeats_rng = rng;
+            hq_FireSeats_n = n;
+            hq_FireSeats_s = s;
+        }
+        if (PhLoop(1, 100000))
+        {
+            int n = hq_FireSeats_n;
+            int s = hq_FireSeats_s;
+            if (!PhSubActive())
+            {
+                int tries = planIter;
+                if (!(s < n && tries < 6 && Fit(1))) PhBreak();
+                else { hq_FireSeats_tries = tries; PhSubBegin(); }
+            }
+            hq_FireSeats_n = n;
+            hq_FireSeats_s = s;
+            if (PhSubActive())
+            {
+                PhPush(); FireSeats_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
     }
+    void FireSeats_L1()
+    {
+        if (Ph(0))
+        {
+            bool wood = hq_FireSeats_wood;
+            uint[] rng = hq_FireSeats_rng;
+            int def = wood ? Pick(rng, "w_logA", 5, "n_stumpRound", 3, "n_stump", 2) : Pick(rng, "k_bench", 4, "w_logA", 3, "n_stumpRound", 3);
+            if (CountInRoom(def, pRoom) >= ScaledCap(defRoomCap[def], pRoom)) { hq_FireSeats_wood = wood; hq_FireSeats_rng = rng; hq_FireSeats_def = def; PhEnd(); return; }
+            int rel = def == Dn("k_bench") ? 180 : (def == Dn("w_logA") ? 90 : 0);
+            hq_FireSeats_wood = wood;
+            hq_FireSeats_rng = rng;
+            hq_FireSeats_def = def;
+            hq_FireSeats_rel = rel;
+        }
+        // a log is a small loose thing: it keeps within a step of the fire (G25: nothing loose alone in the open)
+        if (PhLoop(1, 100000))
+        {
+            int fire = hq_FireSeats_fire;
+            uint[] rng = hq_FireSeats_rng;
+            int def = hq_FireSeats_def;
+            int rel = hq_FireSeats_rel;
+            int ht1 = 0;
+            if (planIter == 0) { hq_AroundFire_def = def; hq_AroundFire_fire = fire; hq_AroundFire_relYaw = rel; hq_AroundFire_distMin = 1300; hq_AroundFire_distMax = def == Dn("w_logA") ? 1600 : 1900; hq_AroundFire_flags = 0; hq_AroundFire_must = false; hq_AroundFire_offGates = false; hq_AroundFire_rng = rng; PhSubReset(); }
+            PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { rng = hq_AroundFire_rng; ht1 = hq_AroundFire_ret; PhBreak(); }
+            hq_FireSeats_fire = fire;
+            hq_FireSeats_rng = rng;
+            hq_FireSeats_def = def;
+            hq_FireSeats_rel = rel;
+            hq_FireSeats_ht1 = ht1;
+        }
+        if (Ph(2))
+        {
+            int s = hq_FireSeats_s;
+            int ht1 = hq_FireSeats_ht1;
+            if (ht1 >= 0)
+            {
+                s++;
+            }
+            hq_FireSeats_s = s;
+            hq_FireSeats_ht1 = ht1;
+        }
+    }
+
 
     void PlanFirepit()
     {
@@ -1666,10 +2692,17 @@ public partial class MapGenUdon
         if (Ph(0))
         {
             uint[] r = SR(1);
-            StonePaths(40, r);
             hq_PlanFirepit_r = r;
         }
         if (PhLoop(1, 100000))
+        {
+            uint[] r = hq_PlanFirepit_r;
+            if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = r; PhSubReset(); }
+            PhPush(); StonePaths_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_StonePaths_rng; PhBreak(); }
+            hq_PlanFirepit_r = r;
+        }
+        if (PhLoop(2, 100000))
         {
             uint[] r = hq_PlanFirepit_r;
             int fire = 0;
@@ -1679,56 +2712,149 @@ public partial class MapGenUdon
             hq_PlanFirepit_r = r;
             hq_PlanFirepit_fire = fire;
         }
-        if (Ph(2))
+        if (PhLoop(3, 100000))
         {
             int fire = hq_PlanFirepit_fire;
-            FireSeats(fire, false, 7);
-            uint[] r2 = SR(2);
+            if (planIter == 0) { hq_FireSeats_fire = fire; hq_FireSeats_wood = false; hq_FireSeats_k = 7; PhSubReset(); }
+            PhPush(); FireSeats_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
             hq_PlanFirepit_fire = fire;
-            hq_PlanFirepit_r2 = r2;
-        }
-        if (Ph(3))
-        {
-            int fire = hq_PlanFirepit_fire;
-            uint[] r2 = hq_PlanFirepit_r2;
-            if (RngChance(r2, 850)) WoodPile(fire, true, r2);
-            hq_PlanFirepit_fire = fire;
-            hq_PlanFirepit_r2 = r2;
         }
         if (Ph(4))
         {
+            uint[] r2 = SR(2);
+            hq_PlanFirepit_sel1 = 0;
+            if (RngChance(r2, 850)) hq_PlanFirepit_sel1 = 1;
+            hq_PlanFirepit_r2 = r2;
+        }
+        if (PhLoop(5, 100000))
+        {
+            if (!(hq_PlanFirepit_sel1 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_PlanFirepit_fire;
+                uint[] r2 = hq_PlanFirepit_r2;
+                if (planIter == 0) { hq_WoodPile_fire = fire; hq_WoodPile_atEdge = true; hq_WoodPile_rng = r2; PhSubReset(); }
+                PhPush(); WoodPile_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_WoodPile_rng; PhBreak(); }
+                hq_PlanFirepit_fire = fire;
+                hq_PlanFirepit_r2 = r2;
+            }
+        }
+        if (Ph(6))
+        {
             DoorSides(50);
         }
-        if (Ph(5))
+        if (Ph(7))
         {
             uint[] r3 = SR(3);
             int trees = TreeCount(room, r3);
             hq_PlanFirepit_r3 = r3;
             hq_PlanFirepit_trees = trees;
         }
-        if (Ph(6))
+        if (PhLoop(8, 100000))
         {
             int trees = hq_PlanFirepit_trees;
-            for (int t = 0; t < trees; t++) LawnTree(60 + t);
+            if (!PhSubActive())
+            {
+                int t = planIter;
+                if (!(t < trees)) PhBreak();
+                else { hq_PlanFirepit_t = t; PhSubBegin(); }
+            }
             hq_PlanFirepit_trees = trees;
-        }
-        if (Ph(7))
-        {
-            uint[] r3 = hq_PlanFirepit_r3;
-            if (RngChance(r3, 350)) BenchAtEdge(4);
-            ClearBans();
-            hq_PlanFirepit_r3 = r3;
-        }
-        if (Ph(8))
-        {
-            Borders(10, 6, false);
+            if (PhSubActive())
+            {
+                PhPush(); PlanFirepit_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
         if (Ph(9))
         {
+            uint[] r3 = hq_PlanFirepit_r3;
+            hq_PlanFirepit_sel2 = 0;
+            if (RngChance(r3, 350)) hq_PlanFirepit_sel2 = 1;
+            hq_PlanFirepit_r3 = r3;
+        }
+        if (PhLoop(10, 100000))
+        {
+            if (!(hq_PlanFirepit_sel2 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_BenchAtEdge_k = 4; PhSubReset(); }
+                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (Ph(11))
+        {
+            ClearBans();
+        }
+        if (PhLoop(12, 100000))
+        {
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = false; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(13))
+        {
             uint[] r5 = SR(5);
-            for (int k = 0; k < 2 && Fit(1); k++) if (!Island(r5)) break;
+            hq_PlanFirepit_r5 = r5;
+        }
+        if (PhLoop(14, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < 2 && Fit(1))) PhBreak();
+                else { hq_PlanFirepit_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanFirepit_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
     }
+    void PlanFirepit_L1()
+    {
+        int room = pRoom;
+        if (PhLoop(0, 100000))
+        {
+            int t = hq_PlanFirepit_t;
+            if (planIter == 0) { hq_LawnTree_k = 60 + t; PhSubReset(); }
+            PhPush(); LawnTree_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+    }
+
+    void PlanFirepit_L2()
+    {
+        int room = pRoom;
+        if (PhLoop(0, 100000))
+        {
+            uint[] r5 = hq_PlanFirepit_r5;
+            bool ht1 = false;
+            if (planIter == 0) { hq_Island_rng = r5; PhSubReset(); }
+            PhPush(); Island_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r5 = hq_Island_rng; ht1 = hq_Island_ret; PhBreak(); }
+            hq_PlanFirepit_r5 = r5;
+            hq_PlanFirepit_ht1 = ht1;
+        }
+        if (Ph(1))
+        {
+            bool ht1 = hq_PlanFirepit_ht1;
+            if (!ht1)
+            {
+                { hq_PlanFirepit_ht1 = ht1; phBreak = true; PhEnd(); return; }
+            }
+            hq_PlanFirepit_ht1 = ht1;
+        }
+    }
+
 
     // ============================================================================================ FOREST
     // the open edges of a forest room towards other outdoor areas: every second one is an entrance. The choice
@@ -1793,15 +2919,60 @@ public partial class MapGenUdon
     // a stand of n trees around a point: one kind, now and then a second among them
     int Stand(int cx, int cz, int n, int main, int accent, uint[] rng)
     {
-        int placed = 0;
-        for (int tries = n * 6; tries > 0 && placed < n; tries--)
+        hq_Stand_cx = cx;
+        hq_Stand_cz = cz;
+        hq_Stand_n = n;
+        hq_Stand_main = main;
+        hq_Stand_accent = accent;
+        hq_Stand_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); Stand_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_Stand_rng;
+        return hq_Stand_ret;
+    }
+
+    // Stand in phases, a step a call (autophase4); Stand() above runs them to the end
+    void Stand_Body()
+    {
+        if (Ph(0))
         {
-            int a = RngRange(rng, 360), rad = placed == 0 ? RngRange(rng, 500) : 1200 + RngRange(rng, 2000);
-            int px = cx + rad * sinTab[a] / 4096, pz = cz + rad * sinTab[(a + 90) % 360] / 4096;
-            int def = (accent >= 0 && RngChance(rng, 250)) ? accent : main;
-            if (TreeAt(def, px, pz, rng) >= 0) placed++;
+            int placed = 0;
+            hq_Stand_placed = placed;
         }
-        return placed;
+        if (PhLoop(1, 100000))
+        {
+            int cx = hq_Stand_cx;
+            int cz = hq_Stand_cz;
+            int n = hq_Stand_n;
+            int main = hq_Stand_main;
+            int accent = hq_Stand_accent;
+            uint[] rng = hq_Stand_rng;
+            int placed = hq_Stand_placed;
+            if (planIter == 0) hq_Stand_tries0 = n * 6;
+            int tries = hq_Stand_tries0 - planIter;
+            if (!(tries > 0 && placed < n)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            {
+                int a = RngRange(rng, 360), rad = placed == 0 ? RngRange(rng, 500) : 1200 + RngRange(rng, 2000);
+                int px = cx + rad * sinTab[a] / 4096, pz = cz + rad * sinTab[(a + 90) % 360] / 4096;
+                int def = (accent >= 0 && RngChance(rng, 250)) ? accent : main;
+                if (TreeAt(def, px, pz, rng) >= 0) placed++;
+            }
+            hq_Stand_cx = cx;
+            hq_Stand_cz = cz;
+            hq_Stand_n = n;
+            hq_Stand_main = main;
+            hq_Stand_accent = accent;
+            hq_Stand_rng = rng;
+            hq_Stand_placed = placed;
+        }
+        if (Ph(2))
+        {
+            int placed = hq_Stand_placed;
+            { hq_Stand_ret = placed; hq_Stand_placed = placed; PhEnd(); return; }
+            hq_Stand_placed = placed;
+        }
     }
 
     int standN;
@@ -1820,6 +2991,8 @@ public partial class MapGenUdon
             if (hub < 0) hub = roomCells[roomCellStart[room] + roomCellCount[room] / 2];
             int hubX = hub % IW * GenData.INNER_MM + 250, hubZ = hub / IW * GenData.INNER_MM + 250;
             int fire = -1, tent = -1;
+            hq_PlanForest_sel1 = 0;
+            if (camp) hq_PlanForest_sel1 = 1;
             hq_PlanForest_r = r;
             hq_PlanForest_hub = hub;
             hq_PlanForest_hubX = hubX;
@@ -1827,36 +3000,51 @@ public partial class MapGenUdon
             hq_PlanForest_fire = fire;
             hq_PlanForest_tent = tent;
         }
-        if (Ph(1))
+        // (b) the camp in its clearing: the fire in the middle, the tent facing it
+        if (PhLoop(1, 100000))
         {
-            uint[] r = hq_PlanForest_r;
-            int hub = hq_PlanForest_hub;
-            int hubX = hq_PlanForest_hubX;
-            int hubZ = hq_PlanForest_hubZ;
-            int fire = hq_PlanForest_fire;
-            if (camp)
+            if (!(hq_PlanForest_sel1 == 1)) PhBreak();
+            else
             {
-                // (b) the camp in its clearing: the fire in the middle, the tent facing it
-                fire = FireRing(7, hubX, hubZ, true, r);
-                if (fire >= 0) { hubX = emitX[fire]; hubZ = emitZ[fire]; hub = FloorDiv(hubZ, GenData.INNER_MM) * IW + FloorDiv(hubX, GenData.INNER_MM); }
+                uint[] r = hq_PlanForest_r;
+                int hubX = hq_PlanForest_hubX;
+                int hubZ = hq_PlanForest_hubZ;
+                int fire = hq_PlanForest_fire;
+                if (planIter == 0) { hq_FireRing_minClr = 7; hq_FireRing_tx = hubX; hq_FireRing_tz = hubZ; hq_FireRing_soft = true; hq_FireRing_rng = r; PhSubReset(); }
+                PhPush(); FireRing_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r = hq_FireRing_rng; fire = hq_FireRing_ret; PhBreak(); }
+                hq_PlanForest_r = r;
+                hq_PlanForest_hubX = hubX;
+                hq_PlanForest_hubZ = hubZ;
+                hq_PlanForest_fire = fire;
             }
-            hq_PlanForest_r = r;
-            hq_PlanForest_hub = hub;
-            hq_PlanForest_hubX = hubX;
-            hq_PlanForest_hubZ = hubZ;
-            hq_PlanForest_fire = fire;
         }
         if (Ph(2))
         {
-            int fire = hq_PlanForest_fire;
-            FindGates(room);
-            hq_PlanForest_sel1 = 0;
-            if (camp && fire >= 0) hq_PlanForest_sel1 = 1;
-            hq_PlanForest_fire = fire;
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int hub = hq_PlanForest_hub;
+                int hubX = hq_PlanForest_hubX;
+                int hubZ = hq_PlanForest_hubZ;
+                int fire = hq_PlanForest_fire;
+                if (fire >= 0) { hubX = emitX[fire]; hubZ = emitZ[fire]; hub = FloorDiv(hubZ, GenData.INNER_MM) * IW + FloorDiv(hubX, GenData.INNER_MM); }
+                hq_PlanForest_hub = hub;
+                hq_PlanForest_hubX = hubX;
+                hq_PlanForest_hubZ = hubZ;
+                hq_PlanForest_fire = fire;
+            }
         }
         if (Ph(3))
         {
-            if (hq_PlanForest_sel1 == 1)
+            int fire = hq_PlanForest_fire;
+            FindGates(room);
+            hq_PlanForest_sel2 = 0;
+            if (camp && fire >= 0) hq_PlanForest_sel2 = 1;
+            hq_PlanForest_fire = fire;
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanForest_sel2 == 1)
             {
                 // the tent across the fire from the way in, its door to the fire; the small tent if the large one has no room
                 uint[] r2 = SR(2);
@@ -1865,9 +3053,9 @@ public partial class MapGenUdon
                 hq_PlanForest_tentDef = tentDef;
             }
         }
-        if (PhLoop(4, 100000))
+        if (PhLoop(5, 100000))
         {
-            if (!(hq_PlanForest_sel1 == 1)) PhBreak();
+            if (!(hq_PlanForest_sel2 == 1)) PhBreak();
             else
             {
                 int fire = hq_PlanForest_fire;
@@ -1883,147 +3071,245 @@ public partial class MapGenUdon
                 hq_PlanForest_tentDef = tentDef;
             }
         }
-        if (Ph(5))
+        if (Ph(6))
         {
-            if (hq_PlanForest_sel1 == 1)
+            if (hq_PlanForest_sel2 == 1)
+            {
+                int tent = hq_PlanForest_tent;
+                int tentDef = hq_PlanForest_tentDef;
+                hq_PlanForest_sel3 = 0;
+                if (tent < 0 && tentDef != Dn("n_tentClosed")) hq_PlanForest_sel3 = 1;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_tentDef = tentDef;
+            }
+        }
+        if (PhLoop(7, 100000))
+        {
+            if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel3 == 1)) PhBreak();
+            else
             {
                 int fire = hq_PlanForest_fire;
                 int tent = hq_PlanForest_tent;
                 uint[] r2 = hq_PlanForest_r2;
-                int tentDef = hq_PlanForest_tentDef;
-                if (tent < 0 && tentDef != Dn("n_tentClosed")) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2600, 3800, EF_MANDATORY, true, true, r2);
+                if (planIter == 0) { hq_AroundFire_def = Dn("n_tentClosed"); hq_AroundFire_fire = fire; hq_AroundFire_relYaw = 180; hq_AroundFire_distMin = 2600; hq_AroundFire_distMax = 3800; hq_AroundFire_flags = EF_MANDATORY; hq_AroundFire_must = true; hq_AroundFire_offGates = true; hq_AroundFire_rng = r2; PhSubReset(); }
+                PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_AroundFire_rng; tent = hq_AroundFire_ret; PhBreak(); }
                 hq_PlanForest_fire = fire;
-                hq_PlanForest_tent = tent;
-                hq_PlanForest_r2 = r2;
-                hq_PlanForest_tentDef = tentDef;
-            }
-        }
-        if (Ph(6))
-        {
-            if (hq_PlanForest_sel1 == 1)
-            {
-                int hubX = hq_PlanForest_hubX;
-                int hubZ = hq_PlanForest_hubZ;
-                int tent = hq_PlanForest_tent;
-                uint[] r2 = hq_PlanForest_r2;
-                int tentDef = hq_PlanForest_tentDef;
-                // a narrow clearing: the tent with its back to the fence, as near the fire as the fence allows
-                if (tent < 0) tent = WallKeep(tentDef, WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, r2);
-                hq_PlanForest_hubX = hubX;
-                hq_PlanForest_hubZ = hubZ;
-                hq_PlanForest_tent = tent;
-                hq_PlanForest_r2 = r2;
-                hq_PlanForest_tentDef = tentDef;
-            }
-        }
-        if (Ph(7))
-        {
-            if (hq_PlanForest_sel1 == 1)
-            {
-                int hubX = hq_PlanForest_hubX;
-                int hubZ = hq_PlanForest_hubZ;
-                int tent = hq_PlanForest_tent;
-                uint[] r2 = hq_PlanForest_r2;
-                if (tent < 0) tent = WallKeep(Dn("n_tentClosed"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, r2);
-                hq_PlanForest_hubX = hubX;
-                hq_PlanForest_hubZ = hubZ;
                 hq_PlanForest_tent = tent;
                 hq_PlanForest_r2 = r2;
             }
         }
         if (Ph(8))
         {
-            if (hq_PlanForest_sel1 == 1)
+            if (hq_PlanForest_sel2 == 1)
             {
-                int fire = hq_PlanForest_fire;
                 int tent = hq_PlanForest_tent;
-                uint[] r2 = hq_PlanForest_r2;
-                if (tent < 0) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2300, 3800, EF_MANDATORY, true, false, r2);
-                hq_PlanForest_fire = fire;
+                // a narrow clearing: the tent with its back to the fence, as near the fire as the fence allows
+                hq_PlanForest_sel4 = 0;
+                if (tent < 0) hq_PlanForest_sel4 = 1;
                 hq_PlanForest_tent = tent;
-                hq_PlanForest_r2 = r2;
             }
         }
-        if (Ph(9))
+        if (PhLoop(9, 100000))
         {
-            if (hq_PlanForest_sel1 == 1)
-            {
-                int fire = hq_PlanForest_fire;
-                int tent = hq_PlanForest_tent;
-                uint[] r2 = hq_PlanForest_r2;
-                // a clearing too narrow for any tent (a strip of wood two cells long): a bedroll laid out by the fire,
-                // its foot to the fire, the gear beside it as beside a tent
-                if (tent < 0) tent = AroundFire(Dn("s_bedroll"), fire, 0, 1500, 2700, EF_MANDATORY, true, false, r2);
-                hq_PlanForest_fire = fire;
-                hq_PlanForest_tent = tent;
-                hq_PlanForest_r2 = r2;
-            }
-        }
-        if (Ph(10))
-        {
-            if (hq_PlanForest_sel1 == 1)
+            if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel4 == 1)) PhBreak();
+            else
             {
                 int hubX = hq_PlanForest_hubX;
                 int hubZ = hq_PlanForest_hubZ;
                 int tent = hq_PlanForest_tent;
                 uint[] r2 = hq_PlanForest_r2;
-                if (tent < 0) tent = WallKeep(Dn("s_bedroll"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, r2);
-                if (tent < 0) MandFail(1);
+                int tentDef = hq_PlanForest_tentDef;
+                if (planIter == 0) { hq_WallKeep_def = tentDef; hq_WallKeep_mode = WM_NEAR; hq_WallKeep_tx = hubX; hq_WallKeep_tz = hubZ; hq_WallKeep_win = WIN_ANY; hq_WallKeep_flags = EF_MANDATORY; hq_WallKeep_rng = r2; PhSubReset(); }
+                PhPush(); WallKeep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_WallKeep_rng; tent = hq_WallKeep_ret; PhBreak(); }
+                hq_PlanForest_hubX = hubX;
+                hq_PlanForest_hubZ = hubZ;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+                hq_PlanForest_tentDef = tentDef;
+            }
+        }
+        if (Ph(10))
+        {
+            if (hq_PlanForest_sel2 == 1)
+            {
+                int tent = hq_PlanForest_tent;
+                hq_PlanForest_sel5 = 0;
+                if (tent < 0) hq_PlanForest_sel5 = 1;
+                hq_PlanForest_tent = tent;
+            }
+        }
+        if (PhLoop(11, 100000))
+        {
+            if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel5 == 1)) PhBreak();
+            else
+            {
+                int hubX = hq_PlanForest_hubX;
+                int hubZ = hq_PlanForest_hubZ;
+                int tent = hq_PlanForest_tent;
+                uint[] r2 = hq_PlanForest_r2;
+                if (planIter == 0) { hq_WallKeep_def = Dn("n_tentClosed"); hq_WallKeep_mode = WM_NEAR; hq_WallKeep_tx = hubX; hq_WallKeep_tz = hubZ; hq_WallKeep_win = WIN_ANY; hq_WallKeep_flags = EF_MANDATORY; hq_WallKeep_rng = r2; PhSubReset(); }
+                PhPush(); WallKeep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_WallKeep_rng; tent = hq_WallKeep_ret; PhBreak(); }
                 hq_PlanForest_hubX = hubX;
                 hq_PlanForest_hubZ = hubZ;
                 hq_PlanForest_tent = tent;
                 hq_PlanForest_r2 = r2;
             }
         }
-        if (Ph(11))
-        {
-            if (hq_PlanForest_sel1 == 1)
-            {
-                int fire = hq_PlanForest_fire;
-                FireSeats(fire, true, 8);
-                uint[] rgear = SR(9);
-                hq_PlanForest_fire = fire;
-                hq_PlanForest_rgear = rgear;
-            }
-        }
         if (Ph(12))
         {
-            if (hq_PlanForest_sel1 == 1)
+            if (hq_PlanForest_sel2 == 1)
             {
-                int fire = hq_PlanForest_fire;
-                uint[] rgear = hq_PlanForest_rgear;
-                FireGear(fire, rgear);
-                hq_PlanForest_fire = fire;
-                hq_PlanForest_rgear = rgear;
+                int tent = hq_PlanForest_tent;
+                hq_PlanForest_sel6 = 0;
+                if (tent < 0) hq_PlanForest_sel6 = 1;
+                hq_PlanForest_tent = tent;
             }
         }
-        if (Ph(13))
+        if (PhLoop(13, 100000))
         {
-            int hub = hq_PlanForest_hub;
-            int fire = hq_PlanForest_fire;
-            // a piece of forest of one cell (4 x 4 m) is too small for a path of its own
-            if (camp || roomOuterCells[room] >= 2)
-                for (int g = 0; g < nGate; g++) { uint[] rg = SR(20 + g); Track(room, gateCell[g], hub, rg); }
-            hq_PlanForest_sel2 = 0;
-            if (camp && fire >= 0) hq_PlanForest_sel2 = 1;
-            hq_PlanForest_hub = hub;
-            hq_PlanForest_fire = fire;
+            if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel6 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_PlanForest_fire;
+                int tent = hq_PlanForest_tent;
+                uint[] r2 = hq_PlanForest_r2;
+                if (planIter == 0) { hq_AroundFire_def = Dn("n_tentClosed"); hq_AroundFire_fire = fire; hq_AroundFire_relYaw = 180; hq_AroundFire_distMin = 2300; hq_AroundFire_distMax = 3800; hq_AroundFire_flags = EF_MANDATORY; hq_AroundFire_must = true; hq_AroundFire_offGates = false; hq_AroundFire_rng = r2; PhSubReset(); }
+                PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_AroundFire_rng; tent = hq_AroundFire_ret; PhBreak(); }
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+            }
         }
         if (Ph(14))
         {
             if (hq_PlanForest_sel2 == 1)
             {
                 int tent = hq_PlanForest_tent;
+                // a clearing too narrow for any tent (a strip of wood two cells long): a bedroll laid out by the fire,
+                // its foot to the fire, the gear beside it as beside a tent
+                hq_PlanForest_sel7 = 0;
+                if (tent < 0) hq_PlanForest_sel7 = 1;
+                hq_PlanForest_tent = tent;
+            }
+        }
+        if (PhLoop(15, 100000))
+        {
+            if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel7 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_PlanForest_fire;
+                int tent = hq_PlanForest_tent;
+                uint[] r2 = hq_PlanForest_r2;
+                if (planIter == 0) { hq_AroundFire_def = Dn("s_bedroll"); hq_AroundFire_fire = fire; hq_AroundFire_relYaw = 0; hq_AroundFire_distMin = 1500; hq_AroundFire_distMax = 2700; hq_AroundFire_flags = EF_MANDATORY; hq_AroundFire_must = true; hq_AroundFire_offGates = false; hq_AroundFire_rng = r2; PhSubReset(); }
+                PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_AroundFire_rng; tent = hq_AroundFire_ret; PhBreak(); }
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+            }
+        }
+        if (Ph(16))
+        {
+            if (hq_PlanForest_sel2 == 1)
+            {
+                int tent = hq_PlanForest_tent;
+                hq_PlanForest_sel8 = 0;
+                if (tent < 0) hq_PlanForest_sel8 = 1;
+                hq_PlanForest_tent = tent;
+            }
+        }
+        if (PhLoop(17, 100000))
+        {
+            if (!(hq_PlanForest_sel2 == 1 && hq_PlanForest_sel8 == 1)) PhBreak();
+            else
+            {
+                int hubX = hq_PlanForest_hubX;
+                int hubZ = hq_PlanForest_hubZ;
+                int tent = hq_PlanForest_tent;
+                uint[] r2 = hq_PlanForest_r2;
+                if (planIter == 0) { hq_WallKeep_def = Dn("s_bedroll"); hq_WallKeep_mode = WM_NEAR; hq_WallKeep_tx = hubX; hq_WallKeep_tz = hubZ; hq_WallKeep_win = WIN_ANY; hq_WallKeep_flags = EF_MANDATORY; hq_WallKeep_rng = r2; PhSubReset(); }
+                PhPush(); WallKeep_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_WallKeep_rng; tent = hq_WallKeep_ret; PhBreak(); }
+                hq_PlanForest_hubX = hubX;
+                hq_PlanForest_hubZ = hubZ;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+            }
+        }
+        if (Ph(18))
+        {
+            if (hq_PlanForest_sel2 == 1)
+            {
+                int tent = hq_PlanForest_tent;
+                if (tent < 0) MandFail(1);
+                hq_PlanForest_tent = tent;
+            }
+        }
+        if (PhLoop(19, 100000))
+        {
+            if (!(hq_PlanForest_sel2 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_PlanForest_fire;
+                if (planIter == 0) { hq_FireSeats_fire = fire; hq_FireSeats_wood = true; hq_FireSeats_k = 8; PhSubReset(); }
+                PhPush(); FireSeats_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+                hq_PlanForest_fire = fire;
+            }
+        }
+        if (Ph(20))
+        {
+            if (hq_PlanForest_sel2 == 1)
+            {
+                uint[] rgear = SR(9);
+                hq_PlanForest_rgear = rgear;
+            }
+        }
+        if (PhLoop(21, 100000))
+        {
+            if (!(hq_PlanForest_sel2 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_PlanForest_fire;
+                uint[] rgear = hq_PlanForest_rgear;
+                if (planIter == 0) { hq_FireGear_fire = fire; hq_FireGear_rng = rgear; PhSubReset(); }
+                PhPush(); FireGear_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { rgear = hq_FireGear_rng; PhBreak(); }
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_rgear = rgear;
+            }
+        }
+        if (Ph(22))
+        {
+            int hub = hq_PlanForest_hub;
+            int fire = hq_PlanForest_fire;
+            // a piece of forest of one cell (4 x 4 m) is too small for a path of its own
+            if (camp || roomOuterCells[room] >= 2)
+                for (int g = 0; g < nGate; g++) { uint[] rg = SR(20 + g); Track(room, gateCell[g], hub, rg); }
+            hq_PlanForest_sel9 = 0;
+            if (camp && fire >= 0) hq_PlanForest_sel9 = 1;
+            hq_PlanForest_hub = hub;
+            hq_PlanForest_fire = fire;
+        }
+        if (Ph(23))
+        {
+            if (hq_PlanForest_sel9 == 1)
+            {
+                int tent = hq_PlanForest_tent;
                 uint[] r3 = SR(3);
-                hq_PlanForest_sel3 = 0;
-                if (tent >= 0 && Fit(2)) hq_PlanForest_sel3 = 1;
+                hq_PlanForest_sel10 = 0;
+                if (tent >= 0 && Fit(2)) hq_PlanForest_sel10 = 1;
                 hq_PlanForest_tent = tent;
                 hq_PlanForest_r3 = r3;
             }
         }
-        if (Ph(15))
+        if (Ph(24))
         {
-            if (hq_PlanForest_sel2 == 1 && hq_PlanForest_sel3 == 1)
+            if (hq_PlanForest_sel9 == 1 && hq_PlanForest_sel10 == 1)
             {
                 uint[] r3 = hq_PlanForest_r3;
                 // the gear beside the tent: a box or a chest with a barrel
@@ -2033,9 +3319,9 @@ public partial class MapGenUdon
                 hq_PlanForest_first = first;
             }
         }
-        if (Ph(16))
+        if (Ph(25))
         {
-            if (hq_PlanForest_sel2 == 1 && hq_PlanForest_sel3 == 1)
+            if (hq_PlanForest_sel9 == 1 && hq_PlanForest_sel10 == 1)
             {
                 int tent = hq_PlanForest_tent;
                 uint[] r3 = hq_PlanForest_r3;
@@ -2046,9 +3332,9 @@ public partial class MapGenUdon
                 hq_PlanForest_first = first;
             }
         }
-        if (Ph(17))
+        if (Ph(26))
         {
-            if (hq_PlanForest_sel2 == 1)
+            if (hq_PlanForest_sel9 == 1)
             {
                 int tent = hq_PlanForest_tent;
                 uint[] r3 = hq_PlanForest_r3;
@@ -2058,23 +3344,28 @@ public partial class MapGenUdon
                     if (GroupBeside(FindGrp("tools"), tent, 2, 0, r3)) Keep(first, false);
                 }
                 uint[] r4 = SR(4);
+                hq_PlanForest_sel11 = 0;
+                if (RngChance(r4, 800)) hq_PlanForest_sel11 = 1;
                 hq_PlanForest_tent = tent;
                 hq_PlanForest_r3 = r3;
                 hq_PlanForest_r4 = r4;
             }
         }
-        if (Ph(18))
+        if (PhLoop(27, 100000))
         {
-            if (hq_PlanForest_sel2 == 1)
+            if (!(hq_PlanForest_sel9 == 1 && hq_PlanForest_sel11 == 1)) PhBreak();
+            else
             {
                 int fire = hq_PlanForest_fire;
                 uint[] r4 = hq_PlanForest_r4;
-                if (RngChance(r4, 800)) WoodPile(fire, false, r4);
+                if (planIter == 0) { hq_WoodPile_fire = fire; hq_WoodPile_atEdge = false; hq_WoodPile_rng = r4; PhSubReset(); }
+                PhPush(); WoodPile_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r4 = hq_WoodPile_rng; PhBreak(); }
                 hq_PlanForest_fire = fire;
                 hq_PlanForest_r4 = r4;
             }
         }
-        if (Ph(19))
+        if (Ph(28))
         {
             int hubX = hq_PlanForest_hubX;
             int hubZ = hq_PlanForest_hubZ;
@@ -2082,7 +3373,7 @@ public partial class MapGenUdon
             hq_PlanForest_hubX = hubX;
             hq_PlanForest_hubZ = hubZ;
         }
-        if (Ph(20))
+        if (Ph(29))
         {
             // (b) trees in stands, away from the path and the clearing; open ground between the stands
             uint[] rt = SR(5);
@@ -2098,7 +3389,7 @@ public partial class MapGenUdon
             hq_PlanForest_main0 = main0;
             hq_PlanForest_left = left;
         }
-        if (PhLoop(21, 100000))
+        if (PhLoop(30, 100000))
         {
             int stands = hq_PlanForest_stands;
             int left = hq_PlanForest_left;
@@ -2118,14 +3409,17 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(22))
+        // crowns have to stay inside the fence (G31), so a stand near an edge comes out short: the trees still
+        // missing join the stands that stand, wherever a crown has the room
+        if (PhLoop(31, 100000))
         {
             uint[] rt = hq_PlanForest_rt;
             int main0 = hq_PlanForest_main0;
             int left = hq_PlanForest_left;
-            // crowns have to stay inside the fence (G31), so a stand near an edge comes out short: the trees still
-            // missing join the stands that stand, wherever a crown has the room
-            for (int tries = left * 12; tries > 0 && left > 0 && standN > 0; tries--)
+            if (planIter == 0) hq_PlanForest_tries0 = left * 12;
+            int tries = hq_PlanForest_tries0 - planIter;
+            if (!(tries > 0 && left > 0 && standN > 0)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 int s = RngRange(rt, standN), a = RngRange(rt, 360), rad = 1200 + RngRange(rt, 2400);
                 if (TreeAt(main0, standX[s] + rad * sinTab[a] / 4096, standZ[s] + rad * sinTab[(a + 90) % 360] / 4096, rt) >= 0) left--;
@@ -2135,14 +3429,14 @@ public partial class MapGenUdon
             hq_PlanForest_left = left;
         }
         // (c) undergrowth: bushes at the edge of a stand and along the fence
-        if (Ph(23))
+        if (Ph(32))
         {
             uint[] r6 = SR(6);
             int bushes = 1 + area / 28;
             hq_PlanForest_r6 = r6;
             hq_PlanForest_bushes = bushes;
         }
-        if (PhLoop(24, 100000))
+        if (PhLoop(33, 100000))
         {
             int bushes = hq_PlanForest_bushes;
             if (!PhSubActive())
@@ -2160,22 +3454,35 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(25))
+        if (Ph(34))
         {
             uint[] r7 = SR(7);
-            if (RngChance(r7, camp ? 350 : 800) && Fit(2)) DeadWood(r7);
-            // a boulder with smaller rocks beside it
+            hq_PlanForest_sel12 = 0;
+            if (RngChance(r7, camp ? 350 : 800) && Fit(2)) hq_PlanForest_sel12 = 1;
+            hq_PlanForest_r7 = r7;
         }
-        if (Ph(26))
+        if (PhLoop(35, 100000))
+        {
+            if (!(hq_PlanForest_sel12 == 1)) PhBreak();
+            else
+            {
+                uint[] r7 = hq_PlanForest_r7;
+                if (planIter == 0) { hq_DeadWood_rng = r7; PhSubReset(); }
+                PhPush(); DeadWood_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r7 = hq_DeadWood_rng; PhBreak(); }
+                hq_PlanForest_r7 = r7;
+            }
+        }
+        if (Ph(36))
         {
             uint[] r8 = SR(8);
-            hq_PlanForest_sel4 = 0;
-            if (RngChance(r8, camp ? 300 : 600) && Fit(2)) hq_PlanForest_sel4 = 1;
+            hq_PlanForest_sel13 = 0;
+            if (RngChance(r8, camp ? 300 : 600) && Fit(2)) hq_PlanForest_sel13 = 1;
             hq_PlanForest_r8 = r8;
         }
-        if (Ph(27))
+        if (Ph(37))
         {
-            if (hq_PlanForest_sel4 == 1)
+            if (hq_PlanForest_sel13 == 1)
             {
                 uint[] r8 = hq_PlanForest_r8;
                 int cell = SoftSpot(r8);
@@ -2185,9 +3492,9 @@ public partial class MapGenUdon
                 hq_PlanForest_first = first;
             }
         }
-        if (Ph(28))
+        if (Ph(38))
         {
-            if (hq_PlanForest_sel4 == 1)
+            if (hq_PlanForest_sel13 == 1)
             {
                 uint[] r8 = hq_PlanForest_r8;
                 int cell = hq_PlanForest_cell;
@@ -2197,9 +3504,9 @@ public partial class MapGenUdon
                 hq_PlanForest_rock = rock;
             }
         }
-        if (Ph(29))
+        if (Ph(39))
         {
-            if (hq_PlanForest_sel4 == 1)
+            if (hq_PlanForest_sel13 == 1)
             {
                 uint[] r8 = hq_PlanForest_r8;
                 int first = hq_PlanForest_first;
@@ -2214,14 +3521,14 @@ public partial class MapGenUdon
                 hq_PlanForest_rock = rock;
             }
         }
-        if (Ph(30))
+        if (Ph(40))
         {
             uint[] r9 = SR(9);
             int clumps = camp ? 1 : 1 + area / 50;
             hq_PlanForest_r9 = r9;
             hq_PlanForest_clumps = clumps;
         }
-        if (PhLoop(31, 100000))
+        if (PhLoop(41, 100000))
         {
             uint[] r9 = hq_PlanForest_r9;
             int clumps = hq_PlanForest_clumps;
@@ -2235,7 +3542,7 @@ public partial class MapGenUdon
             hq_PlanForest_r9 = r9;
             hq_PlanForest_clumps = clumps;
         }
-        if (Ph(32))
+        if (Ph(42))
         {
             uint[] r10 = SR(10);
             if (RngChance(r10, 600) && Fit(3))
@@ -2244,18 +3551,31 @@ public partial class MapGenUdon
                 if (GroupAt(FlowerGroup(r10), GenData.A_SOFT, RngBetween(r10, 3, Fit(5) ? 5 : 3), WM_NEAR, planHX, planHZ, 0, r10)) Keep(first, false);
             }
         }
-        if (Ph(33))
+        if (Ph(43))
         {
             uint[] r11 = SR(11);
-            if (nGate > 0 && RngChance(r11, 400) && Fit(1)) Signpost(gateCell[0], r11);
-            // fill up to the area's budget: more undergrowth at the fence, rocks and stumps on open ground (G29)
+            hq_PlanForest_sel14 = 0;
+            if (nGate > 0 && RngChance(r11, 400) && Fit(1)) hq_PlanForest_sel14 = 1;
+            hq_PlanForest_r11 = r11;
         }
-        if (Ph(34))
+        if (PhLoop(44, 100000))
+        {
+            if (!(hq_PlanForest_sel14 == 1)) PhBreak();
+            else
+            {
+                uint[] r11 = hq_PlanForest_r11;
+                if (planIter == 0) { hq_Signpost_gate = gateCell[0]; hq_Signpost_rng = r11; PhSubReset(); }
+                PhPush(); Signpost_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r11 = hq_Signpost_rng; PhBreak(); }
+                hq_PlanForest_r11 = r11;
+            }
+        }
+        if (Ph(45))
         {
             uint[] r12 = SR(12);
             hq_PlanForest_r12 = r12;
         }
-        if (PhLoop(35, 100000))
+        if (PhLoop(46, 100000))
         {
             if (!PhSubActive())
             {
@@ -2271,7 +3591,7 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(36))
+        if (Ph(47))
         {
             uint[] r13 = SR(13);
             int type = roomType[room];
@@ -2325,25 +3645,38 @@ public partial class MapGenUdon
             hq_PlanForest_accent = accent;
             hq_PlanForest_want = want;
         }
-        if (Ph(1))
+        if (PhLoop(1, 100000))
         {
             uint[] rt = hq_PlanForest_rt;
-            int left = hq_PlanForest_left;
             int sx = hq_PlanForest_sx;
             int sz = hq_PlanForest_sz;
             int kind = hq_PlanForest_kind;
             int accent = hq_PlanForest_accent;
             int want = hq_PlanForest_want;
-            int got = Stand(sx, sz, want, kind, accent, rt);
-            left -= got;
-            if (got > 0 && standN < standX.Length) { standX[standN] = sx; standZ[standN] = sz; standN++; }
+            int got = 0;
+            if (planIter == 0) { hq_Stand_cx = sx; hq_Stand_cz = sz; hq_Stand_n = want; hq_Stand_main = kind; hq_Stand_accent = accent; hq_Stand_rng = rt; PhSubReset(); }
+            PhPush(); Stand_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { rt = hq_Stand_rng; got = hq_Stand_ret; PhBreak(); }
             hq_PlanForest_rt = rt;
-            hq_PlanForest_left = left;
             hq_PlanForest_sx = sx;
             hq_PlanForest_sz = sz;
             hq_PlanForest_kind = kind;
             hq_PlanForest_accent = accent;
             hq_PlanForest_want = want;
+            hq_PlanForest_got = got;
+        }
+        if (Ph(2))
+        {
+            int left = hq_PlanForest_left;
+            int sx = hq_PlanForest_sx;
+            int sz = hq_PlanForest_sz;
+            int got = hq_PlanForest_got;
+            left -= got;
+            if (got > 0 && standN < standX.Length) { standX[standN] = sx; standZ[standN] = sz; standN++; }
+            hq_PlanForest_left = left;
+            hq_PlanForest_sx = sx;
+            hq_PlanForest_sz = sz;
+            hq_PlanForest_got = got;
         }
     }
 
@@ -2431,27 +3764,165 @@ public partial class MapGenUdon
     // entrance, turned to face the path, so whoever comes in along it reads it. None if no such spot is free.
     void Signpost(int gate, uint[] rng)
     {
-        int room = pRoom, def = Dn("s_signpost");
-        int gx = gate % IW, gz = gate / IW, a0 = RngRange(rng, 4);
-        for (int dist = 1; dist <= 4; dist++)
-            for (int dz = -dist; dz <= dist; dz++)
-                for (int dx = -dist; dx <= dist; dx++)
-                {
-                    if (Abs(dx) != dist && Abs(dz) != dist) continue;
-                    int x = gx + dx, z = gz + dz;
-                    if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
-                    int c = z * IW + x;
-                    if (innerRoom[c] != room || (tags[c] & GenData.T_PATH) != 0) continue;
-                    for (int k = 0; k < 4; k++)
-                    {
-                        int d = (a0 + k) & 3, px = x + DX[d], pz = z + DZ[d];
-                        if (px < 0 || pz < 0 || px >= IW || pz >= IH || (tags[pz * IW + px] & GenData.T_PATH) == 0 || !CanStep(x, z, d)) continue;
-                        int first = nEmit;
-                        int e = StampAt(def, room, x * GenData.INNER_MM + 250, z * GenData.INNER_MM + 250, DirYaw(d), 0, -1, H_GROUND, false);
-                        if (e >= 0 && KeepIfWalkable(room, first, false)) return;
-                    }
-                }
+        hq_Signpost_gate = gate;
+        hq_Signpost_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); Signpost_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_Signpost_rng;
     }
+
+    // Signpost in phases, a step a call (autophase4); Signpost() above runs them to the end
+    void Signpost_Body()
+    {
+        if (Ph(0))
+        {
+            int gate = hq_Signpost_gate;
+            uint[] rng = hq_Signpost_rng;
+            int room = pRoom, def = Dn("s_signpost");
+            int gx = gate % IW, gz = gate / IW, a0 = RngRange(rng, 4);
+            hq_Signpost_gate = gate;
+            hq_Signpost_rng = rng;
+            hq_Signpost_room = room;
+            hq_Signpost_def = def;
+            hq_Signpost_gx = gx;
+            hq_Signpost_gz = gz;
+            hq_Signpost_a0 = a0;
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int dist = 1 + planIter;
+                if (!(dist <= 4)) PhBreak();
+                else { hq_Signpost_dist = dist; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); Signpost_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+    }
+    void Signpost_L4()
+    {
+        if (Ph(0))
+        {
+            int room = hq_Signpost_room;
+            int def = hq_Signpost_def;
+            int a0 = hq_Signpost_a0;
+            int x = hq_Signpost_x;
+            int z = hq_Signpost_z;
+            int k = hq_Signpost_k;
+            int d = (a0 + k) & 3, px = x + DX[d], pz = z + DZ[d];
+            if (px < 0 || pz < 0 || px >= IW || pz >= IH || (tags[pz * IW + px] & GenData.T_PATH) == 0 || !CanStep(x, z, d)) { hq_Signpost_room = room; hq_Signpost_def = def; hq_Signpost_a0 = a0; hq_Signpost_x = x; hq_Signpost_z = z; PhEnd(); return; }
+            int first = nEmit;
+            int e = StampAt(def, room, x * GenData.INNER_MM + 250, z * GenData.INNER_MM + 250, DirYaw(d), 0, -1, H_GROUND, false);
+            hq_Signpost_room = room;
+            hq_Signpost_def = def;
+            hq_Signpost_a0 = a0;
+            hq_Signpost_x = x;
+            hq_Signpost_z = z;
+            hq_Signpost_first = first;
+            hq_Signpost_e = e;
+        }
+        if (Ph(1))
+        {
+            int room = hq_Signpost_room;
+            int first = hq_Signpost_first;
+            int e = hq_Signpost_e;
+            if (e >= 0 && KeepIfWalkable(room, first, false)) { hq_Signpost_room = room; hq_Signpost_first = first; hq_Signpost_e = e; phReturn = true; PhEnd(); return; }
+            hq_Signpost_room = room;
+            hq_Signpost_first = first;
+            hq_Signpost_e = e;
+        }
+    }
+
+    void Signpost_L3()
+    {
+        if (Ph(0))
+        {
+            int room = hq_Signpost_room;
+            int gx = hq_Signpost_gx;
+            int gz = hq_Signpost_gz;
+            int dist = hq_Signpost_dist;
+            int dz = hq_Signpost_dz;
+            int dx = hq_Signpost_dx;
+            if (Abs(dx) != dist && Abs(dz) != dist) { hq_Signpost_room = room; hq_Signpost_gx = gx; hq_Signpost_gz = gz; PhEnd(); return; }
+            int x = gx + dx, z = gz + dz;
+            if (x < 0 || z < 0 || x >= IW || z >= IH) { hq_Signpost_room = room; hq_Signpost_gx = gx; hq_Signpost_gz = gz; hq_Signpost_x = x; hq_Signpost_z = z; PhEnd(); return; }
+            int c = z * IW + x;
+            if (innerRoom[c] != room || (tags[c] & GenData.T_PATH) != 0) { hq_Signpost_room = room; hq_Signpost_gx = gx; hq_Signpost_gz = gz; hq_Signpost_x = x; hq_Signpost_z = z; PhEnd(); return; }
+            hq_Signpost_room = room;
+            hq_Signpost_gx = gx;
+            hq_Signpost_gz = gz;
+            hq_Signpost_x = x;
+            hq_Signpost_z = z;
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < 4)) PhBreak();
+                else { hq_Signpost_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); Signpost_L4(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { PhEnd(); return; }
+            }
+        }
+    }
+
+    void Signpost_L2()
+    {
+        if (PhLoop(0, 100000))
+        {
+            int dist = hq_Signpost_dist;
+            if (!PhSubActive())
+            {
+                if (planIter == 0) hq_Signpost_dx0 = -dist;
+                int dx = hq_Signpost_dx0 + planIter;
+                if (!(dx <= dist)) PhBreak();
+                else { hq_Signpost_dx = dx; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); Signpost_L3(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { PhEnd(); return; }
+            }
+        }
+    }
+
+    void Signpost_L1()
+    {
+        if (PhLoop(0, 100000))
+        {
+            int dist = hq_Signpost_dist;
+            if (!PhSubActive())
+            {
+                if (planIter == 0) hq_Signpost_dz0 = -dist;
+                int dz = hq_Signpost_dz0 + planIter;
+                if (!(dz <= dist)) PhBreak();
+                else { hq_Signpost_dz = dz; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); Signpost_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { PhEnd(); return; }
+            }
+        }
+    }
+
 
     // the yaw (degrees) whose front looks along direction d (0 north +z, 1 east +x, 2 south, 3 west)
     int DirYaw(int d) { return d == 0 ? 0 : (d == 1 ? 90 : (d == 2 ? 180 : 270)); }
@@ -2578,6 +4049,39 @@ public partial class MapGenUdon
     int hq_BenchAtEdge_k;
     int hq_BenchAtEdge_pot;
     uint[] hq_BenchAtEdge_r;
+    int hq_Border_added;
+    int hq_Border_back;
+    int hq_Border_before;
+    int hq_Border_cursor;
+    int hq_Border_d;
+    int hq_Border_def;
+    int hq_Border_first;
+    int hq_Border_g;
+    int hq_Border_halfAlong;
+    int hq_Border_kind;
+    int hq_Border_last;
+    int hq_Border_len;
+    int hq_Border_maxLen;
+    int hq_Border_mode;
+    int hq_Border_px;
+    int hq_Border_pz;
+    int hq_Border_ret;
+    uint[] hq_Border_rng;
+    int hq_Border_room;
+    int hq_Border_rot;
+    int hq_Border_sel1;
+    bool hq_Border_soil;
+    int hq_Border_start;
+    int hq_Border_tx;
+    int hq_Border_tz;
+    int hq_Border_yaw;
+    int hq_Borders_b;
+    int hq_Borders_ht1;
+    int hq_Borders_k0;
+    int hq_Borders_longest;
+    int hq_Borders_max;
+    uint[] hq_Borders_r;
+    bool hq_Borders_soil;
     int hq_DeadWood_cell;
     int hq_DeadWood_first;
     int hq_DeadWood_log;
@@ -2585,14 +4089,52 @@ public partial class MapGenUdon
     uint[] hq_DeadWood_rng;
     int hq_DeadWood_sel1;
     int hq_DeadWood_stump;
+    int hq_FillOne_cell;
+    int hq_FillOne_first;
+    bool hq_FillOne_forest;
+    int hq_FillOne_g;
+    int hq_FillOne_how;
+    int hq_FillOne_k;
+    int hq_FillOne_pass;
+    uint[] hq_FillOne_r;
+    int hq_FillOne_room;
+    int hq_FillOne_sel1;
+    int hq_FillOne_sel2;
+    int hq_FillOne_sel3;
+    int hq_FillOne_type;
+    int hq_FireGear_fire;
+    int hq_FireGear_first;
+    uint[] hq_FireGear_rng;
+    int hq_FireGear_sel1;
     int hq_FireRing_fire;
     int hq_FireRing_minClr;
     int hq_FireRing_ret;
     uint[] hq_FireRing_rng;
     int hq_FireRing_room;
+    int hq_FireRing_sel1;
     bool hq_FireRing_soft;
     int hq_FireRing_tx;
     int hq_FireRing_tz;
+    int hq_FireSeats_def;
+    int hq_FireSeats_fire;
+    int hq_FireSeats_ht1;
+    int hq_FireSeats_k;
+    int hq_FireSeats_n;
+    int hq_FireSeats_rel;
+    uint[] hq_FireSeats_rng;
+    int hq_FireSeats_s;
+    int hq_FireSeats_tries;
+    bool hq_FireSeats_wood;
+    int hq_FrontMarkers_c;
+    int hq_FrontMarkers_cell;
+    int hq_FrontMarkers_cx;
+    int hq_FrontMarkers_cz;
+    int hq_FrontMarkers_k0;
+    bool hq_FrontMarkers_lane;
+    int hq_FrontMarkers_n;
+    int hq_FrontMarkers_q;
+    int hq_FrontMarkers_room;
+    int hq_FrontMarkers_zone;
     int hq_Island_bush;
     int hq_Island_cell;
     int hq_Island_first;
@@ -2604,9 +4146,15 @@ public partial class MapGenUdon
     int hq_LawnTree_ret;
     int hq_LawnTree_tree;
     int hq_PlanFirepit_fire;
+    bool hq_PlanFirepit_ht1;
+    int hq_PlanFirepit_k;
     uint[] hq_PlanFirepit_r;
     uint[] hq_PlanFirepit_r2;
     uint[] hq_PlanFirepit_r3;
+    uint[] hq_PlanFirepit_r5;
+    int hq_PlanFirepit_sel1;
+    int hq_PlanFirepit_sel2;
+    int hq_PlanFirepit_t;
     int hq_PlanFirepit_trees;
     int hq_PlanForest_accent;
     int hq_PlanForest_b;
@@ -2616,6 +4164,7 @@ public partial class MapGenUdon
     int hq_PlanForest_clumps;
     int hq_PlanForest_fire;
     int hq_PlanForest_first;
+    int hq_PlanForest_got;
     int hq_PlanForest_hub;
     int hq_PlanForest_hubX;
     int hq_PlanForest_hubZ;
@@ -2625,11 +4174,13 @@ public partial class MapGenUdon
     int hq_PlanForest_main0;
     bool hq_PlanForest_ok;
     uint[] hq_PlanForest_r;
+    uint[] hq_PlanForest_r11;
     uint[] hq_PlanForest_r12;
     uint[] hq_PlanForest_r2;
     uint[] hq_PlanForest_r3;
     uint[] hq_PlanForest_r4;
     uint[] hq_PlanForest_r6;
+    uint[] hq_PlanForest_r7;
     uint[] hq_PlanForest_r8;
     uint[] hq_PlanForest_r9;
     uint[] hq_PlanForest_rgear;
@@ -2637,49 +4188,105 @@ public partial class MapGenUdon
     uint[] hq_PlanForest_rt;
     int hq_PlanForest_s;
     int hq_PlanForest_sel1;
+    int hq_PlanForest_sel10;
+    int hq_PlanForest_sel11;
+    int hq_PlanForest_sel12;
+    int hq_PlanForest_sel13;
+    int hq_PlanForest_sel14;
     int hq_PlanForest_sel2;
     int hq_PlanForest_sel3;
     int hq_PlanForest_sel4;
+    int hq_PlanForest_sel5;
+    int hq_PlanForest_sel6;
+    int hq_PlanForest_sel7;
+    int hq_PlanForest_sel8;
+    int hq_PlanForest_sel9;
     int hq_PlanForest_stands;
     int hq_PlanForest_sx;
     int hq_PlanForest_sz;
     int hq_PlanForest_tent;
     int hq_PlanForest_tentDef;
+    int hq_PlanForest_tries0;
     int hq_PlanForest_want;
     int hq_PlanGarden_cell;
     int hq_PlanGarden_first;
+    bool hq_PlanGarden_ht1;
+    int hq_PlanGarden_k;
     bool hq_PlanGarden_ok;
     uint[] hq_PlanGarden_r;
     uint[] hq_PlanGarden_r3;
     uint[] hq_PlanGarden_r4;
     uint[] hq_PlanGarden_r5;
+    uint[] hq_PlanGarden_r8;
     int hq_PlanGarden_sel1;
     int hq_PlanGarden_sel2;
     int hq_PlanGarden_sel3;
     int hq_PlanGarden_sel4;
+    int hq_PlanGarden_sel5;
+    int hq_PlanGarden_sel6;
     int hq_PlanGarden_shed;
+    int hq_PlanGarden_t;
     int hq_PlanGarden_tap;
     int hq_PlanGarden_trees;
-    uint[] hq_PlanLawn_r3;
+    int hq_PlanLane_sel1;
+    bool hq_PlanLawn_ht1;
+    int hq_PlanLawn_k;
+    uint[] hq_PlanLawn_r4;
+    int hq_PlanLawn_sel1;
     int hq_PlanPatio_first;
+    bool hq_PlanPatio_ht1;
+    int hq_PlanPatio_j;
     int hq_PlanPatio_midX;
     int hq_PlanPatio_midZ;
     bool hq_PlanPatio_ok;
     uint[] hq_PlanPatio_r;
     uint[] hq_PlanPatio_r2;
-    uint[] hq_PlanPatio_r4;
     uint[] hq_PlanPatio_r5;
+    uint[] hq_PlanPatio_r6;
     int hq_PlanPatio_room;
     int hq_PlanPatio_sel1;
+    int hq_PlanPatio_sel2;
+    int hq_PlanPatio_sel3;
     int hq_PlanPatio_set;
     int hq_PlanPatio_setDef;
+    int hq_PlanPatio_t;
     int hq_PlanPatio_trees;
     bool hq_PlanYard_diner;
     int hq_PlanYard_dx;
     int hq_PlanYard_dz;
     uint[] hq_PlanYard_r;
     uint[] hq_PlanYard_r9;
+    int hq_PlanYard_room;
     string[] hq_PlanYard_rows;
+    int hq_Signpost_a0;
+    int hq_Signpost_def;
+    int hq_Signpost_dist;
+    int hq_Signpost_dx;
+    int hq_Signpost_dx0;
+    int hq_Signpost_dz;
+    int hq_Signpost_dz0;
+    int hq_Signpost_e;
+    int hq_Signpost_first;
+    int hq_Signpost_gate;
+    int hq_Signpost_gx;
+    int hq_Signpost_gz;
+    int hq_Signpost_k;
+    uint[] hq_Signpost_rng;
+    int hq_Signpost_room;
+    int hq_Signpost_x;
+    int hq_Signpost_z;
+    int hq_Stand_accent;
+    int hq_Stand_cx;
+    int hq_Stand_cz;
+    int hq_Stand_main;
+    int hq_Stand_n;
+    int hq_Stand_placed;
+    int hq_Stand_ret;
+    uint[] hq_Stand_rng;
+    int hq_Stand_tries0;
+    int hq_StonePaths_k0;
+    uint[] hq_StonePaths_rng;
+    int hq_StonePaths_room;
     bool hq_VegPlot_alongX;
     int hq_VegPlot_c0;
     int hq_VegPlot_cell;
@@ -2695,6 +4302,10 @@ public partial class MapGenUdon
     int hq_WoodPile_fire;
     int hq_WoodPile_first;
     uint[] hq_WoodPile_rng;
+    int hq_WoodPile_sel1;
+    int hq_WoodPile_sel2;
+    int hq_WoodPile_sel3;
+    int hq_WoodPile_sel4;
     int hq_WoodPile_stack;
     int hq_WoodPile_stackDef;
 }

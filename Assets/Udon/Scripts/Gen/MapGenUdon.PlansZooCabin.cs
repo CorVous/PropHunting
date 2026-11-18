@@ -261,9 +261,12 @@ public partial class MapGenUdon
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(8, PoolLen(new string[] { "ma_vending", "ma_claw", "ms_gacha", "ck_bench", "k_bench", "ck_trash", "ck_flowers", "f_lamp", "f_hedge", "k_plant", "ms_cart", "n_planter", "hk_bench", "hk_lantern", "sk_scooter", "ck_toilets",
-            "f_stallBench", "f_stallStool", "ma_prizeWheel", "ma_tickets", "n_statueRing", "f_hedgeCurve", "k_trashcan", "hk_benchShort" })) && !PoolStep(50, new string[] { "ma_vending", "ma_claw", "ms_gacha", "ck_bench", "k_bench", "ck_trash", "ck_flowers", "f_lamp", "f_hedge", "k_plant", "ms_cart", "n_planter", "hk_bench", "hk_lantern", "sk_scooter", "ck_toilets",
-            "f_stallBench", "f_stallStool", "ma_prizeWheel", "ma_tickets", "n_statueRing", "f_hedgeCurve", "k_trashcan", "hk_benchShort" })) PhBreak();
+        if (PhLoop(8, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ma_vending", "ma_claw", "ms_gacha", "ck_bench", "k_bench", "ck_trash", "ck_flowers", "f_lamp", "f_hedge", "k_plant", "ms_cart", "n_planter", "hk_bench", "hk_lantern", "sk_scooter", "ck_toilets", "f_stallBench", "f_stallStool", "ma_prizeWheel", "ma_tickets", "n_statueRing", "f_hedgeCurve", "k_trashcan", "hk_benchShort" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
 }
     void PlanZooPlaza_L1()
     {
@@ -325,9 +328,12 @@ public partial class MapGenUdon
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(3, PoolLen(new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
-            "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" })) && !PoolStep(50, new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall",
-            "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" })) PhBreak();
+        if (PhLoop(3, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "ck_bench", "k_bench", "ck_trash", "f_lamp", "ck_flowers", "f_hedge", "n_planter", "ma_vending", "n_bush", "n_bushSmall", "ck_info", "ck_toilets", "f_hedgeCurve", "n_bushDetailed", "k_benchCushion", "n_statueBlock", "hk_bench", "hk_lantern", "f_cartHigh", "hk_benchShort" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // ============================================================================================ ENCLOSURES
@@ -429,17 +435,32 @@ public partial class MapGenUdon
             hq_PlanEnclosure_r3 = r3;
             hq_PlanEnclosure_trees = trees;
         }
-        if (Ph(7))
+        if (PhLoop(7, 100000))
         {
             int trees = hq_PlanEnclosure_trees;
-            for (int k = 0; k < trees && t != GenData.R_ENC_ARCTIC; k++) LawnTree(60 + k);
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < trees && t != GenData.R_ENC_ARCTIC)) PhBreak();
+                else { hq_PlanEnclosure_k = k; PhSubBegin(); }
+            }
+            hq_PlanEnclosure_trees = trees;
+            if (PhSubActive())
+            {
+                PhPush(); PlanEnclosure_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(8))
+        {
             uint[] r4 = SR(4);
             hq_PlanEnclosure_sel1 = 0;
             if (t != GenData.R_ENC_ARCTIC && t != GenData.R_AVIARY && RngChance(r4, 700) && Fit(2)) hq_PlanEnclosure_sel1 = 1;
-            hq_PlanEnclosure_trees = trees;
             hq_PlanEnclosure_r4 = r4;
         }
-        if (Ph(8))
+        if (Ph(9))
         {
             if (hq_PlanEnclosure_sel1 == 1)
             {
@@ -451,7 +472,7 @@ public partial class MapGenUdon
                 hq_PlanEnclosure_tr = tr;
             }
         }
-        if (Ph(9))
+        if (Ph(10))
         {
             if (hq_PlanEnclosure_sel1 == 1)
             {
@@ -464,12 +485,12 @@ public partial class MapGenUdon
                 hq_PlanEnclosure_tr = tr;
             }
         }
-        if (Ph(10))
+        if (Ph(11))
         {
             hq_PlanEnclosure_sel2 = 0;
             if (t == GenData.R_ENC_WOODS && Fit(2)) hq_PlanEnclosure_sel2 = 1;
         }
-        if (Ph(11))
+        if (Ph(12))
         {
             if (hq_PlanEnclosure_sel2 == 1)
             {
@@ -481,7 +502,7 @@ public partial class MapGenUdon
                 hq_PlanEnclosure_first = first;
             }
         }
-        if (Ph(12))
+        if (Ph(13))
         {
             if (hq_PlanEnclosure_sel2 == 1)
             {
@@ -493,7 +514,7 @@ public partial class MapGenUdon
                 hq_PlanEnclosure_st = st;
             }
         }
-        if (Ph(13))
+        if (Ph(14))
         {
             if (hq_PlanEnclosure_sel2 == 1)
             {
@@ -506,12 +527,12 @@ public partial class MapGenUdon
                 hq_PlanEnclosure_st = st;
             }
         }
-        if (Ph(14))
+        if (Ph(15))
         {
             if (t == GenData.R_AVIARY) { ClearBans(); Borders(30, 3, true); }
             else if (t == GenData.R_ENC_FARM && Fit(2)) { uint[] r6 = SR(6); int first = nEmit; if (PlaceGroup(FindGrp("hens"), room, GenData.A_OUT_OPEN, 2, 0, r6)) Keep(first, false); }
         }
-        if (PhLoop(15, 100000))
+        if (PhLoop(16, 100000))
         {
             string[] pool = hq_PlanEnclosure_pool;
             if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = pool; PhSubReset(); }
@@ -519,14 +540,46 @@ public partial class MapGenUdon
             if (fin) {  PhBreak(); }
             hq_PlanEnclosure_pool = pool;
         }
-        if (Ph(16))
+        if (Ph(17))
         {
             // and the habitat every enclosure shares: grass tussocks, small shrubs, a flat rock, a log, a stone, a stump
-            if (t != GenData.R_ENC_FARM) FillFromPool(51, new string[] { "n_grassLarge", "n_bushSmall", "s_rockFlat", "n_logLarge", "s_stoneL", "n_stump", "n_bush", "s_logSmall", "n_rockTall",
-                "s_block", "n_rockLarge", "n_bushTriangle", "n_stumpRound", "n_rockLargeB", "m_bucketWater", "g_hayBundled", "n_logStack", "n_log" });
-            else FillFromPool(51, new string[] { "p_cat", "m_sack", "n_bush", "n_stump", "k_bench" });
+            hq_PlanEnclosure_sel3 = 0;
+            if (t != GenData.R_ENC_FARM) hq_PlanEnclosure_sel3 = 1;
+            else hq_PlanEnclosure_sel3 = 2;
+        }
+        if (PhLoop(18, 100000))
+        {
+            if (!(hq_PlanEnclosure_sel3 == 1)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_FillFromPool_k0 = 51; hq_FillFromPool_pool = new string[] { "n_grassLarge", "n_bushSmall", "s_rockFlat", "n_logLarge", "s_stoneL", "n_stump", "n_bush", "s_logSmall", "n_rockTall", "s_block", "n_rockLarge", "n_bushTriangle", "n_stumpRound", "n_rockLargeB", "m_bucketWater", "g_hayBundled", "n_logStack", "n_log" }; PhSubReset(); }
+                PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
+        }
+        if (PhLoop(19, 100000))
+        {
+            if (!(hq_PlanEnclosure_sel3 == 2)) PhBreak();
+            else
+            {
+                if (planIter == 0) { hq_FillFromPool_k0 = 51; hq_FillFromPool_pool = new string[] { "p_cat", "m_sack", "n_bush", "n_stump", "k_bench" }; PhSubReset(); }
+                PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) {  PhBreak(); }
+            }
         }
     }
+    void PlanEnclosure_L1()
+    {
+        int room = pRoom, t = roomType[room];
+        if (PhLoop(0, 100000))
+        {
+            int k = hq_PlanEnclosure_k;
+            if (planIter == 0) { hq_LawnTree_k = 60 + k; PhSubReset(); }
+            PhPush(); LawnTree_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+    }
+
 
     // ============================================================================================ KEEPERS' YARD
     void PlanKeeper()
@@ -543,7 +596,7 @@ public partial class MapGenUdon
         {
             int k = planIter;
             if (!(k < hp_PlanKeeper_rows.Length)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 uint[] rk = SR(2 + k);
                 if (!RngChance(rk, k < 2 ? 850 : 550) || !Fit(2)) continue;
@@ -552,7 +605,12 @@ public partial class MapGenUdon
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(2, PoolLen(new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) && !PoolStep(50, new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" })) PhBreak();
+        if (PhLoop(2, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "gen_shed", "m_wheelbarrow", "f_cart", "f_cartHigh", "gen_trough", "w_pallet", "w_palletLoaded", "gen_tap", "gen_coop", "ms_handTruck", "s_boxLarge" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // ============================================================================================ CABIN ROOM
@@ -710,9 +768,12 @@ public partial class MapGenUdon
             hq_PlanCabinMain_first = first;
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(12, PoolLen(new string[] { "k_bookcaseClosed", "k_bookcaseWide", "hk_sled", "n_paddle", "s_chest", "k_lampSquare", "k_bench", "hk_benchShort", "s_barrel", "k_plant",
-            "q_cabinet", "k_trashcan" })) && !PoolStep(50, new string[] { "k_bookcaseClosed", "k_bookcaseWide", "hk_sled", "n_paddle", "s_chest", "k_lampSquare", "k_bench", "hk_benchShort", "s_barrel", "k_plant",
-            "q_cabinet", "k_trashcan" })) PhBreak();
+        if (PhLoop(12, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "k_bookcaseClosed", "k_bookcaseWide", "hk_sled", "n_paddle", "s_chest", "k_lampSquare", "k_bench", "hk_benchShort", "s_barrel", "k_plant", "q_cabinet", "k_trashcan" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
 }
 
     // ============================================================================================ BUNK ROOM
@@ -798,11 +859,16 @@ public partial class MapGenUdon
     void PlanPorch()
     {
         int room = pRoom, dx = 0, dz = 0;
-        if (Ph(0))
+        if (PhLoop(0, 100000))
+        {
+            if (planIter == 0) { hq_FrontMarkers_k0 = 30; PhSubReset(); }
+            PhPush(); FrontMarkers_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
+        if (Ph(1))
         {
             dx = hq_PlanPorch_dx;
             dz = hq_PlanPorch_dz;
-            FrontMarkers(30);
             MainDoor(room, out dx, out dz);
             uint[] r = SR(1);
             int first = nEmit;
@@ -811,7 +877,7 @@ public partial class MapGenUdon
             hq_PlanPorch_r = r;
             hq_PlanPorch_first = first;
         }
-        if (Ph(1))
+        if (Ph(2))
         {
             uint[] r = hq_PlanPorch_r;
             int first = hq_PlanPorch_first;
@@ -821,7 +887,7 @@ public partial class MapGenUdon
             hq_PlanPorch_first = first;
             hq_PlanPorch_r2 = r2;
         }
-        if (PhLoop(2, 100000))
+        if (PhLoop(3, 100000))
         {
             if (!PhSubActive())
             {
@@ -837,7 +903,7 @@ public partial class MapGenUdon
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(3))
+        if (Ph(4))
         {
             int first = hq_PlanPorch_first;
             uint[] r3 = SR(3);
@@ -845,7 +911,12 @@ public partial class MapGenUdon
             hq_PlanPorch_first = first;
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(4, PoolLen(new string[] { "hk_bench", "hk_benchShort", "k_recliner", "hk_sled", "hk_sledLong", "s_barrel", "n_logStack", "s_bedrollPacked", "gen_tap", "n_planter" })) && !PoolStep(50, new string[] { "hk_bench", "hk_benchShort", "k_recliner", "hk_sled", "hk_sledLong", "s_barrel", "n_logStack", "s_bedrollPacked", "gen_tap", "n_planter" })) PhBreak();
+        if (PhLoop(5, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "hk_bench", "hk_benchShort", "k_recliner", "hk_sled", "hk_sledLong", "s_barrel", "n_logStack", "s_bedrollPacked", "gen_tap", "n_planter" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
 }
     void PlanPorch_L1()
     {
@@ -922,7 +993,12 @@ public partial class MapGenUdon
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(6, PoolLen(new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) && !PoolStep(50, new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" })) PhBreak();
+        if (PhLoop(6, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = new string[] { "n_logStackLarge", "gen_shed", "s_anvil", "s_grind", "s_workbench", "m_wheelbarrow", "s_planks", "w_logs", "s_barrel", "s_shovelB", "s_logSmall" }; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // ============================================================================================ CAMPGROUND
@@ -947,9 +1023,11 @@ public partial class MapGenUdon
             if (fin) { r = hq_FireRing_rng; planA = hq_FireRing_ret; PhBreak(); }
             hq_PlanCampsite_r = r;
         }
-        if (Ph(2))
+        if (PhLoop(2, 100000))
         {
-            FireSeats(planA, false, 7);
+            if (planIter == 0) { hq_FireSeats_fire = planA; hq_FireSeats_wood = false; hq_FireSeats_k = 7; PhSubReset(); }
+            PhPush(); FireSeats_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
         }
         if (Ph(3))
         {
@@ -962,28 +1040,39 @@ public partial class MapGenUdon
         {
             if (hq_PlanCampsite_sel1 == 1)
             {
-                int fire = hq_PlanCampsite_fire;
                 uint[] r2 = SR(2);
-                if (RngChance(r2, 850)) WoodPile(fire, true, r2);
-                uint[] r3 = SR(3);
-                hq_PlanCampsite_fire = fire;
-                hq_PlanCampsite_r3 = r3;
+                hq_PlanCampsite_sel2 = 0;
+                if (RngChance(r2, 850)) hq_PlanCampsite_sel2 = 1;
+                hq_PlanCampsite_r2 = r2;
             }
         }
-        if (Ph(5))
+        if (PhLoop(5, 100000))
+        {
+            if (!(hq_PlanCampsite_sel1 == 1 && hq_PlanCampsite_sel2 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_PlanCampsite_fire;
+                uint[] r2 = hq_PlanCampsite_r2;
+                if (planIter == 0) { hq_WoodPile_fire = fire; hq_WoodPile_atEdge = true; hq_WoodPile_rng = r2; PhSubReset(); }
+                PhPush(); WoodPile_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_WoodPile_rng; PhBreak(); }
+                hq_PlanCampsite_fire = fire;
+                hq_PlanCampsite_r2 = r2;
+            }
+        }
+        if (Ph(6))
         {
             if (hq_PlanCampsite_sel1 == 1)
             {
                 int fire = hq_PlanCampsite_fire;
-                uint[] r3 = hq_PlanCampsite_r3;
+                uint[] r3 = SR(3);
                 if (Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r3, 500) ? "s_spit" : "s_fishStand"), fire, RngChance(r3, 500) ? 1 : -1, 200, 0, r3) >= 0) Keep(first, false); }
                 planR = SR(4);
                 planB = RngRange(planR, tents.Length);
                 hq_PlanCampsite_fire = fire;
-                hq_PlanCampsite_r3 = r3;
             }
         }
-        if (PhLoop(6, planA >= 0 ? 1 + AreaM2(room) / 24 : 0))
+        if (PhLoop(7, planA >= 0 ? 1 + AreaM2(room) / 24 : 0))
         {
             if (!Fit(1)) PhBreak();
             else
@@ -994,7 +1083,12 @@ public partial class MapGenUdon
             }
         }
         string[] pool = { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" };
-        if (PhLoop(7, pool.Length) && !PoolStep(50, pool)) PhBreak();
+        if (PhLoop(8, 100000))
+        {
+            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = pool; PhSubReset(); }
+            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) {  PhBreak(); }
+        }
     }
 
     // phase state of the split plans (Tools: autophase2)
@@ -1039,13 +1133,15 @@ public partial class MapGenUdon
     int hq_PlanCabinMain_sz;
     int hq_PlanCampsite_fire;
     uint[] hq_PlanCampsite_r;
-    uint[] hq_PlanCampsite_r3;
+    uint[] hq_PlanCampsite_r2;
     int hq_PlanCampsite_sel1;
+    int hq_PlanCampsite_sel2;
     string[] hq_PlanEnclosure_big;
     int hq_PlanEnclosure_cell;
     int hq_PlanEnclosure_first;
     int hq_PlanEnclosure_got;
     string hq_PlanEnclosure_grp;
+    int hq_PlanEnclosure_k;
     string[] hq_PlanEnclosure_pool;
     uint[] hq_PlanEnclosure_r;
     uint[] hq_PlanEnclosure_r3;
@@ -1053,6 +1149,7 @@ public partial class MapGenUdon
     uint[] hq_PlanEnclosure_r5;
     int hq_PlanEnclosure_sel1;
     int hq_PlanEnclosure_sel2;
+    int hq_PlanEnclosure_sel3;
     int hq_PlanEnclosure_st;
     int hq_PlanEnclosure_tr;
     int hq_PlanEnclosure_trees;
