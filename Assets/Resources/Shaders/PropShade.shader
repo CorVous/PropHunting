@@ -25,7 +25,10 @@ Shader "PropHunt/Shade"
             #include "UnityCG.cginc"
 
             fixed4 _Shade;
-            float _PipOnly;
+            // per instance (as PropLit's): shade patches are drawn in instanced batches
+            UNITY_INSTANCING_BUFFER_START(Props)
+                UNITY_DEFINE_INSTANCED_PROP(float, _PipOnly)
+            UNITY_INSTANCING_BUFFER_END(Props)
 
             struct appdata
             {
@@ -46,7 +49,7 @@ Shader "PropHunt/Shade"
                 v2f o;
                 UNITY_SETUP_INSTANCE_ID(v);
                 o.pos = UnityObjectToClipPos(v.vertex);
-                if (_PipOnly > 0.5 && abs(_ScreenParams.x - 384.0) > 0.5) o.pos = float4(2.0, 2.0, 2.0, 1.0);
+                if (UNITY_ACCESS_INSTANCED_PROP(Props, _PipOnly) > 0.5 && abs(_ScreenParams.x - 384.0) > 0.5) o.pos = float4(2.0, 2.0, 2.0, 1.0);
                 o.a = v.color.a;
                 UNITY_TRANSFER_FOG(o, o.pos);
                 return o;
