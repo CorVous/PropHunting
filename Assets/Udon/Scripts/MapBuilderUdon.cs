@@ -1461,17 +1461,18 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // Review 9: every lane was a fence corridor. A plot's side to the lane is chosen per plot: a shop, a diner or a
     // garage opens onto it (no fence), a house now and then too; otherwise a fence, a hedge or a low wall (stone in a
     // medieval village). Between plots: a fence or a hedge. The map's edge keeps its fence; a space base its rails.
-    void Boundary(bool horizontal, float ex, float ez, int cellA, int cellB)
+    // what a boundary between two cells is drawn as: 0 a fence, 1 a hedge, 2 a low wall, 3 nothing (open)
+    int BoundaryKind(int cellA, int cellB)
     {
-        if (theme == GenData.THEME_SPACE || cellA < 0 || cellB < 0) { Fence(horizontal, ex, ez); return; }
+        if (theme == GenData.THEME_SPACE || cellA < 0 || cellB < 0) return 0;
         int[] cp = gen.cellPlot;
         int pa = cp[cellA], pb = cp[cellB];
         bool laneA = IsLaneCell(cellA % W, cellA / W), laneB = IsLaneCell(cellB % W, cellB / W);
         int plot = laneA ? pb : (laneB ? pa : (pa >= 0 ? pa : pb));
-        if (plot < 0 || (pa < 0 && pb < 0)) { Fence(horizontal, ex, ez); return; }   // the wood, the release
+        if (plot < 0 || (pa < 0 && pb < 0)) return 0;   // the wood, the release
         int pz = gen.plotZone[plot];
         uint hsh = Mix(gen.seed ^ U32(plot * 977 + 41));
-        int kind;   // 0 fence, 1 hedge, 2 low wall, 3 open
+        int kind;
         if (laneA || laneB)
         {
             if (pz == GenData.Z_SHOP || pz == GenData.Z_DINER || pz == GenData.Z_GARAGE || pz == GenData.Z_FAIR) kind = 3;
@@ -1479,16 +1480,48 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (theme == GenData.THEME_MEDIEVAL && kind == 0) kind = 2;
         }
         else kind = (hsh & 8u) == 0u ? 0 : 1;
+        return kind;
+    }
+
+    // is the boundary stretch at grid edge (cx, cz) a hedge? (horizontal: between cells (cx, cz - 1) and (cx, cz);
+    // else between (cx - 1, cz) and (cx, cz))
+    bool HedgeAt(bool horizontal, int cx, int cz)
+    {
+        int ax = horizontal ? cx : cx - 1, az = horizontal ? cz - 1 : cz;
+        if (!InGrid(ax, az) || !InGrid(cx, cz)) return false;
+        if (gen.EdgeType(cx, cz, horizontal ? 2 : 3) != GenData.E_FENCE) return false;
+        return BoundaryKind(az * W + ax, cz * W + cx) == 1;
+    }
+
+    void Boundary(bool horizontal, float ex, float ez, int cellA, int cellB)
+    {
+        if (theme == GenData.THEME_SPACE || cellA < 0 || cellB < 0) { Fence(horizontal, ex, ez); return; }
+        int kind = BoundaryKind(cellA, cellB);   // 0 fence, 1 hedge, 2 low wall, 3 open
         if (kind == 3) return;   // open: no fence, no collider
         if (kind == 0) { Fence(horizontal, ex, ez); return; }
         if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.12f), new Vector3(ex + CELL + 0.1f, 6f, ez + 0.12f));
         else Collider(new Vector3(ex - 0.12f, 0, ez - 0.1f), new Vector3(ex + 0.12f, 6f, ez + CELL + 0.1f));
         if (kind == 1 && decorPrefabs != null && DECOR_HEDGE < decorPrefabs.Length && decorPrefabs[DECOR_HEDGE] != null)
         {
-            int n = hedgeLen > 0.1f ? Mathf.Clamp(Mathf.RoundToInt(CELL / hedgeLen), 2, 6) : 2;
+            // the row's ends: on unbroken where the next stretch is hedge too; short of a building (and its facade);
+            // short of whatever else begins there, a fence's post or a wall's end (Cor: the hedge ran into them)
+            int gx = Mathf.RoundToInt(ex / CELL), gz = Mathf.RoundToInt(ez / CELL);
+            float lo = 0f, hi = CELL;
+            if (horizontal)
+            {
+                if (Bld(gx - 1, gz - 1) || Bld(gx - 1, gz)) lo = 0.55f; else if (!HedgeAt(true, gx - 1, gz)) lo = 0.16f;
+                if (Bld(gx + 1, gz - 1) || Bld(gx + 1, gz)) hi = CELL - 0.55f; else if (!HedgeAt(true, gx + 1, gz)) hi = CELL - 0.16f;
+            }
+            else
+            {
+                if (Bld(gx - 1, gz - 1) || Bld(gx, gz - 1)) lo = 0.55f; else if (!HedgeAt(false, gx, gz - 1)) lo = 0.16f;
+                if (Bld(gx - 1, gz + 1) || Bld(gx, gz + 1)) hi = CELL - 0.55f; else if (!HedgeAt(false, gx, gz + 1)) hi = CELL - 0.16f;
+            }
+            float run = hi - lo;
+            int n = hedgeLen > 0.1f ? Mathf.Clamp(Mathf.RoundToInt(run / hedgeLen), 1, 6) : 2;
             for (int q = 0; q < n; q++)
             {
-                float a = CELL * (q + 0.5f) / n;
+                float a = lo + run * (q + 0.5f) / n;
                 // the hedge model is long along its own z: turned to run along the boundary (Cor: they stood across it)
                 GameObject h = PlaceDecor(DECOR_HEDGE, horizontal ? new Vector3(ex + a, 0f, ez) : new Vector3(ex, 0f, ez + a), horizontal ? 90f : 0f);
                 if (h == null) continue;
@@ -1501,15 +1534,15 @@ public class MapBuilderUdon : UdonSharpBehaviour
                     if (mr != null) hedgeLen = horizontal ? mr.bounds.size.x : mr.bounds.size.z;
                     if (hedgeLen > 0.1f)
                     {
-                        n = Mathf.Clamp(Mathf.RoundToInt(CELL / hedgeLen), 2, 6);
-                        a = CELL * 0.5f / n;
+                        n = Mathf.Clamp(Mathf.RoundToInt(run / hedgeLen), 1, 6);
+                        a = lo + run * 0.5f / n;
                         h.transform.position = (horizontal ? new Vector3(ex + a, 0f, ez) : new Vector3(ex, 0f, ez + a)) + lv;
                     }
                 }
                 if (hedgeLen > 0.1f)
                 {
                     Vector3 hs = h.transform.localScale;
-                    hs.z *= (CELL / n + 0.04f) / hedgeLen;
+                    hs.z *= (run / n + 0.02f) / hedgeLen;
                     h.transform.localScale = hs;
                 }
                 TintHedge(h);
