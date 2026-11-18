@@ -464,15 +464,23 @@ public partial class MapGenUdon
             planR = SR(1);
             StonePaths(40, planR);
             FrontMarkers(30);
+        }
+        if (Ph(1))
+        {
             DoorSides(50);
             planN = TreeCount(room, planR);
             if (planN < 1 && AreaM2(room) >= 30) planN = 1;
         }
-        if (PhLoop(1, planN)) LawnTree(60 + planIter);
-        if (Ph(2))
+        if (PhLoop(2, planN)) LawnTree(60 + planIter);
+        if (Ph(3))
         {
             if (RngChance(planR, 650)) BenchAtEdge(2);
             uint[] r3 = SR(3);
+            hq_PlanLawn_r3 = r3;
+        }
+        if (Ph(4))
+        {
+            uint[] r3 = hq_PlanLawn_r3;
             if (RngChance(r3, 350) && Fit(1))
             {
                 int first = nEmit;
@@ -480,9 +488,10 @@ public partial class MapGenUdon
             }
             // planted borders along the fences fill the rest of the budget: no lawn is left bare (G29)
             ClearBans();
+            hq_PlanLawn_r3 = r3;
         }
-        if (PhLoop(3, 6) && !BorderStep(10, planIter, true)) PhBreak();
-        if (Ph(4))
+        if (PhLoop(5, 6) && !BorderStep(10, planIter, true)) PhBreak();
+        if (Ph(6))
         {
             uint[] r4 = SR(4);
             for (int k = 0; k < 3 && Fit(1); k++) if (!Island(r4)) break;
@@ -501,25 +510,74 @@ public partial class MapGenUdon
             StonePaths(40, r);
             // the shed in a corner of a larger garden, the barrow and the sacks beside it
             int shed = -1;
-            if (cells >= 2 && RngChance(r, 650))
+            hq_PlanGarden_sel1 = 0;
+            if (cells >= 2 && RngChance(r, 650)) hq_PlanGarden_sel1 = 1;
+            hq_PlanGarden_r = r;
+            hq_PlanGarden_shed = shed;
+        }
+        if (Ph(1))
+        {
+            if (hq_PlanGarden_sel1 == 1)
             {
+                uint[] r = hq_PlanGarden_r;
+                int shed = hq_PlanGarden_shed;
                 int first = nEmit;
                 shed = WallPlace(Dn("gen_shed"), WM_CORNER, 0, 0, WIN_ANY, 0, r);
-                if (shed >= 0 && !Keep(first, false)) shed = -1;
-                if (shed >= 0)
-                {
-                    if (RngChance(r, 700) && Fit(1))
-                    {
-                        first = nEmit;
-                        if (RelBeside(Dn("m_wheelbarrow"), shed, 0, 150, 0, r) >= 0) Keep(first, false);
-                    }
-                    if (RngChance(r, 550) && Fit(2))
-                    {
-                        first = nEmit;
-                        if (GroupBeside(FindGrp("sacks"), shed, RngBetween(r, 2, 3), 0, r)) Keep(first, false);
-                    }
-                }
+                hq_PlanGarden_r = r;
+                hq_PlanGarden_shed = shed;
+                hq_PlanGarden_first = first;
             }
+        }
+        if (Ph(2))
+        {
+            if (hq_PlanGarden_sel1 == 1)
+            {
+                int shed = hq_PlanGarden_shed;
+                int first = hq_PlanGarden_first;
+                if (shed >= 0 && !Keep(first, false)) shed = -1;
+                hq_PlanGarden_sel2 = 0;
+                if (shed >= 0) hq_PlanGarden_sel2 = 1;
+                hq_PlanGarden_shed = shed;
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
+            {
+                uint[] r = hq_PlanGarden_r;
+                int shed = hq_PlanGarden_shed;
+                int first = hq_PlanGarden_first;
+                if (RngChance(r, 700) && Fit(1))
+                {
+                    first = nEmit;
+                    if (RelBeside(Dn("m_wheelbarrow"), shed, 0, 150, 0, r) >= 0) Keep(first, false);
+                }
+                hq_PlanGarden_r = r;
+                hq_PlanGarden_shed = shed;
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
+            {
+                uint[] r = hq_PlanGarden_r;
+                int shed = hq_PlanGarden_shed;
+                int first = hq_PlanGarden_first;
+                if (RngChance(r, 550) && Fit(2))
+                {
+                    first = nEmit;
+                    if (GroupBeside(FindGrp("sacks"), shed, RngBetween(r, 2, 3), 0, r)) Keep(first, false);
+                }
+                hq_PlanGarden_r = r;
+                hq_PlanGarden_shed = shed;
+                hq_PlanGarden_first = first;
+            }
+        }
+        if (Ph(5))
+        {
+            int shed = hq_PlanGarden_shed;
             // the water point: a tap at the fence, the can and the buckets beside it
             uint[] r2 = SR(2);
             int tap = -1;
@@ -535,30 +593,103 @@ public partial class MapGenUdon
             }
             // the vegetable plot: a bed of soil in the open, two rows, one crop to a row
             uint[] r3 = SR(3);
-            if (Fit(6) && RngChance(r3, 800))
+            hq_PlanGarden_sel3 = 0;
+            if (Fit(6) && RngChance(r3, 800)) hq_PlanGarden_sel3 = 1;
+            hq_PlanGarden_shed = shed;
+            hq_PlanGarden_tap = tap;
+            hq_PlanGarden_r3 = r3;
+        }
+        if (Ph(6))
+        {
+            if (hq_PlanGarden_sel3 == 1)
             {
+                uint[] r3 = hq_PlanGarden_r3;
                 int cell = OpenSpot(4, WM_ANY, 0, 0, 0, r3);
-                if (cell >= 0) VegPlot(cell, r3);
+                hq_PlanGarden_r3 = r3;
+                hq_PlanGarden_cell = cell;
             }
+        }
+        if (Ph(7))
+        {
+            if (hq_PlanGarden_sel3 == 1)
+            {
+                uint[] r3 = hq_PlanGarden_r3;
+                int cell = hq_PlanGarden_cell;
+                if (cell >= 0) VegPlot(cell, r3);
+                hq_PlanGarden_r3 = r3;
+                hq_PlanGarden_cell = cell;
+            }
+        }
+        if (Ph(8))
+        {
             // tools leaning at the fence near the water point
             uint[] r4 = SR(4);
-            if (RngChance(r4, 750) && Fit(2))
+            hq_PlanGarden_sel4 = 0;
+            if (RngChance(r4, 750) && Fit(2)) hq_PlanGarden_sel4 = 1;
+            hq_PlanGarden_r4 = r4;
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanGarden_sel4 == 1)
             {
+                int shed = hq_PlanGarden_shed;
+                uint[] r4 = hq_PlanGarden_r4;
                 int first = nEmit;
                 bool ok = shed >= 0 && GroupBeside(FindGrp("tools"), shed, RngBetween(r4, 2, 3), 0, r4);
-                if (!ok) ok = GroupAt(FindGrp("tools"), GenData.A_OUT_EDGE, RngBetween(r4, 2, 3), tap >= 0 ? WM_NEAR : WM_ANY, tap >= 0 ? emitX[tap] : 0, tap >= 0 ? emitZ[tap] : 0, 0, r4);
-                if (ok) Keep(first, false);
+                hq_PlanGarden_shed = shed;
+                hq_PlanGarden_r4 = r4;
+                hq_PlanGarden_first = first;
+                hq_PlanGarden_ok = ok;
             }
+        }
+        if (Ph(10))
+        {
+            if (hq_PlanGarden_sel4 == 1)
+            {
+                int tap = hq_PlanGarden_tap;
+                uint[] r4 = hq_PlanGarden_r4;
+                bool ok = hq_PlanGarden_ok;
+                if (!ok) ok = GroupAt(FindGrp("tools"), GenData.A_OUT_EDGE, RngBetween(r4, 2, 3), tap >= 0 ? WM_NEAR : WM_ANY, tap >= 0 ? emitX[tap] : 0, tap >= 0 ? emitZ[tap] : 0, 0, r4);
+                hq_PlanGarden_tap = tap;
+                hq_PlanGarden_r4 = r4;
+                hq_PlanGarden_ok = ok;
+            }
+        }
+        if (Ph(11))
+        {
+            if (hq_PlanGarden_sel4 == 1)
+            {
+                int first = hq_PlanGarden_first;
+                bool ok = hq_PlanGarden_ok;
+                if (ok) Keep(first, false);
+                hq_PlanGarden_first = first;
+                hq_PlanGarden_ok = ok;
+            }
+        }
+        if (Ph(12))
+        {
             DoorSides(50);
         }
-        if (Ph(1))
+        if (Ph(13))
         {
             uint[] r5 = SR(5);
             int trees = TreeCount(room, r5);
-            for (int t = 0; t < trees; t++) LawnTree(60 + t);
-            if (RngChance(r5, 450)) BenchAtEdge(6);
+            hq_PlanGarden_r5 = r5;
+            hq_PlanGarden_trees = trees;
         }
-        if (Ph(2))
+        if (Ph(14))
+        {
+            int trees = hq_PlanGarden_trees;
+            for (int t = 0; t < trees; t++) LawnTree(60 + t);
+            hq_PlanGarden_trees = trees;
+        }
+        if (Ph(15))
+        {
+            uint[] r5 = hq_PlanGarden_r5;
+            if (RngChance(r5, 450)) BenchAtEdge(6);
+            hq_PlanGarden_r5 = r5;
+        }
+        if (Ph(16))
         {
             uint[] r7 = SR(7);
             if (RngChance(r7, 500) && Fit(2))
@@ -568,9 +699,12 @@ public partial class MapGenUdon
             }
             // the beds along the fences
             ClearBans();
+        }
+        if (Ph(17))
+        {
             Borders(10, 8, true);
         }
-        if (Ph(3))
+        if (Ph(18))
         {
             uint[] r8 = SR(8);
             for (int k = 0; k < 3 && Fit(1); k++) if (!Island(r8)) break;
@@ -620,8 +754,25 @@ public partial class MapGenUdon
             FrontMarkers(30);
             uint[] r = SR(1);
             // (a) the paving: 4 x 4 m in front of the first door, or against an edge, or in the middle
-            int px0, pz0, px1, pz1;
+            int px0 = 0, pz0 = 0, px1 = 0, pz1 = 0;
             int k = roomDoorCount[room] > 0 ? 0 : -1;
+            hq_PlanPatio_room = room;
+            hq_PlanPatio_r = r;
+            hq_PlanPatio_px0 = px0;
+            hq_PlanPatio_pz0 = pz0;
+            hq_PlanPatio_px1 = px1;
+            hq_PlanPatio_pz1 = pz1;
+            hq_PlanPatio_k = k;
+        }
+        if (Ph(1))
+        {
+            int room = hq_PlanPatio_room;
+            uint[] r = hq_PlanPatio_r;
+            int px0 = hq_PlanPatio_px0;
+            int pz0 = hq_PlanPatio_pz0;
+            int px1 = hq_PlanPatio_px1;
+            int pz1 = hq_PlanPatio_pz1;
+            int k = hq_PlanPatio_k;
             if (k >= 0)
             {
                 int cell = roomDoors[roomDoorStart[room]], d = roomDoorDir[roomDoorStart[room]], o = (d + 2) & 3;
@@ -651,11 +802,61 @@ public partial class MapGenUdon
                     if (innerRoom[i] == room) { tags[i] |= GenData.T_COVERED; paved++; }
                 }
             int midX = (px0 + px1 + 1) * GenData.INNER_MM / 2, midZ = (pz0 + pz1 + 1) * GenData.INNER_MM / 2;
+            hq_PlanPatio_room = room;
+            hq_PlanPatio_r = r;
+            hq_PlanPatio_px0 = px0;
+            hq_PlanPatio_pz0 = pz0;
+            hq_PlanPatio_px1 = px1;
+            hq_PlanPatio_pz1 = pz1;
+            hq_PlanPatio_k = k;
+            hq_PlanPatio_midX = midX;
+            hq_PlanPatio_midZ = midZ;
+        }
+        if (Ph(2))
+        {
+            int room = hq_PlanPatio_room;
             for (int q = 1; q < roomDoorCount[room]; q++) { uint[] rq = SR(40 + q); StonePath(room, q, 7 + RngRange(rq, 6), rq); }
+            hq_PlanPatio_room = room;
+        }
+        if (Ph(3))
+        {
+            uint[] r = hq_PlanPatio_r;
             // (b) the table set on the paving
             int setDef = Pick(r, "k_table", 5, "r_tableRound", 5);
+            hq_PlanPatio_r = r;
+            hq_PlanPatio_setDef = setDef;
+        }
+        if (Ph(4))
+        {
+            uint[] r = hq_PlanPatio_r;
+            int midX = hq_PlanPatio_midX;
+            int midZ = hq_PlanPatio_midZ;
+            int setDef = hq_PlanPatio_setDef;
             int set = CentrePiece(setDef, 0, true, 2, 1, WM_NEAR, midX, midZ, GenData.T_COVERED, EF_MANDATORY, r);
+            hq_PlanPatio_r = r;
+            hq_PlanPatio_midX = midX;
+            hq_PlanPatio_midZ = midZ;
+            hq_PlanPatio_setDef = setDef;
+            hq_PlanPatio_set = set;
+        }
+        if (Ph(5))
+        {
+            uint[] r = hq_PlanPatio_r;
+            int midX = hq_PlanPatio_midX;
+            int midZ = hq_PlanPatio_midZ;
+            int set = hq_PlanPatio_set;
             if (set < 0) set = CentrePiece(Dn("r_tableRound"), 0, false, 1, 1, WM_NEAR, midX, midZ, 0, EF_MANDATORY, r);
+            hq_PlanPatio_r = r;
+            hq_PlanPatio_midX = midX;
+            hq_PlanPatio_midZ = midZ;
+            hq_PlanPatio_set = set;
+        }
+        if (Ph(6))
+        {
+            uint[] r = hq_PlanPatio_r;
+            int midX = hq_PlanPatio_midX;
+            int midZ = hq_PlanPatio_midZ;
+            int set = hq_PlanPatio_set;
             if (set < 0)
             {
                 // a paving too narrow beside the door's walkway for a table set: a bench against the wall by the door
@@ -664,35 +865,105 @@ public partial class MapGenUdon
             }
             // (c) loungers side by side on the paving, planters at the door, a bench against the wall
             uint[] r2 = SR(2);
-            if (RngChance(r2, 600) && Fit(2))
+            hq_PlanPatio_sel1 = 0;
+            if (RngChance(r2, 600) && Fit(2)) hq_PlanPatio_sel1 = 1;
+            hq_PlanPatio_r = r;
+            hq_PlanPatio_midX = midX;
+            hq_PlanPatio_midZ = midZ;
+            hq_PlanPatio_set = set;
+            hq_PlanPatio_r2 = r2;
+        }
+        if (Ph(7))
+        {
+            if (hq_PlanPatio_sel1 == 1)
             {
+                int midX = hq_PlanPatio_midX;
+                int midZ = hq_PlanPatio_midZ;
+                int set = hq_PlanPatio_set;
+                uint[] r2 = hq_PlanPatio_r2;
                 int first = nEmit;
                 fHost = H_FREE;
                 bool ok = GroupAt(FindGrp("loungers"), GenData.A_COVERED, 2, WM_FAR, set >= 0 ? emitX[set] : midX, set >= 0 ? emitZ[set] : midZ, 0, r2);
                 fHost = H_NONE;
-                if (ok) Keep(first, false);
+                hq_PlanPatio_midX = midX;
+                hq_PlanPatio_midZ = midZ;
+                hq_PlanPatio_set = set;
+                hq_PlanPatio_r2 = r2;
+                hq_PlanPatio_first = first;
+                hq_PlanPatio_ok = ok;
             }
+        }
+        if (Ph(8))
+        {
+            if (hq_PlanPatio_sel1 == 1)
+            {
+                int first = hq_PlanPatio_first;
+                bool ok = hq_PlanPatio_ok;
+                if (ok) Keep(first, false);
+                hq_PlanPatio_first = first;
+                hq_PlanPatio_ok = ok;
+            }
+        }
+        if (Ph(9))
+        {
             DoorSides(50);
+        }
+        if (Ph(10))
+        {
+            uint[] r2 = hq_PlanPatio_r2;
             if (RngChance(r2, 550)) BenchAtEdge(3);
             uint[] r4 = SR(4);
+            hq_PlanPatio_r2 = r2;
+            hq_PlanPatio_r4 = r4;
+        }
+        if (Ph(11))
+        {
+            int midX = hq_PlanPatio_midX;
+            int midZ = hq_PlanPatio_midZ;
+            uint[] r4 = hq_PlanPatio_r4;
             if (RngChance(r4, 500) && Fit(2))
             {
                 int first = nEmit;
                 if (GroupAt(FindGrp("pots"), GenData.A_OUT_EDGE, RngBetween(r4, 2, 3), WM_NEAR, midX, midZ, 0, r4)) Keep(first, false);
             }
             uint[] r5 = SR(5);
+            hq_PlanPatio_midX = midX;
+            hq_PlanPatio_midZ = midZ;
+            hq_PlanPatio_r4 = r4;
+            hq_PlanPatio_r5 = r5;
+        }
+        if (Ph(12))
+        {
+            uint[] r5 = hq_PlanPatio_r5;
             if (RngChance(r5, 300) && Fit(1))
             {
                 int first = nEmit;
                 FSet(Dn("s_barrel"));
                 if (FormAt(GenData.GL_ROW, 0, GenData.A_BUILDING, WM_ANY, 0, 0, 0, r5) >= 0) Keep(first, false);
             }
+            hq_PlanPatio_r5 = r5;
+        }
+        if (Ph(13))
+        {
+            int room = hq_PlanPatio_room;
+            uint[] r5 = hq_PlanPatio_r5;
             int trees = TreeCount(room, r5);
+            hq_PlanPatio_room = room;
+            hq_PlanPatio_r5 = r5;
+            hq_PlanPatio_trees = trees;
+        }
+        if (Ph(14))
+        {
+            int trees = hq_PlanPatio_trees;
             for (int t = 0; t < trees; t++) LawnTree(60 + t);
             ClearBans();
+            hq_PlanPatio_trees = trees;
+        }
+        if (Ph(15))
+        {
             Borders(10, 6, true);
         }
-        if (Ph(1))
+        if (Ph(16))
         {
             uint[] r6 = SR(6);
             for (int j = 0; j < 2 && Fit(1); j++) if (!Island(r6)) break;
@@ -793,12 +1064,23 @@ public partial class MapGenUdon
     {
         if (Ph(0))
         {
-            int room = pRoom, dx, dz;
+            int room = pRoom, dx = 0, dz = 0;
             FrontMarkers(30);
             MainDoor(room, out dx, out dz);
             bool diner = false;
             for (int k = 0; k < roomDoorCount[room]; k++) if (DoorZone(room, k) == GenData.Z_DINER) diner = true;
             uint[] r = SR(1);
+            hq_PlanYard_dx = dx;
+            hq_PlanYard_dz = dz;
+            hq_PlanYard_diner = diner;
+            hq_PlanYard_r = r;
+        }
+        if (Ph(1))
+        {
+            int dx = hq_PlanYard_dx;
+            int dz = hq_PlanYard_dz;
+            bool diner = hq_PlanYard_diner;
+            uint[] r = hq_PlanYard_r;
             if (!diner && Fit(2))
             {
                 // pallets side by side against the building beside the dock door
@@ -807,13 +1089,35 @@ public partial class MapGenUdon
                 if (FormAt(GenData.GL_ROW, 100, GenData.A_BUILDING, WM_NEAR, dx, dz, 0, r) >= 0) Keep(first, false);
             }
             string[] rows = diner ? new string[] { "crates", "barrels", "boxes", "sacks" } : new string[] { "crates", "barrels", "fuel", "boxes", "sacks" };
-            for (int k = 0; k < rows.Length; k++)
+            hq_PlanYard_dx = dx;
+            hq_PlanYard_dz = dz;
+            hq_PlanYard_diner = diner;
+            hq_PlanYard_r = r;
+            hq_PlanYard_rows = rows;
+        }
+        if (PhLoop(2, 100000))
+        {
+            int dx = hq_PlanYard_dx;
+            int dz = hq_PlanYard_dz;
+            string[] rows = hq_PlanYard_rows;
+            int k = planIter;
+            if (!(k < rows.Length)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 uint[] rk = SR(2 + k);
                 if (!RngChance(rk, k < 2 ? 800 : 500) || !Fit(2)) continue;
                 int first = nEmit;
                 if (GroupAt(FindGrp(rows[k]), GenData.A_OUT_EDGE, RngBetween(rk, 2, 3), WM_NEAR, dx, dz, 0, rk)) Keep(first, false);
             }
+            hq_PlanYard_dx = dx;
+            hq_PlanYard_dz = dz;
+            hq_PlanYard_rows = rows;
+        }
+        if (Ph(3))
+        {
+            int dx = hq_PlanYard_dx;
+            int dz = hq_PlanYard_dz;
+            bool diner = hq_PlanYard_diner;
             uint[] r8 = SR(8);
             if (!diner && RngChance(r8, 700) && Fit(1))
             {
@@ -821,6 +1125,16 @@ public partial class MapGenUdon
                 if (WallPlace(Dn("ms_handTruck"), WM_NEAR, dx, dz, WIN_ANY, 0, r8) >= 0) Keep(first, false);
             }
             uint[] r9 = SR(9);
+            hq_PlanYard_dx = dx;
+            hq_PlanYard_dz = dz;
+            hq_PlanYard_diner = diner;
+            hq_PlanYard_r9 = r9;
+        }
+        if (Ph(4))
+        {
+            int dx = hq_PlanYard_dx;
+            int dz = hq_PlanYard_dz;
+            uint[] r9 = hq_PlanYard_r9;
             if (RngChance(r9, 750) && Fit(1))
             {
                 // the waste: a dumpster at the fence or the wall near the door, else a bin
@@ -831,8 +1145,11 @@ public partial class MapGenUdon
                     if (WallPlace(Dn("k_trashcan"), WM_NEAR, dx, dz, WIN_ANY, 0, r9) >= 0) Keep(first, false);
                 }
             }
+            hq_PlanYard_dx = dx;
+            hq_PlanYard_dz = dz;
+            hq_PlanYard_r9 = r9;
         }
-        if (Ph(1))
+        if (Ph(5))
         {
             uint[] r10 = SR(10);
             if (RngChance(r10, 450) && Fit(1))
@@ -966,22 +1283,60 @@ public partial class MapGenUdon
         {
             uint[] r = SR(1);
             StonePaths(40, r);
-            int fire = FireRing(6, RoomMidX(room), RoomMidZ(room), false, r);
-            FireSeats(fire, false, 7);
-            uint[] r2 = SR(2);
-            if (RngChance(r2, 850)) WoodPile(fire, true, r2);
-            DoorSides(50);
+            hq_PlanFirepit_r = r;
         }
         if (Ph(1))
         {
-            uint[] r3 = SR(3);
-            int trees = TreeCount(room, r3);
-            for (int t = 0; t < trees; t++) LawnTree(60 + t);
-            if (RngChance(r3, 350)) BenchAtEdge(4);
-            ClearBans();
-            Borders(10, 6, false);
+            uint[] r = hq_PlanFirepit_r;
+            int fire = FireRing(6, RoomMidX(room), RoomMidZ(room), false, r);
+            hq_PlanFirepit_r = r;
+            hq_PlanFirepit_fire = fire;
         }
         if (Ph(2))
+        {
+            int fire = hq_PlanFirepit_fire;
+            FireSeats(fire, false, 7);
+            uint[] r2 = SR(2);
+            hq_PlanFirepit_fire = fire;
+            hq_PlanFirepit_r2 = r2;
+        }
+        if (Ph(3))
+        {
+            int fire = hq_PlanFirepit_fire;
+            uint[] r2 = hq_PlanFirepit_r2;
+            if (RngChance(r2, 850)) WoodPile(fire, true, r2);
+            hq_PlanFirepit_fire = fire;
+            hq_PlanFirepit_r2 = r2;
+        }
+        if (Ph(4))
+        {
+            DoorSides(50);
+        }
+        if (Ph(5))
+        {
+            uint[] r3 = SR(3);
+            int trees = TreeCount(room, r3);
+            hq_PlanFirepit_r3 = r3;
+            hq_PlanFirepit_trees = trees;
+        }
+        if (Ph(6))
+        {
+            int trees = hq_PlanFirepit_trees;
+            for (int t = 0; t < trees; t++) LawnTree(60 + t);
+            hq_PlanFirepit_trees = trees;
+        }
+        if (Ph(7))
+        {
+            uint[] r3 = hq_PlanFirepit_r3;
+            if (RngChance(r3, 350)) BenchAtEdge(4);
+            ClearBans();
+            hq_PlanFirepit_r3 = r3;
+        }
+        if (Ph(8))
+        {
+            Borders(10, 6, false);
+        }
+        if (Ph(9))
         {
             uint[] r5 = SR(5);
             for (int k = 0; k < 2 && Fit(1); k++) if (!Island(r5)) break;
@@ -1346,4 +1701,50 @@ public partial class MapGenUdon
             if (GroupBeside(FindGrp("mushrooms"), stump >= 0 ? stump : log, RngBetween(rng, 2, 3), 0, rng)) Keep(first, false);
         }
     }
+
+    // locals of the split plans, kept from one phase to the next (autophase3)
+    int hq_PlanFirepit_fire;
+    uint[] hq_PlanFirepit_r;
+    uint[] hq_PlanFirepit_r2;
+    uint[] hq_PlanFirepit_r3;
+    int hq_PlanFirepit_trees;
+    int hq_PlanGarden_cell;
+    int hq_PlanGarden_first;
+    bool hq_PlanGarden_ok;
+    uint[] hq_PlanGarden_r;
+    uint[] hq_PlanGarden_r3;
+    uint[] hq_PlanGarden_r4;
+    uint[] hq_PlanGarden_r5;
+    int hq_PlanGarden_sel1;
+    int hq_PlanGarden_sel2;
+    int hq_PlanGarden_sel3;
+    int hq_PlanGarden_sel4;
+    int hq_PlanGarden_shed;
+    int hq_PlanGarden_tap;
+    int hq_PlanGarden_trees;
+    uint[] hq_PlanLawn_r3;
+    int hq_PlanPatio_first;
+    int hq_PlanPatio_k;
+    int hq_PlanPatio_midX;
+    int hq_PlanPatio_midZ;
+    bool hq_PlanPatio_ok;
+    int hq_PlanPatio_px0;
+    int hq_PlanPatio_px1;
+    int hq_PlanPatio_pz0;
+    int hq_PlanPatio_pz1;
+    uint[] hq_PlanPatio_r;
+    uint[] hq_PlanPatio_r2;
+    uint[] hq_PlanPatio_r4;
+    uint[] hq_PlanPatio_r5;
+    int hq_PlanPatio_room;
+    int hq_PlanPatio_sel1;
+    int hq_PlanPatio_set;
+    int hq_PlanPatio_setDef;
+    int hq_PlanPatio_trees;
+    bool hq_PlanYard_diner;
+    int hq_PlanYard_dx;
+    int hq_PlanYard_dz;
+    uint[] hq_PlanYard_r;
+    uint[] hq_PlanYard_r9;
+    string[] hq_PlanYard_rows;
 }

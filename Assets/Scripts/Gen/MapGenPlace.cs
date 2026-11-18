@@ -532,6 +532,9 @@ public partial class MapGen
 
     void PhBreak() { planBroken = true; }
 
+    // a plan's `return`: the plan is over, whatever phases follow
+    void PhEnd() { planBroken = true; planPhase = 100000; }
+
     bool PlanStep(int room)
     {
         int type = roomType[room];

@@ -9,25 +9,60 @@ public partial class MapGen
         int room = pRoom, cells = roomOuterCells[room];
         if (Ph(0))
         {
-            int dx, dz;
+            int dx = 0, dz = 0;
             MainDoor(room, out dx, out dz);
             GenRng r = SR(1);
             // the prize counter by the door: the till, the prize shelves behind it, the ticket machine
             hp_PlanArcade_first = nEmit;
+            hq_PlanArcade_dx = dx;
+            hq_PlanArcade_dz = dz;
+            hq_PlanArcade_r = r;
+        }
+        if (Ph(1))
+        {
+            int dx = hq_PlanArcade_dx;
+            int dz = hq_PlanArcade_dz;
+            GenRng r = hq_PlanArcade_r;
             int till = WallPlace(Dn("ma_register"), WM_NEAR, dx, dz, WIN_ANY, EF_MANDATORY, ref r);
+            hq_PlanArcade_dx = dx;
+            hq_PlanArcade_dz = dz;
+            hq_PlanArcade_r = r;
+            hq_PlanArcade_till = till;
+        }
+        if (Ph(2))
+        {
+            int till = hq_PlanArcade_till;
             if (till < 0 || !Keep(hp_PlanArcade_first, true)) { till = -1; MandFail(1); }
+            hq_PlanArcade_till = till;
+        }
+        if (Ph(3))
+        {
+            GenRng r = hq_PlanArcade_r;
+            int till = hq_PlanArcade_till;
             if (till >= 0 && Fit(1)) { hp_PlanArcade_first = nEmit; if (RelBeside(Dn("ma_prizes"), till, r.Chance(500) ? 1 : -1, 100, 0, ref r) >= 0) Keep(hp_PlanArcade_first, false); }
             GenRng r2 = SR(2);
+            hq_PlanArcade_r = r;
+            hq_PlanArcade_till = till;
+            hq_PlanArcade_r2 = r2;
+        }
+        if (Ph(4))
+        {
+            int dx = hq_PlanArcade_dx;
+            int dz = hq_PlanArcade_dz;
+            GenRng r2 = hq_PlanArcade_r2;
             if (Fit(1)) { hp_PlanArcade_first = nEmit; if (WallPlace(Dn("ma_tickets"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r2) >= 0) Keep(hp_PlanArcade_first, false); }
             // machines along the walls, a run at a time, of different kinds
             hp_PlanArcade_wall = new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha" };
+            hq_PlanArcade_dx = dx;
+            hq_PlanArcade_dz = dz;
+            hq_PlanArcade_r2 = r2;
         }
-        if (Ph(1))
+        if (Ph(5))
         {
             hp_PlanArcade_r3 = SR(3);
             hp_PlanArcade_w0 = hp_PlanArcade_r3.Range(hp_PlanArcade_wall.Length);
         }
-        if (PhLoop(2, 100000))
+        if (PhLoop(6, 100000))
         {
             int k = planIter;
             if (!(k < 2 + cells && Fit(2))) PhBreak();
@@ -38,12 +73,12 @@ public partial class MapGen
                 if (WallRow(0, 2, WM_ANY, 0, 0, WIN_AVOID, 0, ref hp_PlanArcade_r3) >= 0) Keep(hp_PlanArcade_first, false);
             }
         }
-        if (Ph(3))
+        if (Ph(7))
         {
             // the middle: air hockey tables, and machines standing free with room round them
             hp_PlanArcade_r4 = SR(4);
         }
-        if (PhLoop(4, 100000))
+        if (PhLoop(8, 100000))
         {
             int k = planIter;
             if (!(k < 1 + cells / 2 && Fit(1))) PhBreak();
@@ -55,14 +90,14 @@ public partial class MapGen
                 if (FreePlace(Dn("ma_airHockey"), cell, hp_PlanArcade_r4.Range(2) * 90, 1, 0, H_FREE) >= 0) Keep(hp_PlanArcade_first, false);
             }
         }
-        if (Ph(5))
+        if (Ph(9))
         {
             GenRng r5 = SR(5);
             if (Fit(2)) { hp_PlanArcade_first = nEmit; if (PlaceGroup(GenData.FindGrp("plush"), room, GenData.A_WALL, 2, 0, ref r5)) Keep(hp_PlanArcade_first, false); }
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(6, PoolLen(new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
+        if (PhLoop(10, PoolLen(new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
             "k_trashcan", "ck_bench", "k_plant" })) && !PoolStep(50, new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
             "k_trashcan", "ck_bench", "k_plant" })) PhBreak();
     }
@@ -78,31 +113,54 @@ public partial class MapGen
             // the counter and the cooker along one wall (three pieces of 1.4 m are longer than a 4 m wall), the sink at another
             rowN = 2; rowDef[0] = Dn("r_counter"); rowDef[1] = Dn("r_stove");
             if (WallRow(0, 1, WM_ANY, 0, 0, WIN_ANY, EF_MANDATORY, ref r) >= 0) Keep(hp_PlanSnackbar_first, true); else MandFail(1);
-            if (Fit(1)) { hp_PlanSnackbar_first = nEmit; if (WallPlace(Dn("r_counterSink"), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0) Keep(hp_PlanSnackbar_first, false); }
+            hq_PlanSnackbar_r = r;
         }
         if (Ph(1))
+        {
+            GenRng r = hq_PlanSnackbar_r;
+            if (Fit(1)) { hp_PlanSnackbar_first = nEmit; if (WallPlace(Dn("r_counterSink"), WM_ANY, 0, 0, WIN_ANY, 0, ref r) >= 0) Keep(hp_PlanSnackbar_first, false); }
+            hq_PlanSnackbar_r = r;
+        }
+        if (Ph(2))
         {
             GenRng r2 = SR(2);
             if (Fit(1)) { hp_PlanSnackbar_first = nEmit; if (WallPlace(Dn(r2.Chance(500) ? "r_fridge" : "ms_freezers"), WM_ANY, 0, 0, WIN_ANY, 0, ref r2) >= 0) Keep(hp_PlanSnackbar_first, false); }
         }
-        if (Ph(2))
+        if (Ph(3))
         {
             GenRng r3 = SR(3);
-            if (Fit(1))
+            hq_PlanSnackbar_sel1 = 0;
+            if (Fit(1)) hq_PlanSnackbar_sel1 = 1;
+            hq_PlanSnackbar_r3 = r3;
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanSnackbar_sel1 == 1)
             {
+                GenRng r3 = hq_PlanSnackbar_r3;
                 int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r3);
                 hp_PlanSnackbar_first = nEmit;
-                if (cell >= 0 && FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(hp_PlanSnackbar_first, false);
+                hq_PlanSnackbar_r3 = r3;
+                hq_PlanSnackbar_cell = cell;
             }
         }
-        if (Ph(3))
+        if (Ph(5))
+        {
+            if (hq_PlanSnackbar_sel1 == 1)
+            {
+                int cell = hq_PlanSnackbar_cell;
+                if (cell >= 0 && FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(hp_PlanSnackbar_first, false);
+                hq_PlanSnackbar_cell = cell;
+            }
+        }
+        if (Ph(6))
         {
             GenRng r4 = SR(4);
             if (r4.Chance(600) && Fit(2)) { hp_PlanSnackbar_first = nEmit; if (PlaceGroup(GenData.FindGrp("crates"), room, GenData.A_WALL, 2, 0, ref r4)) Keep(hp_PlanSnackbar_first, false); }
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(4, PoolLen(new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) && !PoolStep(50, new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) PhBreak();
+        if (PhLoop(7, PoolLen(new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) && !PoolStep(50, new string[] { "ms_freezer", "ma_vending", "ms_dispCans", "k_trashcan", "r_stool", "ms_freezers", "r_fridge" })) PhBreak();
     }
 
     // ============================================================================================ PRIZE STORE
@@ -136,7 +194,7 @@ public partial class MapGen
     // lane, a claw machine and the prize wheel set out, benches, bins, lantern posts, flower beds, the circus tent.
     void PlanMidway()
     {
-        int room = pRoom, dx, dz;
+        int room = pRoom, dx = 0, dz = 0;
         if (Ph(0))
         {
             FrontMarkers(30);
@@ -144,7 +202,16 @@ public partial class MapGen
             GenRng r = SR(1);
             string[] stalls = { "f_stallRed", "f_stallGreen", "ck_food", "ck_drinks", "ck_info" };
             int s0 = r.Range(stalls.Length);
-            for (int k = 0; k < 2 + AreaM2(room) / 24 && Fit(1); k++)
+            hq_PlanMidway_stalls = stalls;
+            hq_PlanMidway_s0 = s0;
+        }
+        if (PhLoop(1, 100000))
+        {
+            string[] stalls = hq_PlanMidway_stalls;
+            int s0 = hq_PlanMidway_s0;
+            int k = planIter;
+            if (!(k < 2 + AreaM2(room) / 24 && Fit(1))) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 GenRng rk = SR(2 + k);
                 int first = nEmit;
@@ -153,9 +220,11 @@ public partial class MapGen
                 // a game stall's prizes beside it
                 if (GenData.defId[emitDef[st]].StartsWith("f_stall") && Fit(2)) { first = nEmit; if (GroupBeside(GenData.FindGrp(rk.Chance(500) ? "plush" : "balls"), st, 2, 0, ref rk)) Keep(first, false); }
             }
+            hq_PlanMidway_stalls = stalls;
+            hq_PlanMidway_s0 = s0;
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(1, PoolLen(new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
+        if (PhLoop(2, PoolLen(new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
             "mb_circus", "r_tableRound", "n_planter" })) && !PoolStep(50, new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
             "mb_circus", "r_tableRound", "n_planter" })) PhBreak();
 }
@@ -204,4 +273,17 @@ public partial class MapGen
     int hp_PlanSnackbar_first;
     string[] hp_PlanPrizeStore_rows;
     int hp_PlanRides_first;
+
+    // locals of the split plans, kept from one phase to the next (autophase3)
+    int hq_PlanArcade_dx;
+    int hq_PlanArcade_dz;
+    GenRng hq_PlanArcade_r;
+    GenRng hq_PlanArcade_r2;
+    int hq_PlanArcade_till;
+    int hq_PlanMidway_s0;
+    string[] hq_PlanMidway_stalls;
+    int hq_PlanSnackbar_cell;
+    GenRng hq_PlanSnackbar_r;
+    GenRng hq_PlanSnackbar_r3;
+    int hq_PlanSnackbar_sel1;
 }

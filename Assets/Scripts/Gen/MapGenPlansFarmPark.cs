@@ -11,31 +11,65 @@ public partial class MapGen
         int room = pRoom;
         if (Ph(0))
         {
-            int dx, dz;
+            int dx = 0, dz = 0;
             MainDoor(room, out dx, out dz);
             GenRng r = SR(1);
             hp_PlanFarmWork_first = nEmit;
-            hp_PlanFarmWork_wb = WallPlace(Dn("s_workbench"), WM_FAR, dx, dz, WIN_PREFER, EF_MANDATORY, ref r);
-            if (hp_PlanFarmWork_wb < 0 || !Keep(hp_PlanFarmWork_first, true)) { hp_PlanFarmWork_wb = -1; MandFail(1); }
+            hq_PlanFarmWork_dx = dx;
+            hq_PlanFarmWork_dz = dz;
+            hq_PlanFarmWork_r = r;
         }
         if (Ph(1))
         {
-            GenRng r2 = SR(2);
-            if (Fit(1))
-            {
-                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r2);
-                hp_PlanFarmWork_first = nEmit;
-                if (cell >= 0 && FreePlace(Dn("g_anvil"), cell, r2.Range(4) * 90, 1, 0, H_FREE) >= 0) Keep(hp_PlanFarmWork_first, false);
-            }
+            int dx = hq_PlanFarmWork_dx;
+            int dz = hq_PlanFarmWork_dz;
+            GenRng r = hq_PlanFarmWork_r;
+            hp_PlanFarmWork_wb = WallPlace(Dn("s_workbench"), WM_FAR, dx, dz, WIN_PREFER, EF_MANDATORY, ref r);
+            hq_PlanFarmWork_dx = dx;
+            hq_PlanFarmWork_dz = dz;
+            hq_PlanFarmWork_r = r;
         }
         if (Ph(2))
+        {
+            if (hp_PlanFarmWork_wb < 0 || !Keep(hp_PlanFarmWork_first, true)) { hp_PlanFarmWork_wb = -1; MandFail(1); }
+        }
+        if (Ph(3))
+        {
+            GenRng r2 = SR(2);
+            hq_PlanFarmWork_sel1 = 0;
+            if (Fit(1)) hq_PlanFarmWork_sel1 = 1;
+            hq_PlanFarmWork_r2 = r2;
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanFarmWork_sel1 == 1)
+            {
+                GenRng r2 = hq_PlanFarmWork_r2;
+                int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r2);
+                hp_PlanFarmWork_first = nEmit;
+                hq_PlanFarmWork_r2 = r2;
+                hq_PlanFarmWork_cell = cell;
+            }
+        }
+        if (Ph(5))
+        {
+            if (hq_PlanFarmWork_sel1 == 1)
+            {
+                GenRng r2 = hq_PlanFarmWork_r2;
+                int cell = hq_PlanFarmWork_cell;
+                if (cell >= 0 && FreePlace(Dn("g_anvil"), cell, r2.Range(4) * 90, 1, 0, H_FREE) >= 0) Keep(hp_PlanFarmWork_first, false);
+                hq_PlanFarmWork_r2 = r2;
+                hq_PlanFarmWork_cell = cell;
+            }
+        }
+        if (Ph(6))
         {
             GenRng r3 = SR(3);
             if (r3.Chance(700) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Dn("g_grindstone"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0) Keep(hp_PlanFarmWork_first, false); }
             hp_PlanFarmWork_rows = new string[] { "handtools", "smallTools", "tyres", "fuel", "boxes" };
             hp_PlanFarmWork_chance = new int[] { 950, 800, 650, 500, 400 };
         }
-        if (PhLoop(3, 100000))
+        if (PhLoop(7, 100000))
         {
             int k = planIter;
             if (!(k < hp_PlanFarmWork_rows.Length)) PhBreak();
@@ -50,24 +84,24 @@ public partial class MapGen
                 if (ok) Keep(hp_PlanFarmWork_first, false);
             }
         }
-        if (Ph(4))
+        if (Ph(8))
         {
             GenRng r9 = SR(9);
             if (r9.Chance(650) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Pick(ref r9, "c_tractorWheel", 5, "f_wheel", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r9) >= 0) Keep(hp_PlanFarmWork_first, false); }
         }
-        if (Ph(5))
+        if (Ph(9))
         {
             GenRng r10 = SR(10);
             if (r10.Chance(550) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Dn("gen_rack"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r10) >= 0) Keep(hp_PlanFarmWork_first, false); }
         }
-        if (Ph(6))
+        if (Ph(10))
         {
             GenRng r11 = SR(11);
             if (r11.Chance(400) && Fit(1)) { hp_PlanFarmWork_first = nEmit; if (WallPlace(Pick(ref r11, "w_planks", 4, "w_logs", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(hp_PlanFarmWork_first, false); }
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(7, PoolLen(new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) && !PoolStep(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) PhBreak();
+        if (PhLoop(11, PoolLen(new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) && !PoolStep(50, new string[] { "gen_toolwall", "gen_rack", "ms_handTruck", "w_planks", "w_logs", "c_tractorWheel", "f_wheel", "g_grindstone", "g_anvil", "dg_barrel" })) PhBreak();
     }
 
     // ============================================================================================ SKATE CORNER
@@ -82,62 +116,114 @@ public partial class MapGen
             int axis = RoomLongAxis(room) == 0 ? 90 : 0;
             string[] big = { "sk_halfPipe", "sk_halfPipeLow", "sk_ramp", "sk_rampRail", "sk_box", "sk_steps", "sk_rail", "sk_grind", "sk_railLow", "sk_platform" };
             int s0 = r.Range(big.Length), got = 0;
-            for (int k = 0; k < big.Length && Fit(1) && got < 3 + AreaM2(room) / 12; k++)
+            hq_PlanPlayground_r = r;
+            hq_PlanPlayground_axis = axis;
+            hq_PlanPlayground_big = big;
+            hq_PlanPlayground_s0 = s0;
+            hq_PlanPlayground_got = got;
+        }
+        if (PhLoop(1, 100000))
+        {
+            GenRng r = hq_PlanPlayground_r;
+            int axis = hq_PlanPlayground_axis;
+            string[] big = hq_PlanPlayground_big;
+            int s0 = hq_PlanPlayground_s0;
+            int got = hq_PlanPlayground_got;
+            int k = planIter;
+            if (!(k < big.Length && Fit(1) && got < 3 + AreaM2(room) / 12)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r);
-                if (cell < 0) break;
+                if (cell < 0) { PhBreak(); break; }
                 int first = nEmit;
                 if (FreePlace(Dn(big[(s0 + k) % big.Length]), cell, axis + (r.Chance(500) ? 180 : 0), 1, 0, H_FREE) >= 0 && Keep(first, false)) got++;
             }
-            if (got == 0) MandFail(1);
+            hq_PlanPlayground_r = r;
+            hq_PlanPlayground_axis = axis;
+            hq_PlanPlayground_big = big;
+            hq_PlanPlayground_s0 = s0;
+            hq_PlanPlayground_got = got;
         }
-        if (Ph(1))
+        if (Ph(2))
+        {
+            int got = hq_PlanPlayground_got;
+            if (got == 0) MandFail(1);
+            hq_PlanPlayground_got = got;
+        }
+        if (Ph(3))
         {
             GenRng r2 = SR(2);
             if (Fit(1)) { int first = nEmit; if (WallPlace(Pick(ref r2, "sk_benches", 5, "ck_bench", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r2) >= 0) Keep(first, false); }
         }
-        if (Ph(2))
+        if (Ph(4))
         {
             GenRng r3 = SR(3);
-            // the scooter and a board leaning at the fence (a loose thing never lies alone in the open)
-            for (int k = 0; k < 2 && LooseFit(1); k++)
+            hq_PlanPlayground_r3 = r3;
+        }
+        // the scooter and a board leaning at the fence (a loose thing never lies alone in the open)
+        if (PhLoop(5, 100000))
+        {
+            GenRng r3 = hq_PlanPlayground_r3;
+            int k = planIter;
+            if (!(k < 2 && LooseFit(1))) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 int first = nEmit;
                 if (WallPlace(Dn(k == 0 ? "sk_scooter" : "sk_board"), WM_ANY, 0, 0, WIN_ANY, 0, ref r3) >= 0 && Keep(first, false)) MarkLoose(first);
             }
+            hq_PlanPlayground_r3 = r3;
         }
-        if (Ph(3))
+        if (Ph(6))
         {
             GenRng r4 = SR(4);
             if (r4.Chance(700) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_trash"), WM_ANY, 0, 0, WIN_ANY, 0, ref r4) >= 0) Keep(first, false); }
         }
-        if (Ph(4))
+        if (Ph(7))
         {
             GenRng r5 = SR(5);
             if (Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("shrubs"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r5)) Keep(first, false); }
         }
-        if (Ph(5))
+        if (Ph(8))
         {
             GenRng r6 = SR(6);
-            if (r6.Chance(600) && Fit(1))
+            hq_PlanPlayground_sel1 = 0;
+            if (r6.Chance(600) && Fit(1)) hq_PlanPlayground_sel1 = 1;
+            hq_PlanPlayground_r6 = r6;
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanPlayground_sel1 == 1)
             {
+                GenRng r6 = hq_PlanPlayground_r6;
                 int cell = OpenSpot(1, WM_ANY, 0, 0, 0, ref r6);
                 int first = nEmit;
-                if (cell >= 0 && FreePlace(Dn("f_lamp"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+                hq_PlanPlayground_r6 = r6;
+                hq_PlanPlayground_cell = cell;
+                hq_PlanPlayground_first = first;
             }
-            // the second seat, a drinks kiosk at the fence, cones set out for tricks, pots by the bench, planting
         }
-        if (Ph(6))
+        if (Ph(10))
+        {
+            if (hq_PlanPlayground_sel1 == 1)
+            {
+                int cell = hq_PlanPlayground_cell;
+                int first = hq_PlanPlayground_first;
+                if (cell >= 0 && FreePlace(Dn("f_lamp"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+                hq_PlanPlayground_cell = cell;
+                hq_PlanPlayground_first = first;
+            }
+        }
+        if (Ph(11))
         {
             GenRng r7 = SR(7);
             if (Fit(1)) { int first = nEmit; if (WallPlace(Dn(r7.Chance(500) ? "k_bench" : "ck_bench"), WM_ANY, 0, 0, WIN_ANY, 0, ref r7) >= 0) Keep(first, false); }
         }
-        if (Ph(7))
+        if (Ph(12))
         {
             GenRng r8 = SR(8);
             if (r8.Chance(450) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_drinks"), WM_ANY, 0, 0, WIN_ANY, 0, ref r8) >= 0) Keep(first, false); }
         }
-        if (Ph(8))
+        if (Ph(13))
         {
             GenRng r9 = SR(9);
             if (r9.Chance(600) && Fit(2))
@@ -147,18 +233,24 @@ public partial class MapGen
                 if (FormAt(GenData.GL_ROW, 500, GenData.A_OUT_OPEN, WM_ANY, 0, 0, 0, ref r9) >= 0) Keep(first, false);
             }
         }
-        if (Ph(9))
+        if (Ph(14))
         {
             GenRng r10 = SR(10);
             if (r10.Chance(500) && Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("pots"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r10)) Keep(first, false); }
             // revision 11: a pallet and a plank left by the ramps (things the skaters build with)
         }
-        if (Ph(10))
+        if (Ph(15))
         {
             GenRng r11 = SR(11);
             if (r11.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("sk_pallet"), WM_ANY, 0, 0, WIN_ANY, 0, ref r11) >= 0) Keep(first, false); }
+        }
+        if (Ph(16))
+        {
             FillFromPool(50, new string[] { "sk_benches", "ck_bench", "k_bench", "ck_trash", "c_cone", "f_lamp", "sk_pallet", "ck_drinks", "n_bush", "sk_railLow", "sk_grind", "hk_benchShort", "hk_lantern", "n_planter" });
             ClearBans();
+        }
+        if (Ph(17))
+        {
             Borders(30, 3, true);
         }
     }
@@ -169,42 +261,86 @@ public partial class MapGen
     void PlanPond()
     {
         int room = pRoom;
-        // the water: every cell of the area at least 1.5 m from its edge
-        int water = 0, cx = 0, cz = 0;
-        for (int k = roomCellStart[room]; k < roomCellStart[room] + roomCellCount[room]; k++)
+        if (Ph(0))
         {
-            int i = roomCells[k], x = i % IW, z = i / IW;
-            bool inner = true;
-            for (int dz = -3; dz <= 3 && inner; dz++)
-                for (int dx = -3; dx <= 3 && inner; dx++)
-                {
-                    int jx = x + dx, jz = z + dz;
-                    if (jx < 0 || jz < 0 || jx >= IW || jz >= IH || innerRoom[jz * IW + jx] != room) inner = false;
-                }
-            if (!inner || (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR)) != 0) continue;
-            tags[i] |= GenData.T_WATER; water++; cx += x; cz += z;
+            // the water: every cell of the area at least 1.5 m from its edge
+            int water = 0, cx = 0, cz = 0;
+            for (int k = roomCellStart[room]; k < roomCellStart[room] + roomCellCount[room]; k++)
+            {
+                int i = roomCells[k], x = i % IW, z = i / IW;
+                bool inner = true;
+                for (int dz = -3; dz <= 3 && inner; dz++)
+                    for (int dx = -3; dx <= 3 && inner; dx++)
+                    {
+                        int jx = x + dx, jz = z + dz;
+                        if (jx < 0 || jz < 0 || jx >= IW || jz >= IH || innerRoom[jz * IW + jx] != room) inner = false;
+                    }
+                if (!inner || (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR)) != 0) continue;
+                tags[i] |= GenData.T_WATER; water++; cx += x; cz += z;
+            }
+            if (water == 0) { MandFail(1); PondBank(room, RoomMidX(room), RoomMidZ(room)); { PhEnd(); return; } }
+            int wx = cx * GenData.INNER_MM / water + 250, wz = cz * GenData.INNER_MM / water + 250;
+            // on the water first: the footbridge, the ducks, the lilies
+            GenRng r = SR(1);
+            hq_PlanPond_water = water;
+            hq_PlanPond_wx = wx;
+            hq_PlanPond_wz = wz;
         }
-        if (water == 0) { MandFail(1); PondBank(room, RoomMidX(room), RoomMidZ(room)); return; }
-        int wx = cx * GenData.INNER_MM / water + 250, wz = cz * GenData.INNER_MM / water + 250;
-        // on the water first: the footbridge, the ducks, the lilies
-        GenRng r = SR(1);
-        if (water >= 12 && Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            if (FreePlaceAt(Dn("n_footbridge"), wx, wz, RoomLongAxis(room) == 0 ? 0 : 90, 0, 0, H_GROUND) >= 0) Keep(first, false);
+            int water = hq_PlanPond_water;
+            int wx = hq_PlanPond_wx;
+            int wz = hq_PlanPond_wz;
+            if (water >= 12 && Fit(1))
+            {
+                int first = nEmit;
+                if (FreePlaceAt(Dn("n_footbridge"), wx, wz, RoomLongAxis(room) == 0 ? 0 : 90, 0, 0, H_GROUND) >= 0) Keep(first, false);
+            }
+            GenRng r2 = SR(2);
+            hq_PlanPond_water = water;
+            hq_PlanPond_wx = wx;
+            hq_PlanPond_wz = wz;
+            hq_PlanPond_r2 = r2;
         }
-        GenRng r2 = SR(2);
-        if (Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("ducks"), GenData.A_OUT_OPEN, r2.Between(2, 4), WM_NEAR, wx, wz, 0, ref r2)) Keep(first, false); }
-        GenRng r3 = SR(3);
-        for (int k = 0; k < 2 && Fit(1); k++)
+        if (Ph(2))
         {
-            int first = nEmit;
-            if (GroupAt(GenData.FindGrp("lilies"), GenData.A_OUT_OPEN, 3, WM_NEAR, wx + (k == 0 ? 900 : -900), wz, 0, ref r3)) Keep(first, false);
+            int wx = hq_PlanPond_wx;
+            int wz = hq_PlanPond_wz;
+            GenRng r2 = hq_PlanPond_r2;
+            if (Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("ducks"), GenData.A_OUT_OPEN, r2.Between(2, 4), WM_NEAR, wx, wz, 0, ref r2)) Keep(first, false); }
+            GenRng r3 = SR(3);
+            hq_PlanPond_wx = wx;
+            hq_PlanPond_wz = wz;
+            hq_PlanPond_r2 = r2;
+            hq_PlanPond_r3 = r3;
         }
-        // then nothing else stands on the water
-        for (int k = roomCellStart[room]; k < roomCellStart[room] + roomCellCount[room]; k++)
-            if ((tags[roomCells[k]] & GenData.T_WATER) != 0) tags[roomCells[k]] |= GenData.T_NO_SPAWN;
-        PondBank(room, wx, wz);
+        if (PhLoop(3, 100000))
+        {
+            int wx = hq_PlanPond_wx;
+            int wz = hq_PlanPond_wz;
+            GenRng r3 = hq_PlanPond_r3;
+            int k = planIter;
+            if (!(k < 2 && Fit(1))) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            {
+                int first = nEmit;
+                if (GroupAt(GenData.FindGrp("lilies"), GenData.A_OUT_OPEN, 3, WM_NEAR, wx + (k == 0 ? 900 : -900), wz, 0, ref r3)) Keep(first, false);
+            }
+            hq_PlanPond_wx = wx;
+            hq_PlanPond_wz = wz;
+            hq_PlanPond_r3 = r3;
+        }
+        if (Ph(4))
+        {
+            int wx = hq_PlanPond_wx;
+            int wz = hq_PlanPond_wz;
+            // then nothing else stands on the water
+            for (int k = roomCellStart[room]; k < roomCellStart[room] + roomCellCount[room]; k++)
+                if ((tags[roomCells[k]] & GenData.T_WATER) != 0) tags[roomCells[k]] |= GenData.T_NO_SPAWN;
+            PondBank(room, wx, wz);
+            hq_PlanPond_wx = wx;
+            hq_PlanPond_wz = wz;
+        }
     }
 
     void PondBank(int room, int wx, int wz)
@@ -279,7 +415,18 @@ public partial class MapGen
             GenRng r = SR(1);
             string[] kiosks = { "ck_food", "ck_drinks", "ck_info", "ck_toilets", "f_stallGreen", "f_stallRed" };
             int k0 = r.Range(kiosks.Length), got = 0;
-            for (int k = 0; k < kiosks.Length && got < 2 + AreaM2(room) / 16 && Fit(1); k++)
+            hq_PlanTerrace_kiosks = kiosks;
+            hq_PlanTerrace_k0 = k0;
+            hq_PlanTerrace_got = got;
+        }
+        if (PhLoop(1, 100000))
+        {
+            string[] kiosks = hq_PlanTerrace_kiosks;
+            int k0 = hq_PlanTerrace_k0;
+            int got = hq_PlanTerrace_got;
+            int k = planIter;
+            if (!(k < kiosks.Length && got < 2 + AreaM2(room) / 16 && Fit(1))) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 GenRng rk = SR(2 + k);
                 int first = nEmit;
@@ -290,66 +437,166 @@ public partial class MapGen
                     if (GenData.defId[emitDef[e]].StartsWith("f_stall") && Fit(1)) { first = nEmit; if (RelBeside(Dn(rk.Chance(500) ? "f_stallBench" : "f_stallStool"), e, rk.Chance(500) ? 1 : -1, 150, 0, ref rk) >= 0) Keep(first, false); }
                 }
             }
+            hq_PlanTerrace_kiosks = kiosks;
+            hq_PlanTerrace_k0 = k0;
+            hq_PlanTerrace_got = got;
+        }
+        if (Ph(2))
+        {
+            int got = hq_PlanTerrace_got;
             if (got == 0) MandFail(1);
             GenRng r10 = SR(10);
             int tables = 2 + AreaM2(room) / 14;
-            for (int k = 0; k < tables && Fit(2); k++)
+            hq_PlanTerrace_got = got;
+            hq_PlanTerrace_r10 = r10;
+            hq_PlanTerrace_tables = tables;
+        }
+        if (PhLoop(3, 100000))
+        {
+            GenRng r10 = hq_PlanTerrace_r10;
+            int tables = hq_PlanTerrace_tables;
+            int k = planIter;
+            if (!(k < tables && Fit(2))) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 int cell = OpenSpot(3, WM_ANY, 0, 0, 0, ref r10);
-                if (cell < 0) break;
+                if (cell < 0) { PhBreak(); break; }
                 int first = nEmit;
                 if (FreePlace(Dn("r_tableRound"), cell, 0, 1, 0, H_FREE) >= 0) Keep(first, false);
             }
+            hq_PlanTerrace_r10 = r10;
+            hq_PlanTerrace_tables = tables;
+        }
+        if (Ph(4))
+        {
             GenRng r11 = SR(11);
-            if (Fit(1))
+            hq_PlanTerrace_sel1 = 0;
+            if (Fit(1)) hq_PlanTerrace_sel1 = 1;
+            hq_PlanTerrace_r11 = r11;
+        }
+        if (Ph(5))
+        {
+            if (hq_PlanTerrace_sel1 == 1)
             {
+                GenRng r11 = hq_PlanTerrace_r11;
                 int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r11);
                 int first = nEmit;
-                if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, r11.Range(4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+                hq_PlanTerrace_r11 = r11;
+                hq_PlanTerrace_cell = cell;
+                hq_PlanTerrace_first = first;
             }
+        }
+        if (Ph(6))
+        {
+            if (hq_PlanTerrace_sel1 == 1)
+            {
+                GenRng r11 = hq_PlanTerrace_r11;
+                int cell = hq_PlanTerrace_cell;
+                int first = hq_PlanTerrace_first;
+                if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, r11.Range(4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+                hq_PlanTerrace_r11 = r11;
+                hq_PlanTerrace_cell = cell;
+                hq_PlanTerrace_first = first;
+            }
+        }
+        if (Ph(7))
+        {
             GenRng r12 = SR(12);
             if (r12.Chance(700) && Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("pots"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r12)) Keep(first, false); }
             GenRng r13 = SR(13);
+            hq_PlanTerrace_r13 = r13;
+        }
+        if (Ph(8))
+        {
+            GenRng r13 = hq_PlanTerrace_r13;
             if (Fit(1)) { int first = nEmit; if (WallPlace(Pick(ref r13, "ck_trash", 5, "k_trashcan", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r13) >= 0) Keep(first, false); }
             GenRng r14 = SR(14);
+            hq_PlanTerrace_r13 = r13;
+            hq_PlanTerrace_r14 = r14;
+        }
+        if (Ph(9))
+        {
+            GenRng r14 = hq_PlanTerrace_r14;
             if (r14.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Dn("ck_bench"), WM_ANY, 0, 0, WIN_ANY, 0, ref r14) >= 0) Keep(first, false); }
             GenRng r15 = SR(15);
-            if (r15.Chance(600) && Fit(1))
+            hq_PlanTerrace_sel2 = 0;
+            if (r15.Chance(600) && Fit(1)) hq_PlanTerrace_sel2 = 1;
+            hq_PlanTerrace_r14 = r14;
+            hq_PlanTerrace_r15 = r15;
+        }
+        if (Ph(10))
+        {
+            if (hq_PlanTerrace_sel2 == 1)
             {
+                GenRng r15 = hq_PlanTerrace_r15;
                 int cell = OpenSpot(1, WM_ANY, 0, 0, 0, ref r15);
                 int first = nEmit;
-                if (cell >= 0 && FreePlace(Dn("f_lamp"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+                hq_PlanTerrace_r15 = r15;
+                hq_PlanTerrace_cell = cell;
+                hq_PlanTerrace_first = first;
             }
-            // revision 11: a vending machine and a pallet of drinks crates by the kiosks, stools at a stall
         }
-        if (Ph(1))
+        if (Ph(11))
+        {
+            if (hq_PlanTerrace_sel2 == 1)
+            {
+                int cell = hq_PlanTerrace_cell;
+                int first = hq_PlanTerrace_first;
+                if (cell >= 0 && FreePlace(Dn("f_lamp"), cell, 0, 0, 0, H_FREE) >= 0) Keep(first, false);
+                hq_PlanTerrace_cell = cell;
+                hq_PlanTerrace_first = first;
+            }
+        }
+        if (Ph(12))
         {
             GenRng r18 = SR(18);
             if (r18.Chance(550) && Fit(1)) { int first = nEmit; if (WallPlace(Dn(r18.Chance(600) ? "ma_vending" : "ma_claw"), WM_ANY, 0, 0, WIN_ANY, 0, ref r18) >= 0) Keep(first, false); }
         }
-        if (Ph(2))
+        if (Ph(13))
         {
             GenRng r19 = SR(19);
             if (r19.Chance(500) && Fit(2)) { int first = nEmit; if (GroupAt(GenData.FindGrp("crates"), GenData.A_OUT_EDGE, 2, WM_ANY, 0, 0, 0, ref r19)) Keep(first, false); }
             // fruit set out by a kiosk, a plant, a second flower bed
         }
-        if (Ph(3))
+        if (Ph(14))
         {
             GenRng r16 = SR(16);
             if (r16.Chance(500) && Fit(1)) { int first = nEmit; if (WallPlace(Pick(ref r16, "ms_dispFruit", 4, "k_plant", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r16) >= 0) Keep(first, false); }
         }
-        if (Ph(4))
+        if (Ph(15))
         {
             GenRng r17 = SR(17);
-            if (r17.Chance(500) && Fit(1))
+            hq_PlanTerrace_sel3 = 0;
+            if (r17.Chance(500) && Fit(1)) hq_PlanTerrace_sel3 = 1;
+            hq_PlanTerrace_r17 = r17;
+        }
+        if (Ph(16))
+        {
+            if (hq_PlanTerrace_sel3 == 1)
             {
+                GenRng r17 = hq_PlanTerrace_r17;
                 int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref r17);
                 int first = nEmit;
+                hq_PlanTerrace_r17 = r17;
+                hq_PlanTerrace_cell = cell;
+                hq_PlanTerrace_first = first;
+            }
+        }
+        if (Ph(17))
+        {
+            if (hq_PlanTerrace_sel3 == 1)
+            {
+                GenRng r17 = hq_PlanTerrace_r17;
+                int cell = hq_PlanTerrace_cell;
+                int first = hq_PlanTerrace_first;
                 if (cell >= 0 && FreePlace(Dn("ck_flowers"), cell, r17.Range(4) * 90, 0, 0, H_FREE) >= 0) Keep(first, false);
+                hq_PlanTerrace_r17 = r17;
+                hq_PlanTerrace_cell = cell;
+                hq_PlanTerrace_first = first;
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(5, PoolLen(new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) && !PoolStep(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) PhBreak();
+        if (PhLoop(18, PoolLen(new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) && !PoolStep(50, new string[] { "ck_bench", "ck_trash", "k_plant", "ms_dispFruit", "ck_flowers", "f_lamp", "ma_vending", "ck_info", "ck_food", "ck_drinks", "n_planter", "hk_bench", "hk_lantern", "ma_claw" })) PhBreak();
 }
 
     // revision 11: what an area's own steps could not place is made up from the rest of what belongs there, each kind
@@ -433,4 +680,42 @@ public partial class MapGen
     int hp_PlanFarmWork_wb;
     string[] hp_PlanFarmWork_rows;
     int[] hp_PlanFarmWork_chance;
+
+    // locals of the split plans, kept from one phase to the next (autophase3)
+    int hq_PlanFarmWork_cell;
+    int hq_PlanFarmWork_dx;
+    int hq_PlanFarmWork_dz;
+    GenRng hq_PlanFarmWork_r;
+    GenRng hq_PlanFarmWork_r2;
+    int hq_PlanFarmWork_sel1;
+    int hq_PlanPlayground_axis;
+    string[] hq_PlanPlayground_big;
+    int hq_PlanPlayground_cell;
+    int hq_PlanPlayground_first;
+    int hq_PlanPlayground_got;
+    GenRng hq_PlanPlayground_r;
+    GenRng hq_PlanPlayground_r3;
+    GenRng hq_PlanPlayground_r6;
+    int hq_PlanPlayground_s0;
+    int hq_PlanPlayground_sel1;
+    GenRng hq_PlanPond_r2;
+    GenRng hq_PlanPond_r3;
+    int hq_PlanPond_water;
+    int hq_PlanPond_wx;
+    int hq_PlanPond_wz;
+    int hq_PlanTerrace_cell;
+    int hq_PlanTerrace_first;
+    int hq_PlanTerrace_got;
+    int hq_PlanTerrace_k0;
+    string[] hq_PlanTerrace_kiosks;
+    GenRng hq_PlanTerrace_r10;
+    GenRng hq_PlanTerrace_r11;
+    GenRng hq_PlanTerrace_r13;
+    GenRng hq_PlanTerrace_r14;
+    GenRng hq_PlanTerrace_r15;
+    GenRng hq_PlanTerrace_r17;
+    int hq_PlanTerrace_sel1;
+    int hq_PlanTerrace_sel2;
+    int hq_PlanTerrace_sel3;
+    int hq_PlanTerrace_tables;
 }

@@ -133,144 +133,398 @@ public partial class MapGen
     void PlanLiving()
     {
         int room = pRoom, area = AreaM2(room);
-        GenRng r = SR(1);
-        int tvDef = Dn("k_tvCabinet");
-        int sofaDef = Pick(ref r, "k_sofa", 5, "q_couch", 4, "k_designSofa", 3);
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        // (b) the focal point: the TV cabinet centred on a wall without a window, the sofa facing it
-        int tv = -1, sofa = -1;
-        ClearBans();
-        for (int t = 0; t < 4 && sofa < 0; t++)
+        if (Ph(0))
         {
-            int first = nEmit;
-            tv = WallPlace(tvDef, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, ref r);
-            if (tv < 0) break;
-            int seg = wrSeg;
-            sofa = SofaFacing(tv, sofaDef, ref r);
-            if (sofa >= 0 && Keep(first, true)) break;
-            if (sofa < 0) TakeBack(first);
-            sofa = -1; tv = -1; segBan[seg] = true;
+            GenRng r = SR(1);
+            int tvDef = Dn("k_tvCabinet");
+            int sofaDef = Pick(ref r, "k_sofa", 5, "q_couch", 4, "k_designSofa", 3);
+            int dx = 0, dz = 0;
+            MainDoor(room, out dx, out dz);
+            // (b) the focal point: the TV cabinet centred on a wall without a window, the sofa facing it
+            int tv = -1, sofa = -1;
+            ClearBans();
+            hq_PlanLiving_r = r;
+            hq_PlanLiving_tvDef = tvDef;
+            hq_PlanLiving_sofaDef = sofaDef;
+            hq_PlanLiving_dx = dx;
+            hq_PlanLiving_dz = dz;
+            hq_PlanLiving_tv = tv;
+            hq_PlanLiving_sofa = sofa;
         }
-        ClearBans();
-        if (sofa < 0)
+        if (PhLoop(1, 100000))
         {
-            // no wall with room in front of it: the sofa against a wall, the cabinet on another
-            int first = nEmit;
-            sofa = WallPlace(sofaDef, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, ref r);
-            if (sofa >= 0 && !Keep(first, true)) sofa = -1;
-            if (sofa < 0) MandFail(1);
-            first = nEmit;
-            tv = WallPlace(tvDef, sofa >= 0 ? WM_FAR : WM_CENTRE, sofa >= 0 ? emitX[sofa] : 0, sofa >= 0 ? emitZ[sofa] : 0, WIN_AVOID, 0, ref r);
-            if (tv >= 0 && !Keep(first, false)) tv = -1;
-        }
-        // (c) what belongs with the seating: coffee table, rug, chairs at right angles, side table, lamp
-        if (sofa >= 0)
-        {
-            int sd = emitDef[sofa], ssz = Sz(sd);
-            GenRng r2 = SR(2);
-            int ctDef = Pick(ref r2, "k_tableCoffee", 5, "q_tableLow", 3);
-            int ctZ = ssz / 2 + 380 + Sz(ctDef) / 2;        // 0.38 m between the seat and the table (0.36 to 0.46 m)
-            bool faces = tv >= 0 && emitSet[sofa] == tv;
-            int view = faces ? AlongFront(tv, sofa) - ssz / 2 - Sz(tvDef) / 2 : 9000;
-            if (Fit(1) && view - 380 - Sz(ctDef) >= 950)
+            GenRng r = hq_PlanLiving_r;
+            int tvDef = hq_PlanLiving_tvDef;
+            int sofaDef = hq_PlanLiving_sofaDef;
+            int tv = hq_PlanLiving_tv;
+            int sofa = hq_PlanLiving_sofa;
+            int t = planIter;
+            if (!(t < 4 && sofa < 0)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 int first = nEmit;
-                if (Rel(ctDef, sofa, 0, ctZ, 0, 0) >= 0) Keep(first, false);
+                tv = WallPlace(tvDef, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, ref r);
+                if (tv < 0) { PhBreak(); break; }
+                int seg = wrSeg;
+                sofa = SofaFacing(tv, sofaDef, ref r);
+                if (sofa >= 0 && Keep(first, true)) { PhBreak(); break; }
+                if (sofa < 0) TakeBack(first);
+                sofa = -1; tv = -1; segBan[seg] = true;
             }
-            GenRng r3 = SR(3);
-            if (r3.Chance(750) && Fit(1))
+            hq_PlanLiving_r = r;
+            hq_PlanLiving_tvDef = tvDef;
+            hq_PlanLiving_sofaDef = sofaDef;
+            hq_PlanLiving_tv = tv;
+            hq_PlanLiving_sofa = sofa;
+        }
+        if (Ph(2))
+        {
+            int sofa = hq_PlanLiving_sofa;
+            ClearBans();
+            hq_PlanLiving_sel1 = 0;
+            if (sofa < 0) hq_PlanLiving_sel1 = 1;
+            hq_PlanLiving_sofa = sofa;
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanLiving_sel1 == 1)
             {
-                string rug = area >= 28 && r3.Chance(500) ? "k_rugLong" : "q_rug";
-                if (RelFlat(Dn(rug), sofa, 0, ctZ - 120, 0, 0) < 0 && rug != "q_rug") RelFlat(Dn("q_rug"), sofa, 0, ctZ - 120, 0, 0);
-            }
-            GenRng r4 = SR(4);
-            int chairs = area >= 26 ? r4.Between(1, 2) : r4.Between(0, 1);
-            int chairDef = r4.Chance(350) ? Pick(ref r4, "k_designChair", 5, "k_recliner", 4) : Pick(ref r4, "q_armchair", 5, "k_loungeChair", 4);
-            int side0 = r4.Chance(500) ? 1 : -1;
-            // at right angles to the sofa, facing the table; where the room is narrow the chair moves back beside the
-            // sofa's end, so a metre stays free in front of the screen (K1)
-            int farMax = view - 950 - Sx(chairDef) / 2 + ssz / 2;
-            int chZ = ctZ < farMax ? ctZ : farMax;
-            int minZ = ssz / 2 - Sx(chairDef) / 2 + 150;
-            if (chZ < minZ) chZ = minZ;
-            int lxTable = (Sx(ctDef) > 1300 ? Sx(ctDef) : 1300) / 2 + 330 + Sz(chairDef) / 2, lxSofa = Sx(sd) / 2 + 80 + Sz(chairDef) / 2;
-            for (int k = 0; k < chairs && Fit(1); k++)
-            {
-                int sgn = k == 0 ? side0 : -side0, first = nEmit;
-                int e = Rel(chairDef, sofa, sgn * (chZ < ssz / 2 + Sx(chairDef) / 2 + 60 && lxSofa > lxTable ? lxSofa : lxTable), chZ, sgn > 0 ? 270 : 90, 0);
-                if (e < 0) e = Rel(chairDef, sofa, sgn * lxSofa, chZ, sgn > 0 ? 270 : 90, 0);
-                if (e >= 0) Keep(first, false);
-            }
-            GenRng r5 = SR(5);
-            int tableSide = r5.Chance(500) ? 1 : -1;
-            if (r5.Chance(650) && Fit(1))
-            {
+                GenRng r = hq_PlanLiving_r;
+                int sofaDef = hq_PlanLiving_sofaDef;
+                int sofa = hq_PlanLiving_sofa;
+                // no wall with room in front of it: the sofa against a wall, the cabinet on another
                 int first = nEmit;
-                if (RelBeside(Dn("q_tableSmall"), sofa, tableSide, 70, 0, ref r5) >= 0) Keep(first, false);
-            }
-            GenRng r6 = SR(6);
-            if (r6.Chance(520) && Fit(1))
-            {
-                int first = nEmit;
-                if (RelBeside(Pick(ref r6, "k_lampFloor", 5, "q_lampStanding", 3), sofa, -tableSide, 60, 0, ref r6) >= 0) Keep(first, false);
+                sofa = WallPlace(sofaDef, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, ref r);
+                hq_PlanLiving_r = r;
+                hq_PlanLiving_sofaDef = sofaDef;
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_first = first;
             }
         }
-        // speakers flank the cabinet as a pair
-        GenRng r7 = SR(7);
-        if (tv >= 0 && r7.Chance(420) && Fit(2))
+        if (Ph(4))
         {
-            int first = nEmit, sp = Dn("k_speaker"), td = emitDef[tv];
-            int lx = Sx(td) / 2 + 70 + Sx(sp) / 2, lz = -(Sz(td) - Sz(sp)) / 2;
-            if (Rel(sp, tv, lx, lz, 0, 0) < 0 || Rel(sp, tv, -lx, lz, 0, 0) < 0) TakeBack(first);
-            else Keep(first, false);
-        }
-        // the storage wall: one or two bookcases side by side, or a cabinet, centred on a free wall
-        GenRng r8 = SR(8);
-        if (r8.Chance(780) && Fit(1))
-        {
-            int first = nEmit;
-            int pick = r8.Range(10);
-            if (pick < 5)
+            if (hq_PlanLiving_sel1 == 1)
             {
-                rowN = area >= 24 && Fit(2) && r8.Chance(550) ? 2 : 1;
-                for (int i = 0; i < rowN; i++) rowDef[i] = Dn("k_bookcase");
-            }
-            else { rowN = 1; rowDef[0] = Dn(pick < 8 ? "q_cabinet" : "k_bookcaseLow"); }
-            if (WallRow(0, 1, WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r8) >= 0) Keep(first, false);
-        }
-        // a reading corner in a large room: an armchair turned to the room, a lamp beside it
-        GenRng r9 = SR(9);
-        if (area >= 24 && r9.Chance(520) && Fit(2))
-        {
-            int first = nEmit;
-            int chair = CornerPlace(Dn("q_armchair"), WM_FAR, dx, dz, true, 0, ref r9);
-            if (chair >= 0 && Keep(first, false))
-            {
+                int sofa = hq_PlanLiving_sofa;
+                int first = hq_PlanLiving_first;
+                if (sofa >= 0 && !Keep(first, true)) sofa = -1;
+                if (sofa < 0) MandFail(1);
                 first = nEmit;
-                if (RelBeside(Dn("k_lampFloor"), chair, 0, 60, 0, ref r9) >= 0) Keep(first, false);
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_first = first;
             }
         }
-        // (d) plants and lamps in corners, a low bookcase or a side table at a free wall
-        Extras(20, 720, "ck_plant", "vk_bookcaseLow", "cq_cactus", "wk_sideTable", "ck_lampFloor", "mq_cabinet");
-        // (e) the loose remainder: a box of toys in a corner, or a couple of moving boxes
-        GenRng r12 = SR(12);
-        int roll = r12.Range(1000);
-        if (roll < 170 && LooseFit(3))
+        if (Ph(5))
         {
-            int first = nEmit;
-            int box = CornerPlace(Dn("k_boxOpen"), WM_FAR, dx, dz, false, 0, ref r12);
-            if (box >= 0 && Keep(first, false))
+            if (hq_PlanLiving_sel1 == 1)
             {
+                GenRng r = hq_PlanLiving_r;
+                int tvDef = hq_PlanLiving_tvDef;
+                int tv = hq_PlanLiving_tv;
+                int sofa = hq_PlanLiving_sofa;
+                tv = WallPlace(tvDef, sofa >= 0 ? WM_FAR : WM_CENTRE, sofa >= 0 ? emitX[sofa] : 0, sofa >= 0 ? emitZ[sofa] : 0, WIN_AVOID, 0, ref r);
+                hq_PlanLiving_r = r;
+                hq_PlanLiving_tvDef = tvDef;
+                hq_PlanLiving_tv = tv;
+                hq_PlanLiving_sofa = sofa;
+            }
+        }
+        if (Ph(6))
+        {
+            if (hq_PlanLiving_sel1 == 1)
+            {
+                int tv = hq_PlanLiving_tv;
+                int first = hq_PlanLiving_first;
+                if (tv >= 0 && !Keep(first, false)) tv = -1;
+                hq_PlanLiving_tv = tv;
+                hq_PlanLiving_first = first;
+            }
+        }
+        if (Ph(7))
+        {
+            int sofa = hq_PlanLiving_sofa;
+            // (c) what belongs with the seating: coffee table, rug, chairs at right angles, side table, lamp
+            hq_PlanLiving_sel2 = 0;
+            if (sofa >= 0) hq_PlanLiving_sel2 = 1;
+            hq_PlanLiving_sofa = sofa;
+        }
+        if (Ph(8))
+        {
+            if (hq_PlanLiving_sel2 == 1)
+            {
+                int tvDef = hq_PlanLiving_tvDef;
+                int tv = hq_PlanLiving_tv;
+                int sofa = hq_PlanLiving_sofa;
+                int sd = emitDef[sofa], ssz = Sz(sd);
+                GenRng r2 = SR(2);
+                int ctDef = Pick(ref r2, "k_tableCoffee", 5, "q_tableLow", 3);
+                int ctZ = ssz / 2 + 380 + Sz(ctDef) / 2;        // 0.38 m between the seat and the table (0.36 to 0.46 m)
+                bool faces = tv >= 0 && emitSet[sofa] == tv;
+                int view = faces ? AlongFront(tv, sofa) - ssz / 2 - Sz(tvDef) / 2 : 9000;
+                if (Fit(1) && view - 380 - Sz(ctDef) >= 950)
+                {
+                    int first = nEmit;
+                    if (Rel(ctDef, sofa, 0, ctZ, 0, 0) >= 0) Keep(first, false);
+                }
+                GenRng r3 = SR(3);
+                hq_PlanLiving_tvDef = tvDef;
+                hq_PlanLiving_tv = tv;
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_sd = sd;
+                hq_PlanLiving_ssz = ssz;
+                hq_PlanLiving_ctDef = ctDef;
+                hq_PlanLiving_ctZ = ctZ;
+                hq_PlanLiving_view = view;
+                hq_PlanLiving_r3 = r3;
+            }
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanLiving_sel2 == 1)
+            {
+                int sofa = hq_PlanLiving_sofa;
+                int sd = hq_PlanLiving_sd;
+                int ssz = hq_PlanLiving_ssz;
+                int ctDef = hq_PlanLiving_ctDef;
+                int ctZ = hq_PlanLiving_ctZ;
+                int view = hq_PlanLiving_view;
+                GenRng r3 = hq_PlanLiving_r3;
+                if (r3.Chance(750) && Fit(1))
+                {
+                    string rug = area >= 28 && r3.Chance(500) ? "k_rugLong" : "q_rug";
+                    if (RelFlat(Dn(rug), sofa, 0, ctZ - 120, 0, 0) < 0 && rug != "q_rug") RelFlat(Dn("q_rug"), sofa, 0, ctZ - 120, 0, 0);
+                }
+                GenRng r4 = SR(4);
+                int chairs = area >= 26 ? r4.Between(1, 2) : r4.Between(0, 1);
+                int chairDef = r4.Chance(350) ? Pick(ref r4, "k_designChair", 5, "k_recliner", 4) : Pick(ref r4, "q_armchair", 5, "k_loungeChair", 4);
+                int side0 = r4.Chance(500) ? 1 : -1;
+                // at right angles to the sofa, facing the table; where the room is narrow the chair moves back beside the
+                // sofa's end, so a metre stays free in front of the screen (K1)
+                int farMax = view - 950 - Sx(chairDef) / 2 + ssz / 2;
+                int chZ = ctZ < farMax ? ctZ : farMax;
+                int minZ = ssz / 2 - Sx(chairDef) / 2 + 150;
+                if (chZ < minZ) chZ = minZ;
+                int lxTable = (Sx(ctDef) > 1300 ? Sx(ctDef) : 1300) / 2 + 330 + Sz(chairDef) / 2, lxSofa = Sx(sd) / 2 + 80 + Sz(chairDef) / 2;
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_sd = sd;
+                hq_PlanLiving_ssz = ssz;
+                hq_PlanLiving_ctDef = ctDef;
+                hq_PlanLiving_ctZ = ctZ;
+                hq_PlanLiving_view = view;
+                hq_PlanLiving_r3 = r3;
+                hq_PlanLiving_chairs = chairs;
+                hq_PlanLiving_chairDef = chairDef;
+                hq_PlanLiving_side0 = side0;
+                hq_PlanLiving_chZ = chZ;
+                hq_PlanLiving_lxTable = lxTable;
+                hq_PlanLiving_lxSofa = lxSofa;
+            }
+        }
+        if (PhLoop(10, 100000))
+        {
+            if (!(hq_PlanLiving_sel2 == 1)) PhBreak();
+            else
+            {
+                int sofa = hq_PlanLiving_sofa;
+                int ssz = hq_PlanLiving_ssz;
+                int chairs = hq_PlanLiving_chairs;
+                int chairDef = hq_PlanLiving_chairDef;
+                int side0 = hq_PlanLiving_side0;
+                int chZ = hq_PlanLiving_chZ;
+                int lxTable = hq_PlanLiving_lxTable;
+                int lxSofa = hq_PlanLiving_lxSofa;
+                int k = planIter;
+                if (!(k < chairs && Fit(1))) PhBreak();
+                else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+                {
+                    int sgn = k == 0 ? side0 : -side0, first = nEmit;
+                    int e = Rel(chairDef, sofa, sgn * (chZ < ssz / 2 + Sx(chairDef) / 2 + 60 && lxSofa > lxTable ? lxSofa : lxTable), chZ, sgn > 0 ? 270 : 90, 0);
+                    if (e < 0) e = Rel(chairDef, sofa, sgn * lxSofa, chZ, sgn > 0 ? 270 : 90, 0);
+                    if (e >= 0) Keep(first, false);
+                }
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_ssz = ssz;
+                hq_PlanLiving_chairs = chairs;
+                hq_PlanLiving_chairDef = chairDef;
+                hq_PlanLiving_side0 = side0;
+                hq_PlanLiving_chZ = chZ;
+                hq_PlanLiving_lxTable = lxTable;
+                hq_PlanLiving_lxSofa = lxSofa;
+            }
+        }
+        if (Ph(11))
+        {
+            if (hq_PlanLiving_sel2 == 1)
+            {
+                int sofa = hq_PlanLiving_sofa;
+                GenRng r5 = SR(5);
+                int tableSide = r5.Chance(500) ? 1 : -1;
+                if (r5.Chance(650) && Fit(1))
+                {
+                    int first = nEmit;
+                    if (RelBeside(Dn("q_tableSmall"), sofa, tableSide, 70, 0, ref r5) >= 0) Keep(first, false);
+                }
+                GenRng r6 = SR(6);
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_tableSide = tableSide;
+                hq_PlanLiving_r6 = r6;
+            }
+        }
+        if (Ph(12))
+        {
+            if (hq_PlanLiving_sel2 == 1)
+            {
+                int sofa = hq_PlanLiving_sofa;
+                int tableSide = hq_PlanLiving_tableSide;
+                GenRng r6 = hq_PlanLiving_r6;
+                if (r6.Chance(520) && Fit(1))
+                {
+                    int first = nEmit;
+                    if (RelBeside(Pick(ref r6, "k_lampFloor", 5, "q_lampStanding", 3), sofa, -tableSide, 60, 0, ref r6) >= 0) Keep(first, false);
+                }
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_tableSide = tableSide;
+                hq_PlanLiving_r6 = r6;
+            }
+        }
+        if (Ph(13))
+        {
+            int tv = hq_PlanLiving_tv;
+            // speakers flank the cabinet as a pair
+            GenRng r7 = SR(7);
+            if (tv >= 0 && r7.Chance(420) && Fit(2))
+            {
+                int first = nEmit, sp = Dn("k_speaker"), td = emitDef[tv];
+                int lx = Sx(td) / 2 + 70 + Sx(sp) / 2, lz = -(Sz(td) - Sz(sp)) / 2;
+                if (Rel(sp, tv, lx, lz, 0, 0) < 0 || Rel(sp, tv, -lx, lz, 0, 0) < 0) TakeBack(first);
+                else Keep(first, false);
+            }
+            // the storage wall: one or two bookcases side by side, or a cabinet, centred on a free wall
+            GenRng r8 = SR(8);
+            hq_PlanLiving_tv = tv;
+            hq_PlanLiving_r8 = r8;
+        }
+        if (Ph(14))
+        {
+            GenRng r8 = hq_PlanLiving_r8;
+            if (r8.Chance(780) && Fit(1))
+            {
+                int first = nEmit;
+                int pick = r8.Range(10);
+                if (pick < 5)
+                {
+                    rowN = area >= 24 && Fit(2) && r8.Chance(550) ? 2 : 1;
+                    for (int i = 0; i < rowN; i++) rowDef[i] = Dn("k_bookcase");
+                }
+                else { rowN = 1; rowDef[0] = Dn(pick < 8 ? "q_cabinet" : "k_bookcaseLow"); }
+                if (WallRow(0, 1, WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r8) >= 0) Keep(first, false);
+            }
+            // a reading corner in a large room: an armchair turned to the room, a lamp beside it
+            GenRng r9 = SR(9);
+            hq_PlanLiving_sel3 = 0;
+            if (area >= 24 && r9.Chance(520) && Fit(2)) hq_PlanLiving_sel3 = 1;
+            hq_PlanLiving_r8 = r8;
+            hq_PlanLiving_r9 = r9;
+        }
+        if (Ph(15))
+        {
+            if (hq_PlanLiving_sel3 == 1)
+            {
+                int dx = hq_PlanLiving_dx;
+                int dz = hq_PlanLiving_dz;
+                GenRng r9 = hq_PlanLiving_r9;
+                int first = nEmit;
+                int chair = CornerPlace(Dn("q_armchair"), WM_FAR, dx, dz, true, 0, ref r9);
+                hq_PlanLiving_dx = dx;
+                hq_PlanLiving_dz = dz;
+                hq_PlanLiving_r9 = r9;
+                hq_PlanLiving_first = first;
+                hq_PlanLiving_chair = chair;
+            }
+        }
+        if (Ph(16))
+        {
+            if (hq_PlanLiving_sel3 == 1)
+            {
+                GenRng r9 = hq_PlanLiving_r9;
+                int first = hq_PlanLiving_first;
+                int chair = hq_PlanLiving_chair;
+                if (chair >= 0 && Keep(first, false))
+                {
+                    first = nEmit;
+                    if (RelBeside(Dn("k_lampFloor"), chair, 0, 60, 0, ref r9) >= 0) Keep(first, false);
+                }
+                hq_PlanLiving_r9 = r9;
+                hq_PlanLiving_first = first;
+                hq_PlanLiving_chair = chair;
+            }
+        }
+        if (Ph(17))
+        {
+            // (d) plants and lamps in corners, a low bookcase or a side table at a free wall
+            Extras(20, 720, "ck_plant", "vk_bookcaseLow", "cq_cactus", "wk_sideTable", "ck_lampFloor", "mq_cabinet");
+            // (e) the loose remainder: a box of toys in a corner, or a couple of moving boxes
+            GenRng r12 = SR(12);
+            int roll = r12.Range(1000);
+            hq_PlanLiving_sel4 = 0;
+            if (roll < 170 && LooseFit(3)) hq_PlanLiving_sel4 = 1;
+            else if (roll < 330 && LooseFit(2)) hq_PlanLiving_sel4 = 2;
+            hq_PlanLiving_r12 = r12;
+        }
+        if (Ph(18))
+        {
+            if (hq_PlanLiving_sel4 == 1)
+            {
+                int dx = hq_PlanLiving_dx;
+                int dz = hq_PlanLiving_dz;
+                GenRng r12 = hq_PlanLiving_r12;
+                int first = nEmit;
+                int box = CornerPlace(Dn("k_boxOpen"), WM_FAR, dx, dz, false, 0, ref r12);
+                hq_PlanLiving_sel5 = 0;
+                if (box >= 0 && Keep(first, false)) hq_PlanLiving_sel5 = 1;
+                hq_PlanLiving_dx = dx;
+                hq_PlanLiving_dz = dz;
+                hq_PlanLiving_r12 = r12;
+                hq_PlanLiving_first = first;
+                hq_PlanLiving_box = box;
+            }
+        }
+        if (Ph(19))
+        {
+            if (hq_PlanLiving_sel4 == 1 && hq_PlanLiving_sel5 == 1)
+            {
+                int first = hq_PlanLiving_first;
                 MarkLoose(first);
                 first = nEmit;
-                if (GroupBeside(GenData.FindGrp("toys"), box, 2, 0, ref r12) && Keep(first, false)) MarkLoose(first);
+                hq_PlanLiving_first = first;
             }
         }
-        else if (roll < 330 && LooseFit(2))
+        if (Ph(20))
         {
-            int first = nEmit;
-            if (GroupAt(GenData.FindGrp("cardboard"), GenData.A_CORNER, 2, WM_FAR, dx, dz, 0, ref r12) && Keep(first, false)) MarkLoose(first);
+            if (hq_PlanLiving_sel4 == 1 && hq_PlanLiving_sel5 == 1)
+            {
+                GenRng r12 = hq_PlanLiving_r12;
+                int first = hq_PlanLiving_first;
+                int box = hq_PlanLiving_box;
+                if (GroupBeside(GenData.FindGrp("toys"), box, 2, 0, ref r12) && Keep(first, false)) MarkLoose(first);
+                hq_PlanLiving_r12 = r12;
+                hq_PlanLiving_first = first;
+                hq_PlanLiving_box = box;
+            }
+        }
+        if (Ph(21))
+        {
+            if (hq_PlanLiving_sel4 == 2)
+            {
+                int dx = hq_PlanLiving_dx;
+                int dz = hq_PlanLiving_dz;
+                GenRng r12 = hq_PlanLiving_r12;
+                int first = nEmit;
+                if (GroupAt(GenData.FindGrp("cardboard"), GenData.A_CORNER, 2, WM_FAR, dx, dz, 0, ref r12) && Keep(first, false)) MarkLoose(first);
+                hq_PlanLiving_dx = dx;
+                hq_PlanLiving_dz = dz;
+                hq_PlanLiving_r12 = r12;
+            }
         }
     }
 
@@ -304,7 +558,27 @@ public partial class MapGen
             int table = AreaM2(room) >= 24 ? Pick(ref r, "k_table", 5, "q_table", 5) : Dn("k_table");
             int yaw = RoomLongAxis(room) == 0 ? 0 : 90;
             int first0 = nEmit;
+            hq_PlanDining_r = r;
+            hq_PlanDining_table = table;
+            hq_PlanDining_yaw = yaw;
+            hq_PlanDining_first0 = first0;
+        }
+        if (Ph(1))
+        {
+            GenRng r = hq_PlanDining_r;
+            int table = hq_PlanDining_table;
+            int yaw = hq_PlanDining_yaw;
             int t = CentrePiece(table, yaw, true, 2, 1, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, ref r);
+            hq_PlanDining_r = r;
+            hq_PlanDining_table = table;
+            hq_PlanDining_yaw = yaw;
+            hq_PlanDining_t = t;
+        }
+        if (Ph(2))
+        {
+            int table = hq_PlanDining_table;
+            int first0 = hq_PlanDining_first0;
+            int t = hq_PlanDining_t;
             if (t >= 0)
             {
                 // In a small room the walkway takes one side: the table is tried one cell off the middle each way, and
@@ -326,12 +600,18 @@ public partial class MapGen
                 }
             }
             if (t < 0) MandFail(1);
+            hq_PlanDining_table = table;
+            hq_PlanDining_first0 = first0;
+            hq_PlanDining_t = t;
         }
-        if (Ph(1))
+        if (Ph(3))
         {
             // the sideboard in the middle of a wall: the widest that fits
             GenRng r2 = SR(2);
             if (r2.Chance(900) && Fit(1)) WallAny(WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r2, "q_cabinet", "k_sideTable", "k_bookcaseLow");
+        }
+        if (Ph(4))
+        {
             Extras(20, 750, "ck_plant", "cq_lampStanding", "wk_bookcaseLow", "cq_cactus", "ck_lampFloor");
         }
     }
@@ -467,33 +747,72 @@ public partial class MapGen
         {
             GenRng r2 = SR(2);
             int eat = r2.Range(1000);
-            if (eat < (area >= 20 ? 700 : 480) && Fit(3))
-            {
-                int first = nEmit;
-                int def = area >= 26 && r2.Chance(500) ? Dn("k_table") : Dn("r_tableRound");
-                CentrePiece(def, RoomLongAxis(room) == 0 ? 0 : 90, false, 2, 1, WM_FAR, runCx, runCz, 0, 0, ref r2);
-            }
-            else if (eat < 850 && Fit(4))
-            {
-                int first = nEmit;
-                rowN = 2; rowDef[0] = Dn("k_bar"); rowDef[1] = Dn("k_bar");
-                int bar = WallRow(0, 2, WM_FAR, runCx, runCz, WIN_ANY, 0, ref r2);
-                if (bar >= 0)
-                {
-                    int stool = Dn("k_stool"), last = nEmit;
-                    for (int e = bar; e < last; e++)
-                        if (emitDef[e] == rowDef[0] && emitParent[e] < 0) Rel(stool, e, 0, Sz(rowDef[0]) / 2 + 60 + Sz(stool) / 2, 180, 0);
-                    Keep(first, false);
-                }
-            }
-            // the waste point: the bin at the end of the run, a box for recycling beside it
+            hq_PlanKitchen_sel1 = 0;
+            if (eat < (area >= 20 ? 700 : 480) && Fit(3)) hq_PlanKitchen_sel1 = 1;
+            else if (eat < 850 && Fit(4)) hq_PlanKitchen_sel1 = 2;
+            hq_PlanKitchen_r2 = r2;
         }
         if (Ph(2))
         {
+            if (hq_PlanKitchen_sel1 == 1)
+            {
+                GenRng r2 = hq_PlanKitchen_r2;
+                int first = nEmit;
+                int def = area >= 26 && r2.Chance(500) ? Dn("k_table") : Dn("r_tableRound");
+                CentrePiece(def, RoomLongAxis(room) == 0 ? 0 : 90, false, 2, 1, WM_FAR, runCx, runCz, 0, 0, ref r2);
+                hq_PlanKitchen_r2 = r2;
+            }
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanKitchen_sel1 == 2)
+            {
+                GenRng r2 = hq_PlanKitchen_r2;
+                int first = nEmit;
+                rowN = 2; rowDef[0] = Dn("k_bar"); rowDef[1] = Dn("k_bar");
+                int bar = WallRow(0, 2, WM_FAR, runCx, runCz, WIN_ANY, 0, ref r2);
+                hq_PlanKitchen_sel2 = 0;
+                if (bar >= 0) hq_PlanKitchen_sel2 = 1;
+                hq_PlanKitchen_r2 = r2;
+                hq_PlanKitchen_first = first;
+                hq_PlanKitchen_bar = bar;
+            }
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanKitchen_sel1 == 2 && hq_PlanKitchen_sel2 == 1)
+            {
+                int bar = hq_PlanKitchen_bar;
+                int stool = Dn("k_stool"), last = nEmit;
+                for (int e = bar; e < last; e++)
+                    if (emitDef[e] == rowDef[0] && emitParent[e] < 0) Rel(stool, e, 0, Sz(rowDef[0]) / 2 + 60 + Sz(stool) / 2, 180, 0);
+                hq_PlanKitchen_bar = bar;
+            }
+        }
+        if (Ph(5))
+        {
+            if (hq_PlanKitchen_sel1 == 2 && hq_PlanKitchen_sel2 == 1)
+            {
+                int first = hq_PlanKitchen_first;
+                Keep(first, false);
+                hq_PlanKitchen_first = first;
+            }
+        }
+        if (Ph(6))
+        {
             GenRng r3 = SR(3);
             int bin = -1;
-            if (runLast >= 0 && r3.Chance(900) && Fit(1))
+            hq_PlanKitchen_sel3 = 0;
+            if (runLast >= 0 && r3.Chance(900) && Fit(1)) hq_PlanKitchen_sel3 = 1;
+            hq_PlanKitchen_r3 = r3;
+            hq_PlanKitchen_bin = bin;
+        }
+        if (Ph(7))
+        {
+            if (hq_PlanKitchen_sel3 == 1)
             {
+                GenRng r3 = hq_PlanKitchen_r3;
+                int bin = hq_PlanKitchen_bin;
                 int first = nEmit;
                 bool highFirst = r3.Chance(500);
                 for (int k = 0; k < 2 && bin < 0; k++)
@@ -502,12 +821,43 @@ public partial class MapGen
                     if (end < 0) continue;
                     bin = RelBeside(Dn("k_trashcan"), end, OutwardSide(end, runCx, runCz), 50, 0, ref r3);
                 }
-                if (bin < 0) bin = WallPlace(Dn("k_trashcan"), WM_NEAR, runCx, runCz, WIN_ANY, 0, ref r3);
-                if (bin >= 0 && !Keep(first, false)) bin = -1;
+                hq_PlanKitchen_r3 = r3;
+                hq_PlanKitchen_bin = bin;
+                hq_PlanKitchen_first = first;
             }
+        }
+        if (Ph(8))
+        {
+            if (hq_PlanKitchen_sel3 == 1)
+            {
+                GenRng r3 = hq_PlanKitchen_r3;
+                int bin = hq_PlanKitchen_bin;
+                if (bin < 0) bin = WallPlace(Dn("k_trashcan"), WM_NEAR, runCx, runCz, WIN_ANY, 0, ref r3);
+                hq_PlanKitchen_r3 = r3;
+                hq_PlanKitchen_bin = bin;
+            }
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanKitchen_sel3 == 1)
+            {
+                int bin = hq_PlanKitchen_bin;
+                int first = hq_PlanKitchen_first;
+                if (bin >= 0 && !Keep(first, false)) bin = -1;
+                hq_PlanKitchen_bin = bin;
+                hq_PlanKitchen_first = first;
+            }
+        }
+        if (Ph(10))
+        {
             Extras(20, 450, "ck_plant", "wq_tableSmall", "cq_cactus");
             // (d) the pantry corner: two crates of vegetables at a wall away from the run
             GenRng r5 = SR(5);
+            hq_PlanKitchen_r5 = r5;
+        }
+        if (Ph(11))
+        {
+            GenRng r5 = hq_PlanKitchen_r5;
             if (area >= 16 && r5.Chance(280) && Fit(2))
             {
                 int first = nEmit;
@@ -515,11 +865,20 @@ public partial class MapGen
             }
             // (e) loose: the recycling box beside the bin
             GenRng r6 = SR(6);
+            hq_PlanKitchen_r5 = r5;
+            hq_PlanKitchen_r6 = r6;
+        }
+        if (Ph(12))
+        {
+            int bin = hq_PlanKitchen_bin;
+            GenRng r6 = hq_PlanKitchen_r6;
             if (bin >= 0 && r6.Chance(300) && LooseFit(1))
             {
                 int first = nEmit;
                 if (RelBeside(Dn("k_boxOpen"), bin, 0, 40, 0, ref r6) >= 0 && Keep(first, false)) MarkLoose(first);
             }
+            hq_PlanKitchen_bin = bin;
+            hq_PlanKitchen_r6 = r6;
         }
     }
 
@@ -528,78 +887,193 @@ public partial class MapGen
     void PlanBedroom()
     {
         int room = pRoom;
-        GenRng r = SR(1);
-        int bedDef = Pick(ref r, "k_bedDouble", 5, "k_bedSingle", 3, "q_bed", 3);
-        bool dbl = bedDef == Dn("k_bedDouble");
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        // (b) the bed: its head on a wall without a window, a double centred on the wall, a single in a corner
-        int bed = -1;
-        for (int t = 0; t < 3 && bed < 0; t++)
+        if (Ph(0))
         {
-            int def = t < 2 ? bedDef : Dn("k_bedSingle");
-            int first = nEmit;
-            bed = WallPlace(def, (dbl && t == 0) ? WM_CENTRE : WM_CORNER, 0, 0, t == 0 ? WIN_NEVER : WIN_AVOID, EF_MANDATORY, ref r);
-            if (bed >= 0 && !Keep(first, true)) bed = -1;
+            GenRng r = SR(1);
+            int bedDef = Pick(ref r, "k_bedDouble", 5, "k_bedSingle", 3, "q_bed", 3);
+            bool dbl = bedDef == Dn("k_bedDouble");
+            int dx = 0, dz = 0;
+            MainDoor(room, out dx, out dz);
+            // (b) the bed: its head on a wall without a window, a double centred on the wall, a single in a corner
+            int bed = -1;
+            hq_PlanBedroom_r = r;
+            hq_PlanBedroom_bedDef = bedDef;
+            hq_PlanBedroom_dbl = dbl;
+            hq_PlanBedroom_dx = dx;
+            hq_PlanBedroom_dz = dz;
+            hq_PlanBedroom_bed = bed;
         }
-        if (bed < 0) MandFail(1);
-        if (bed >= 0)
+        if (PhLoop(1, 100000))
         {
-            // (c) bedside tables at the head: a pair for a double bed, one for a single; lamps come with them
-            GenRng r2 = SR(2);
-            int bs = Dn("k_bedside");
-            int s0 = r2.Chance(500) ? 1 : -1, got = 0;
-            dbl = emitDef[bed] == Dn("k_bedDouble");
-            for (int k = 0; k < 2 && Fit(1); k++)
+            GenRng r = hq_PlanBedroom_r;
+            int bedDef = hq_PlanBedroom_bedDef;
+            bool dbl = hq_PlanBedroom_dbl;
+            int bed = hq_PlanBedroom_bed;
+            int t = planIter;
+            if (!(t < 3 && bed < 0)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
-                if (!dbl && got > 0) break;
+                int def = t < 2 ? bedDef : Dn("k_bedSingle");
                 int first = nEmit;
-                if (RelBeside(bs, bed, k == 0 ? s0 : -s0, 50, 0, ref r2) >= 0 && Keep(first, false)) got++;
+                bed = WallPlace(def, (dbl && t == 0) ? WM_CENTRE : WM_CORNER, 0, 0, t == 0 ? WIN_NEVER : WIN_AVOID, EF_MANDATORY, ref r);
+                if (bed >= 0 && !Keep(first, true)) bed = -1;
             }
-            // a rug under the foot half of the bed, showing at its sides
-            GenRng r3 = SR(3);
-            if (r3.Chance(520) && Fit(1))
+            hq_PlanBedroom_r = r;
+            hq_PlanBedroom_bedDef = bedDef;
+            hq_PlanBedroom_dbl = dbl;
+            hq_PlanBedroom_bed = bed;
+        }
+        if (Ph(2))
+        {
+            int bed = hq_PlanBedroom_bed;
+            if (bed < 0) MandFail(1);
+            hq_PlanBedroom_sel1 = 0;
+            if (bed >= 0) hq_PlanBedroom_sel1 = 1;
+            hq_PlanBedroom_bed = bed;
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanBedroom_sel1 == 1)
             {
-                int rug = Dn("q_rug"), bz = Sz(emitDef[bed]) / 4;
-                if (RelFlat(rug, bed, 0, bz, 0, 0) < 0 && RelFlat(rug, bed, 450, bz, 0, 0) < 0) RelFlat(rug, bed, -450, bz, 0, 0);
-            }
-            GenRng r4 = SR(4);
-            if (dbl && r4.Chance(180) && Fit(1))
-            {
-                int first = nEmit, bench = Dn("k_bench");
-                if (Rel(bench, bed, 0, Sz(emitDef[bed]) / 2 + 70 + Sz(bench) / 2, 0, 0) >= 0) Keep(first, false);
+                bool dbl = hq_PlanBedroom_dbl;
+                int bed = hq_PlanBedroom_bed;
+                // (c) bedside tables at the head: a pair for a double bed, one for a single; lamps come with them
+                GenRng r2 = SR(2);
+                int bs = Dn("k_bedside");
+                int s0 = r2.Chance(500) ? 1 : -1, got = 0;
+                dbl = emitDef[bed] == Dn("k_bedDouble");
+                hq_PlanBedroom_dbl = dbl;
+                hq_PlanBedroom_bed = bed;
+                hq_PlanBedroom_r2 = r2;
+                hq_PlanBedroom_bs = bs;
+                hq_PlanBedroom_s0 = s0;
+                hq_PlanBedroom_got = got;
             }
         }
-        int bx = bed >= 0 ? emitX[bed] : RoomMidX(room), bz2 = bed >= 0 ? emitZ[bed] : RoomMidZ(room);
-        // clothes: the wardrobe on a wall away from the bed, its door free to swing
-        GenRng r5 = SR(5);
-        if (r5.Chance(900) && Fit(1)) WallAny(WM_FAR, bx, bz2, WIN_NEVER, 0, ref r5, "gen_wardrobe", "q_cabinet", "q_cabinetSmall");
-        // a desk under the window with its chair, or a dresser, or a reading chair
-        GenRng r6 = SR(6);
-        int third = r6.Range(1000);
-        if (third < 400 && Fit(2))
+        if (PhLoop(4, 100000))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("k_desk"), WM_FAR, bx, bz2, WIN_PREFER, 0, ref r6) >= 0) Keep(first, false);
-        }
-        else if (third < 760 && Fit(1)) WallAny(WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r6, r6.Chance(500) ? "q_cabinet" : "k_bookcaseLow", "k_bookcaseLow", "q_cabinetSmall");
-        else if (third < 900 && Fit(2))
-        {
-            int first = nEmit;
-            int chair = CornerPlace(Dn("q_armchair"), WM_FAR, bx, bz2, true, 0, ref r6);
-            if (chair >= 0 && Keep(first, false))
+            if (!(hq_PlanBedroom_sel1 == 1)) PhBreak();
+            else
             {
-                first = nEmit;
-                if (RelBeside(Pick(ref r6, "k_lampFloor", 5, "q_lampStanding", 4), chair, 0, 60, 0, ref r6) >= 0) Keep(first, false);
+                bool dbl = hq_PlanBedroom_dbl;
+                int bed = hq_PlanBedroom_bed;
+                GenRng r2 = hq_PlanBedroom_r2;
+                int bs = hq_PlanBedroom_bs;
+                int s0 = hq_PlanBedroom_s0;
+                int got = hq_PlanBedroom_got;
+                int k = planIter;
+                if (!(k < 2 && Fit(1))) PhBreak();
+                else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+                {
+                    if (!dbl && got > 0) { PhBreak(); break; }
+                    int first = nEmit;
+                    if (RelBeside(bs, bed, k == 0 ? s0 : -s0, 50, 0, ref r2) >= 0 && Keep(first, false)) got++;
+                }
+                hq_PlanBedroom_dbl = dbl;
+                hq_PlanBedroom_bed = bed;
+                hq_PlanBedroom_r2 = r2;
+                hq_PlanBedroom_bs = bs;
+                hq_PlanBedroom_s0 = s0;
+                hq_PlanBedroom_got = got;
             }
         }
-        Extras(20, 600, "ck_plant", "ck_lampFloor", "wq_cabinetSmall", "wk_bookcaseLow");
-        // (e) loose: moving boxes in a corner
-        GenRng r8 = SR(8);
-        if (r8.Chance(160) && LooseFit(2))
+        if (Ph(5))
         {
-            int first = nEmit;
-            if (GroupAt(GenData.FindGrp("cardboard"), GenData.A_CORNER, 2, WM_FAR, dx, dz, 0, ref r8) && Keep(first, false)) MarkLoose(first);
+            if (hq_PlanBedroom_sel1 == 1)
+            {
+                int bed = hq_PlanBedroom_bed;
+                // a rug under the foot half of the bed, showing at its sides
+                GenRng r3 = SR(3);
+                if (r3.Chance(520) && Fit(1))
+                {
+                    int rug = Dn("q_rug"), bz = Sz(emitDef[bed]) / 4;
+                    if (RelFlat(rug, bed, 0, bz, 0, 0) < 0 && RelFlat(rug, bed, 450, bz, 0, 0) < 0) RelFlat(rug, bed, -450, bz, 0, 0);
+                }
+                GenRng r4 = SR(4);
+                hq_PlanBedroom_bed = bed;
+                hq_PlanBedroom_r4 = r4;
+            }
+        }
+        if (Ph(6))
+        {
+            if (hq_PlanBedroom_sel1 == 1)
+            {
+                bool dbl = hq_PlanBedroom_dbl;
+                int bed = hq_PlanBedroom_bed;
+                GenRng r4 = hq_PlanBedroom_r4;
+                if (dbl && r4.Chance(180) && Fit(1))
+                {
+                    int first = nEmit, bench = Dn("k_bench");
+                    if (Rel(bench, bed, 0, Sz(emitDef[bed]) / 2 + 70 + Sz(bench) / 2, 0, 0) >= 0) Keep(first, false);
+                }
+                hq_PlanBedroom_dbl = dbl;
+                hq_PlanBedroom_bed = bed;
+                hq_PlanBedroom_r4 = r4;
+            }
+        }
+        if (Ph(7))
+        {
+            int bed = hq_PlanBedroom_bed;
+            int bx = bed >= 0 ? emitX[bed] : RoomMidX(room), bz2 = bed >= 0 ? emitZ[bed] : RoomMidZ(room);
+            // clothes: the wardrobe on a wall away from the bed, its door free to swing
+            GenRng r5 = SR(5);
+            if (r5.Chance(900) && Fit(1)) WallAny(WM_FAR, bx, bz2, WIN_NEVER, 0, ref r5, "gen_wardrobe", "q_cabinet", "q_cabinetSmall");
+            // a desk under the window with its chair, or a dresser, or a reading chair
+            GenRng r6 = SR(6);
+            int third = r6.Range(1000);
+            hq_PlanBedroom_bed = bed;
+            hq_PlanBedroom_bx = bx;
+            hq_PlanBedroom_bz2 = bz2;
+            hq_PlanBedroom_r6 = r6;
+            hq_PlanBedroom_third = third;
+        }
+        if (Ph(8))
+        {
+            int bx = hq_PlanBedroom_bx;
+            int bz2 = hq_PlanBedroom_bz2;
+            GenRng r6 = hq_PlanBedroom_r6;
+            int third = hq_PlanBedroom_third;
+            if (third < 400 && Fit(2))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("k_desk"), WM_FAR, bx, bz2, WIN_PREFER, 0, ref r6) >= 0) Keep(first, false);
+            }
+            else if (third < 760 && Fit(1)) WallAny(WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r6, r6.Chance(500) ? "q_cabinet" : "k_bookcaseLow", "k_bookcaseLow", "q_cabinetSmall");
+            else if (third < 900 && Fit(2))
+            {
+                int first = nEmit;
+                int chair = CornerPlace(Dn("q_armchair"), WM_FAR, bx, bz2, true, 0, ref r6);
+                if (chair >= 0 && Keep(first, false))
+                {
+                    first = nEmit;
+                    if (RelBeside(Pick(ref r6, "k_lampFloor", 5, "q_lampStanding", 4), chair, 0, 60, 0, ref r6) >= 0) Keep(first, false);
+                }
+            }
+            hq_PlanBedroom_bx = bx;
+            hq_PlanBedroom_bz2 = bz2;
+            hq_PlanBedroom_r6 = r6;
+            hq_PlanBedroom_third = third;
+        }
+        if (Ph(9))
+        {
+            Extras(20, 600, "ck_plant", "ck_lampFloor", "wq_cabinetSmall", "wk_bookcaseLow");
+            // (e) loose: moving boxes in a corner
+            GenRng r8 = SR(8);
+            hq_PlanBedroom_r8 = r8;
+        }
+        if (Ph(10))
+        {
+            int dx = hq_PlanBedroom_dx;
+            int dz = hq_PlanBedroom_dz;
+            GenRng r8 = hq_PlanBedroom_r8;
+            if (r8.Chance(160) && LooseFit(2))
+            {
+                int first = nEmit;
+                if (GroupAt(GenData.FindGrp("cardboard"), GenData.A_CORNER, 2, WM_FAR, dx, dz, 0, ref r8) && Keep(first, false)) MarkLoose(first);
+            }
+            hq_PlanBedroom_dx = dx;
+            hq_PlanBedroom_dz = dz;
+            hq_PlanBedroom_r8 = r8;
         }
     }
 
@@ -613,13 +1087,49 @@ public partial class MapGen
             GenRng r = SR(1);
             int bedDef = Pick(ref r, "k_bedSingle", 6, "q_bed", 4);
             int first0 = nEmit;
+            hq_PlanKids_r = r;
+            hq_PlanKids_bedDef = bedDef;
+            hq_PlanKids_first0 = first0;
+        }
+        if (Ph(1))
+        {
+            GenRng r = hq_PlanKids_r;
+            int bedDef = hq_PlanKids_bedDef;
             int bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_NEVER, EF_MANDATORY, ref r);
+            hq_PlanKids_r = r;
+            hq_PlanKids_bedDef = bedDef;
+            hq_PlanKids_bed = bed;
+        }
+        if (Ph(2))
+        {
+            GenRng r = hq_PlanKids_r;
+            int bedDef = hq_PlanKids_bedDef;
+            int bed = hq_PlanKids_bed;
             if (bed < 0) bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, ref r);
+            hq_PlanKids_r = r;
+            hq_PlanKids_bedDef = bedDef;
+            hq_PlanKids_bed = bed;
+        }
+        if (Ph(3))
+        {
+            int first0 = hq_PlanKids_first0;
+            int bed = hq_PlanKids_bed;
             if (bed >= 0 && !Keep(first0, true)) bed = -1;
             if (bed < 0) MandFail(1);
             GenRng r2 = SR(2);
-            if (bed >= 0)
+            hq_PlanKids_sel1 = 0;
+            if (bed >= 0) hq_PlanKids_sel1 = 1;
+            hq_PlanKids_first0 = first0;
+            hq_PlanKids_bed = bed;
+            hq_PlanKids_r2 = r2;
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanKids_sel1 == 1)
             {
+                int bedDef = hq_PlanKids_bedDef;
+                int bed = hq_PlanKids_bed;
+                GenRng r2 = hq_PlanKids_r2;
                 // a second bed beside the first, a bedside table between them
                 int bs = Dn("k_bedside");
                 int side = r2.Chance(500) ? 1 : -1;
@@ -634,32 +1144,88 @@ public partial class MapGen
                             if (Keep(first, false)) two = true;
                         }
                     }
+                hq_PlanKids_bedDef = bedDef;
+                hq_PlanKids_bed = bed;
+                hq_PlanKids_r2 = r2;
+                hq_PlanKids_bs = bs;
+                hq_PlanKids_two = two;
+            }
+        }
+        if (Ph(5))
+        {
+            if (hq_PlanKids_sel1 == 1)
+            {
+                int bed = hq_PlanKids_bed;
+                GenRng r2 = hq_PlanKids_r2;
+                int bs = hq_PlanKids_bs;
+                bool two = hq_PlanKids_two;
                 if (!two && Fit(1))
                 {
                     int first = nEmit;
                     if (RelBeside(bs, bed, 0, 50, 0, ref r2) >= 0) Keep(first, false);
                 }
+                hq_PlanKids_bed = bed;
+                hq_PlanKids_r2 = r2;
+                hq_PlanKids_bs = bs;
+                hq_PlanKids_two = two;
             }
-            // the play rug in the open middle with a clump of toys on it
         }
-        if (Ph(1))
+        if (Ph(6))
         {
             GenRng r3 = SR(3);
-            if (Fit(3))
+            hq_PlanKids_sel2 = 0;
+            if (Fit(3)) hq_PlanKids_sel2 = 1;
+            hq_PlanKids_r3 = r3;
+        }
+        if (Ph(7))
+        {
+            if (hq_PlanKids_sel2 == 1)
             {
+                GenRng r3 = hq_PlanKids_r3;
                 int cell = OpenSpot(2, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, ref r3);
-                if (cell >= 0)
-                {
-                    int rug = FreePlace(Dn("k_rug"), cell, 0, 0, 0, H_FREE);
-                    int first = nEmit;
-                    fHost = rug >= 0 ? rug : H_FREE;
-                    bool ok = GroupAt(GenData.FindGrp("toys"), GenData.A_ANY, r3.Between(2, 3), WM_NEAR, cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, 0, ref r3);
-                    fHost = H_NONE;
-                    if (ok) Keep(first, false);
-                }
+                hq_PlanKids_sel3 = 0;
+                if (cell >= 0) hq_PlanKids_sel3 = 1;
+                hq_PlanKids_r3 = r3;
+                hq_PlanKids_cell = cell;
             }
         }
-        if (Ph(2))
+        if (Ph(8))
+        {
+            if (hq_PlanKids_sel2 == 1 && hq_PlanKids_sel3 == 1)
+            {
+                int cell = hq_PlanKids_cell;
+                int rug = FreePlace(Dn("k_rug"), cell, 0, 0, 0, H_FREE);
+                int first = nEmit;
+                fHost = rug >= 0 ? rug : H_FREE;
+                hq_PlanKids_cell = cell;
+                hq_PlanKids_first = first;
+            }
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanKids_sel2 == 1 && hq_PlanKids_sel3 == 1)
+            {
+                GenRng r3 = hq_PlanKids_r3;
+                int cell = hq_PlanKids_cell;
+                bool ok = GroupAt(GenData.FindGrp("toys"), GenData.A_ANY, r3.Between(2, 3), WM_NEAR, cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, 0, ref r3);
+                fHost = H_NONE;
+                hq_PlanKids_r3 = r3;
+                hq_PlanKids_cell = cell;
+                hq_PlanKids_ok = ok;
+            }
+        }
+        if (Ph(10))
+        {
+            if (hq_PlanKids_sel2 == 1 && hq_PlanKids_sel3 == 1)
+            {
+                int first = hq_PlanKids_first;
+                bool ok = hq_PlanKids_ok;
+                if (ok) Keep(first, false);
+                hq_PlanKids_first = first;
+                hq_PlanKids_ok = ok;
+            }
+        }
+        if (Ph(11))
         {
             GenRng r4 = SR(4);
             if (r4.Chance(800) && Fit(1))
@@ -668,7 +1234,7 @@ public partial class MapGen
                 if (WallPlace(Dn("k_bookcaseLow"), WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r4) >= 0) Keep(first, false);
             }
         }
-        if (Ph(3))
+        if (Ph(12))
         {
             GenRng r5 = SR(5);
             if (r5.Chance(650) && Fit(1))
@@ -677,7 +1243,7 @@ public partial class MapGen
                 if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, ref r5) >= 0) Keep(first, false);
             }
         }
-        if (Ph(4))
+        if (Ph(13))
         {
             GenRng r6 = SR(6);
             if (r6.Chance(450) && Fit(2))
@@ -687,19 +1253,44 @@ public partial class MapGen
             }
             // the toy box in a corner, a toy or two beside it
         }
-        if (Ph(5))
+        if (Ph(14))
         {
             GenRng r7 = SR(7);
-            if (r7.Chance(600) && Fit(2))
+            hq_PlanKids_sel4 = 0;
+            if (r7.Chance(600) && Fit(2)) hq_PlanKids_sel4 = 1;
+            hq_PlanKids_r7 = r7;
+        }
+        if (Ph(15))
+        {
+            if (hq_PlanKids_sel4 == 1)
             {
+                GenRng r7 = hq_PlanKids_r7;
                 int first = nEmit;
                 int box = CornerPlace(Pick(ref r7, "k_boxOpen", 6, "s_chest", 4), WM_ANY, 0, 0, false, 0, ref r7);
+                hq_PlanKids_r7 = r7;
+                hq_PlanKids_first = first;
+                hq_PlanKids_box = box;
+            }
+        }
+        if (Ph(16))
+        {
+            if (hq_PlanKids_sel4 == 1)
+            {
+                GenRng r7 = hq_PlanKids_r7;
+                int first = hq_PlanKids_first;
+                int box = hq_PlanKids_box;
                 if (box >= 0 && Keep(first, false) && Fit(2) && r7.Chance(600))
                 {
                     first = nEmit;
                     if (GroupBeside(GenData.FindGrp("toys"), box, 2, 0, ref r7)) Keep(first, false);
                 }
+                hq_PlanKids_r7 = r7;
+                hq_PlanKids_first = first;
+                hq_PlanKids_box = box;
             }
+        }
+        if (Ph(17))
+        {
             Extras(20, 500, "ck_lampFloor", "wq_cabinetSmall", "ck_plant");
         }
     }
@@ -796,55 +1387,135 @@ public partial class MapGen
     void PlanHall()
     {
         int room = pRoom;
-        GenRng r = SR(1);
-        int anyMat = 0;
-        for (int k = 0; k < roomDoorCount[room]; k++)
-            if (roomDoorExt[roomDoorStart[room] + k] && Fit(1) && Doormat(room, k) >= 0) anyMat++;
-        if (anyMat == 0 && roomDoorCount[room] > 0 && Fit(1)) Doormat(room, 0);
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        // coats in the corner nearest the outside door
-        int rack = -1;
-        if (r.Chance(900) && Fit(1))
+        if (Ph(0))
         {
-            int first = nEmit;
-            rack = CornerPlace(Dn("k_coatRack"), WM_NEAR, dx, dz, false, 0, ref r);
-            if (rack >= 0 && !Keep(first, false)) rack = -1;
+            GenRng r = SR(1);
+            int anyMat = 0;
+            for (int k = 0; k < roomDoorCount[room]; k++)
+                if (roomDoorExt[roomDoorStart[room] + k] && Fit(1) && Doormat(room, k) >= 0) anyMat++;
+            if (anyMat == 0 && roomDoorCount[room] > 0 && Fit(1)) Doormat(room, 0);
+            int dx = 0, dz = 0;
+            MainDoor(room, out dx, out dz);
+            // coats in the corner nearest the outside door
+            int rack = -1;
+            hq_PlanHall_r = r;
+            hq_PlanHall_dx = dx;
+            hq_PlanHall_dz = dz;
+            hq_PlanHall_rack = rack;
         }
-        GenRng r2 = SR(2);
-        int bench = -1;
-        if (r2.Chance(700) && Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            bench = WallPlace(Pick(ref r2, "k_bench", 5, "k_benchCushion", 5), WM_NEAR, dx, dz, WIN_ANY, 0, ref r2);
-            if (bench >= 0 && !Keep(first, false)) bench = -1;
+            GenRng r = hq_PlanHall_r;
+            int dx = hq_PlanHall_dx;
+            int dz = hq_PlanHall_dz;
+            int rack = hq_PlanHall_rack;
+            if (r.Chance(900) && Fit(1))
+            {
+                int first = nEmit;
+                rack = CornerPlace(Dn("k_coatRack"), WM_NEAR, dx, dz, false, 0, ref r);
+                if (rack >= 0 && !Keep(first, false)) rack = -1;
+            }
+            GenRng r2 = SR(2);
+            int bench = -1;
+            hq_PlanHall_sel1 = 0;
+            if (r2.Chance(700) && Fit(1)) hq_PlanHall_sel1 = 1;
+            hq_PlanHall_r = r;
+            hq_PlanHall_dx = dx;
+            hq_PlanHall_dz = dz;
+            hq_PlanHall_rack = rack;
+            hq_PlanHall_r2 = r2;
+            hq_PlanHall_bench = bench;
         }
-        // shoes by the bench or by the coats
-        GenRng r3 = SR(3);
-        if (r3.Chance(750) && Fit(1) && (bench >= 0 || rack >= 0))
+        if (Ph(2))
         {
-            int first = nEmit;
-            if (RelBeside(Dn("gen_shoes"), bench >= 0 ? bench : rack, 0, 60, 0, ref r3) >= 0) Keep(first, false);
+            if (hq_PlanHall_sel1 == 1)
+            {
+                int dx = hq_PlanHall_dx;
+                int dz = hq_PlanHall_dz;
+                GenRng r2 = hq_PlanHall_r2;
+                int bench = hq_PlanHall_bench;
+                int first = nEmit;
+                bench = WallPlace(Pick(ref r2, "k_bench", 5, "k_benchCushion", 5), WM_NEAR, dx, dz, WIN_ANY, 0, ref r2);
+                hq_PlanHall_dx = dx;
+                hq_PlanHall_dz = dz;
+                hq_PlanHall_r2 = r2;
+                hq_PlanHall_bench = bench;
+                hq_PlanHall_first = first;
+            }
         }
-        GenRng r4 = SR(4);
-        if (r4.Chance(700) && Fit(1))
+        if (Ph(3))
         {
-            int first = nEmit;
-            if (WallPlace(Pick(ref r4, "k_sideTable", 6, "q_cabinetSmall", 3), WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r4) >= 0) Keep(first, false);
+            if (hq_PlanHall_sel1 == 1)
+            {
+                int bench = hq_PlanHall_bench;
+                int first = hq_PlanHall_first;
+                if (bench >= 0 && !Keep(first, false)) bench = -1;
+                hq_PlanHall_bench = bench;
+                hq_PlanHall_first = first;
+            }
         }
-        GenRng r5 = SR(5);
-        if (r5.Chance(280) && Fit(1))
+        if (Ph(4))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("gen_wardrobe"), WM_FAR, dx, dz, WIN_NEVER, 0, ref r5) >= 0) Keep(first, false);
+            int rack = hq_PlanHall_rack;
+            int bench = hq_PlanHall_bench;
+            // shoes by the bench or by the coats
+            GenRng r3 = SR(3);
+            if (r3.Chance(750) && Fit(1) && (bench >= 0 || rack >= 0))
+            {
+                int first = nEmit;
+                if (RelBeside(Dn("gen_shoes"), bench >= 0 ? bench : rack, 0, 60, 0, ref r3) >= 0) Keep(first, false);
+            }
+            GenRng r4 = SR(4);
+            hq_PlanHall_rack = rack;
+            hq_PlanHall_bench = bench;
+            hq_PlanHall_r4 = r4;
         }
-        Extras(20, 600, "ck_plant", "ck_lampFloor", "wq_cabinetSmall");
-        // (e) loose: a parcel left by the door
-        GenRng r7 = SR(7);
-        if (r7.Chance(260) && LooseFit(1))
+        if (Ph(5))
         {
-            int first = nEmit;
-            if (GroupAt(GenData.FindGrp("cardboard"), GenData.A_DOOR_SIDE, r7.Between(1, 2), WM_NEAR, dx, dz, 0, ref r7) && Keep(first, false)) MarkLoose(first);
+            GenRng r4 = hq_PlanHall_r4;
+            if (r4.Chance(700) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Pick(ref r4, "k_sideTable", 6, "q_cabinetSmall", 3), WM_CENTRE, 0, 0, WIN_AVOID, 0, ref r4) >= 0) Keep(first, false);
+            }
+            GenRng r5 = SR(5);
+            hq_PlanHall_r4 = r4;
+            hq_PlanHall_r5 = r5;
+        }
+        if (Ph(6))
+        {
+            int dx = hq_PlanHall_dx;
+            int dz = hq_PlanHall_dz;
+            GenRng r5 = hq_PlanHall_r5;
+            if (r5.Chance(280) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("gen_wardrobe"), WM_FAR, dx, dz, WIN_NEVER, 0, ref r5) >= 0) Keep(first, false);
+            }
+            hq_PlanHall_dx = dx;
+            hq_PlanHall_dz = dz;
+            hq_PlanHall_r5 = r5;
+        }
+        if (Ph(7))
+        {
+            Extras(20, 600, "ck_plant", "ck_lampFloor", "wq_cabinetSmall");
+            // (e) loose: a parcel left by the door
+            GenRng r7 = SR(7);
+            hq_PlanHall_r7 = r7;
+        }
+        if (Ph(8))
+        {
+            int dx = hq_PlanHall_dx;
+            int dz = hq_PlanHall_dz;
+            GenRng r7 = hq_PlanHall_r7;
+            if (r7.Chance(260) && LooseFit(1))
+            {
+                int first = nEmit;
+                if (GroupAt(GenData.FindGrp("cardboard"), GenData.A_DOOR_SIDE, r7.Between(1, 2), WM_NEAR, dx, dz, 0, ref r7) && Keep(first, false)) MarkLoose(first);
+            }
+            hq_PlanHall_dx = dx;
+            hq_PlanHall_dz = dz;
+            hq_PlanHall_r7 = r7;
         }
     }
 
@@ -854,79 +1525,351 @@ public partial class MapGen
     void PlanBath()
     {
         int room = pRoom;
-        GenRng r = SR(1);
-        int dx, dz;
-        MainDoor(room, out dx, out dz);
-        int tub = -1;
-        if (r.Chance(800))
+        if (Ph(0))
         {
-            int first = nEmit;
-            tub = WallPlace(Dn("k_bathtub"), WM_CORNER, 0, 0, WIN_ANY, 0, ref r);
-            if (tub >= 0 && !Keep(first, false)) tub = -1;
+            GenRng r = SR(1);
+            int dx = 0, dz = 0;
+            MainDoor(room, out dx, out dz);
+            int tub = -1;
+            hq_PlanBath_sel1 = 0;
+            if (r.Chance(800)) hq_PlanBath_sel1 = 1;
+            hq_PlanBath_r = r;
+            hq_PlanBath_dx = dx;
+            hq_PlanBath_dz = dz;
+            hq_PlanBath_tub = tub;
         }
-        GenRng r2 = SR(2);
-        int first2 = nEmit;
-        int toilet = WallPlace(Dn("k_toilet"), WM_FAR, dx, dz, WIN_ANY, EF_MANDATORY, ref r2);
-        if (toilet >= 0 && !Keep(first2, true)) toilet = -1;
-        if (toilet < 0) MandFail(1);
-        int sink = -1;
-        first2 = nEmit;
-        if (toilet >= 0) sink = RelBeside(Dn("k_bathSink"), toilet, 0, 320, EF_MANDATORY, ref r2);
-        if (sink < 0) sink = WallPlace(Dn("k_bathSink"), WM_NEAR, toilet >= 0 ? emitX[toilet] : dx, toilet >= 0 ? emitZ[toilet] : dz, WIN_ANY, EF_MANDATORY, ref r2);
-        if (sink >= 0 && !Keep(first2, true)) sink = -1;
-        if (sink < 0) MandFail(1);
-        // (c) the bin beside the toilet, a mat in front of the bath or the basin
-        GenRng r3 = SR(3);
-        if (toilet >= 0 && r3.Chance(750) && Fit(1))
+        if (Ph(1))
         {
-            int first = nEmit;
-            if (RelBeside(Dn("k_trashcan"), toilet, 0, 130, 0, ref r3) >= 0) Keep(first, false);
-        }
-        GenRng r4 = SR(4);
-        if (r4.Chance(700) && Fit(1))
-        {
-            int mat = Dn("k_doormat"), host = tub >= 0 ? tub : sink;
-            if (host >= 0) RelFlat(mat, host, 0, Sz(emitDef[host]) / 2 + 80 + Sz(mat) / 2, 0, 0);
-        }
-        // the laundry corner: washer, perhaps a dryer beside it, the basket
-        GenRng r5 = SR(5);
-        if (r5.Chance(600) && Fit(1))
-        {
-            int first = nEmit;
-            int washer = WallPlace(Dn("k_washer"), WM_CORNER, 0, 0, WIN_ANY, 0, ref r5);
-            if (washer >= 0 && Keep(first, false))
+            if (hq_PlanBath_sel1 == 1)
             {
+                GenRng r = hq_PlanBath_r;
+                int tub = hq_PlanBath_tub;
+                int first = nEmit;
+                tub = WallPlace(Dn("k_bathtub"), WM_CORNER, 0, 0, WIN_ANY, 0, ref r);
+                hq_PlanBath_r = r;
+                hq_PlanBath_tub = tub;
+                hq_PlanBath_first = first;
+            }
+        }
+        if (Ph(2))
+        {
+            if (hq_PlanBath_sel1 == 1)
+            {
+                int tub = hq_PlanBath_tub;
+                int first = hq_PlanBath_first;
+                if (tub >= 0 && !Keep(first, false)) tub = -1;
+                hq_PlanBath_tub = tub;
+                hq_PlanBath_first = first;
+            }
+        }
+        if (Ph(3))
+        {
+            int dx = hq_PlanBath_dx;
+            int dz = hq_PlanBath_dz;
+            GenRng r2 = SR(2);
+            int first2 = nEmit;
+            int toilet = WallPlace(Dn("k_toilet"), WM_FAR, dx, dz, WIN_ANY, EF_MANDATORY, ref r2);
+            hq_PlanBath_dx = dx;
+            hq_PlanBath_dz = dz;
+            hq_PlanBath_r2 = r2;
+            hq_PlanBath_first2 = first2;
+            hq_PlanBath_toilet = toilet;
+        }
+        if (Ph(4))
+        {
+            GenRng r2 = hq_PlanBath_r2;
+            int first2 = hq_PlanBath_first2;
+            int toilet = hq_PlanBath_toilet;
+            if (toilet >= 0 && !Keep(first2, true)) toilet = -1;
+            if (toilet < 0) MandFail(1);
+            int sink = -1;
+            first2 = nEmit;
+            if (toilet >= 0) sink = RelBeside(Dn("k_bathSink"), toilet, 0, 320, EF_MANDATORY, ref r2);
+            hq_PlanBath_r2 = r2;
+            hq_PlanBath_first2 = first2;
+            hq_PlanBath_toilet = toilet;
+            hq_PlanBath_sink = sink;
+        }
+        if (Ph(5))
+        {
+            int dx = hq_PlanBath_dx;
+            int dz = hq_PlanBath_dz;
+            GenRng r2 = hq_PlanBath_r2;
+            int toilet = hq_PlanBath_toilet;
+            int sink = hq_PlanBath_sink;
+            if (sink < 0) sink = WallPlace(Dn("k_bathSink"), WM_NEAR, toilet >= 0 ? emitX[toilet] : dx, toilet >= 0 ? emitZ[toilet] : dz, WIN_ANY, EF_MANDATORY, ref r2);
+            hq_PlanBath_dx = dx;
+            hq_PlanBath_dz = dz;
+            hq_PlanBath_r2 = r2;
+            hq_PlanBath_toilet = toilet;
+            hq_PlanBath_sink = sink;
+        }
+        if (Ph(6))
+        {
+            int first2 = hq_PlanBath_first2;
+            int sink = hq_PlanBath_sink;
+            if (sink >= 0 && !Keep(first2, true)) sink = -1;
+            if (sink < 0) MandFail(1);
+            // (c) the bin beside the toilet, a mat in front of the bath or the basin
+            GenRng r3 = SR(3);
+            hq_PlanBath_first2 = first2;
+            hq_PlanBath_sink = sink;
+            hq_PlanBath_r3 = r3;
+        }
+        if (Ph(7))
+        {
+            int tub = hq_PlanBath_tub;
+            int toilet = hq_PlanBath_toilet;
+            int sink = hq_PlanBath_sink;
+            GenRng r3 = hq_PlanBath_r3;
+            if (toilet >= 0 && r3.Chance(750) && Fit(1))
+            {
+                int first = nEmit;
+                if (RelBeside(Dn("k_trashcan"), toilet, 0, 130, 0, ref r3) >= 0) Keep(first, false);
+            }
+            GenRng r4 = SR(4);
+            if (r4.Chance(700) && Fit(1))
+            {
+                int mat = Dn("k_doormat"), host = tub >= 0 ? tub : sink;
+                if (host >= 0) RelFlat(mat, host, 0, Sz(emitDef[host]) / 2 + 80 + Sz(mat) / 2, 0, 0);
+            }
+            // the laundry corner: washer, perhaps a dryer beside it, the basket
+            GenRng r5 = SR(5);
+            hq_PlanBath_sel2 = 0;
+            if (r5.Chance(600) && Fit(1)) hq_PlanBath_sel2 = 1;
+            hq_PlanBath_tub = tub;
+            hq_PlanBath_toilet = toilet;
+            hq_PlanBath_sink = sink;
+            hq_PlanBath_r3 = r3;
+            hq_PlanBath_r5 = r5;
+        }
+        if (Ph(8))
+        {
+            if (hq_PlanBath_sel2 == 1)
+            {
+                GenRng r5 = hq_PlanBath_r5;
+                int first = nEmit;
+                int washer = WallPlace(Dn("k_washer"), WM_CORNER, 0, 0, WIN_ANY, 0, ref r5);
+                hq_PlanBath_r5 = r5;
+                hq_PlanBath_first = first;
+                hq_PlanBath_washer = washer;
+            }
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanBath_sel2 == 1)
+            {
+                int first = hq_PlanBath_first;
+                int washer = hq_PlanBath_washer;
+                hq_PlanBath_sel3 = 0;
+                if (washer >= 0 && Keep(first, false)) hq_PlanBath_sel3 = 1;
+                hq_PlanBath_first = first;
+                hq_PlanBath_washer = washer;
+            }
+        }
+        if (Ph(10))
+        {
+            if (hq_PlanBath_sel2 == 1 && hq_PlanBath_sel3 == 1)
+            {
+                GenRng r5 = hq_PlanBath_r5;
+                int first = hq_PlanBath_first;
+                int washer = hq_PlanBath_washer;
                 int side = r5.Chance(500) ? 1 : -1;
                 if (r5.Chance(450) && Fit(1))
                 {
                     first = nEmit;
                     if (RelBeside(Dn("k_dryer"), washer, side, 20, 0, ref r5) >= 0) Keep(first, false);
                 }
+                hq_PlanBath_r5 = r5;
+                hq_PlanBath_first = first;
+                hq_PlanBath_washer = washer;
+                hq_PlanBath_side = side;
+            }
+        }
+        if (Ph(11))
+        {
+            if (hq_PlanBath_sel2 == 1 && hq_PlanBath_sel3 == 1)
+            {
+                GenRng r5 = hq_PlanBath_r5;
+                int first = hq_PlanBath_first;
+                int washer = hq_PlanBath_washer;
+                int side = hq_PlanBath_side;
                 if (r5.Chance(650) && Fit(1))
                 {
                     first = nEmit;
                     if (RelBeside(Dn("gen_laundryBasket"), washer, -side, 60, 0, ref r5) >= 0) Keep(first, false);
                 }
+                hq_PlanBath_r5 = r5;
+                hq_PlanBath_first = first;
+                hq_PlanBath_washer = washer;
+                hq_PlanBath_side = side;
             }
         }
-        GenRng r6 = SR(6);
-        if (r6.Chance(600) && Fit(1))
+        if (Ph(12))
         {
-            int first = nEmit;
-            if (WallPlace(Dn("q_cabinetSmall"), WM_NEAR, sink >= 0 ? emitX[sink] : dx, sink >= 0 ? emitZ[sink] : dz, WIN_ANY, 0, ref r6) >= 0) Keep(first, false);
+            int dx = hq_PlanBath_dx;
+            int dz = hq_PlanBath_dz;
+            int sink = hq_PlanBath_sink;
+            GenRng r6 = SR(6);
+            if (r6.Chance(600) && Fit(1))
+            {
+                int first = nEmit;
+                if (WallPlace(Dn("q_cabinetSmall"), WM_NEAR, sink >= 0 ? emitX[sink] : dx, sink >= 0 ? emitZ[sink] : dz, WIN_ANY, 0, ref r6) >= 0) Keep(first, false);
+            }
+            hq_PlanBath_dx = dx;
+            hq_PlanBath_dz = dz;
+            hq_PlanBath_sink = sink;
         }
-        Extras(20, 400, "ck_plant", "wk_trashcan");
-        // (e) the cleaning corner by the door: a bucket with a mop or a broom
-        GenRng r8 = SR(8);
-        if (r8.Chance(330) && LooseFit(2))
+        if (Ph(13))
         {
-            int first = nEmit;
-            FSet(Pick(ref r8, "gen_mop", 5, "gen_broom", 5), Pick(ref r8, "s_bucket", 5, "t_bucketMetal", 5));
-            if (FormAt(GenData.GL_ROW, 70, GenData.A_WALL, WM_NEAR, dx, dz, 0, ref r8) >= 0 && Keep(first, false)) MarkLoose(first);
+            Extras(20, 400, "ck_plant", "wk_trashcan");
+            // (e) the cleaning corner by the door: a bucket with a mop or a broom
+            GenRng r8 = SR(8);
+            hq_PlanBath_sel4 = 0;
+            if (r8.Chance(330) && LooseFit(2)) hq_PlanBath_sel4 = 1;
+            hq_PlanBath_r8 = r8;
+        }
+        if (Ph(14))
+        {
+            if (hq_PlanBath_sel4 == 1)
+            {
+                GenRng r8 = hq_PlanBath_r8;
+                int first = nEmit;
+                FSet(Pick(ref r8, "gen_mop", 5, "gen_broom", 5), Pick(ref r8, "s_bucket", 5, "t_bucketMetal", 5));
+                hq_PlanBath_r8 = r8;
+                hq_PlanBath_first = first;
+            }
+        }
+        if (Ph(15))
+        {
+            if (hq_PlanBath_sel4 == 1)
+            {
+                int dx = hq_PlanBath_dx;
+                int dz = hq_PlanBath_dz;
+                GenRng r8 = hq_PlanBath_r8;
+                int first = hq_PlanBath_first;
+                if (FormAt(GenData.GL_ROW, 70, GenData.A_WALL, WM_NEAR, dx, dz, 0, ref r8) >= 0 && Keep(first, false)) MarkLoose(first);
+                hq_PlanBath_dx = dx;
+                hq_PlanBath_dz = dz;
+                hq_PlanBath_r8 = r8;
+                hq_PlanBath_first = first;
+            }
         }
     }
 
     // phase state of the split plans (Tools: autophase2)
     int hp_PlanOffice_desk;
     int hp_PlanOffice_shelf;
+
+    // locals of the split plans, kept from one phase to the next (autophase3)
+    int hq_PlanBath_dx;
+    int hq_PlanBath_dz;
+    int hq_PlanBath_first;
+    int hq_PlanBath_first2;
+    GenRng hq_PlanBath_r;
+    GenRng hq_PlanBath_r2;
+    GenRng hq_PlanBath_r3;
+    GenRng hq_PlanBath_r5;
+    GenRng hq_PlanBath_r8;
+    int hq_PlanBath_sel1;
+    int hq_PlanBath_sel2;
+    int hq_PlanBath_sel3;
+    int hq_PlanBath_sel4;
+    int hq_PlanBath_side;
+    int hq_PlanBath_sink;
+    int hq_PlanBath_toilet;
+    int hq_PlanBath_tub;
+    int hq_PlanBath_washer;
+    int hq_PlanBedroom_bed;
+    int hq_PlanBedroom_bedDef;
+    int hq_PlanBedroom_bs;
+    int hq_PlanBedroom_bx;
+    int hq_PlanBedroom_bz2;
+    bool hq_PlanBedroom_dbl;
+    int hq_PlanBedroom_dx;
+    int hq_PlanBedroom_dz;
+    int hq_PlanBedroom_got;
+    GenRng hq_PlanBedroom_r;
+    GenRng hq_PlanBedroom_r2;
+    GenRng hq_PlanBedroom_r4;
+    GenRng hq_PlanBedroom_r6;
+    GenRng hq_PlanBedroom_r8;
+    int hq_PlanBedroom_s0;
+    int hq_PlanBedroom_sel1;
+    int hq_PlanBedroom_third;
+    int hq_PlanDining_first0;
+    GenRng hq_PlanDining_r;
+    int hq_PlanDining_t;
+    int hq_PlanDining_table;
+    int hq_PlanDining_yaw;
+    int hq_PlanHall_bench;
+    int hq_PlanHall_dx;
+    int hq_PlanHall_dz;
+    int hq_PlanHall_first;
+    GenRng hq_PlanHall_r;
+    GenRng hq_PlanHall_r2;
+    GenRng hq_PlanHall_r4;
+    GenRng hq_PlanHall_r5;
+    GenRng hq_PlanHall_r7;
+    int hq_PlanHall_rack;
+    int hq_PlanHall_sel1;
+    int hq_PlanKids_bed;
+    int hq_PlanKids_bedDef;
+    int hq_PlanKids_box;
+    int hq_PlanKids_bs;
+    int hq_PlanKids_cell;
+    int hq_PlanKids_first;
+    int hq_PlanKids_first0;
+    bool hq_PlanKids_ok;
+    GenRng hq_PlanKids_r;
+    GenRng hq_PlanKids_r2;
+    GenRng hq_PlanKids_r3;
+    GenRng hq_PlanKids_r7;
+    int hq_PlanKids_sel1;
+    int hq_PlanKids_sel2;
+    int hq_PlanKids_sel3;
+    int hq_PlanKids_sel4;
+    bool hq_PlanKids_two;
+    int hq_PlanKitchen_bar;
+    int hq_PlanKitchen_bin;
+    int hq_PlanKitchen_first;
+    GenRng hq_PlanKitchen_r2;
+    GenRng hq_PlanKitchen_r3;
+    GenRng hq_PlanKitchen_r5;
+    GenRng hq_PlanKitchen_r6;
+    int hq_PlanKitchen_sel1;
+    int hq_PlanKitchen_sel2;
+    int hq_PlanKitchen_sel3;
+    int hq_PlanLiving_box;
+    int hq_PlanLiving_chZ;
+    int hq_PlanLiving_chair;
+    int hq_PlanLiving_chairDef;
+    int hq_PlanLiving_chairs;
+    int hq_PlanLiving_ctDef;
+    int hq_PlanLiving_ctZ;
+    int hq_PlanLiving_dx;
+    int hq_PlanLiving_dz;
+    int hq_PlanLiving_first;
+    int hq_PlanLiving_lxSofa;
+    int hq_PlanLiving_lxTable;
+    GenRng hq_PlanLiving_r;
+    GenRng hq_PlanLiving_r12;
+    GenRng hq_PlanLiving_r3;
+    GenRng hq_PlanLiving_r6;
+    GenRng hq_PlanLiving_r8;
+    GenRng hq_PlanLiving_r9;
+    int hq_PlanLiving_sd;
+    int hq_PlanLiving_sel1;
+    int hq_PlanLiving_sel2;
+    int hq_PlanLiving_sel3;
+    int hq_PlanLiving_sel4;
+    int hq_PlanLiving_sel5;
+    int hq_PlanLiving_side0;
+    int hq_PlanLiving_sofa;
+    int hq_PlanLiving_sofaDef;
+    int hq_PlanLiving_ssz;
+    int hq_PlanLiving_tableSide;
+    int hq_PlanLiving_tv;
+    int hq_PlanLiving_tvDef;
+    int hq_PlanLiving_view;
 }
