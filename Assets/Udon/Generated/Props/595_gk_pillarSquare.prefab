@@ -95,6 +95,7 @@ GameObject:
   - component: {fileID: 7084420119747300620}
   - component: {fileID: 8768810206099032948}
   - component: {fileID: 4087911825461811027}
+  - component: {fileID: 3339084795465808583}
   - component: {fileID: 8364970071886967784}
   m_Layer: 11
   m_Name: 595_gk_pillarSquare
@@ -126,7 +127,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6503673500350717761}
-  m_Mesh: {fileID: 58474323826437406, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 2942117146475602703, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &8768810206099032948
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -188,8 +189,29 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.35, y: 1.15, z: 0.35}
-  m_Center: {x: 0, y: 0.575, z: 0}
+  m_Size: {x: 0.35, y: 1.0833333, z: 0.35}
+  m_Center: {x: 0, y: 0.5416666, z: 0}
+--- !u!65 &3339084795465808583
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6503673500350717761}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.22569445, y: 0.06111133, z: 0.22569445}
+  m_Center: {x: 0, y: 1.1194444, z: 0}
 --- !u!54 &8364970071886967784
 Rigidbody:
   m_ObjectHideFlags: 0

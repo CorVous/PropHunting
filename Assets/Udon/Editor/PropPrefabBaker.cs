@@ -7,8 +7,8 @@ using UnityEngine;
 // read the blob or add components at runtime:
 //   Assets/Udon/Generated/Models.asset          every model as a Mesh (sub-assets, named after GenModels.Name)
 //   Assets/Udon/Generated/PropLit.mat           the one vertex-coloured material (shader PropHunt/Lit)
-//   Assets/Udon/Generated/Props/<def>.prefab    one prefab per prop definition: mesh, scale, the box colliders of
-//                                               PropColliders.Build, and the door or lid parts of openables as
+//   Assets/Udon/Generated/Props/<def>.prefab    one prefab per prop definition: mesh, scale, box colliders fitted
+//                                               to the model's own shape (FitBoxes), and the door or lid parts of openables as
 //                                               children named "door0", "door1", ... (hinge at the child's origin)
 // MapBuilderUdon instantiates the prefabs by def index (its propPrefabs array, filled by this baker).
 // Menu PropHunt > Bake prop prefabs. Run it after the models or the defs change.
@@ -75,6 +75,7 @@ public static class PropPrefabBaker
         for (int m = 1; m < mesh.Length; m++) AssetDatabase.AddObjectToAsset(mesh[m], mesh[0]);
         AssetDatabase.SaveAssets();
 
+        fitProps = 0; fitBoxes = 0; fitSingle = 0; fitCache.Clear();
         var prefabs = new GameObject[GenData.nDefs];
         for (int d = 0; d < GenData.nDefs; d++)
             prefabs[d] = MakePrefab(d, mat);
@@ -114,6 +115,7 @@ public static class PropPrefabBaker
         AssetDatabase.SaveAssets();
         MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor, partMesh, partOpening, partBody, skyPrefabs, starDome, moonPrefab);
         Debug.Log("[prophunt] baked " + mesh.Length + " meshes and " + prefabs.Length + " prop prefabs");
+        Debug.Log("[prophunt] fitted colliders: " + fitProps + " props, " + fitBoxes + " boxes (" + fitSingle + " props of one box)");
     }
 
     static GameObject MakePrefab(int def, Material mat)
@@ -606,6 +608,10 @@ public static class PropPrefabBaker
         float top = GenData.defTopY[def] / 1000f / sc;
         float cm = 0.01f / sc;
         if ((fl & GenData.FL_DECOR) != 0) return;
+        // Fitted to the model (Cor: a small hider should get into the gaps a thing has: under a chair, between a
+        // table's legs, into an open crate). The kinds whose collider is not the model's shape on purpose keep
+        // theirs: a tree is only its trunk, a tent stays open, a flat thing is a thin base.
+        if (kind != GenData.C_TRUNK && kind != GenData.C_TENT && kind != GenData.C_NONE && FitColliders(go, model, sc)) return;
         switch (kind)
         {
             case GenData.C_TABLE:
@@ -683,6 +689,192 @@ public static class PropPrefabBaker
                 Add(go, mn, new Vector3(mx.x, Mathf.Max(mx.y, mn.y + 2f * cm), mx.z));
                 break;
         }
+    }
+
+    // ------------------------------------------------------------------ colliders fitted to the model
+    // The model is cut into a grid of cells about 5 cm across (in the world, at the prop's scale). A cell a
+    // triangle passes through is full, and so is a cell shut in on every side (the inside of a closed thing). The
+    // full cells are merged into boxes, the largest first, each shrunk to the part of the model it holds. A
+    // knockable prop is a rigidbody, which takes no hollow mesh collider: a handful of boxes is what it can have.
+    // A model that needs more than FIT_MAX boxes is cut coarser until it does not (small gaps close first).
+    const int FIT_MAX = 8, FIT_GRID = 18;
+    const float FIT_CELL = 0.05f, FIT_SMALL = 0.05f, FIT_THIN = 0.02f;
+    public static int fitBoxes, fitProps, fitSingle;
+    static readonly System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<Bounds>> fitCache = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<Bounds>>();
+
+    static bool FitColliders(GameObject go, int model, float sc)
+    {
+        Mesh m = mesh[model];
+        if (m == null) return false;
+        Bounds b = bounds[model];
+        // (defs that share a model at one scale share the work)
+        string key = model + "@" + sc.ToString("0.000");
+        System.Collections.Generic.List<Bounds> known;
+        if (fitCache.TryGetValue(key, out known))
+        {
+            if (known == null) return false;
+            for (int i = 0; i < known.Count; i++) Add(go, known[i].min, known[i].max);
+            fitProps++; fitBoxes += known.Count; if (known.Count == 1) fitSingle++;
+            return true;
+        }
+        float cell = Mathf.Max(FIT_CELL / sc, Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z)) / FIT_GRID);
+        System.Collections.Generic.List<Bounds> boxes = null;
+        for (int pass = 0; pass < 8; pass++)
+        {
+            boxes = FitBoxes(m, b, cell, FIT_SMALL / sc, FIT_SPARE);
+            if (boxes.Count <= FIT_MAX) break;
+            // Too many: where the extra boxes are small bits (a chair's stretchers, a slat) they are left out and
+            // the gaps kept; cutting coarser instead closed them (a chair came out a solid block)
+            if (boxes.Count <= FIT_SPARE)
+            {
+                boxes.Sort((p, q) => Vol(q).CompareTo(Vol(p)));
+                float all = 0f, drop = 0f;
+                for (int i = 0; i < boxes.Count; i++) { all += Vol(boxes[i]); if (i >= FIT_MAX) drop += Vol(boxes[i]); }
+                if (drop <= FIT_DROP * all) { boxes.RemoveRange(FIT_MAX, boxes.Count - FIT_MAX); break; }
+            }
+            cell *= 1.35f;
+        }
+        if (boxes == null || boxes.Count == 0 || boxes.Count > FIT_MAX) { fitCache[key] = null; return false; }
+        float thin = FIT_THIN / sc;
+        var kept = new System.Collections.Generic.List<Bounds>();
+        for (int i = 0; i < boxes.Count; i++)
+        {
+            Vector3 c = boxes[i].center, s = boxes[i].size;
+            s = new Vector3(Mathf.Max(s.x, thin), Mathf.Max(s.y, thin), Mathf.Max(s.z, thin));
+            // (a box made thicker stays inside the model's bounds)
+            Vector3 mn = Vector3.Max(c - s * 0.5f, b.min), mx = Vector3.Min(c + s * 0.5f, b.max);
+            if (mx.x - mn.x < thin) { mn.x = Mathf.Min(mn.x, b.max.x - thin); mx.x = mn.x + thin; }
+            if (mx.y - mn.y < thin) { mn.y = Mathf.Min(mn.y, b.max.y - thin); mx.y = mn.y + thin; }
+            if (mx.z - mn.z < thin) { mn.z = Mathf.Min(mn.z, b.max.z - thin); mx.z = mn.z + thin; }
+            Add(go, mn, mx);
+            var kb = new Bounds(); kb.SetMinMax(mn, mx); kept.Add(kb);
+        }
+        fitCache[key] = kept;
+        fitProps++; fitBoxes += boxes.Count; if (boxes.Count == 1) fitSingle++;
+        return true;
+    }
+
+    const int FIT_SPARE = 24;          // boxes found before giving up on a cut (the smallest beyond FIT_MAX may be left out)
+    const float FIT_DROP = 0.1f;       // ... when together they are at most this share of the volume
+    static float Vol(Bounds k) { return k.size.x * k.size.y * k.size.z; }
+
+    static System.Collections.Generic.List<Bounds> FitBoxes(Mesh m, Bounds b, float cell, float small, int limit)
+    {
+        Vector3 mn = b.min, size = b.size;
+        int nx = Mathf.Clamp(Mathf.CeilToInt(size.x / cell), 1, 24), ny = Mathf.Clamp(Mathf.CeilToInt(size.y / cell), 1, 24), nz = Mathf.Clamp(Mathf.CeilToInt(size.z / cell), 1, 24);
+        Vector3 cs = new Vector3(Mathf.Max(size.x, 1e-5f) / nx, Mathf.Max(size.y, 1e-5f) / ny, Mathf.Max(size.z, 1e-5f) / nz);
+        int n = nx * ny * nz;
+        var occ = new bool[n];
+        var lo = new Vector3[n];
+        var hi = new Vector3[n];
+        Vector3[] v = m.vertices;
+        int[] t = m.triangles;
+        float stepLen = Mathf.Min(cs.x, Mathf.Min(cs.y, cs.z)) * 0.5f;
+        for (int i = 0; i + 2 < t.Length; i += 3)
+        {
+            Vector3 a = v[t[i]], e1 = v[t[i + 1]] - a, e2 = v[t[i + 2]] - a;
+            float longest = Mathf.Max(e1.magnitude, Mathf.Max(e2.magnitude, (e2 - e1).magnitude));
+            int k = Mathf.Clamp(Mathf.CeilToInt(longest / stepLen), 1, 96);
+            for (int p = 0; p <= k; p++)
+                for (int q = 0; q <= k - p; q++)
+                {
+                    Vector3 s = a + e1 * ((float)p / k) + e2 * ((float)q / k);
+                    int ix = Mathf.Clamp((int)((s.x - mn.x) / cs.x), 0, nx - 1), iy = Mathf.Clamp((int)((s.y - mn.y) / cs.y), 0, ny - 1), iz = Mathf.Clamp((int)((s.z - mn.z) / cs.z), 0, nz - 1);
+                    int id = ix + nx * (iy + ny * iz);
+                    if (!occ[id]) { occ[id] = true; lo[id] = s; hi[id] = s; }
+                    else { lo[id] = Vector3.Min(lo[id], s); hi[id] = Vector3.Max(hi[id], s); }
+                }
+        }
+        // what the outside cannot reach is inside a closed thing: full
+        var reached = new bool[n];
+        var queue = new int[n];
+        int qh = 0, qt = 0;
+        for (int iz = 0; iz < nz; iz++)
+            for (int iy = 0; iy < ny; iy++)
+                for (int ix = 0; ix < nx; ix++)
+                {
+                    if (ix > 0 && ix < nx - 1 && iy > 0 && iy < ny - 1 && iz > 0 && iz < nz - 1) continue;
+                    int id = ix + nx * (iy + ny * iz);
+                    if (!occ[id] && !reached[id]) { reached[id] = true; queue[qt++] = id; }
+                }
+        while (qh < qt)
+        {
+            int id = queue[qh++];
+            int ix = id % nx, iy = (id / nx) % ny, iz = id / (nx * ny);
+            for (int d = 0; d < 6; d++)
+            {
+                int jx = ix + (d == 0 ? 1 : d == 1 ? -1 : 0), jy = iy + (d == 2 ? 1 : d == 3 ? -1 : 0), jz = iz + (d == 4 ? 1 : d == 5 ? -1 : 0);
+                if (jx < 0 || jy < 0 || jz < 0 || jx >= nx || jy >= ny || jz >= nz) continue;
+                int jd = jx + nx * (jy + ny * jz);
+                if (occ[jd] || reached[jd]) continue;
+                reached[jd] = true; queue[qt++] = jd;
+            }
+        }
+        for (int id = 0; id < n; id++)
+        {
+            if (occ[id] || reached[id]) continue;
+            int ix = id % nx, iy = (id / nx) % ny, iz = id / (nx * ny);
+            occ[id] = true;
+            lo[id] = mn + new Vector3(ix * cs.x, iy * cs.y, iz * cs.z);
+            hi[id] = lo[id] + cs;
+        }
+        // boxes, the one that takes the most cells first; a seed grows along the axes in three orders
+        var used = new bool[n];
+        var boxes = new System.Collections.Generic.List<Bounds>();
+        int[] g0 = new int[3], g1 = new int[3], dim = { nx, ny, nz };
+        int[][] orders = { new[] { 0, 2, 1 }, new[] { 0, 1, 2 }, new[] { 2, 1, 0 } };
+        for (int round = 0; round < 48; round++)
+        {
+            int best = 0; int[] b0 = null, b1 = null;
+            for (int id = 0; id < n; id++)
+            {
+                if (!occ[id] || used[id]) continue;
+                int sx = id % nx, sy = (id / nx) % ny, sz = id / (nx * ny);
+                for (int o = 0; o < 3; o++)
+                {
+                    g0[0] = sx; g0[1] = sy; g0[2] = sz; g1[0] = sx; g1[1] = sy; g1[2] = sz;
+                    for (int ai = 0; ai < 3; ai++)
+                    {
+                        int ax = orders[o][ai];
+                        while (g1[ax] + 1 < dim[ax] && FreeSlab(occ, used, nx, ny, g0, g1, ax, g1[ax] + 1)) g1[ax]++;
+                        while (g0[ax] - 1 >= 0 && FreeSlab(occ, used, nx, ny, g0, g1, ax, g0[ax] - 1)) g0[ax]--;
+                    }
+                    int cells = (g1[0] - g0[0] + 1) * (g1[1] - g0[1] + 1) * (g1[2] - g0[2] + 1);
+                    if (cells > best) { best = cells; b0 = (int[])g0.Clone(); b1 = (int[])g1.Clone(); }
+                }
+            }
+            if (best == 0) break;
+            Vector3 bl = Vector3.positiveInfinity, bh = Vector3.negativeInfinity;
+            for (int iz = b0[2]; iz <= b1[2]; iz++)
+                for (int iy = b0[1]; iy <= b1[1]; iy++)
+                    for (int ix = b0[0]; ix <= b1[0]; ix++)
+                    {
+                        int id = ix + nx * (iy + ny * iz);
+                        used[id] = true;
+                        bl = Vector3.Min(bl, lo[id]); bh = Vector3.Max(bh, hi[id]);
+                    }
+            Vector3 sz3 = bh - bl;
+            // a crumb (a knob, a leaf's tip) is left out
+            if (Mathf.Max(sz3.x, Mathf.Max(sz3.y, sz3.z)) < small) continue;
+            boxes.Add(new Bounds((bl + bh) * 0.5f, sz3));
+            if (boxes.Count > limit) break;   // too many: the caller cuts coarser
+        }
+        return boxes;
+    }
+
+    // whether the layer at index `at` along axis `ax`, across the box's other two extents, is all full and unused
+    static bool FreeSlab(bool[] occ, bool[] used, int nx, int ny, int[] g0, int[] g1, int ax, int at)
+    {
+        int a = (ax + 1) % 3, b = (ax + 2) % 3;
+        int[] c = new int[3];
+        c[ax] = at;
+        for (c[a] = g0[a]; c[a] <= g1[a]; c[a]++)
+            for (c[b] = g0[b]; c[b] <= g1[b]; c[b]++)
+            {
+                int id = c[0] + nx * (c[1] + ny * c[2]);
+                if (!occ[id] || used[id]) return false;
+            }
+        return true;
     }
 
     static float InsideFloor(int model)

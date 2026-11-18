@@ -95,6 +95,8 @@ GameObject:
   - component: {fileID: 5166391491509345455}
   - component: {fileID: 5322666659270932460}
   - component: {fileID: 7630674589257553195}
+  - component: {fileID: 7289313216932092628}
+  - component: {fileID: 6280414392252657846}
   - component: {fileID: 574680417384295439}
   m_Layer: 11
   m_Name: 112_w_barrelB
@@ -126,7 +128,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8488836185709187512}
-  m_Mesh: {fileID: -390606187895833680, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 6453297612940186147, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &5322666659270932460
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -188,8 +190,50 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
+  m_Size: {x: 0.71428573, y: 1, z: 1}
   m_Center: {x: 0, y: 0.5, z: 0}
+--- !u!65 &7289313216932092628
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8488836185709187512}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.14280367, y: 1, z: 0.64641017}
+  m_Center: {x: -0.42859817, y: 0.5, z: 0.000000029802322}
+--- !u!65 &6280414392252657846
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8488836185709187512}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.14280367, y: 1, z: 0.6464101}
+  m_Center: {x: 0.42859817, y: 0.5, z: 0}
 --- !u!54 &574680417384295439
 Rigidbody:
   m_ObjectHideFlags: 0

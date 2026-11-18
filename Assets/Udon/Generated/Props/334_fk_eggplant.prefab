@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 7366227529278276217}
   - component: {fileID: 1076624557546258203}
   - component: {fileID: 273043972498345985}
+  - component: {fileID: 7491071000441834393}
   - component: {fileID: 6172299422776028502}
   m_Layer: 11
   m_Name: 334_fk_eggplant
@@ -43,7 +44,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1103655796229537512}
-  m_Mesh: {fileID: 9217788354607787910, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -4384041146983294222, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &1076624557546258203
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,8 +106,29 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.20403574, y: 0.40519834, z: 0.21555664}
-  m_Center: {x: 0, y: 0.20259917, z: 0}
+  m_Size: {x: 0.20403574, y: 0.40519834, z: 0.14370443}
+  m_Center: {x: 0, y: 0.20259917, z: -0.035926104}
+--- !u!65 &7491071000441834393
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1103655796229537512}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.1709797, y: 0.22653705, z: 0.07137102}
+  m_Center: {x: 0, y: 0.129336, z: 0.07209281}
 --- !u!54 &6172299422776028502
 Rigidbody:
   m_ObjectHideFlags: 0

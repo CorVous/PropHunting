@@ -95,6 +95,11 @@ GameObject:
   - component: {fileID: 647952335394162035}
   - component: {fileID: 8938875704210182084}
   - component: {fileID: 2855852451777800566}
+  - component: {fileID: 2878086333424259245}
+  - component: {fileID: 9023402336205970362}
+  - component: {fileID: 5584596082969273385}
+  - component: {fileID: 4208385845859736860}
+  - component: {fileID: 8235401468469112524}
   - component: {fileID: 1233749326769617649}
   m_Layer: 11
   m_Name: 636_f_hedge
@@ -126,7 +131,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6038545762055929796}
-  m_Mesh: {fileID: 5119989683011177009, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -6452369312351380781, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &8938875704210182084
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -188,8 +193,113 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.4, y: 0.6, z: 1}
+  m_Size: {x: 0.3, y: 0.6, z: 1}
   m_Center: {x: 0, y: 0.3, z: 0}
+--- !u!65 &2878086333424259245
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6038545762055929796}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.049999997, y: 0.4909091, z: 1}
+  m_Center: {x: -0.17500001, y: 0.24545455, z: 0}
+--- !u!65 &9023402336205970362
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6038545762055929796}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.049999997, y: 0.2, z: 1}
+  m_Center: {x: 0.17500001, y: 0.1, z: 0}
+--- !u!65 &5584596082969273385
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6038545762055929796}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.01111111, y: 0.01111111, z: 0.172894}
+  m_Center: {x: -0.15000002, y: 0.49565214, z: 0.0005095005}
+--- !u!65 &4208385845859736860
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6038545762055929796}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.01111111, y: 0.01111114, z: 0.08928573}
+  m_Center: {x: -0.15000002, y: 0.49553573, z: -0.45535713}
+--- !u!65 &8235401468469112524
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6038545762055929796}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.01111111, y: 0.01111114, z: 0.08928573}
+  m_Center: {x: -0.15000002, y: 0.49553573, z: 0.45535713}
 --- !u!54 &1233749326769617649
 Rigidbody:
   m_ObjectHideFlags: 0

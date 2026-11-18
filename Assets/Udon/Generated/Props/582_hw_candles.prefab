@@ -95,6 +95,8 @@ GameObject:
   - component: {fileID: 3062547016716073942}
   - component: {fileID: 3990920785494323597}
   - component: {fileID: 7703118633898474132}
+  - component: {fileID: 4803048296217589808}
+  - component: {fileID: 3669321506600528998}
   - component: {fileID: 1098498688328265231}
   m_Layer: 11
   m_Name: 582_hw_candles
@@ -126,7 +128,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3866961658591584965}
-  m_Mesh: {fileID: -1470091743739651016, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 3123999904270146042, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &3990920785494323597
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -188,8 +190,50 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.45106077, y: 0.7856838, z: 0.35093173}
-  m_Center: {x: 0, y: 0.3928419, z: 0}
+  m_Size: {x: 0.45106077, y: 0.5609769, z: 0.35093173}
+  m_Center: {x: 0, y: 0.28048846, z: 0}
+--- !u!65 &4803048296217589808
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3866961658591584965}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.3329082, y: 0.07380557, z: 0.2803368}
+  m_Center: {x: -0.059076283, y: 0.5987214, z: -0.02302358}
+--- !u!65 &3669321506600528998
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3866961658591584965}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.17386732, y: 0.10230678, z: 0.17139512}
+  m_Center: {x: -0.13859673, y: 0.73453045, z: -0.07749441}
 --- !u!54 &1098498688328265231
 Rigidbody:
   m_ObjectHideFlags: 0

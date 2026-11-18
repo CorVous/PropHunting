@@ -95,6 +95,8 @@ GameObject:
   - component: {fileID: 3926968650108866918}
   - component: {fileID: 4797356234057617401}
   - component: {fileID: 2096943231714605734}
+  - component: {fileID: 5957223376355753672}
+  - component: {fileID: 9194710888199484278}
   m_Layer: 11
   m_Name: 264_c_van
   m_TagString: Untagged
@@ -125,7 +127,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3770028502016661264}
-  m_Mesh: {fileID: -3607663414590824370, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -8658090618393476229, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &4797356234057617401
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -187,5 +189,47 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.5, y: 1.35, z: 2.7500002}
-  m_Center: {x: 0, y: 0.675, z: 0}
+  m_Size: {x: 1.5, y: 1.08, z: 2.4750004}
+  m_Center: {x: 0, y: 0.54, z: -0.13749999}
+--- !u!65 &5957223376355753672
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3770028502016661264}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.9878447, y: 0.26961172, z: 1.9688582}
+  m_Center: {x: 0, y: 1.2151942, z: -0.22200131}
+--- !u!65 &9194710888199484278
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3770028502016661264}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.3, y: 0.5916667, z: 0.2711252}
+  m_Center: {x: 0, y: 0.44583333, z: 1.2394376}

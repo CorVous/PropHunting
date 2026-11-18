@@ -95,6 +95,8 @@ GameObject:
   - component: {fileID: 2353382702397113214}
   - component: {fileID: 6913951820231261977}
   - component: {fileID: 1795561639155587996}
+  - component: {fileID: 7948368334452648954}
+  - component: {fileID: 8548693916863173630}
   - component: {fileID: 8056187115326922216}
   m_Layer: 11
   m_Name: 190_toy_panda
@@ -126,7 +128,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7992943597230117737}
-  m_Mesh: {fileID: -7883024309556162724, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 9116254986916059962, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &6913951820231261977
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -188,8 +190,50 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.3433471, y: 1.5012499, z: 1.439858}
-  m_Center: {x: 0, y: 0.75062495, z: 0}
+  m_Size: {x: 1.3433471, y: 1.285824, z: 1.1998817}
+  m_Center: {x: 0, y: 0.85833794, z: -0.11998814}
+--- !u!65 &7948368334452648954
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7992943597230117737}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.8750001, y: 0.21383205, z: 0.95876825}
+  m_Center: {x: 0, y: 0.106916025, z: -0.13681298}
+--- !u!65 &8548693916863173630
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7992943597230117737}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.89455074, y: 0.7750001, z: 0.23985794}
+  m_Center: {x: 0, y: 0.80625, z: 0.6}
 --- !u!54 &8056187115326922216
 Rigidbody:
   m_ObjectHideFlags: 0

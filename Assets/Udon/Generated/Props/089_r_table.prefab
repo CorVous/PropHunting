@@ -99,6 +99,9 @@ GameObject:
   - component: {fileID: 7728205315023619868}
   - component: {fileID: 7536886550478807775}
   - component: {fileID: 6507889964272052992}
+  - component: {fileID: 1055646119383406499}
+  - component: {fileID: 3405833213321586574}
+  - component: {fileID: 116322332363763220}
   - component: {fileID: 2180640159953455649}
   m_Layer: 11
   m_Name: 089_r_table
@@ -130,7 +133,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8613197074998659300}
-  m_Mesh: {fileID: 3668073990961597816, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -5872744332026411174, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &3429628828028271425
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -192,8 +195,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 2, y: 0.100375175, z: 2}
-  m_Center: {x: 0, y: 0.95381236, z: 0}
+  m_Size: {x: 1.5999999, y: 0.39999998, z: 1.8}
+  m_Center: {x: 0, y: 0.80375177, z: -0.100000024}
 --- !u!65 &1087017961083532739
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -213,8 +216,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.18, y: 0.9036248, z: 0.18}
-  m_Center: {x: -0.8833333, y: 0.4518124, z: -0.8833333}
+  m_Size: {x: 1.8874878, y: 0.36531428, z: 0.25906265}
+  m_Center: {x: 0, y: 0.18265714, z: 0.81421876}
 --- !u!65 &7728205315023619868
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -234,8 +237,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.18, y: 0.9036248, z: 0.18}
-  m_Center: {x: 0.8833333, y: 0.4518124, z: -0.8833333}
+  m_Size: {x: 1.8874878, y: 0.3653125, z: 0.25906253}
+  m_Center: {x: 0, y: 0.18265803, z: -0.81421876}
 --- !u!65 &7536886550478807775
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -255,8 +258,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.18, y: 0.9036248, z: 0.18}
-  m_Center: {x: -0.8833333, y: 0.4518124, z: 0.8833333}
+  m_Size: {x: 0.20000005, y: 0.20000005, z: 2}
+  m_Center: {x: -0.9, y: 0.90375173, z: 0}
 --- !u!65 &6507889964272052992
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -276,8 +279,71 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.18, y: 0.9036248, z: 0.18}
-  m_Center: {x: 0.8833333, y: 0.4518124, z: 0.8833333}
+  m_Size: {x: 0.19972456, y: 0.20000005, z: 2}
+  m_Center: {x: 0.9001377, y: 0.90375173, z: 0}
+--- !u!65 &1055646119383406499
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8613197074998659300}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.5999999, y: 0.20000005, z: 0.19971836}
+  m_Center: {x: 0, y: 0.90375173, z: 0.9001408}
+--- !u!65 &3405833213321586574
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8613197074998659300}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.12500012, y: 0.10825321, z: 1.17375}
+  m_Center: {x: -0.85, y: 0.20375176, z: -0.000000059604645}
+--- !u!65 &116322332363763220
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8613197074998659300}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.12500012, y: 0.10825321, z: 1.17375}
+  m_Center: {x: 0.85, y: 0.20375176, z: -0.000000059604645}
 --- !u!54 &2180640159953455649
 Rigidbody:
   m_ObjectHideFlags: 0

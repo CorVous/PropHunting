@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1468846189299042402}
   - component: {fileID: 7989340362000864173}
   - component: {fileID: 6754009510908892176}
+  - component: {fileID: 3303117335251885486}
   - component: {fileID: 4300917607666306277}
   m_Layer: 11
   m_Name: 314_g_hammer
@@ -43,7 +44,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1757960944410022487}
-  m_Mesh: {fileID: 21866201038894775, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 982603711220559870, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &7989340362000864173
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,8 +106,29 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.54344475, y: 0.82335377, z: 0.32613277}
-  m_Center: {x: 0, y: 0.41167688, z: 0}
+  m_Size: {x: 0.54344475, y: 0.42853355, z: 0.32613277}
+  m_Center: {x: 0, y: 0.609087, z: 0}
+--- !u!65 &3303117335251885486
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1757960944410022487}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.15186702, y: 0.35478786, z: 0.13078362}
+  m_Center: {x: 0.000026866794, y: 0.17739393, z: 0.00000090897083}
 --- !u!54 &4300917607666306277
 Rigidbody:
   m_ObjectHideFlags: 0
