@@ -300,7 +300,9 @@ public class PHHiderBody : UdonSharpBehaviour
         Vector3 h = new Vector3(half.x, half.y - RAISE * 0.5f, half.z);
         Vector3 c = from + Vector3.up * (half.y + RAISE * 0.5f);
         RaycastHit r;   // (an out parameter into a field is not written back in Udon)
-        bool any = Physics.BoxCast(c, h, dir, out r, Rot(), dist + GAP, mask, QueryTriggerInteraction.Ignore);
+        // A tenth of a degree off: at exactly 90 or 270 degrees PhysX sweeps a box that is longer than wide as if it
+        // were not turned, and short sweeps miss the walls (a prop facing east or west walked through them)
+        bool any = Physics.BoxCast(c, h, dir, out r, Quaternion.Euler(0f, yaw + 0.1f, 0f), dist + GAP, mask, QueryTriggerInteraction.Ignore);
         hit = r;
         return any;
     }
@@ -469,6 +471,13 @@ public class PHHiderBody : UdonSharpBehaviour
                 }
                 }
             }
+            if (blocked && !narrow && mask != 0)
+            {
+                Vector3 got = pos - start; got.y = 0f;
+                float len = delta.magnitude;
+                if (got.magnitude < 0.35f * len) CornerAssist(start, delta / len, len, wasGrounded);
+            }
+            if (mask != 0) Unstick(start, delta, dt);
         }
         if (narrow) SqueezeAfterMove();
         if (velY > 0f)
@@ -512,6 +521,80 @@ public class PHHiderBody : UdonSharpBehaviour
             if (Fits(pos, newYaw + d)) { yaw = newYaw + d; return true; }
             if (Fits(pos, newYaw - d)) { yaw = newYaw - d; return true; }
         }
+        // no room to turn where it stands: a little aside there may be (Cor: nudge it so it can turn). As far as
+        // its long side sticks out past its short one, and a hand's width
+        if (!narrow && !lifting && Nudge(newYaw, Mathf.Min(0.8f, Mathf.Abs(half.x - half.z) + 0.12f))) { yaw = newYaw; return true; }
         return false;
+    }
+
+    // ------------------------------------------------------------------ forgiving (Cor: hiders must not get stuck)
+    // The nearest place within reach where the prop's own box fits at this facing, with something to stand on, and
+    // no wall between here and there (a thin box gets there). The prop is moved to it.
+    public bool Nudge(float atYaw, float reach)
+    {
+        if (mask == 0) return true;
+        Vector3 keep = half;
+        half = fullHalf;
+        Vector3 thin = new Vector3(Mathf.Min(fullHalf.x, 0.08f), fullHalf.y, Mathf.Min(fullHalf.z, 0.08f));
+        for (int ring = 1; ring <= 5; ring++)
+            for (int k = 0; k < 12; k++)
+            {
+                float a = k * Mathf.PI / 6f, d = reach * ring / 5f;
+                Vector3 at = pos + new Vector3(Mathf.Cos(a) * d, 0f, Mathf.Sin(a) * d);
+                if (!Fits(at, atYaw)) continue;
+                half = thin;
+                bool wall = SweepH(pos, (at - pos).normalized, d);
+                half = fullHalf;
+                if (wall) continue;
+                if (!GroundBelow(at, 0.5f) || groundN.y < 0.64f) continue;   // not out over a drop
+                at.y = groundY;
+                pos = at; narrow = false;
+                return true;
+            }
+        half = keep;
+        return false;
+    }
+
+    // A new disguise where the hider stands; where its box has no room there, the nearest place it has, as it faces
+    // or turned a quarter (Cor: a large thing that does not fit looks for a spot where it does)
+    public bool FitHere()
+    {
+        if (Fits(pos, yaw)) return true;
+        float reach = Mathf.Max(fullHalf.x, fullHalf.z) + 1f;
+        if (Nudge(yaw, reach)) return true;
+        float turned = Mathf.Repeat(yaw + 90f, 360f);
+        if (Fits(pos, turned) || Nudge(turned, reach)) { yaw = turned; return true; }
+        return false;
+    }
+
+    // Stopped almost dead by the corner of a thing (a table's leg, a door's jamb, the end of a wall): it steps
+    // aside, up to a hand's width or three, to where the way on is clear, at its own pace. Walking square into a
+    // wall finds no such place and stays.
+    void CornerAssist(Vector3 start, Vector3 dir, float len, bool step)
+    {
+        Vector3 side = new Vector3(-dir.z, 0f, dir.x);
+        for (int k = 1; k <= 6; k++)
+        {
+            float off = ((k + 1) / 2) * 0.08f;
+            Vector3 s = (k & 1) == 1 ? side : -side;
+            if (SweepH(start, s, off)) continue;                 // no room to step aside that far
+            if (SweepH(start + s * off, dir, 0.3f)) continue;    // nor a clear way on from there
+            pos = start;
+            SlideMove(s * Mathf.Min(len, off), step);
+            return;
+        }
+    }
+
+    // Standing inside something (a door swung onto it, a knocked prop came to rest in it) and getting nowhere for
+    // half a second of trying: out to the nearest place where it fits
+    float stuckFor;
+    void Unstick(Vector3 start, Vector3 delta, float dt)
+    {
+        Vector3 got = pos - start; got.y = 0f;
+        if (narrow || lifting || !grounded || got.sqrMagnitude > 0.01f * delta.sqrMagnitude) { stuckFor = 0f; return; }
+        stuckFor += dt;
+        if (stuckFor < 0.5f) return;
+        stuckFor = 0f;
+        if (!Fits(pos, yaw)) Nudge(yaw, Mathf.Max(fullHalf.x, fullHalf.z) + 0.6f);
     }
 }

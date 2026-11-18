@@ -288,13 +288,16 @@ public static class WorldSceneBuilder
         var drt = desk.GetComponent<RectTransform>(); drt.sizeDelta = new Vector2(1600, 900);
         desk.transform.localScale = Vector3.one * 0.0004f;
         GameObject bar; Image fill;
-        HealthBar(desk.transform, sprite, new Vector2(0f, -360f), new Vector2(420f, 26f), out bar, out fill);
+        // (PHView fits the canvas to the screen: 900 units high, as wide as the screen)
+        HealthBar(desk.transform, sprite, new Vector2(0f, -410f), new Vector2(280f, 18f), out bar, out fill);
         view.desktopHealthBar = bar; view.desktopHealth = fill;
         var pip = new GameObject("Pip");
         pip.transform.SetParent(desk.transform, false);
         pip.layer = 5;
         var raw = pip.AddComponent<RawImage>(); raw.texture = rt; raw.raycastTarget = false; raw.material = hudMat;
-        var prt = pip.GetComponent<RectTransform>(); prt.anchoredPosition = new Vector2(560f, -300f); prt.sizeDelta = new Vector2(360f, 240f);
+        var prt = pip.GetComponent<RectTransform>();   // the bottom right corner
+        prt.anchorMin = new Vector2(1f, 0f); prt.anchorMax = new Vector2(1f, 0f); prt.pivot = new Vector2(1f, 0f);
+        prt.anchoredPosition = new Vector2(-12f, 12f); prt.sizeDelta = new Vector2(270f, 180f);
         view.desktopPip = pip;
         view.desktopRoot = desk.transform;
 
@@ -380,28 +383,20 @@ public static class WorldSceneBuilder
             view.outlineParts[i] = Part(outline, PrimitiveType.Cube, i < 40 ? "Piece" + i : "Nub", Vector3.zero, Vector3.zero, new Vector3(0.02f, 0.004f, 0.02f), outlineMat).transform;
         view.outline = outline;
 
-        // desktop: the controls, lower left
+        // desktop: the controls in the bottom left corner, drawn as VRChat's own panels are (Cor): a dark rounded
+        // panel, a white picture over a key cap. One picture for each state; PHView shows and sizes them.
         var lg = new GameObject("Legend");
         lg.transform.SetParent(desk.transform, false);
         lg.layer = 5;
-        var lt = lg.AddComponent<TextMeshProUGUI>();
-        lt.font = TMP_Settings.defaultFontAsset;
-        lt.fontSize = 20f; lt.alignment = TextAlignmentOptions.BottomLeft; lt.color = new Color(1f, 1f, 1f, 0.92f);
-        lt.raycastTarget = false; lt.enableWordWrapping = false; lt.text = "";
-        var lrt = lg.GetComponent<RectTransform>(); lrt.anchoredPosition = new Vector2(-500f, -372f); lrt.sizeDelta = new Vector2(560f, 70f);
-        // over everything, as the rest of the desktop view, and outlined to read on any ground
-        var overlay = Shader.Find("TextMeshPro/Distance Field Overlay");
-        if (overlay != null && lt.font != null)
-        {
-            string fp = "Assets/Udon/Generated/LegendFont.mat";
-            var fm = AssetDatabase.LoadAssetAtPath<Material>(fp);
-            if (fm == null) { fm = new Material(lt.font.material); AssetDatabase.CreateAsset(fm, fp); }
-            fm.shader = overlay;
-            fm.SetFloat("_OutlineWidth", 0.2f); fm.SetColor("_OutlineColor", Color.black); fm.EnableKeyword("OUTLINE_ON");
-            EditorUtility.SetDirty(fm);
-            lt.fontSharedMaterial = fm;
-        }
-        view.legend = lt;
+        var li = lg.AddComponent<RawImage>(); li.raycastTarget = false; li.material = hudMat;
+        var lrt = lg.GetComponent<RectTransform>();
+        lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.zero; lrt.pivot = Vector2.zero;
+        lrt.anchoredPosition = new Vector2(12f, 12f); lrt.sizeDelta = new Vector2(420f, 80f);
+        view.legend = li;
+        view.legendHider = LegendTexture("LegendHider");
+        view.legendHiderShort = LegendTexture("LegendHiderShort");
+        view.legendHunter = LegendTexture("LegendHunter");
+        view.desktopCanvas = drt;
 
         UdonSharpEditorUtility.CopyProxyToUdon(view);
     }
@@ -419,6 +414,22 @@ public static class WorldSceneBuilder
         m.SetFloat(flag, 1f);
         EditorUtility.SetDirty(m);
         return m;
+    }
+
+    // a picture of the desktop controls (Assets/Udon/Textures, drawn by Tools/make_legend.py)
+    static Texture2D LegendTexture(string name)
+    {
+        string path = "Assets/Udon/Textures/" + name + ".png";
+        var ti = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (ti == null) { Debug.LogError("[prophunt] no legend picture at " + path); return null; }
+        ti.textureType = TextureImporterType.Default;
+        ti.alphaIsTransparency = true; ti.sRGBTexture = true;
+        ti.npotScale = TextureImporterNPOTScale.None;
+        ti.wrapMode = TextureWrapMode.Clamp;
+        ti.mipmapEnabled = true;
+        ti.textureCompression = TextureImporterCompression.Uncompressed;
+        ti.SaveAndReimport();
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
     static Transform Empty(Transform parent, string name)

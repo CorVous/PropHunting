@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using VRC.SDKBase;
 using VRC.SDK3.Components;
+using VRC.SDK3.Rendering;
 using VRC.Udon.Common;
 
 // What the local player sees besides the world: as little as possible (most cues are sounds, PHAudio).
@@ -49,7 +50,12 @@ public class PHView : UdonSharpBehaviour
     public Transform tauntButton, tauntCap;
     public MeshRenderer tauntCapRenderer;
     public Material capReady, capWait;
-    public TextMeshProUGUI legend;     // desktop
+    // desktop: the controls, drawn as VRChat's own panels are (Cor): a picture for each state, bottom left, clear
+    // of VRChat's rows (top left, top right)
+    public RawImage legend;
+    public Texture2D legendHider, legendHiderShort, legendHunter;
+    public RectTransform desktopCanvas;
+    const float LEGEND_H = 120f / 1342f;   // a VRChat panel's height against the screen's
     public Transform outline;          // the own prop's footprint on the ground
     public Transform[] outlineParts;   // short pieces of the edges, and the nub on the front (the last)
 
@@ -99,7 +105,7 @@ public class PHView : UdonSharpBehaviour
         if (pipCam != null && vrPanel != null) pipCam.cullingMask &= ~(1 << vrPanel.gameObject.layer);
         ShowDevices(false);
         devicesOn = false;
-        if (legend != null) legend.text = "";
+        if (legend != null) legend.gameObject.SetActive(false);
         if (outline != null) outline.gameObject.SetActive(false);
     }
 
@@ -167,11 +173,12 @@ public class PHView : UdonSharpBehaviour
         }
         if (want == legendMode) return;
         legendMode = want;
-        string t = "";
-        if (want == 1) t = "W A S D  move      Shift  run      Space  jump\nQ  E  turn the prop      Click  become a prop      T  taunt";
-        else if (want == 2) t = "Q  E  turn the prop      T  taunt";
-        else if (want == 3) t = "Click  shoot a prop";
-        legend.text = t;
+        Texture2D tex = want == 1 ? legendHider : (want == 2 ? legendHiderShort : (want == 3 ? legendHunter : null));
+        legend.gameObject.SetActive(tex != null);
+        if (tex == null) return;
+        legend.texture = tex;
+        float h = 900f * LEGEND_H;   // the canvas is 900 high (PostLateBody)
+        legend.rectTransform.sizeDelta = new Vector2(h * tex.width / tex.height, h);
     }
 
     // the avatar's size against a 1.6 m eye height: what is worn or held scales with it
@@ -329,6 +336,13 @@ public class PHView : UdonSharpBehaviour
         if (!vr)
         {
             VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+            // The canvas fills the screen, 900 units high whatever the field of view and as wide as the screen is,
+            // so what is anchored to a corner sits in the screen's corner (Cor: the controls ran into VRChat's own)
+            float fov = 60f, aspect = 16f / 9f;
+            VRCCameraSettings cam = VRCCameraSettings.ScreenCamera;
+            if (cam != null) { fov = cam.FieldOfView; aspect = cam.Aspect; }
+            desktopRoot.localScale = Vector3.one * (Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) / 900f);   // 0.5 m ahead
+            if (desktopCanvas != null && Mathf.Abs(desktopCanvas.sizeDelta.x - 900f * aspect) > 0.5f) desktopCanvas.sizeDelta = new Vector2(900f * aspect, 900f);
             desktopRoot.SetPositionAndRotation(head.position + head.rotation * new Vector3(0f, 0f, 0.5f), head.rotation);
             return;
         }

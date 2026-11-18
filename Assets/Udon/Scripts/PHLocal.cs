@@ -317,7 +317,9 @@ public class PHLocal : UdonSharpBehaviour
         {
             int old = s.def;
             body.SetProp(d);
-            if (!body.Fits(body.pos, body.yaw)) { body.SetProp(old); Say("No room for that here.", 2f); return false; }
+            // no room where the hider stands: the nearest place with room (PHHiderBody.FitHere), or not at all
+            Vector3 was = body.pos; float wasYaw = body.yaw;
+            if (!body.FitHere()) { body.SetProp(old); body.pos = was; body.yaw = wasYaw; Say("No room for that here.", 2f); return false; }
         }
         int cls = Mathf.Clamp(game.gen.defDisguise[d] - 1, 0, 3);
         int oldMax = s.maxHealth;
