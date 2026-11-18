@@ -6,8 +6,9 @@ using TMPro;
 
 // The local player's side of the game (the prototype's Player and PlayerActions, without its own movement:
 // VRChat moves the player). One per world; it acts for whoever is running this client.
-//   Hider: Use (desktop click, VR trigger) on a prop within 4 m becomes it (G5, G25); the avatar shrinks to the
-//          prop's eye height, sits in its parked station and the synced prop follows them. T taunts.
+//   Hider: Use (desktop click, VR right trigger) on a prop within 4 m becomes it (G5, G25); the avatar shrinks
+//          to the prop's eye height, sits in its parked station and the synced prop follows them. The VR left
+//          trigger turns the prop (PHHiderBody). Taunt: T on desktop, the button on the screen device in VR (PHView).
 //   Hunter: Use fires the tagger (05 section 5.3): a hider's prop takes a hit (sent to its owner), a real prop
 //          costs health (G17) and gets knocked, anything else is a miss. Hunters walk through props (G45).
 //   Everyone: frozen during the reveal; hunters are held at the release during BRIEF and HIDE.
@@ -351,13 +352,16 @@ public class PHLocal : UdonSharpBehaviour
     {
         if (!value) return;
         int phase = game.phase;
+        bool vr = Networking.LocalPlayer.IsUserInVR();
         // desktop: a click on a door within reach works it (C7), before anything else
-        if (!Networking.LocalPlayer.IsUserInVR() && TryDoor()) return;
+        if (!vr && TryDoor()) return;
+        // VR: a hider's left trigger turns the prop (PHHiderBody); the selector in the right hand picks
+        if (vr && role == PHGame.ROLE_HIDER && args.handType == VRC.Udon.Common.HandType.LEFT) return;
         if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) TryTakeDisguise();
         else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT) Fire();
     }
 
-    // VR: a hider taunts by squeezing the left grip (the right hand grabs the third-person panel); desktop: T
+    // VR: the grips work doors (a hider taunts with the button on the screen device, PHView; desktop: T)
     public override void InputGrab(bool value, VRC.Udon.Common.UdonInputEventArgs args)
     {
         VRCPlayerApi me = Networking.LocalPlayer;
@@ -370,7 +374,20 @@ public class PHLocal : UdonSharpBehaviour
             int d = doors.NearPart(hand, GRAB_REACH);
             if (d >= 0) { doors.Toggle(d); return; }
         }
-        if (args.handType == VRC.Udon.Common.HandType.LEFT) Taunt();
+    }
+
+    // the taunt button on the VR screen device (PHView)
+    public bool TauntReady()
+    {
+        PHSlot s = Me();
+        return s != null && role == PHGame.ROLE_HIDER && !s.caught && game.phase == PHGame.PH_HUNT && Time.time - lastTaunt >= TAUNT_COOLDOWN;
+    }
+
+    public bool ButtonTaunt()
+    {
+        if (!TauntReady()) return false;
+        Taunt();
+        return true;
     }
 
     bool InRound()
@@ -433,13 +450,22 @@ public class PHLocal : UdonSharpBehaviour
     Collider hoverCol;
     GameObject hoverObj;
     int hoverDef = -1;
+    // for the selector in a VR hider's right hand (PHView): whether it can pick now, and how far its ray goes
+    [HideInInspector] public bool canPick;
+    [HideInInspector] public float aimDist = TAKE_RANGE;
+    public bool AimValid() { return hoverObj != null; }
+    // VR: the way the selector points, from the right hand's tracking (the offset, in degrees, is for tuning)
+    public Vector3 vrAimEuler = Vector3.zero;
+    public Quaternion AimRotation(Quaternion hand) { return hand * Quaternion.Euler(vrAimEuler); }
 
     void UpdateHover()
     {
         int phase = game.phase;
         bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT) && !aimOverride;
         Collider c = null;
-        if (can && Aim(TAKE_RANGE)) c = hit.collider;
+        canPick = can;
+        aimDist = TAKE_RANGE;
+        if (can && Aim(TAKE_RANGE)) { c = hit.collider; aimDist = hit.distance; }
         if (c == hoverCol && (c != null || hoverObj == null)) return;
         hoverCol = c;
         GameObject o = null; int d = -1;
@@ -507,7 +533,7 @@ public class PHLocal : UdonSharpBehaviour
         if (aimOverride) { any = Physics.SphereCast(aimOrigin, 0.04f, aimDir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore); hit = r; return any; }
         VRCPlayerApi me = Networking.LocalPlayer;
         VRCPlayerApi.TrackingData t = me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
-        Vector3 dir = me.IsUserInVR() ? t.rotation * Vector3.forward : t.rotation * Vector3.forward;
+        Vector3 dir = me.IsUserInVR() ? AimRotation(t.rotation) * Vector3.forward : t.rotation * Vector3.forward;
         any = Physics.SphereCast(t.position, 0.04f, dir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
         hit = r;
         return any;

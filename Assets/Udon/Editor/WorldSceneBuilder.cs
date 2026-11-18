@@ -319,7 +319,114 @@ public static class WorldSceneBuilder
         pickup.InteractionText = "Third-person view";
         view.vrPanel = panel.transform; view.vrPanelPickup = pickup;
 
+        // ---- a VR hider's devices (Cor): flat-coloured, without colliders, on the UI layer (the third-person camera
+        // leaves it out). PHView puts them in the hands each frame; nobody else sees them.
+        var dark = Flat("DeviceDark", new Color(0.16f, 0.18f, 0.22f));
+        var mid = Flat("DeviceMid", new Color(0.30f, 0.33f, 0.38f));
+        var teal = Flat("DeviceTeal", new Color(0.25f, 0.80f, 0.75f));
+        var amber = Flat("DeviceAmber", new Color(1.00f, 0.72f, 0.20f));
+        var red = Flat("DeviceRed", new Color(0.92f, 0.26f, 0.22f));
+        var grey = Flat("DeviceGrey", new Color(0.45f, 0.42f, 0.42f));
+        var beamIdle = Flat("BeamIdle", new Color(0.82f, 0.84f, 0.86f));
+        var beamHit = Flat("BeamHit", new Color(0.45f, 1.00f, 0.55f));
+
+        // right hand: the selector (it points along +z, the ray that picks)
+        var gun = Empty(viewGo.transform, "Selector");
+        Part(gun, PrimitiveType.Cube, "Barrel", new Vector3(0f, 0f, 0.05f), Vector3.zero, new Vector3(0.028f, 0.034f, 0.15f), dark);
+        Part(gun, PrimitiveType.Cube, "Muzzle", new Vector3(0f, 0f, 0.126f), Vector3.zero, new Vector3(0.036f, 0.042f, 0.014f), teal);
+        Part(gun, PrimitiveType.Cube, "Sight", new Vector3(0f, 0.022f, 0.085f), Vector3.zero, new Vector3(0.008f, 0.010f, 0.03f), teal);
+        Part(gun, PrimitiveType.Cube, "Grip", new Vector3(0f, -0.045f, -0.005f), new Vector3(20f, 0f, 0f), new Vector3(0.026f, 0.07f, 0.032f), mid);
+        view.gun = gun;
+        var beam = Part(viewGo.transform, PrimitiveType.Cube, "SelectorBeam", Vector3.zero, Vector3.zero, new Vector3(0.004f, 0.004f, 1f), beamIdle);
+        view.beam = beam.transform; view.beamRenderer = beam.GetComponent<MeshRenderer>();
+        view.beamIdle = beamIdle; view.beamHit = beamHit;
+
+        // left hand: the turner, a grip with a trigger; the pad floats above it
+        var dial = Empty(viewGo.transform, "Turner");
+        Part(dial, PrimitiveType.Cube, "Handle", Vector3.zero, Vector3.zero, new Vector3(0.03f, 0.03f, 0.09f), dark);
+        Part(dial, PrimitiveType.Cube, "Band", new Vector3(0f, 0f, 0.03f), Vector3.zero, new Vector3(0.034f, 0.034f, 0.012f), amber);
+        Part(dial, PrimitiveType.Cube, "Trigger", new Vector3(0f, -0.022f, 0.022f), Vector3.zero, new Vector3(0.012f, 0.02f, 0.012f), amber);
+        view.dial = dial;
+        var pad = Part(viewGo.transform, PrimitiveType.Cylinder, "TurnerPad", Vector3.zero, Vector3.zero, new Vector3(0.11f, 0.003f, 0.11f), mid);
+        view.pad = pad.transform; view.padRenderer = pad.GetComponent<MeshRenderer>();
+        view.padIdle = mid; view.padLit = amber;
+
+        // the screen device: a casing around the panel (the panel is its screen and its grab), with a chin that
+        // carries the taunt button. The casing's front is -z, as the screen's.
+        var casing = Empty(viewGo.transform, "ScreenCasing");
+        Part(casing, PrimitiveType.Cube, "Back", new Vector3(0f, 0f, 0.014f), Vector3.zero, new Vector3(0.40f, 0.28f, 0.024f), dark);
+        Part(casing, PrimitiveType.Cube, "Chin", new Vector3(0f, -0.175f, 0.004f), Vector3.zero, new Vector3(0.40f, 0.09f, 0.028f), mid);
+        Part(casing, PrimitiveType.Cube, "Handle", new Vector3(0f, 0.152f, 0.012f), Vector3.zero, new Vector3(0.14f, 0.024f, 0.02f), teal);
+        for (int i = 0; i < 4; i++)
+            Part(casing, PrimitiveType.Cube, "Slot" + i, new Vector3(0.07f + i * 0.022f, -0.175f, -0.0105f), Vector3.zero, new Vector3(0.008f, 0.04f, 0.002f), dark);
+        view.casing = casing;
+        var button = Empty(viewGo.transform, "TauntButton");
+        Part(button, PrimitiveType.Cylinder, "Base", new Vector3(0f, 0f, -0.006f), new Vector3(90f, 0f, 0f), new Vector3(0.082f, 0.006f, 0.082f), dark);
+        var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
+        view.tauntButton = button; view.tauntCap = cap.transform; view.tauntCapRenderer = cap.GetComponent<MeshRenderer>();
+        view.capReady = red; view.capWait = grey;
+
+        // desktop: the controls, lower left
+        var lg = new GameObject("Legend");
+        lg.transform.SetParent(desk.transform, false);
+        lg.layer = 5;
+        var lt = lg.AddComponent<TextMeshProUGUI>();
+        lt.font = TMP_Settings.defaultFontAsset;
+        lt.fontSize = 20f; lt.alignment = TextAlignmentOptions.BottomLeft; lt.color = new Color(1f, 1f, 1f, 0.92f);
+        lt.raycastTarget = false; lt.enableWordWrapping = false; lt.text = "";
+        var lrt = lg.GetComponent<RectTransform>(); lrt.anchoredPosition = new Vector2(-500f, -372f); lrt.sizeDelta = new Vector2(560f, 70f);
+        // over everything, as the rest of the desktop view, and outlined to read on any ground
+        var overlay = Shader.Find("TextMeshPro/Distance Field Overlay");
+        if (overlay != null && lt.font != null)
+        {
+            string fp = "Assets/Udon/Generated/LegendFont.mat";
+            var fm = AssetDatabase.LoadAssetAtPath<Material>(fp);
+            if (fm == null) { fm = new Material(lt.font.material); AssetDatabase.CreateAsset(fm, fp); }
+            fm.shader = overlay;
+            fm.SetFloat("_OutlineWidth", 0.2f); fm.SetColor("_OutlineColor", Color.black); fm.EnableKeyword("OUTLINE_ON");
+            EditorUtility.SetDirty(fm);
+            lt.fontSharedMaterial = fm;
+        }
+        view.legend = lt;
+
         UdonSharpEditorUtility.CopyProxyToUdon(view);
+    }
+
+    static Transform Empty(Transform parent, string name)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.layer = 5;
+        return go.transform;
+    }
+
+    static GameObject Part(Transform parent, PrimitiveType type, string name, Vector3 pos, Vector3 euler, Vector3 scale, Material m)
+    {
+        var go = GameObject.CreatePrimitive(type);
+        go.name = name;
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = pos;
+        go.transform.localRotation = Quaternion.Euler(euler);
+        go.transform.localScale = scale;
+        go.layer = 5;
+        var r = go.GetComponent<MeshRenderer>();
+        r.sharedMaterial = m;
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        r.receiveShadows = false;
+        return go;
+    }
+
+    static Material Flat(string name, Color c)
+    {
+        string path = "Assets/Udon/Generated/" + name + ".mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        var sh = Shader.Find("Unlit/Color");
+        if (m == null) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+        m.shader = sh;
+        m.color = c;
+        EditorUtility.SetDirty(m);
+        return m;
     }
 
     static Material hudMat;

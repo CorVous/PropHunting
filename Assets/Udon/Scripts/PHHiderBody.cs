@@ -10,9 +10,11 @@ using VRC.Udon.Common;
 // draws the synced prop instead (PHSlot).
 //   input: Udon's move events (VR thumbstick, desktop WASD) along the facing; Shift runs on
 //          desktop (55% without it, as the prototype); jump hops (tiny and medium props), with a ledge assist;
-//          the VR right stick or the desktop mouse turn the seated player and the prop; the head and the
-//          playspace never move or turn it
-//   the prop turns with the body in 15 degree steps, and only where its box fits (TryYaw)
+//          the view and the prop turn apart (Cor): the VR right stick (the desktop mouse) turns only the view,
+//          and the prop keeps its facing in the world, so looking about never gives a hider away. The prop
+//          turns only when asked: VR, the right stick while the left trigger is held; desktop, Q and E.
+//          The head and the playspace never move or turn it
+//   the prop turns in 15 degree steps, each with a click, and only where its box fits (TryYaw)
 // A caught hider (a ghost) moves as a person-sized box through everything but the architecture.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHHiderBody : UdonSharpBehaviour
@@ -40,7 +42,14 @@ public class PHHiderBody : UdonSharpBehaviour
     float liftT;
 
     float moveV, moveH, look;
-    float lastFaceYaw;
+    // turning the prop: VR, the left trigger held makes the right stick turn the prop instead of the view
+    [HideInInspector] public bool turnHeld;
+    bool wasTurning;
+    float propAim, propDetent;            // where the stick has turned the prop to, and the step it stands on
+    const float PROP_TURN = 100f;         // degrees a second at full stick
+    int keyDir;                           // desktop: Q (-1) or E (+1) held
+    float keyNext;
+    const float KEY_FIRST = 0.35f, KEY_REPEAT = 0.09f;
     const float EDGE_DEG = 55f;           // how far the desktop view may turn from the station before the station follows
     public float desktopTurn = 4f;        // degrees the station turns per unit of mouse movement at that edge
     bool jumpPressed;
@@ -52,6 +61,7 @@ public class PHHiderBody : UdonSharpBehaviour
         pos = at; yaw = facing; stationYaw = facing;
         velY = 0f; grounded = false; lifting = false;
         active = true; ghost = false;
+        turnHeld = false; wasTurning = false; keyDir = 0;
     }
 
     public void End() { active = false; }
@@ -134,8 +144,32 @@ public class PHHiderBody : UdonSharpBehaviour
     public override void InputLookVertical(float value, UdonInputEventArgs args)
     {
         if (!Networking.LocalPlayer.IsUserInVR()) return;
+        // not while the stick turns the prop: a slanted push would hop
+        if (turnHeld) { lookUpHeld = value > 0.4f; return; }
         if (value > 0.75f && !lookUpHeld) { lookUpHeld = true; jumpPressed = true; }
         else if (value < 0.4f) lookUpHeld = false;
+    }
+
+    // VR: the left trigger, held, hands the right stick to the prop
+    public override void InputUse(bool value, UdonInputEventArgs args)
+    {
+        if (args.handType == HandType.LEFT) turnHeld = value;
+    }
+
+    // one step of the prop's turning took: a click, and in VR a tap in the hand that holds the trigger
+    void TurnClick(bool vr)
+    {
+        if (local != null && local.sound != null) local.sound.Play("click_001", 0.35f);
+        if (vr) Networking.LocalPlayer.PlayHapticEventInHand(VRC_Pickup.PickupHand.Left, 0.04f, 0.6f, 160f);
+    }
+
+    // the prop to this facing, if its box fits there; false where it does not
+    bool TurnPropTo(float target, bool vr)
+    {
+        float before = yaw;
+        if (!TryYaw(Mathf.Repeat(target, 360f))) return false;
+        if (Mathf.Abs(Mathf.DeltaAngle(before, yaw)) > 0.5f) TurnClick(vr);
+        return true;
     }
 
     // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
@@ -168,14 +202,43 @@ public class PHHiderBody : UdonSharpBehaviour
         jumpPressed = false;
         if (frozen) { v = 0f; h = 0f; jump = false; }
 
-        // Moving always goes where the player looks. The prop turns only by input (Cor): in VR the right stick turns
-        // it (and the station, with the seated player's view), never head turning or playspace movement; on desktop
-        // the mouse is the input that turns the view (VRChat turns a seated player's head with it), so there the
-        // prop faces where the view looks. The station is not turned on desktop (that turned the view twice).
+        // Moving always goes where the player looks. The view and the prop turn apart (Cor): in VR the right stick
+        // turns the station (and the seated player's view with it), and the prop only while the left trigger is
+        // held; on desktop the mouse turns the view (VRChat turns a seated player's head with it) and Q and E turn
+        // the prop. Head turning and playspace movement never turn the prop.
         Vector3 hf = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation * Vector3.forward;
         hf.y = 0f;
         float headYaw = hf.sqrMagnitude > 1e-4f ? Mathf.Atan2(hf.x, hf.z) * Mathf.Rad2Deg : stationYaw;
-        if (vr && !frozen && Mathf.Abs(look) > 0.1f) stationYaw += look * 120f * dt;
+        bool turning = vr && turnHeld && !frozen && !ghost;
+        if (turning && !wasTurning) { propAim = yaw; propDetent = Mathf.Round(yaw / 15f) * 15f; }
+        wasTurning = turning;
+        if (vr && !frozen && Mathf.Abs(look) > 0.1f)
+        {
+            if (turning) propAim += look * PROP_TURN * dt;
+            else stationYaw += look * 120f * dt;
+        }
+        if (turning)
+        {
+            float detent = Mathf.Round(propAim / 15f) * 15f;
+            if (Mathf.Abs(detent - propDetent) > 0.5f)
+            {
+                propDetent = detent;
+                // no room to turn that way: the stick starts again from where the prop stands
+                if (!TurnPropTo(detent, true)) { propAim = yaw; propDetent = Mathf.Round(yaw / 15f) * 15f; }
+            }
+        }
+        // desktop: a tap of Q or E is one step; held, the steps repeat
+        if (!vr && !frozen && !ghost)
+        {
+            int dir = (Input.GetKey(KeyCode.E) ? 1 : 0) - (Input.GetKey(KeyCode.Q) ? 1 : 0);
+            if (dir == 0) keyDir = 0;
+            else if (dir != keyDir || Time.time >= keyNext)
+            {
+                keyNext = Time.time + (dir != keyDir ? KEY_FIRST : KEY_REPEAT);
+                keyDir = dir;
+                TurnPropTo((Mathf.Round(yaw / 15f) + dir) * 15f, false);
+            }
+        }
         // desktop: VRChat lets a seated player's view turn only about 90 degrees either way from the station (Cor: a
         // hider could only turn 180 degrees). Near that limit, mouse movement that keeps turning the same way turns the
         // station instead, so the view (and the prop with it) can go all the way round. Only mouse movement does
@@ -187,7 +250,6 @@ public class PHHiderBody : UdonSharpBehaviour
             if ((rel > EDGE_DEG && mx > 0f) || (rel < -EDGE_DEG && mx < 0f)) stationYaw += mx * desktopTurn;
         }
         stationYaw = Mathf.Repeat(stationYaw, 360f);
-        lastFaceYaw = vr ? stationYaw : headYaw;
         float faceYaw = headYaw;
         Quaternion facing = Quaternion.Euler(0f, faceYaw, 0f);
         Vector3 fwd = facing * Vector3.forward;
@@ -196,9 +258,6 @@ public class PHHiderBody : UdonSharpBehaviour
         if (wish.sqrMagnitude > 1f) wish.Normalize();
         bool run = vr || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         wish *= speed * (run ? 1f : DESKTOP_WALK);
-
-        // the prop faces the way the hider has turned, in 15 degree steps, where it fits
-        if (!ghost && !frozen) TryYaw(Mathf.Round(lastFaceYaw / 15f) * 15f);
 
         float left = dt;
         while (left > 1e-5f)
