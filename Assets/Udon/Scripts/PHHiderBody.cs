@@ -81,6 +81,47 @@ public class PHHiderBody : UdonSharpBehaviour
     void SetBox(Vector3 size)
     {
         half = new Vector3(Mathf.Max(0.02f, size.x / 2 - SKIN), Mathf.Max(0.02f, size.y / 2 - SKIN / 2), Mathf.Max(0.02f, size.z / 2 - SKIN));
+        fullHalf = half;
+        narrowHalf = new Vector3(Mathf.Min(half.x, SQUEEZE_HALF), Mathf.Min(half.y, SQUEEZE_HALF_Y), Mathf.Min(half.z, SQUEEZE_HALF));
+        canSqueeze = narrowHalf != fullHalf;
+        narrow = false;
+    }
+
+    // A big prop squeezes through a doorway (Cor: make it easier for large props to get through doors). Where the
+    // prop is stopped but a box no wider than SQUEEZE_HALF could go on for a good way (a doorway, a gap: not a wall),
+    // it moves as that narrower box until its own box fits again. The prop looks as it always does: in the doorway
+    // it overlaps the frame. Left standing in a gap for a while, it is moved to the nearest place where it fits.
+    const float SQUEEZE_HALF = 0.28f, SQUEEZE_HALF_Y = 0.99f, SQUEEZE_PASS = 0.9f, SQUEEZE_TIME = 2.5f;
+    Vector3 fullHalf, narrowHalf;
+    bool canSqueeze, narrow;
+    Vector3 squeezeAxis;   // the way through the gap it is squeezing through
+    float narrowSince;
+
+    void SqueezeAfterMove()
+    {
+        half = fullHalf;
+        if (Fits(pos, yaw)) { narrow = false; return; }
+        half = narrowHalf;
+        if (Time.time - narrowSince < SQUEEZE_TIME) return;
+        // too long in the gap: out to the nearest place its own box fits
+        half = fullHalf;
+        float reach = Mathf.Max(fullHalf.x, fullHalf.z) + 0.5f;
+        for (int ring = 1; ring <= 4; ring++)
+            for (int k = 0; k < 8; k++)
+            {
+                float a = k * Mathf.PI / 4f, d = reach * ring / 4f;
+                Vector3 at = pos + new Vector3(Mathf.Cos(a) * d, 0f, Mathf.Sin(a) * d);
+                if (!Fits(at, yaw)) continue;
+                // not through a wall: the narrow box can get there
+                half = narrowHalf;
+                bool wall = SweepH(pos, (at - pos).normalized, d);
+                half = fullHalf;
+                if (wall) continue;
+                pos = at; narrow = false;
+                return;
+            }
+        half = narrowHalf;
+        narrowSince = Time.time;   // nowhere yet: look again later
     }
 
     // ------------------------------------------------------------------ input
@@ -234,6 +275,7 @@ public class PHHiderBody : UdonSharpBehaviour
     }
 
     bool hitSomething;
+    Vector3 firstNormal;   // of the first thing a Slide met
 
     Vector3 Slide(Vector3 from, Vector3 delta)
     {
@@ -245,6 +287,7 @@ public class PHHiderBody : UdonSharpBehaviour
             if (dist < 1e-5f) break;
             Vector3 dir = remaining / dist;
             if (!SweepH(p, dir, dist)) { p += remaining; break; }
+            if (!hitSomething) firstNormal = hit.normal;
             hitSomething = true;
             float travel = Mathf.Max(0f, hit.distance - GAP);
             p += dir * travel;
@@ -306,7 +349,47 @@ public class PHHiderBody : UdonSharpBehaviour
         else velY = Mathf.Max(velY - GRAVITY * dt, -MAX_FALL);
         blocked = false;
         Vector3 delta = new Vector3(wish.x, 0f, wish.z) * dt;
-        if (delta.sqrMagnitude > 1e-10f) SlideMove(delta, wasGrounded);
+        // squeezing through a gap: only along it, forwards or back (walking at a slant slid the narrow box off
+        // along the wall beside the door)
+        if (narrow && delta.sqrMagnitude > 1e-10f)
+        {
+            float along = Vector3.Dot(delta, squeezeAxis), len = delta.magnitude;
+            delta = Mathf.Abs(along) > 0.2f * len ? squeezeAxis * (along > 0f ? len : -len) : Vector3.zero;
+        }
+        if (delta.sqrMagnitude > 1e-10f)
+        {
+            Vector3 start = pos;
+            SlideMove(delta, wasGrounded);
+            if (blocked && canSqueeze && !narrow && mask != 0)
+            {
+                // straight through what stopped it (not along the way it was going: one seldom walks square at a
+                // door), from where it stands or from up to half a metre to either side along the wall
+                // (and, when that is a thing standing by the door and not the wall, square along the way it is going)
+                for (int tryN = 0; tryN < 2 && !narrow; tryN++)
+                {
+                Vector3 n = firstNormal; n.y = 0f;
+                if (tryN == 1) n = Mathf.Abs(delta.x) > Mathf.Abs(delta.z) ? new Vector3(delta.x > 0f ? -1f : 1f, 0f, 0f) : new Vector3(0f, 0f, delta.z > 0f ? -1f : 1f);
+                if (n.sqrMagnitude > 1e-6f)
+                {
+                    n.Normalize();
+                    Vector3 along = new Vector3(-n.z, 0f, n.x);
+                    half = narrowHalf;
+                    for (int k = 0; k < 7 && !narrow; k++)
+                    {
+                        float off = ((k + 1) / 2) * 0.16f * ((k & 1) == 1 ? 1f : -1f);   // 0, then 0.16, 0.32, 0.48 to either side
+                        if (off != 0f && SweepH(start, off > 0f ? along : -along, Mathf.Abs(off))) continue;
+                        Vector3 from = start + along * off;
+                        if (SweepH(from, -n, SQUEEZE_PASS)) continue;
+                        narrow = true; narrowSince = Time.time; squeezeAxis = -n;
+                        pos = from;
+                        SlideMove(-n * delta.magnitude, wasGrounded);
+                    }
+                    if (!narrow) half = fullHalf;
+                }
+                }
+            }
+        }
+        if (narrow) SqueezeAfterMove();
         if (velY > 0f)
         {
             float want = velY * dt;
