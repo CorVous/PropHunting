@@ -681,24 +681,149 @@ public partial class MapGen
     // next one tried. Returns the emit index of the piece, which stands and is kept, or -1.
     int CentrePiece(int def, int yaw, bool bothYaws, int ringWant, int ringMin, int mode, int tx, int tz, int need, int flags, ref GenRng rng)
     {
-        for (int ring = ringWant; ring >= ringMin; ring--)
+        hq_CentrePiece_def = def;
+        hq_CentrePiece_yaw = yaw;
+        hq_CentrePiece_bothYaws = bothYaws;
+        hq_CentrePiece_ringWant = ringWant;
+        hq_CentrePiece_ringMin = ringMin;
+        hq_CentrePiece_mode = mode;
+        hq_CentrePiece_tx = tx;
+        hq_CentrePiece_tz = tz;
+        hq_CentrePiece_need = need;
+        hq_CentrePiece_flags = flags;
+        hq_CentrePiece_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); CentrePiece_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_CentrePiece_rng;
+        return hq_CentrePiece_ret;
+    }
+
+    // CentrePiece in phases, a step a call (autophase4); CentrePiece() above runs them to the end
+    void CentrePiece_Body()
+    {
+        if (PhLoop(0, 100000))
         {
-            osTriedN = 0;
-            for (int attempt = 0; attempt < 10; attempt++)
+            int ringWant = hq_CentrePiece_ringWant;
+            int ringMin = hq_CentrePiece_ringMin;
+            if (!PhSubActive())
             {
-                int cell = OpenSpot(2, mode, tx, tz, need, ref rng);
-                if (cell < 0) break;
-                for (int k = 0; k < (bothYaws ? 2 : 1); k++)
-                {
-                    int e = FreePlace(def, cell, yaw + k * 90, ring, flags, H_FREE);
-                    if (e >= 0 && Keep(e, (flags & EF_MANDATORY) != 0)) { osTriedN = 0; return e; }
-                }
-                if (osTriedN < osTried.Length) osTried[osTriedN++] = cell;
+                if (planIter == 0) hq_CentrePiece_ring0 = ringWant;
+                int ring = hq_CentrePiece_ring0 - planIter;
+                if (!(ring >= ringMin)) PhBreak();
+                else { hq_CentrePiece_ring = ring; PhSubBegin(); }
+            }
+            hq_CentrePiece_ringWant = ringWant;
+            hq_CentrePiece_ringMin = ringMin;
+            if (PhSubActive())
+            {
+                PhPush(); CentrePiece_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        osTriedN = 0;
-        return -1;
+        if (Ph(1))
+        {
+            osTriedN = 0;
+            { hq_CentrePiece_ret = -1; PhEnd(); return; }
+        }
     }
+    void CentrePiece_L3()
+    {
+        if (Ph(0))
+        {
+            int def = hq_CentrePiece_def;
+            int yaw = hq_CentrePiece_yaw;
+            int flags = hq_CentrePiece_flags;
+            int ring = hq_CentrePiece_ring;
+            int cell = hq_CentrePiece_cell;
+            int k = hq_CentrePiece_k;
+            int e = FreePlace(def, cell, yaw + k * 90, ring, flags, H_FREE);
+            hq_CentrePiece_def = def;
+            hq_CentrePiece_yaw = yaw;
+            hq_CentrePiece_flags = flags;
+            hq_CentrePiece_cell = cell;
+            hq_CentrePiece_e = e;
+        }
+        if (Ph(1))
+        {
+            int flags = hq_CentrePiece_flags;
+            int e = hq_CentrePiece_e;
+            if (e >= 0 && Keep(e, (flags & EF_MANDATORY) != 0)) { osTriedN = 0; { hq_CentrePiece_ret = e; hq_CentrePiece_flags = flags; hq_CentrePiece_e = e; phReturn = true; PhEnd(); return; } }
+            hq_CentrePiece_flags = flags;
+            hq_CentrePiece_e = e;
+        }
+    }
+
+    void CentrePiece_L2()
+    {
+        if (Ph(0))
+        {
+            int mode = hq_CentrePiece_mode;
+            int tx = hq_CentrePiece_tx;
+            int tz = hq_CentrePiece_tz;
+            int need = hq_CentrePiece_need;
+            GenRng rng = hq_CentrePiece_rng;
+            int cell = OpenSpot(2, mode, tx, tz, need, ref rng);
+            if (cell < 0) { hq_CentrePiece_mode = mode; hq_CentrePiece_tx = tx; hq_CentrePiece_tz = tz; hq_CentrePiece_need = need; hq_CentrePiece_rng = rng; hq_CentrePiece_cell = cell; phBreak = true; PhEnd(); return; }
+            hq_CentrePiece_mode = mode;
+            hq_CentrePiece_tx = tx;
+            hq_CentrePiece_tz = tz;
+            hq_CentrePiece_need = need;
+            hq_CentrePiece_rng = rng;
+            hq_CentrePiece_cell = cell;
+        }
+        if (PhLoop(1, 100000))
+        {
+            bool bothYaws = hq_CentrePiece_bothYaws;
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < (bothYaws ? 2 : 1))) PhBreak();
+                else { hq_CentrePiece_k = k; PhSubBegin(); }
+            }
+            hq_CentrePiece_bothYaws = bothYaws;
+            if (PhSubActive())
+            {
+                PhPush(); CentrePiece_L3(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { PhEnd(); return; }
+            }
+        }
+        if (Ph(2))
+        {
+            int cell = hq_CentrePiece_cell;
+            if (osTriedN < osTried.Length) osTried[osTriedN++] = cell;
+            hq_CentrePiece_cell = cell;
+        }
+    }
+
+    void CentrePiece_L1()
+    {
+        if (Ph(0))
+        {
+            osTriedN = 0;
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int attempt = planIter;
+                if (!(attempt < 10)) PhBreak();
+                else { hq_CentrePiece_attempt = attempt; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); CentrePiece_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { PhEnd(); return; }
+            }
+        }
+    }
+
 
     // A centre piece on a cell: turned by yaw, with `ring` free cells around it. H_FREE unless a host is given.
     int FreePlace(int def, int cellIndex, int yaw, int ring, int flags, int host)
@@ -782,4 +907,24 @@ public partial class MapGen
         for (int e = first; e < nEmit; e++)
             if ((emitFlags[e] & EF_REMOVED) == 0 && OnFloor(e)) { emitFlags[e] |= EF_LOOSE; looseUsed++; }
     }
+
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_CentrePiece_attempt;
+    bool hq_CentrePiece_bothYaws;
+    int hq_CentrePiece_cell;
+    int hq_CentrePiece_def;
+    int hq_CentrePiece_e;
+    int hq_CentrePiece_flags;
+    int hq_CentrePiece_k;
+    int hq_CentrePiece_mode;
+    int hq_CentrePiece_need;
+    int hq_CentrePiece_ret;
+    int hq_CentrePiece_ring;
+    int hq_CentrePiece_ring0;
+    int hq_CentrePiece_ringMin;
+    int hq_CentrePiece_ringWant;
+    GenRng hq_CentrePiece_rng;
+    int hq_CentrePiece_tx;
+    int hq_CentrePiece_tz;
+    int hq_CentrePiece_yaw;
 }

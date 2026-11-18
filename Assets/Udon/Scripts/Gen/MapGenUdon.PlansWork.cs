@@ -41,21 +41,58 @@ public partial class MapGenUdon
     // a block of pallets, side by side, 10 cm apart: cols x rows around a cell. Returns the first emit or -1.
     int PalletBlock(int cell, int cols, int rows, int yaw, uint[] rng)
     {
-        int p = Dn("w_pallet"), pl = Dn("w_palletLoaded");
-        int pitch = 1164 + 100;
-        int cx = cell % IW * GenData.INNER_MM + 250, cz = cell / IW * GenData.INNER_MM + 250;
-        int set = -1, first = nEmit;
-        for (int j = 0; j < rows; j++)
-            for (int i = 0; i < cols; i++)
-            {
-                int ox = (2 * i - (cols - 1)) * pitch / 2, oz = (2 * j - (rows - 1)) * pitch / 2;
-                int px = yaw == 0 ? cx + ox : cx + oz, pz = yaw == 0 ? cz + oz : cz + ox;
-                int def = RngChance(rng, 400) ? pl : p;
-                int e = StampAt(def, pRoom, px, pz, yaw, 0, set, set >= 0 ? set : H_FREE, true);
-                if (e >= 0 && set < 0) set = e;
-            }
-        if (set >= 0 && !Keep(first, false)) set = -1;
-        return set;
+        hq_PalletBlock_cell = cell;
+        hq_PalletBlock_cols = cols;
+        hq_PalletBlock_rows = rows;
+        hq_PalletBlock_yaw = yaw;
+        hq_PalletBlock_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); PalletBlock_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_PalletBlock_rng;
+        return hq_PalletBlock_ret;
+    }
+
+    // PalletBlock in phases, a step a call (autophase4); PalletBlock() above runs them to the end
+    void PalletBlock_Body()
+    {
+        if (Ph(0))
+        {
+            int cell = hq_PalletBlock_cell;
+            int cols = hq_PalletBlock_cols;
+            int rows = hq_PalletBlock_rows;
+            int yaw = hq_PalletBlock_yaw;
+            uint[] rng = hq_PalletBlock_rng;
+            int p = Dn("w_pallet"), pl = Dn("w_palletLoaded");
+            int pitch = 1164 + 100;
+            int cx = cell % IW * GenData.INNER_MM + 250, cz = cell / IW * GenData.INNER_MM + 250;
+            int set = -1, first = nEmit;
+            for (int j = 0; j < rows; j++)
+                for (int i = 0; i < cols; i++)
+                {
+                    int ox = (2 * i - (cols - 1)) * pitch / 2, oz = (2 * j - (rows - 1)) * pitch / 2;
+                    int px = yaw == 0 ? cx + ox : cx + oz, pz = yaw == 0 ? cz + oz : cz + ox;
+                    int def = RngChance(rng, 400) ? pl : p;
+                    int e = StampAt(def, pRoom, px, pz, yaw, 0, set, set >= 0 ? set : H_FREE, true);
+                    if (e >= 0 && set < 0) set = e;
+                }
+            hq_PalletBlock_cell = cell;
+            hq_PalletBlock_cols = cols;
+            hq_PalletBlock_rows = rows;
+            hq_PalletBlock_yaw = yaw;
+            hq_PalletBlock_rng = rng;
+            hq_PalletBlock_set = set;
+            hq_PalletBlock_first = first;
+        }
+        if (Ph(1))
+        {
+            int set = hq_PalletBlock_set;
+            int first = hq_PalletBlock_first;
+            if (set >= 0 && !Keep(first, false)) set = -1;
+            { hq_PalletBlock_ret = set; hq_PalletBlock_set = set; hq_PalletBlock_first = first; PhEnd(); return; }
+            hq_PalletBlock_set = set;
+            hq_PalletBlock_first = first;
+        }
     }
 
     // a row of fuel drums against a wall with a jerrycan or two at its end, away from the doors (report 15, W-drum row)
@@ -451,36 +488,30 @@ public partial class MapGenUdon
         }
         if (PhLoop(7, 100000))
         {
-            string[] rows = hq_PlanLoading_rows;
-            uint[] r10 = hq_PlanLoading_r10;
-            int k = planIter;
-            if (!(k < 6 && Fit(2))) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                int first = nEmit;
-                if (k % 2 == 0)
-                {
-                    if (PlaceGroup(FindGrp(rows[RngRange(r10, rows.Length)]), room, GenData.A_WALL, RngBetween(r10, 2, 3), 0, r10)) Keep(first, false);
-                }
-                else
-                {
-                    int def = Pick(r10, "w_palletLoaded", 5, "w_pallet", 3, "s_boxLarge", 3);
-                    if (CountInRoom(def, room) < ScaledCap(defRoomCap[def], room) && WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, r10) >= 0) Keep(first, false);
-                }
+                int k = planIter;
+                if (!(k < 6 && Fit(2))) PhBreak();
+                else { hq_PlanLoading_k = k; PhSubBegin(); }
             }
-            hq_PlanLoading_rows = rows;
-            hq_PlanLoading_r10 = r10;
+            if (PhSubActive())
+            {
+                PhPush(); PlanLoading_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
         if (Ph(8))
         {
             uint[] r9 = SR(9);
-            hq_PlanLoading_sel1 = 0;
-            if (RngChance(r9, 300) && LooseFit(2)) hq_PlanLoading_sel1 = 1;
+            hq_PlanLoading_sel2 = 0;
+            if (RngChance(r9, 300) && LooseFit(2)) hq_PlanLoading_sel2 = 1;
             hq_PlanLoading_r9 = r9;
         }
         if (Ph(9))
         {
-            if (hq_PlanLoading_sel1 == 1)
+            if (hq_PlanLoading_sel2 == 1)
             {
                 uint[] r9 = hq_PlanLoading_r9;
                 int first = nEmit;
@@ -491,7 +522,7 @@ public partial class MapGenUdon
         }
         if (Ph(10))
         {
-            if (hq_PlanLoading_sel1 == 1)
+            if (hq_PlanLoading_sel2 == 1)
             {
                 uint[] r9 = hq_PlanLoading_r9;
                 int first = hq_PlanLoading_first;
@@ -501,6 +532,56 @@ public partial class MapGenUdon
             }
         }
     }
+    void PlanLoading_L1()
+    {
+        int room = pRoom;
+        if (Ph(0))
+        {
+            int k = hq_PlanLoading_k;
+            int first = nEmit;
+            hq_PlanLoading_sel1 = 0;
+            if (k % 2 == 0) hq_PlanLoading_sel1 = 1;
+            else hq_PlanLoading_sel1 = 2;
+            hq_PlanLoading_first = first;
+        }
+        if (Ph(1))
+        {
+            if (hq_PlanLoading_sel1 == 1)
+            {
+                string[] rows = hq_PlanLoading_rows;
+                uint[] r10 = hq_PlanLoading_r10;
+                int first = hq_PlanLoading_first;
+                if (PlaceGroup(FindGrp(rows[RngRange(r10, rows.Length)]), room, GenData.A_WALL, RngBetween(r10, 2, 3), 0, r10)) Keep(first, false);
+                hq_PlanLoading_rows = rows;
+                hq_PlanLoading_r10 = r10;
+                hq_PlanLoading_first = first;
+            }
+        }
+        if (Ph(2))
+        {
+            if (hq_PlanLoading_sel1 == 2)
+            {
+                uint[] r10 = hq_PlanLoading_r10;
+                int def = Pick(r10, "w_palletLoaded", 5, "w_pallet", 3, "s_boxLarge", 3);
+                hq_PlanLoading_r10 = r10;
+                hq_PlanLoading_def = def;
+            }
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanLoading_sel1 == 2)
+            {
+                uint[] r10 = hq_PlanLoading_r10;
+                int first = hq_PlanLoading_first;
+                int def = hq_PlanLoading_def;
+                if (CountInRoom(def, room) < ScaledCap(defRoomCap[def], room) && WallPlace(def, WM_ANY, 0, 0, WIN_ANY, 0, r10) >= 0) Keep(first, false);
+                hq_PlanLoading_r10 = r10;
+                hq_PlanLoading_first = first;
+                hq_PlanLoading_def = def;
+            }
+        }
+    }
+
 
     // ============================================================================================ DINER
     // Seating: a counter with stools along a wall; booths along the window wall; tables in rows on the floor;
@@ -608,11 +689,14 @@ public partial class MapGenUdon
             hq_PlanDinerDining_tDef = tDef;
             hq_PlanDinerDining_tables = tables;
         }
-        if (Ph(6))
+        if (PhLoop(6, 100000))
         {
             uint[] r3 = hq_PlanDinerDining_r3;
             int tDef = hq_PlanDinerDining_tDef;
-            int t0 = CentrePiece(tDef, 0, false, 2, 1, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r3);
+            int t0 = 0;
+            if (planIter == 0) { hq_CentrePiece_def = tDef; hq_CentrePiece_yaw = 0; hq_CentrePiece_bothYaws = false; hq_CentrePiece_ringWant = 2; hq_CentrePiece_ringMin = 1; hq_CentrePiece_mode = WM_NEAR; hq_CentrePiece_tx = RoomMidX(room); hq_CentrePiece_tz = RoomMidZ(room); hq_CentrePiece_need = 0; hq_CentrePiece_flags = EF_MANDATORY; hq_CentrePiece_rng = r3; PhSubReset(); }
+            PhPush(); CentrePiece_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r3 = hq_CentrePiece_rng; t0 = hq_CentrePiece_ret; PhBreak(); }
             hq_PlanDinerDining_r3 = r3;
             hq_PlanDinerDining_tDef = tDef;
             hq_PlanDinerDining_t0 = t0;
@@ -788,35 +872,38 @@ public partial class MapGenUdon
             hp_PlanDinerKitchen_ct = Dn("r_counter");
             hp_PlanDinerKitchen_fr = Dn("r_fridge");
             int line = -1;
-            for (int n = 3; n >= 2 && line < 0; n--)
-            {
-                rowN = 0;
-                rowDef[rowN++] = sk;
-                if (n == 3) rowDef[rowN++] = hp_PlanDinerKitchen_ct;
-                rowDef[rowN++] = sv;
-                if (RngChance(r, 500)) { int tmp = rowDef[0]; rowDef[0] = rowDef[rowN - 1]; rowDef[rowN - 1] = tmp; }
-                int first = nEmit;
-                line = WallRow(0, 2, WM_CORNER, 0, 0, WIN_ANY, EF_MANDATORY, r);
-                if (line >= 0 && !Keep(first, true)) line = -1;
-            }
-            hp_PlanDinerKitchen_lx = RoomMidX(room);
-            hp_PlanDinerKitchen_lz = RoomMidZ(room);
-            bool haveS = line >= 0, haveV = line >= 0;
             hq_PlanDinerKitchen_r = r;
             hq_PlanDinerKitchen_sk = sk;
             hq_PlanDinerKitchen_sv = sv;
             hq_PlanDinerKitchen_line = line;
-            hq_PlanDinerKitchen_haveS = haveS;
-            hq_PlanDinerKitchen_haveV = haveV;
         }
-        if (Ph(1))
+        if (PhLoop(1, 100000))
+        {
+            int line = hq_PlanDinerKitchen_line;
+            if (!PhSubActive())
+            {
+                int n = 3 - planIter;
+                if (!(n >= 2 && line < 0)) PhBreak();
+                else { hq_PlanDinerKitchen_n = n; PhSubBegin(); }
+            }
+            hq_PlanDinerKitchen_line = line;
+            if (PhSubActive())
+            {
+                PhPush(); PlanDinerKitchen_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(2))
         {
             uint[] r = hq_PlanDinerKitchen_r;
             int sk = hq_PlanDinerKitchen_sk;
             int sv = hq_PlanDinerKitchen_sv;
             int line = hq_PlanDinerKitchen_line;
-            bool haveS = hq_PlanDinerKitchen_haveS;
-            bool haveV = hq_PlanDinerKitchen_haveV;
+            hp_PlanDinerKitchen_lx = RoomMidX(room);
+            hp_PlanDinerKitchen_lz = RoomMidZ(room);
+            bool haveS = line >= 0, haveV = line >= 0;
             if (line >= 0) { hp_PlanDinerKitchen_lx = emitX[line]; hp_PlanDinerKitchen_lz = emitZ[line]; }
             else
             {
@@ -833,7 +920,7 @@ public partial class MapGenUdon
             hq_PlanDinerKitchen_haveS = haveS;
             hq_PlanDinerKitchen_haveV = haveV;
         }
-        if (Ph(2))
+        if (Ph(3))
         {
             uint[] r = hq_PlanDinerKitchen_r;
             bool haveS = hq_PlanDinerKitchen_haveS;
@@ -842,7 +929,7 @@ public partial class MapGenUdon
             hq_PlanDinerKitchen_r = r;
             hq_PlanDinerKitchen_haveS = haveS;
         }
-        if (Ph(3))
+        if (Ph(4))
         {
             uint[] r = hq_PlanDinerKitchen_r;
             bool haveS = hq_PlanDinerKitchen_haveS;
@@ -854,7 +941,7 @@ public partial class MapGenUdon
             hq_PlanDinerKitchen_haveS = haveS;
             hq_PlanDinerKitchen_haveV = haveV;
         }
-        if (Ph(4))
+        if (Ph(5))
         {
             uint[] r2 = SR(2);
             // the fridge near the line if a wall has the room: these units are 1.4 m wide and up to 1.6 m deep, and a
@@ -863,13 +950,13 @@ public partial class MapGenUdon
             if (WallKeep(hp_PlanDinerKitchen_fr, WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_NEVER, 0, r2) < 0 && WallKeep(hp_PlanDinerKitchen_fr, WM_ANY, 0, 0, WIN_ANY, 0, r2) < 0)
                 WallAny(WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r2, "k_fridge", null, null);
         }
-        if (Ph(5))
+        if (Ph(6))
         {
             uint[] r3 = SR(3);
             if (RngChance(r3, 800) && Fit(1) && WallKeep(hp_PlanDinerKitchen_ct, WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r3) < 0)
                 WallAny(WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r3, "k_counterDrawer", "k_counter", null);
         }
-        if (Ph(6))
+        if (Ph(7))
         {
             uint[] r4 = SR(4);
             int dx = 0, dz = 0;
@@ -878,7 +965,7 @@ public partial class MapGenUdon
             hq_PlanDinerKitchen_dx = dx;
             hq_PlanDinerKitchen_dz = dz;
         }
-        if (Ph(7))
+        if (Ph(8))
         {
             uint[] r4 = hq_PlanDinerKitchen_r4;
             int dx = hq_PlanDinerKitchen_dx;
@@ -894,7 +981,7 @@ public partial class MapGenUdon
             hq_PlanDinerKitchen_dz = dz;
             hq_PlanDinerKitchen_r5 = r5;
         }
-        if (Ph(8))
+        if (Ph(9))
         {
             uint[] r5 = hq_PlanDinerKitchen_r5;
             if (RngChance(r5, 700) && Fit(1))
@@ -903,12 +990,17 @@ public partial class MapGenUdon
                 if (WallPlace(Dn("k_trashcan"), WM_NEAR, hp_PlanDinerKitchen_lx, hp_PlanDinerKitchen_lz, WIN_ANY, 0, r5) >= 0) Keep(first, false);
             }
             uint[] r6 = SR(6);
-            hq_PlanDinerKitchen_sel1 = 0;
-            if (RngChance(r6, 380) && LooseFit(2)) hq_PlanDinerKitchen_sel1 = 1;
             hq_PlanDinerKitchen_r5 = r5;
             hq_PlanDinerKitchen_r6 = r6;
         }
-        if (Ph(9))
+        if (Ph(10))
+        {
+            uint[] r6 = hq_PlanDinerKitchen_r6;
+            hq_PlanDinerKitchen_sel1 = 0;
+            if (RngChance(r6, 380) && LooseFit(2)) hq_PlanDinerKitchen_sel1 = 1;
+            hq_PlanDinerKitchen_r6 = r6;
+        }
+        if (Ph(11))
         {
             if (hq_PlanDinerKitchen_sel1 == 1)
             {
@@ -919,7 +1011,7 @@ public partial class MapGenUdon
                 hq_PlanDinerKitchen_first = first;
             }
         }
-        if (Ph(10))
+        if (Ph(12))
         {
             if (hq_PlanDinerKitchen_sel1 == 1)
             {
@@ -935,6 +1027,39 @@ public partial class MapGenUdon
             }
         }
     }
+    void PlanDinerKitchen_L1()
+    {
+        int room = pRoom;
+        if (Ph(0))
+        {
+            uint[] r = hq_PlanDinerKitchen_r;
+            int sk = hq_PlanDinerKitchen_sk;
+            int sv = hq_PlanDinerKitchen_sv;
+            int line = hq_PlanDinerKitchen_line;
+            int n = hq_PlanDinerKitchen_n;
+            rowN = 0;
+            rowDef[rowN++] = sk;
+            if (n == 3) rowDef[rowN++] = hp_PlanDinerKitchen_ct;
+            rowDef[rowN++] = sv;
+            if (RngChance(r, 500)) { int tmp = rowDef[0]; rowDef[0] = rowDef[rowN - 1]; rowDef[rowN - 1] = tmp; }
+            int first = nEmit;
+            line = WallRow(0, 2, WM_CORNER, 0, 0, WIN_ANY, EF_MANDATORY, r);
+            hq_PlanDinerKitchen_r = r;
+            hq_PlanDinerKitchen_sk = sk;
+            hq_PlanDinerKitchen_sv = sv;
+            hq_PlanDinerKitchen_line = line;
+            hq_PlanDinerKitchen_first = first;
+        }
+        if (Ph(1))
+        {
+            int line = hq_PlanDinerKitchen_line;
+            int first = hq_PlanDinerKitchen_first;
+            if (line >= 0 && !Keep(first, true)) line = -1;
+            hq_PlanDinerKitchen_line = line;
+            hq_PlanDinerKitchen_first = first;
+        }
+    }
+
 
     // The store room: pantry shelving along a wall; crates in a row; a pallet; barrels, boxes and sacks at the walls.
     void PlanDinerStore()
@@ -1014,7 +1139,15 @@ public partial class MapGenUdon
     int hp_PlanDinerKitchen_lx;
     int hp_PlanDinerKitchen_lz;
 
-    // locals of the split plans, kept from one phase to the next (autophase3)
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_PalletBlock_cell;
+    int hq_PalletBlock_cols;
+    int hq_PalletBlock_first;
+    int hq_PalletBlock_ret;
+    uint[] hq_PalletBlock_rng;
+    int hq_PalletBlock_rows;
+    int hq_PalletBlock_set;
+    int hq_PalletBlock_yaw;
     int hq_PlanDinerDining_bar;
     int hq_PlanDinerDining_barDef;
     int hq_PlanDinerDining_boothsPlaced;
@@ -1041,6 +1174,7 @@ public partial class MapGenUdon
     bool hq_PlanDinerKitchen_haveS;
     bool hq_PlanDinerKitchen_haveV;
     int hq_PlanDinerKitchen_line;
+    int hq_PlanDinerKitchen_n;
     uint[] hq_PlanDinerKitchen_r;
     uint[] hq_PlanDinerKitchen_r4;
     uint[] hq_PlanDinerKitchen_r5;
@@ -1055,9 +1189,11 @@ public partial class MapGenUdon
     int hq_PlanDinerStore_shelf;
     int hq_PlanLoading_cell;
     int[] hq_PlanLoading_chance;
+    int hq_PlanLoading_def;
     int hq_PlanLoading_dx;
     int hq_PlanLoading_dz;
     int hq_PlanLoading_first;
+    int hq_PlanLoading_k;
     int hq_PlanLoading_lane;
     uint[] hq_PlanLoading_r;
     uint[] hq_PlanLoading_r10;
@@ -1066,6 +1202,7 @@ public partial class MapGenUdon
     uint[] hq_PlanLoading_r9;
     string[] hq_PlanLoading_rows;
     int hq_PlanLoading_sel1;
+    int hq_PlanLoading_sel2;
     int hq_PlanStorage_cell;
     int[] hq_PlanStorage_chance;
     int hq_PlanStorage_dx;

@@ -369,24 +369,69 @@ public partial class MapGen
     // wall beside a door. Never on a walkway and never alone on open floor.
     int DumpSpot(int def, int room, int flags, bool outdoor, ref GenRng rng)
     {
-        int e = -1;
-        bool small = Has(def, GenData.FL_LOOSE) || GenData.defSizeClass[def] <= GenData.SZ_L;
-        int k = ExtDoor(room);
-        int tx = k >= 0 ? DoorX(room, k) : RoomMidX(room), tz = k >= 0 ? DoorZ(room, k) : RoomMidZ(room);
-        bool besideFirst = rng.Chance(small ? 600 : 250);
-        if (besideFirst)
+        hq_DumpSpot_def = def;
+        hq_DumpSpot_room = room;
+        hq_DumpSpot_flags = flags;
+        hq_DumpSpot_outdoor = outdoor;
+        hq_DumpSpot_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); DumpSpot_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_DumpSpot_rng;
+        return hq_DumpSpot_ret;
+    }
+
+    // DumpSpot in phases, a step a call (autophase4); DumpSpot() above runs them to the end
+    void DumpSpot_Body()
+    {
+        if (Ph(0))
         {
-            FSet(def);
-            e = PlaceFormationBeside(GenData.GL_ROW, 0, GenData.K_STORE | GenData.K_WORK | GenData.K_TENT | GenData.defBeside[def], room, flags, -1, ref rng);
+            int def = hq_DumpSpot_def;
+            int room = hq_DumpSpot_room;
+            int flags = hq_DumpSpot_flags;
+            bool outdoor = hq_DumpSpot_outdoor;
+            GenRng rng = hq_DumpSpot_rng;
+            int e = -1;
+            bool small = Has(def, GenData.FL_LOOSE) || GenData.defSizeClass[def] <= GenData.SZ_L;
+            int k = ExtDoor(room);
+            int tx = k >= 0 ? DoorX(room, k) : RoomMidX(room), tz = k >= 0 ? DoorZ(room, k) : RoomMidZ(room);
+            bool besideFirst = rng.Chance(small ? 600 : 250);
+            if (besideFirst)
+            {
+                FSet(def);
+                e = PlaceFormationBeside(GenData.GL_ROW, 0, GenData.K_STORE | GenData.K_WORK | GenData.K_TENT | GenData.defBeside[def], room, flags, -1, ref rng);
+            }
+            if (e < 0 && !outdoor) e = CornerPlace(def, k >= 0 ? WM_NEAR : WM_ANY, tx, tz, false, flags, ref rng);
+            if (e < 0) e = WallPlace(def, outdoor ? WM_CORNER : WM_NEAR, tx, tz, WIN_AVOID, flags, ref rng);
+            hq_DumpSpot_def = def;
+            hq_DumpSpot_room = room;
+            hq_DumpSpot_flags = flags;
+            hq_DumpSpot_outdoor = outdoor;
+            hq_DumpSpot_rng = rng;
+            hq_DumpSpot_e = e;
+            hq_DumpSpot_besideFirst = besideFirst;
         }
-        if (e < 0 && !outdoor) e = CornerPlace(def, k >= 0 ? WM_NEAR : WM_ANY, tx, tz, false, flags, ref rng);
-        if (e < 0) e = WallPlace(def, outdoor ? WM_CORNER : WM_NEAR, tx, tz, WIN_AVOID, flags, ref rng);
-        if (e < 0 && !besideFirst)
+        if (Ph(1))
         {
-            FSet(def);
-            e = PlaceFormationBeside(GenData.GL_ROW, 0, GenData.K_STORE | GenData.K_WORK | GenData.K_TENT | GenData.K_FIRE | GenData.K_TREE | GenData.defBeside[def], room, flags, -1, ref rng);
+            int def = hq_DumpSpot_def;
+            int room = hq_DumpSpot_room;
+            int flags = hq_DumpSpot_flags;
+            GenRng rng = hq_DumpSpot_rng;
+            int e = hq_DumpSpot_e;
+            bool besideFirst = hq_DumpSpot_besideFirst;
+            if (e < 0 && !besideFirst)
+            {
+                FSet(def);
+                e = PlaceFormationBeside(GenData.GL_ROW, 0, GenData.K_STORE | GenData.K_WORK | GenData.K_TENT | GenData.K_FIRE | GenData.K_TREE | GenData.defBeside[def], room, flags, -1, ref rng);
+            }
+            { hq_DumpSpot_ret = e; hq_DumpSpot_def = def; hq_DumpSpot_room = room; hq_DumpSpot_flags = flags; hq_DumpSpot_rng = rng; hq_DumpSpot_e = e; hq_DumpSpot_besideFirst = besideFirst; PhEnd(); return; }
+            hq_DumpSpot_def = def;
+            hq_DumpSpot_room = room;
+            hq_DumpSpot_flags = flags;
+            hq_DumpSpot_rng = rng;
+            hq_DumpSpot_e = e;
+            hq_DumpSpot_besideFirst = besideFirst;
         }
-        return e;
     }
 
     // A comedic one stands in plain view and borrows a role (D10; report 15: a fridge as the camp's cooler, a sofa
@@ -394,15 +439,73 @@ public partial class MapGen
     // middle of a wall, facing the room; else, outdoors, at an open spot.
     int ComedicSpot(int def, int room, int flags, bool outdoor, ref GenRng rng)
     {
-        FSet(def);
-        int e = PlaceFormationBeside(GenData.GL_ROW, 0, GenData.K_FIRE | GenData.K_TENT | GenData.K_TABLE | GenData.K_BED | GenData.K_SEAT | GenData.K_TV, room, flags, -1, ref rng);
-        if (e < 0) e = WallPlace(def, WM_CENTRE, 0, 0, WIN_AVOID, flags, ref rng);
-        if (e < 0 && outdoor)
+        hq_ComedicSpot_def = def;
+        hq_ComedicSpot_room = room;
+        hq_ComedicSpot_flags = flags;
+        hq_ComedicSpot_outdoor = outdoor;
+        hq_ComedicSpot_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); ComedicSpot_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_ComedicSpot_rng;
+        return hq_ComedicSpot_ret;
+    }
+
+    // ComedicSpot in phases, a step a call (autophase4); ComedicSpot() above runs them to the end
+    void ComedicSpot_Body()
+    {
+        if (Ph(0))
         {
-            int c = OpenSpot(2, WM_ANY, 0, 0, 0, ref rng);
-            if (c >= 0) e = FreePlace(def, c, rng.Range(4) * 90, 0, flags, H_FREE);
+            int def = hq_ComedicSpot_def;
+            int room = hq_ComedicSpot_room;
+            int flags = hq_ComedicSpot_flags;
+            bool outdoor = hq_ComedicSpot_outdoor;
+            GenRng rng = hq_ComedicSpot_rng;
+            FSet(def);
+            int e = PlaceFormationBeside(GenData.GL_ROW, 0, GenData.K_FIRE | GenData.K_TENT | GenData.K_TABLE | GenData.K_BED | GenData.K_SEAT | GenData.K_TV, room, flags, -1, ref rng);
+            if (e < 0) e = WallPlace(def, WM_CENTRE, 0, 0, WIN_AVOID, flags, ref rng);
+            hq_ComedicSpot_sel1 = 0;
+            if (e < 0 && outdoor) hq_ComedicSpot_sel1 = 1;
+            hq_ComedicSpot_def = def;
+            hq_ComedicSpot_room = room;
+            hq_ComedicSpot_flags = flags;
+            hq_ComedicSpot_outdoor = outdoor;
+            hq_ComedicSpot_rng = rng;
+            hq_ComedicSpot_e = e;
         }
-        return e;
+        if (Ph(1))
+        {
+            if (hq_ComedicSpot_sel1 == 1)
+            {
+                GenRng rng = hq_ComedicSpot_rng;
+                int c = OpenSpot(2, WM_ANY, 0, 0, 0, ref rng);
+                hq_ComedicSpot_rng = rng;
+                hq_ComedicSpot_c = c;
+            }
+        }
+        if (Ph(2))
+        {
+            if (hq_ComedicSpot_sel1 == 1)
+            {
+                int def = hq_ComedicSpot_def;
+                int flags = hq_ComedicSpot_flags;
+                GenRng rng = hq_ComedicSpot_rng;
+                int e = hq_ComedicSpot_e;
+                int c = hq_ComedicSpot_c;
+                if (c >= 0) e = FreePlace(def, c, rng.Range(4) * 90, 0, flags, H_FREE);
+                hq_ComedicSpot_def = def;
+                hq_ComedicSpot_flags = flags;
+                hq_ComedicSpot_rng = rng;
+                hq_ComedicSpot_e = e;
+                hq_ComedicSpot_c = c;
+            }
+        }
+        if (Ph(3))
+        {
+            int e = hq_ComedicSpot_e;
+            { hq_ComedicSpot_ret = e; hq_ComedicSpot_e = e; PhEnd(); return; }
+            hq_ComedicSpot_e = e;
+        }
     }
 
     // The leak candidates by (table, zone, indoors or out, comedic), worked out once per map (they were summed over every
@@ -529,4 +632,23 @@ public partial class MapGen
             if (comedic) statLeakComedic++; else statLeakPlausible++;
             for (int h = first; h < nEmit; h++) FillSlots(h, 1);
             }
+
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_ComedicSpot_c;
+    int hq_ComedicSpot_def;
+    int hq_ComedicSpot_e;
+    int hq_ComedicSpot_flags;
+    bool hq_ComedicSpot_outdoor;
+    int hq_ComedicSpot_ret;
+    GenRng hq_ComedicSpot_rng;
+    int hq_ComedicSpot_room;
+    int hq_ComedicSpot_sel1;
+    bool hq_DumpSpot_besideFirst;
+    int hq_DumpSpot_def;
+    int hq_DumpSpot_e;
+    int hq_DumpSpot_flags;
+    bool hq_DumpSpot_outdoor;
+    int hq_DumpSpot_ret;
+    GenRng hq_DumpSpot_rng;
+    int hq_DumpSpot_room;
 }

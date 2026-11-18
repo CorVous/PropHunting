@@ -66,14 +66,59 @@ public partial class MapGenUdon
     // wall has the length, else a narrower one). Returns the emit index or -1.
     int WallAny(int mode, int tx, int tz, int win, int flags, uint[] rng, string a, string b, string c)
     {
-        for (int k = 0; k < 3; k++)
+        hq_WallAny_mode = mode;
+        hq_WallAny_tx = tx;
+        hq_WallAny_tz = tz;
+        hq_WallAny_win = win;
+        hq_WallAny_flags = flags;
+        hq_WallAny_rng = rng;
+        hq_WallAny_a = a;
+        hq_WallAny_b = b;
+        hq_WallAny_c = c;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); WallAny_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_WallAny_rng;
+        return hq_WallAny_ret;
+    }
+
+    // WallAny in phases, a step a call (autophase4); WallAny() above runs them to the end
+    void WallAny_Body()
+    {
+        if (PhLoop(0, 100000))
         {
-            string id = k == 0 ? a : (k == 1 ? b : c);
-            if (id == null) continue;
-            int e = WallKeep(Dn(id), mode, tx, tz, win, flags, rng);
-            if (e >= 0) return e;
+            int mode = hq_WallAny_mode;
+            int tx = hq_WallAny_tx;
+            int tz = hq_WallAny_tz;
+            int win = hq_WallAny_win;
+            int flags = hq_WallAny_flags;
+            uint[] rng = hq_WallAny_rng;
+            string a = hq_WallAny_a;
+            string b = hq_WallAny_b;
+            string c = hq_WallAny_c;
+            int k = planIter;
+            if (!(k < 3)) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            {
+                string id = k == 0 ? a : (k == 1 ? b : c);
+                if (id == null) continue;
+                int e = WallKeep(Dn(id), mode, tx, tz, win, flags, rng);
+                if (e >= 0) { hq_WallAny_ret = e; hq_WallAny_mode = mode; hq_WallAny_tx = tx; hq_WallAny_tz = tz; hq_WallAny_win = win; hq_WallAny_flags = flags; hq_WallAny_rng = rng; hq_WallAny_a = a; hq_WallAny_b = b; hq_WallAny_c = c; PhEnd(); return; }
+            }
+            hq_WallAny_mode = mode;
+            hq_WallAny_tx = tx;
+            hq_WallAny_tz = tz;
+            hq_WallAny_win = win;
+            hq_WallAny_flags = flags;
+            hq_WallAny_rng = rng;
+            hq_WallAny_a = a;
+            hq_WallAny_b = b;
+            hq_WallAny_c = c;
         }
-        return -1;
+        if (Ph(1))
+        {
+            { hq_WallAny_ret = -1; PhEnd(); return; }
+        }
     }
 
     // What a room takes on at its walls and in its corners once its areas stand, while the budget lasts. Each
@@ -154,29 +199,21 @@ public partial class MapGenUdon
         }
         if (PhLoop(1, 100000))
         {
-            uint[] r = hq_PlanLiving_r;
-            int tvDef = hq_PlanLiving_tvDef;
-            int sofaDef = hq_PlanLiving_sofaDef;
-            int tv = hq_PlanLiving_tv;
             int sofa = hq_PlanLiving_sofa;
-            int t = planIter;
-            if (!(t < 4 && sofa < 0)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                int first = nEmit;
-                tv = WallPlace(tvDef, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, r);
-                if (tv < 0) { PhBreak(); break; }
-                int seg = wrSeg;
-                sofa = SofaFacing(tv, sofaDef, r);
-                if (sofa >= 0 && Keep(first, true)) { PhBreak(); break; }
-                if (sofa < 0) TakeBack(first);
-                sofa = -1; tv = -1; segBan[seg] = true;
+                int t = planIter;
+                if (!(t < 4 && sofa < 0)) PhBreak();
+                else { hq_PlanLiving_t = t; PhSubBegin(); }
             }
-            hq_PlanLiving_r = r;
-            hq_PlanLiving_tvDef = tvDef;
-            hq_PlanLiving_sofaDef = sofaDef;
-            hq_PlanLiving_tv = tv;
             hq_PlanLiving_sofa = sofa;
+            if (PhSubActive())
+            {
+                PhPush(); PlanLiving_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
         if (Ph(2))
         {
@@ -262,12 +299,6 @@ public partial class MapGenUdon
                 int ctZ = ssz / 2 + 380 + Sz(ctDef) / 2;        // 0.38 m between the seat and the table (0.36 to 0.46 m)
                 bool faces = tv >= 0 && emitSet[sofa] == tv;
                 int view = faces ? AlongFront(tv, sofa) - ssz / 2 - Sz(tvDef) / 2 : 9000;
-                if (Fit(1) && view - 380 - Sz(ctDef) >= 950)
-                {
-                    int first = nEmit;
-                    if (Rel(ctDef, sofa, 0, ctZ, 0, 0) >= 0) Keep(first, false);
-                }
-                uint[] r3 = SR(3);
                 hq_PlanLiving_tvDef = tvDef;
                 hq_PlanLiving_tv = tv;
                 hq_PlanLiving_sofa = sofa;
@@ -276,10 +307,30 @@ public partial class MapGenUdon
                 hq_PlanLiving_ctDef = ctDef;
                 hq_PlanLiving_ctZ = ctZ;
                 hq_PlanLiving_view = view;
-                hq_PlanLiving_r3 = r3;
             }
         }
         if (Ph(9))
+        {
+            if (hq_PlanLiving_sel2 == 1)
+            {
+                int sofa = hq_PlanLiving_sofa;
+                int ctDef = hq_PlanLiving_ctDef;
+                int ctZ = hq_PlanLiving_ctZ;
+                int view = hq_PlanLiving_view;
+                if (Fit(1) && view - 380 - Sz(ctDef) >= 950)
+                {
+                    int first = nEmit;
+                    if (Rel(ctDef, sofa, 0, ctZ, 0, 0) >= 0) Keep(first, false);
+                }
+                uint[] r3 = SR(3);
+                hq_PlanLiving_sofa = sofa;
+                hq_PlanLiving_ctDef = ctDef;
+                hq_PlanLiving_ctZ = ctZ;
+                hq_PlanLiving_view = view;
+                hq_PlanLiving_r3 = r3;
+            }
+        }
+        if (Ph(10))
         {
             if (hq_PlanLiving_sel2 == 1)
             {
@@ -321,39 +372,29 @@ public partial class MapGenUdon
                 hq_PlanLiving_lxSofa = lxSofa;
             }
         }
-        if (PhLoop(10, 100000))
+        if (PhLoop(11, 100000))
         {
             if (!(hq_PlanLiving_sel2 == 1)) PhBreak();
             else
             {
-                int sofa = hq_PlanLiving_sofa;
-                int ssz = hq_PlanLiving_ssz;
                 int chairs = hq_PlanLiving_chairs;
-                int chairDef = hq_PlanLiving_chairDef;
-                int side0 = hq_PlanLiving_side0;
-                int chZ = hq_PlanLiving_chZ;
-                int lxTable = hq_PlanLiving_lxTable;
-                int lxSofa = hq_PlanLiving_lxSofa;
-                int k = planIter;
-                if (!(k < chairs && Fit(1))) PhBreak();
-                else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+                if (!PhSubActive())
                 {
-                    int sgn = k == 0 ? side0 : -side0, first = nEmit;
-                    int e = Rel(chairDef, sofa, sgn * (chZ < ssz / 2 + Sx(chairDef) / 2 + 60 && lxSofa > lxTable ? lxSofa : lxTable), chZ, sgn > 0 ? 270 : 90, 0);
-                    if (e < 0) e = Rel(chairDef, sofa, sgn * lxSofa, chZ, sgn > 0 ? 270 : 90, 0);
-                    if (e >= 0) Keep(first, false);
+                    int k = planIter;
+                    if (!(k < chairs && Fit(1))) PhBreak();
+                    else { hq_PlanLiving_k = k; PhSubBegin(); }
                 }
-                hq_PlanLiving_sofa = sofa;
-                hq_PlanLiving_ssz = ssz;
                 hq_PlanLiving_chairs = chairs;
-                hq_PlanLiving_chairDef = chairDef;
-                hq_PlanLiving_side0 = side0;
-                hq_PlanLiving_chZ = chZ;
-                hq_PlanLiving_lxTable = lxTable;
-                hq_PlanLiving_lxSofa = lxSofa;
+                if (PhSubActive())
+                {
+                    PhPush(); PlanLiving_L2(); bool fin = PhAdvance(); PhPop();
+                    if (fin) PhSubEnd(); else PhStay();
+                    if (phBreak) { phBreak = false; PhBreak(); }
+                    if (phReturn) { phReturn = false; PhEnd(); return; }
+                }
             }
         }
-        if (Ph(11))
+        if (Ph(12))
         {
             if (hq_PlanLiving_sel2 == 1)
             {
@@ -371,7 +412,7 @@ public partial class MapGenUdon
                 hq_PlanLiving_r6 = r6;
             }
         }
-        if (Ph(12))
+        if (Ph(13))
         {
             if (hq_PlanLiving_sel2 == 1)
             {
@@ -388,7 +429,7 @@ public partial class MapGenUdon
                 hq_PlanLiving_r6 = r6;
             }
         }
-        if (Ph(13))
+        if (Ph(14))
         {
             int tv = hq_PlanLiving_tv;
             // speakers flank the cabinet as a pair
@@ -405,7 +446,7 @@ public partial class MapGenUdon
             hq_PlanLiving_tv = tv;
             hq_PlanLiving_r8 = r8;
         }
-        if (Ph(14))
+        if (Ph(15))
         {
             uint[] r8 = hq_PlanLiving_r8;
             if (RngChance(r8, 780) && Fit(1))
@@ -427,7 +468,7 @@ public partial class MapGenUdon
             hq_PlanLiving_r8 = r8;
             hq_PlanLiving_r9 = r9;
         }
-        if (Ph(15))
+        if (Ph(16))
         {
             if (hq_PlanLiving_sel3 == 1)
             {
@@ -443,7 +484,7 @@ public partial class MapGenUdon
                 hq_PlanLiving_chair = chair;
             }
         }
-        if (Ph(16))
+        if (Ph(17))
         {
             if (hq_PlanLiving_sel3 == 1)
             {
@@ -460,19 +501,25 @@ public partial class MapGenUdon
                 hq_PlanLiving_chair = chair;
             }
         }
-        if (Ph(17))
+        if (Ph(18))
         {
             // (d) plants and lamps in corners, a low bookcase or a side table at a free wall
             Extras(20, 720, "ck_plant", "vk_bookcaseLow", "cq_cactus", "wk_sideTable", "ck_lampFloor", "mq_cabinet");
             // (e) the loose remainder: a box of toys in a corner, or a couple of moving boxes
             uint[] r12 = SR(12);
             int roll = RngRange(r12, 1000);
+            hq_PlanLiving_r12 = r12;
+            hq_PlanLiving_roll = roll;
+        }
+        if (Ph(19))
+        {
+            int roll = hq_PlanLiving_roll;
             hq_PlanLiving_sel4 = 0;
             if (roll < 170 && LooseFit(3)) hq_PlanLiving_sel4 = 1;
             else if (roll < 330 && LooseFit(2)) hq_PlanLiving_sel4 = 2;
-            hq_PlanLiving_r12 = r12;
+            hq_PlanLiving_roll = roll;
         }
-        if (Ph(18))
+        if (Ph(20))
         {
             if (hq_PlanLiving_sel4 == 1)
             {
@@ -481,8 +528,6 @@ public partial class MapGenUdon
                 uint[] r12 = hq_PlanLiving_r12;
                 int first = nEmit;
                 int box = CornerPlace(Dn("k_boxOpen"), WM_FAR, dx, dz, false, 0, r12);
-                hq_PlanLiving_sel5 = 0;
-                if (box >= 0 && Keep(first, false)) hq_PlanLiving_sel5 = 1;
                 hq_PlanLiving_dx = dx;
                 hq_PlanLiving_dz = dz;
                 hq_PlanLiving_r12 = r12;
@@ -490,7 +535,19 @@ public partial class MapGenUdon
                 hq_PlanLiving_box = box;
             }
         }
-        if (Ph(19))
+        if (Ph(21))
+        {
+            if (hq_PlanLiving_sel4 == 1)
+            {
+                int first = hq_PlanLiving_first;
+                int box = hq_PlanLiving_box;
+                hq_PlanLiving_sel5 = 0;
+                if (box >= 0 && Keep(first, false)) hq_PlanLiving_sel5 = 1;
+                hq_PlanLiving_first = first;
+                hq_PlanLiving_box = box;
+            }
+        }
+        if (Ph(22))
         {
             if (hq_PlanLiving_sel4 == 1 && hq_PlanLiving_sel5 == 1)
             {
@@ -500,7 +557,7 @@ public partial class MapGenUdon
                 hq_PlanLiving_first = first;
             }
         }
-        if (Ph(20))
+        if (Ph(23))
         {
             if (hq_PlanLiving_sel4 == 1 && hq_PlanLiving_sel5 == 1)
             {
@@ -513,7 +570,7 @@ public partial class MapGenUdon
                 hq_PlanLiving_box = box;
             }
         }
-        if (Ph(21))
+        if (Ph(24))
         {
             if (hq_PlanLiving_sel4 == 2)
             {
@@ -528,6 +585,88 @@ public partial class MapGenUdon
             }
         }
     }
+    void PlanLiving_L1()
+    {
+        int room = pRoom, area = AreaM2(room);
+        if (Ph(0))
+        {
+            uint[] r = hq_PlanLiving_r;
+            int tvDef = hq_PlanLiving_tvDef;
+            int sofaDef = hq_PlanLiving_sofaDef;
+            int tv = hq_PlanLiving_tv;
+            int sofa = hq_PlanLiving_sofa;
+            int first = nEmit;
+            tv = WallPlace(tvDef, WM_CENTRE, 0, 0, WIN_AVOID, EF_MANDATORY, r);
+            if (tv < 0) { hq_PlanLiving_r = r; hq_PlanLiving_tvDef = tvDef; hq_PlanLiving_sofaDef = sofaDef; hq_PlanLiving_tv = tv; hq_PlanLiving_sofa = sofa; hq_PlanLiving_first = first; phBreak = true; PhEnd(); return; }
+            int seg = wrSeg;
+            sofa = SofaFacing(tv, sofaDef, r);
+            hq_PlanLiving_r = r;
+            hq_PlanLiving_tvDef = tvDef;
+            hq_PlanLiving_sofaDef = sofaDef;
+            hq_PlanLiving_tv = tv;
+            hq_PlanLiving_sofa = sofa;
+            hq_PlanLiving_first = first;
+            hq_PlanLiving_seg = seg;
+        }
+        if (Ph(1))
+        {
+            int sofa = hq_PlanLiving_sofa;
+            int first = hq_PlanLiving_first;
+            if (sofa >= 0 && Keep(first, true)) { hq_PlanLiving_sofa = sofa; hq_PlanLiving_first = first; phBreak = true; PhEnd(); return; }
+            hq_PlanLiving_sofa = sofa;
+            hq_PlanLiving_first = first;
+        }
+        if (Ph(2))
+        {
+            int tv = hq_PlanLiving_tv;
+            int sofa = hq_PlanLiving_sofa;
+            int first = hq_PlanLiving_first;
+            int seg = hq_PlanLiving_seg;
+            if (sofa < 0) TakeBack(first);
+            sofa = -1; tv = -1; segBan[seg] = true;
+            hq_PlanLiving_tv = tv;
+            hq_PlanLiving_sofa = sofa;
+            hq_PlanLiving_first = first;
+            hq_PlanLiving_seg = seg;
+        }
+    }
+
+    void PlanLiving_L2()
+    {
+        int room = pRoom, area = AreaM2(room);
+        if (Ph(0))
+        {
+            int sofa = hq_PlanLiving_sofa;
+            int ssz = hq_PlanLiving_ssz;
+            int chairDef = hq_PlanLiving_chairDef;
+            int side0 = hq_PlanLiving_side0;
+            int chZ = hq_PlanLiving_chZ;
+            int lxTable = hq_PlanLiving_lxTable;
+            int lxSofa = hq_PlanLiving_lxSofa;
+            int k = hq_PlanLiving_k;
+            int sgn = k == 0 ? side0 : -side0, first = nEmit;
+            int e = Rel(chairDef, sofa, sgn * (chZ < ssz / 2 + Sx(chairDef) / 2 + 60 && lxSofa > lxTable ? lxSofa : lxTable), chZ, sgn > 0 ? 270 : 90, 0);
+            if (e < 0) e = Rel(chairDef, sofa, sgn * lxSofa, chZ, sgn > 0 ? 270 : 90, 0);
+            hq_PlanLiving_sofa = sofa;
+            hq_PlanLiving_ssz = ssz;
+            hq_PlanLiving_chairDef = chairDef;
+            hq_PlanLiving_side0 = side0;
+            hq_PlanLiving_chZ = chZ;
+            hq_PlanLiving_lxTable = lxTable;
+            hq_PlanLiving_lxSofa = lxSofa;
+            hq_PlanLiving_first = first;
+            hq_PlanLiving_e = e;
+        }
+        if (Ph(1))
+        {
+            int first = hq_PlanLiving_first;
+            int e = hq_PlanLiving_e;
+            if (e >= 0) Keep(first, false);
+            hq_PlanLiving_first = first;
+            hq_PlanLiving_e = e;
+        }
+    }
+
 
     // the sofa opposite a TV cabinet, facing it: against the wall across the room when that is near enough,
     // else standing free 2.3 to 2.7 m from the screen with its back to the walkway
@@ -564,12 +703,15 @@ public partial class MapGenUdon
             hq_PlanDining_yaw = yaw;
             hq_PlanDining_first0 = first0;
         }
-        if (Ph(1))
+        if (PhLoop(1, 100000))
         {
             uint[] r = hq_PlanDining_r;
             int table = hq_PlanDining_table;
             int yaw = hq_PlanDining_yaw;
-            int t = CentrePiece(table, yaw, true, 2, 1, WM_NEAR, RoomMidX(room), RoomMidZ(room), 0, EF_MANDATORY, r);
+            int t = 0;
+            if (planIter == 0) { hq_CentrePiece_def = table; hq_CentrePiece_yaw = yaw; hq_CentrePiece_bothYaws = true; hq_CentrePiece_ringWant = 2; hq_CentrePiece_ringMin = 1; hq_CentrePiece_mode = WM_NEAR; hq_CentrePiece_tx = RoomMidX(room); hq_CentrePiece_tz = RoomMidZ(room); hq_CentrePiece_need = 0; hq_CentrePiece_flags = EF_MANDATORY; hq_CentrePiece_rng = r; PhSubReset(); }
+            PhPush(); CentrePiece_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_CentrePiece_rng; t = hq_CentrePiece_ret; PhBreak(); }
             hq_PlanDining_r = r;
             hq_PlanDining_table = table;
             hq_PlanDining_yaw = yaw;
@@ -577,45 +719,148 @@ public partial class MapGenUdon
         }
         if (Ph(2))
         {
-            int table = hq_PlanDining_table;
-            int first0 = hq_PlanDining_first0;
             int t = hq_PlanDining_t;
-            if (t >= 0)
+            hq_PlanDining_sel1 = 0;
+            if (t >= 0) hq_PlanDining_sel1 = 1;
+            hq_PlanDining_t = t;
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanDining_sel1 == 1)
             {
+                int t = hq_PlanDining_t;
                 // In a small room the walkway takes one side: the table is tried one cell off the middle each way, and
                 // stands where it keeps the most chairs (report 15, K3: a seat with its back to a wall needs less room).
                 int bestSeats = SeatsOf(t), bestX = emitX[t], bestZ = emitZ[t], tyaw = emitYaw[t];
                 int k = 0;
-                while (k < 4 && bestSeats < 4)
+                hq_PlanDining_t = t;
+                hq_PlanDining_bestSeats = bestSeats;
+                hq_PlanDining_bestX = bestX;
+                hq_PlanDining_bestZ = bestZ;
+                hq_PlanDining_tyaw = tyaw;
+                hq_PlanDining_k = k;
+            }
+        }
+        if (PhLoop(4, 100000))
+        {
+            if (!(hq_PlanDining_sel1 == 1)) PhBreak();
+            else
+            {
+                int bestSeats = hq_PlanDining_bestSeats;
+                int k = hq_PlanDining_k;
+                if (!PhSubActive())
                 {
-                    int nx = bestX + DX[k] * GenData.INNER_MM, nz = bestZ + DZ[k] * GenData.INNER_MM;
-                    TakeBack(first0);
-                    first0 = nEmit;
-                    int alt = FreePlaceAt(table, nx, nz, tyaw, 1, EF_MANDATORY, H_FREE);
-                    if (alt >= 0 && Keep(first0, true) && SeatsOf(alt) > bestSeats) { bestSeats = SeatsOf(alt); bestX = nx; bestZ = nz; k = 0; t = alt; continue; }
-                    if (alt >= 0) TakeBack(first0);
-                    first0 = nEmit;
-                    t = FreePlaceAt(table, bestX, bestZ, tyaw, 1, EF_MANDATORY, H_FREE);
-                    if (t < 0 || !Keep(first0, true)) { t = -1; break; }
-                    k++;
+                    if (!(k < 4 && bestSeats < 4)) PhBreak();
+                    else { PhSubBegin(); }
+                }
+                hq_PlanDining_bestSeats = bestSeats;
+                hq_PlanDining_k = k;
+                if (PhSubActive())
+                {
+                    PhPush(); PlanDining_L1(); bool fin = PhAdvance(); PhPop();
+                    if (fin) PhSubEnd(); else PhStay();
+                    if (phBreak) { phBreak = false; PhBreak(); }
+                    if (phReturn) { phReturn = false; PhEnd(); return; }
                 }
             }
+        }
+        if (Ph(5))
+        {
+            int t = hq_PlanDining_t;
             if (t < 0) MandFail(1);
-            hq_PlanDining_table = table;
-            hq_PlanDining_first0 = first0;
             hq_PlanDining_t = t;
         }
-        if (Ph(3))
+        if (Ph(6))
         {
             // the sideboard in the middle of a wall: the widest that fits
             uint[] r2 = SR(2);
             if (RngChance(r2, 900) && Fit(1)) WallAny(WM_CENTRE, 0, 0, WIN_AVOID, 0, r2, "q_cabinet", "k_sideTable", "k_bookcaseLow");
         }
-        if (Ph(4))
+        if (Ph(7))
         {
             Extras(20, 750, "ck_plant", "cq_lampStanding", "wk_bookcaseLow", "cq_cactus", "ck_lampFloor");
         }
     }
+    void PlanDining_L1()
+    {
+        int room = pRoom;
+        if (Ph(0))
+        {
+            int table = hq_PlanDining_table;
+            int first0 = hq_PlanDining_first0;
+            int bestX = hq_PlanDining_bestX;
+            int bestZ = hq_PlanDining_bestZ;
+            int tyaw = hq_PlanDining_tyaw;
+            int k = hq_PlanDining_k;
+            int nx = bestX + DX[k] * GenData.INNER_MM, nz = bestZ + DZ[k] * GenData.INNER_MM;
+            TakeBack(first0);
+            first0 = nEmit;
+            int alt = FreePlaceAt(table, nx, nz, tyaw, 1, EF_MANDATORY, H_FREE);
+            hq_PlanDining_table = table;
+            hq_PlanDining_first0 = first0;
+            hq_PlanDining_bestX = bestX;
+            hq_PlanDining_bestZ = bestZ;
+            hq_PlanDining_tyaw = tyaw;
+            hq_PlanDining_k = k;
+            hq_PlanDining_nx = nx;
+            hq_PlanDining_nz = nz;
+            hq_PlanDining_alt = alt;
+        }
+        if (Ph(1))
+        {
+            int first0 = hq_PlanDining_first0;
+            int t = hq_PlanDining_t;
+            int bestSeats = hq_PlanDining_bestSeats;
+            int bestX = hq_PlanDining_bestX;
+            int bestZ = hq_PlanDining_bestZ;
+            int k = hq_PlanDining_k;
+            int nx = hq_PlanDining_nx;
+            int nz = hq_PlanDining_nz;
+            int alt = hq_PlanDining_alt;
+            if (alt >= 0 && Keep(first0, true) && SeatsOf(alt) > bestSeats) { bestSeats = SeatsOf(alt); bestX = nx; bestZ = nz; k = 0; t = alt; { hq_PlanDining_first0 = first0; hq_PlanDining_t = t; hq_PlanDining_bestSeats = bestSeats; hq_PlanDining_bestX = bestX; hq_PlanDining_bestZ = bestZ; hq_PlanDining_k = k; hq_PlanDining_nx = nx; hq_PlanDining_nz = nz; hq_PlanDining_alt = alt; PhEnd(); return; } }
+            hq_PlanDining_first0 = first0;
+            hq_PlanDining_t = t;
+            hq_PlanDining_bestSeats = bestSeats;
+            hq_PlanDining_bestX = bestX;
+            hq_PlanDining_bestZ = bestZ;
+            hq_PlanDining_k = k;
+            hq_PlanDining_nx = nx;
+            hq_PlanDining_nz = nz;
+            hq_PlanDining_alt = alt;
+        }
+        if (Ph(2))
+        {
+            int table = hq_PlanDining_table;
+            int first0 = hq_PlanDining_first0;
+            int t = hq_PlanDining_t;
+            int bestX = hq_PlanDining_bestX;
+            int bestZ = hq_PlanDining_bestZ;
+            int tyaw = hq_PlanDining_tyaw;
+            int alt = hq_PlanDining_alt;
+            if (alt >= 0) TakeBack(first0);
+            first0 = nEmit;
+            t = FreePlaceAt(table, bestX, bestZ, tyaw, 1, EF_MANDATORY, H_FREE);
+            hq_PlanDining_table = table;
+            hq_PlanDining_first0 = first0;
+            hq_PlanDining_t = t;
+            hq_PlanDining_bestX = bestX;
+            hq_PlanDining_bestZ = bestZ;
+            hq_PlanDining_tyaw = tyaw;
+            hq_PlanDining_alt = alt;
+        }
+        if (Ph(3))
+        {
+            int first0 = hq_PlanDining_first0;
+            int t = hq_PlanDining_t;
+            int k = hq_PlanDining_k;
+            if (t < 0 || !Keep(first0, true)) { t = -1; { hq_PlanDining_first0 = first0; hq_PlanDining_t = t; hq_PlanDining_k = k; phBreak = true; PhEnd(); return; } }
+            k++;
+            hq_PlanDining_first0 = first0;
+            hq_PlanDining_t = t;
+            hq_PlanDining_k = k;
+        }
+    }
+
 
     // ============================================================================================ KITCHEN
     // Areas: the work run along one wall (round a corner if it must): fridge at an end, sink, cooker, worktops;
@@ -626,14 +871,174 @@ public partial class MapGenUdon
     // Returns how many of the three work centres (fridge, sink, cooker) stand.
     int KitchenRun(int want, uint[] rng)
     {
-        int room = pRoom;
-        int fr = Dn("k_fridge"), sk = Dn("k_sink"), sv = Dn("k_stove"), c1 = Dn("k_counter"), c2 = Dn("k_counterDrawer");
-        int[] order = new int[8];
-        bool haveF = false, haveS = false, haveV = false;
-        runFirst = nEmit; runLast = -1; runCx = RoomMidX(room); runCz = RoomMidZ(room);
-        int nearX = 0, nearZ = 0;
-        for (int leg = 0; leg < 3 && !(haveF && haveS && haveV); leg++)
+        hq_KitchenRun_want = want;
+        hq_KitchenRun_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); KitchenRun_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_KitchenRun_rng;
+        return hq_KitchenRun_ret;
+    }
+
+    // KitchenRun in phases, a step a call (autophase4); KitchenRun() above runs them to the end
+    void KitchenRun_Body()
+    {
+        if (Ph(0))
         {
+            int room = pRoom;
+            int fr = Dn("k_fridge"), sk = Dn("k_sink"), sv = Dn("k_stove"), c1 = Dn("k_counter"), c2 = Dn("k_counterDrawer");
+            int[] order = new int[8];
+            bool haveF = false, haveS = false, haveV = false;
+            runFirst = nEmit; runLast = -1; runCx = RoomMidX(room); runCz = RoomMidZ(room);
+            int nearX = 0, nearZ = 0;
+            hq_KitchenRun_room = room;
+            hq_KitchenRun_fr = fr;
+            hq_KitchenRun_sk = sk;
+            hq_KitchenRun_sv = sv;
+            hq_KitchenRun_c1 = c1;
+            hq_KitchenRun_c2 = c2;
+            hq_KitchenRun_order = order;
+            hq_KitchenRun_haveF = haveF;
+            hq_KitchenRun_haveS = haveS;
+            hq_KitchenRun_haveV = haveV;
+            hq_KitchenRun_nearX = nearX;
+            hq_KitchenRun_nearZ = nearZ;
+        }
+        if (PhLoop(1, 100000))
+        {
+            bool haveF = hq_KitchenRun_haveF;
+            bool haveS = hq_KitchenRun_haveS;
+            bool haveV = hq_KitchenRun_haveV;
+            if (!PhSubActive())
+            {
+                int leg = planIter;
+                if (!(leg < 3 && !(haveF && haveS && haveV))) PhBreak();
+                else { hq_KitchenRun_leg = leg; PhSubBegin(); }
+            }
+            hq_KitchenRun_haveF = haveF;
+            hq_KitchenRun_haveS = haveS;
+            hq_KitchenRun_haveV = haveV;
+            if (PhSubActive())
+            {
+                PhPush(); KitchenRun_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(2))
+        {
+            bool haveF = hq_KitchenRun_haveF;
+            bool haveS = hq_KitchenRun_haveS;
+            bool haveV = hq_KitchenRun_haveV;
+            { hq_KitchenRun_ret = (haveF ? 1 : 0) + (haveS ? 1 : 0) + (haveV ? 1 : 0); hq_KitchenRun_haveF = haveF; hq_KitchenRun_haveS = haveS; hq_KitchenRun_haveV = haveV; PhEnd(); return; }
+            hq_KitchenRun_haveF = haveF;
+            hq_KitchenRun_haveS = haveS;
+            hq_KitchenRun_haveV = haveV;
+        }
+    }
+    void KitchenRun_L2()
+    {
+        if (Ph(0))
+        {
+            uint[] rng = hq_KitchenRun_rng;
+            int room = hq_KitchenRun_room;
+            int fr = hq_KitchenRun_fr;
+            int sk = hq_KitchenRun_sk;
+            int sv = hq_KitchenRun_sv;
+            int c1 = hq_KitchenRun_c1;
+            int c2 = hq_KitchenRun_c2;
+            int[] order = hq_KitchenRun_order;
+            int nearX = hq_KitchenRun_nearX;
+            int nearZ = hq_KitchenRun_nearZ;
+            int leg = hq_KitchenRun_leg;
+            int n = hq_KitchenRun_n;
+            int m = hq_KitchenRun_m;
+            // the longest stretch that fits: drop worktops first, then the far end of the list
+            rowN = 0;
+            int drop = n - m;
+            for (int i = 0; i < n; i++)
+            {
+                bool worktop = order[i] == c1 || order[i] == c2;
+                if (drop > 0 && worktop) { drop--; continue; }
+                rowDef[rowN++] = order[i];
+            }
+            if (rowN > m) rowN = m;
+            if (rowN == 0) { hq_KitchenRun_rng = rng; hq_KitchenRun_room = room; hq_KitchenRun_fr = fr; hq_KitchenRun_sk = sk; hq_KitchenRun_sv = sv; hq_KitchenRun_c1 = c1; hq_KitchenRun_c2 = c2; hq_KitchenRun_order = order; hq_KitchenRun_nearX = nearX; hq_KitchenRun_nearZ = nearZ; hq_KitchenRun_n = n; phBreak = true; PhEnd(); return; }
+            if (RngChance(rng, 500)) for (int i = 0; i < rowN / 2; i++) { int tmp = rowDef[i]; rowDef[i] = rowDef[rowN - 1 - i]; rowDef[rowN - 1 - i] = tmp; }
+            int len = 0;
+            for (int i = 0; i < rowN; i++) len += Sx(rowDef[i]);
+            if (!FindWallRun(room, len, 900, 2, leg == 0 ? WM_CORNER : WM_NEAR, nearX, nearZ, WIN_ANY, rng)) { hq_KitchenRun_rng = rng; hq_KitchenRun_room = room; hq_KitchenRun_fr = fr; hq_KitchenRun_sk = sk; hq_KitchenRun_sv = sv; hq_KitchenRun_c1 = c1; hq_KitchenRun_c2 = c2; hq_KitchenRun_order = order; hq_KitchenRun_nearX = nearX; hq_KitchenRun_nearZ = nearZ; hq_KitchenRun_n = n; PhEnd(); return; }
+            ArrangeForWindows(wrSeg, wrDir, wrCentre - len / 2, len, fr, sk, sv);
+            int first = nEmit;
+            if (StampRow(wrDir, wrBack, wrCentre - len / 2, 0, EF_MANDATORY) < 0) { hq_KitchenRun_rng = rng; hq_KitchenRun_room = room; hq_KitchenRun_fr = fr; hq_KitchenRun_sk = sk; hq_KitchenRun_sv = sv; hq_KitchenRun_c1 = c1; hq_KitchenRun_c2 = c2; hq_KitchenRun_order = order; hq_KitchenRun_nearX = nearX; hq_KitchenRun_nearZ = nearZ; hq_KitchenRun_n = n; hq_KitchenRun_first = first; PhEnd(); return; }
+            hq_KitchenRun_rng = rng;
+            hq_KitchenRun_room = room;
+            hq_KitchenRun_fr = fr;
+            hq_KitchenRun_sk = sk;
+            hq_KitchenRun_sv = sv;
+            hq_KitchenRun_c1 = c1;
+            hq_KitchenRun_c2 = c2;
+            hq_KitchenRun_order = order;
+            hq_KitchenRun_nearX = nearX;
+            hq_KitchenRun_nearZ = nearZ;
+            hq_KitchenRun_n = n;
+            hq_KitchenRun_first = first;
+        }
+        if (Ph(1))
+        {
+            int fr = hq_KitchenRun_fr;
+            int sk = hq_KitchenRun_sk;
+            int sv = hq_KitchenRun_sv;
+            bool haveF = hq_KitchenRun_haveF;
+            bool haveS = hq_KitchenRun_haveS;
+            bool haveV = hq_KitchenRun_haveV;
+            int nearX = hq_KitchenRun_nearX;
+            int nearZ = hq_KitchenRun_nearZ;
+            int leg = hq_KitchenRun_leg;
+            bool placed = hq_KitchenRun_placed;
+            int first = hq_KitchenRun_first;
+            if (!Keep(first, true)) { hq_KitchenRun_fr = fr; hq_KitchenRun_sk = sk; hq_KitchenRun_sv = sv; hq_KitchenRun_haveF = haveF; hq_KitchenRun_haveS = haveS; hq_KitchenRun_haveV = haveV; hq_KitchenRun_nearX = nearX; hq_KitchenRun_nearZ = nearZ; hq_KitchenRun_placed = placed; hq_KitchenRun_first = first; PhEnd(); return; }
+            placed = true;
+            for (int e = first; e < nEmit; e++)
+            {
+                if (emitParent[e] >= 0) continue;
+                if (emitDef[e] == fr) haveF = true;
+                if (emitDef[e] == sk) haveS = true;
+                if (emitDef[e] == sv) haveV = true;
+                runLast = e;
+            }
+            int rot;
+            WallPos(wrDir, wrBack, wrCentre, 900, out nearX, out nearZ, out rot);
+            if (leg == 0) { runCx = nearX; runCz = nearZ; }
+            hq_KitchenRun_fr = fr;
+            hq_KitchenRun_sk = sk;
+            hq_KitchenRun_sv = sv;
+            hq_KitchenRun_haveF = haveF;
+            hq_KitchenRun_haveS = haveS;
+            hq_KitchenRun_haveV = haveV;
+            hq_KitchenRun_nearX = nearX;
+            hq_KitchenRun_nearZ = nearZ;
+            hq_KitchenRun_placed = placed;
+            hq_KitchenRun_first = first;
+        }
+    }
+
+    void KitchenRun_L1()
+    {
+        if (Ph(0))
+        {
+            int want = hq_KitchenRun_want;
+            int fr = hq_KitchenRun_fr;
+            int sk = hq_KitchenRun_sk;
+            int sv = hq_KitchenRun_sv;
+            int c1 = hq_KitchenRun_c1;
+            int c2 = hq_KitchenRun_c2;
+            int[] order = hq_KitchenRun_order;
+            bool haveF = hq_KitchenRun_haveF;
+            bool haveS = hq_KitchenRun_haveS;
+            bool haveV = hq_KitchenRun_haveV;
+            int leg = hq_KitchenRun_leg;
             // the units still to come
             int n = 0;
             if (leg == 0)
@@ -649,43 +1054,42 @@ public partial class MapGenUdon
                 if (!haveF) order[n++] = fr;
             }
             bool placed = false;
-            for (int m = n; m >= 1 && !placed; m--)
+            hq_KitchenRun_want = want;
+            hq_KitchenRun_fr = fr;
+            hq_KitchenRun_sk = sk;
+            hq_KitchenRun_sv = sv;
+            hq_KitchenRun_c1 = c1;
+            hq_KitchenRun_c2 = c2;
+            hq_KitchenRun_order = order;
+            hq_KitchenRun_haveF = haveF;
+            hq_KitchenRun_haveS = haveS;
+            hq_KitchenRun_haveV = haveV;
+            hq_KitchenRun_n = n;
+            hq_KitchenRun_placed = placed;
+        }
+        if (PhLoop(1, 100000))
+        {
+            int n = hq_KitchenRun_n;
+            bool placed = hq_KitchenRun_placed;
+            if (!PhSubActive())
             {
-                // the longest stretch that fits: drop worktops first, then the far end of the list
-                rowN = 0;
-                int drop = n - m;
-                for (int i = 0; i < n; i++)
-                {
-                    bool worktop = order[i] == c1 || order[i] == c2;
-                    if (drop > 0 && worktop) { drop--; continue; }
-                    rowDef[rowN++] = order[i];
-                }
-                if (rowN > m) rowN = m;
-                if (rowN == 0) break;
-                if (RngChance(rng, 500)) for (int i = 0; i < rowN / 2; i++) { int tmp = rowDef[i]; rowDef[i] = rowDef[rowN - 1 - i]; rowDef[rowN - 1 - i] = tmp; }
-                int len = 0;
-                for (int i = 0; i < rowN; i++) len += Sx(rowDef[i]);
-                if (!FindWallRun(room, len, 900, 2, leg == 0 ? WM_CORNER : WM_NEAR, nearX, nearZ, WIN_ANY, rng)) continue;
-                ArrangeForWindows(wrSeg, wrDir, wrCentre - len / 2, len, fr, sk, sv);
-                int first = nEmit;
-                if (StampRow(wrDir, wrBack, wrCentre - len / 2, 0, EF_MANDATORY) < 0) continue;
-                if (!Keep(first, true)) continue;
-                placed = true;
-                for (int e = first; e < nEmit; e++)
-                {
-                    if (emitParent[e] >= 0) continue;
-                    if (emitDef[e] == fr) haveF = true;
-                    if (emitDef[e] == sk) haveS = true;
-                    if (emitDef[e] == sv) haveV = true;
-                    runLast = e;
-                }
-                int rot;
-                WallPos(wrDir, wrBack, wrCentre, 900, out nearX, out nearZ, out rot);
-                if (leg == 0) { runCx = nearX; runCz = nearZ; }
+                if (planIter == 0) hq_KitchenRun_m0 = n;
+                int m = hq_KitchenRun_m0 - planIter;
+                if (!(m >= 1 && !placed)) PhBreak();
+                else { hq_KitchenRun_m = m; PhSubBegin(); }
+            }
+            hq_KitchenRun_n = n;
+            hq_KitchenRun_placed = placed;
+            if (PhSubActive())
+            {
+                PhPush(); KitchenRun_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { PhEnd(); return; }
             }
         }
-        return (haveF ? 1 : 0) + (haveS ? 1 : 0) + (haveV ? 1 : 0);
     }
+
 
     // The sink goes under the window if the run passes one; the fridge and the cooker do not stand at a window
     // (report 15, K10 and K11). Swaps units of rowDef; the run itself stays where it was found.
@@ -739,12 +1143,30 @@ public partial class MapGenUdon
             uint[] r = SR(1);
             int want = area >= 28 ? 6 : (area >= 20 ? 5 : 4);
             if (RngChance(r, 400)) want++;
-            int centres = KitchenRun(want, r);
+            hq_PlanKitchen_r = r;
+            hq_PlanKitchen_want = want;
+        }
+        if (PhLoop(1, 100000))
+        {
+            uint[] r = hq_PlanKitchen_r;
+            int want = hq_PlanKitchen_want;
+            int centres = 0;
+            if (planIter == 0) { hq_KitchenRun_want = want; hq_KitchenRun_rng = r; PhSubReset(); }
+            PhPush(); KitchenRun_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_KitchenRun_rng; centres = hq_KitchenRun_ret; PhBreak(); }
+            hq_PlanKitchen_r = r;
+            hq_PlanKitchen_want = want;
+            hq_PlanKitchen_centres = centres;
+        }
+        if (Ph(2))
+        {
+            int centres = hq_PlanKitchen_centres;
             if (centres < 3) MandFail(3 - centres);
             // (c) eating in the kitchen: a table with chairs where the floor is open (a metre from the run, K2), or a
             // breakfast bar with stools against a free wall
+            hq_PlanKitchen_centres = centres;
         }
-        if (Ph(1))
+        if (Ph(3))
         {
             uint[] r2 = SR(2);
             int eat = RngRange(r2, 1000);
@@ -753,18 +1175,32 @@ public partial class MapGenUdon
             else if (eat < 850 && Fit(4)) hq_PlanKitchen_sel1 = 2;
             hq_PlanKitchen_r2 = r2;
         }
-        if (Ph(2))
+        if (Ph(4))
         {
             if (hq_PlanKitchen_sel1 == 1)
             {
                 uint[] r2 = hq_PlanKitchen_r2;
                 int first = nEmit;
                 int def = area >= 26 && RngChance(r2, 500) ? Dn("k_table") : Dn("r_tableRound");
-                CentrePiece(def, RoomLongAxis(room) == 0 ? 0 : 90, false, 2, 1, WM_FAR, runCx, runCz, 0, 0, r2);
                 hq_PlanKitchen_r2 = r2;
+                hq_PlanKitchen_def = def;
             }
         }
-        if (Ph(3))
+        if (PhLoop(5, 100000))
+        {
+            if (!(hq_PlanKitchen_sel1 == 1)) PhBreak();
+            else
+            {
+                uint[] r2 = hq_PlanKitchen_r2;
+                int def = hq_PlanKitchen_def;
+                if (planIter == 0) { hq_CentrePiece_def = def; hq_CentrePiece_yaw = RoomLongAxis(room) == 0 ? 0 : 90; hq_CentrePiece_bothYaws = false; hq_CentrePiece_ringWant = 2; hq_CentrePiece_ringMin = 1; hq_CentrePiece_mode = WM_FAR; hq_CentrePiece_tx = runCx; hq_CentrePiece_tz = runCz; hq_CentrePiece_need = 0; hq_CentrePiece_flags = 0; hq_CentrePiece_rng = r2; PhSubReset(); }
+                PhPush(); CentrePiece_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_CentrePiece_rng; PhBreak(); }
+                hq_PlanKitchen_r2 = r2;
+                hq_PlanKitchen_def = def;
+            }
+        }
+        if (Ph(6))
         {
             if (hq_PlanKitchen_sel1 == 2)
             {
@@ -779,7 +1215,7 @@ public partial class MapGenUdon
                 hq_PlanKitchen_bar = bar;
             }
         }
-        if (Ph(4))
+        if (Ph(7))
         {
             if (hq_PlanKitchen_sel1 == 2 && hq_PlanKitchen_sel2 == 1)
             {
@@ -790,7 +1226,7 @@ public partial class MapGenUdon
                 hq_PlanKitchen_bar = bar;
             }
         }
-        if (Ph(5))
+        if (Ph(8))
         {
             if (hq_PlanKitchen_sel1 == 2 && hq_PlanKitchen_sel2 == 1)
             {
@@ -799,7 +1235,7 @@ public partial class MapGenUdon
                 hq_PlanKitchen_first = first;
             }
         }
-        if (Ph(6))
+        if (Ph(9))
         {
             uint[] r3 = SR(3);
             int bin = -1;
@@ -808,7 +1244,7 @@ public partial class MapGenUdon
             hq_PlanKitchen_r3 = r3;
             hq_PlanKitchen_bin = bin;
         }
-        if (Ph(7))
+        if (Ph(10))
         {
             if (hq_PlanKitchen_sel3 == 1)
             {
@@ -822,23 +1258,13 @@ public partial class MapGenUdon
                     if (end < 0) continue;
                     bin = RelBeside(Dn("k_trashcan"), end, OutwardSide(end, runCx, runCz), 50, 0, r3);
                 }
+                if (bin < 0) bin = WallPlace(Dn("k_trashcan"), WM_NEAR, runCx, runCz, WIN_ANY, 0, r3);
                 hq_PlanKitchen_r3 = r3;
                 hq_PlanKitchen_bin = bin;
                 hq_PlanKitchen_first = first;
             }
         }
-        if (Ph(8))
-        {
-            if (hq_PlanKitchen_sel3 == 1)
-            {
-                uint[] r3 = hq_PlanKitchen_r3;
-                int bin = hq_PlanKitchen_bin;
-                if (bin < 0) bin = WallPlace(Dn("k_trashcan"), WM_NEAR, runCx, runCz, WIN_ANY, 0, r3);
-                hq_PlanKitchen_r3 = r3;
-                hq_PlanKitchen_bin = bin;
-            }
-        }
-        if (Ph(9))
+        if (Ph(11))
         {
             if (hq_PlanKitchen_sel3 == 1)
             {
@@ -849,14 +1275,14 @@ public partial class MapGenUdon
                 hq_PlanKitchen_first = first;
             }
         }
-        if (Ph(10))
+        if (Ph(12))
         {
             Extras(20, 450, "ck_plant", "wq_tableSmall", "cq_cactus");
             // (d) the pantry corner: two crates of vegetables at a wall away from the run
             uint[] r5 = SR(5);
             hq_PlanKitchen_r5 = r5;
         }
-        if (Ph(11))
+        if (Ph(13))
         {
             uint[] r5 = hq_PlanKitchen_r5;
             if (area >= 16 && RngChance(r5, 280) && Fit(2))
@@ -869,7 +1295,7 @@ public partial class MapGenUdon
             hq_PlanKitchen_r5 = r5;
             hq_PlanKitchen_r6 = r6;
         }
-        if (Ph(12))
+        if (Ph(14))
         {
             int bin = hq_PlanKitchen_bin;
             uint[] r6 = hq_PlanKitchen_r6;
@@ -906,23 +1332,21 @@ public partial class MapGenUdon
         }
         if (PhLoop(1, 100000))
         {
-            uint[] r = hq_PlanBedroom_r;
-            int bedDef = hq_PlanBedroom_bedDef;
-            bool dbl = hq_PlanBedroom_dbl;
             int bed = hq_PlanBedroom_bed;
-            int t = planIter;
-            if (!(t < 3 && bed < 0)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                int def = t < 2 ? bedDef : Dn("k_bedSingle");
-                int first = nEmit;
-                bed = WallPlace(def, (dbl && t == 0) ? WM_CENTRE : WM_CORNER, 0, 0, t == 0 ? WIN_NEVER : WIN_AVOID, EF_MANDATORY, r);
-                if (bed >= 0 && !Keep(first, true)) bed = -1;
+                int t = planIter;
+                if (!(t < 3 && bed < 0)) PhBreak();
+                else { hq_PlanBedroom_t = t; PhSubBegin(); }
             }
-            hq_PlanBedroom_r = r;
-            hq_PlanBedroom_bedDef = bedDef;
-            hq_PlanBedroom_dbl = dbl;
             hq_PlanBedroom_bed = bed;
+            if (PhSubActive())
+            {
+                PhPush(); PlanBedroom_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
         if (Ph(2))
         {
@@ -1077,6 +1501,35 @@ public partial class MapGenUdon
             hq_PlanBedroom_r8 = r8;
         }
     }
+    void PlanBedroom_L1()
+    {
+        int room = pRoom;
+        if (Ph(0))
+        {
+            uint[] r = hq_PlanBedroom_r;
+            int bedDef = hq_PlanBedroom_bedDef;
+            bool dbl = hq_PlanBedroom_dbl;
+            int bed = hq_PlanBedroom_bed;
+            int t = hq_PlanBedroom_t;
+            int def = t < 2 ? bedDef : Dn("k_bedSingle");
+            int first = nEmit;
+            bed = WallPlace(def, (dbl && t == 0) ? WM_CENTRE : WM_CORNER, 0, 0, t == 0 ? WIN_NEVER : WIN_AVOID, EF_MANDATORY, r);
+            hq_PlanBedroom_r = r;
+            hq_PlanBedroom_bedDef = bedDef;
+            hq_PlanBedroom_dbl = dbl;
+            hq_PlanBedroom_bed = bed;
+            hq_PlanBedroom_first = first;
+        }
+        if (Ph(1))
+        {
+            int bed = hq_PlanBedroom_bed;
+            int first = hq_PlanBedroom_first;
+            if (bed >= 0 && !Keep(first, true)) bed = -1;
+            hq_PlanBedroom_bed = bed;
+            hq_PlanBedroom_first = first;
+        }
+    }
+
 
     // ============================================================================================ KIDS' ROOM
     // Areas: one or two single beds; a play rug with toys in the open middle; low storage; a desk.
@@ -1088,30 +1541,13 @@ public partial class MapGenUdon
             uint[] r = SR(1);
             int bedDef = Pick(r, "k_bedSingle", 6, "q_bed", 4);
             int first0 = nEmit;
-            hq_PlanKids_r = r;
+            int bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_NEVER, EF_MANDATORY, r);
+            if (bed < 0) bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, r);
             hq_PlanKids_bedDef = bedDef;
             hq_PlanKids_first0 = first0;
+            hq_PlanKids_bed = bed;
         }
         if (Ph(1))
-        {
-            uint[] r = hq_PlanKids_r;
-            int bedDef = hq_PlanKids_bedDef;
-            int bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_NEVER, EF_MANDATORY, r);
-            hq_PlanKids_r = r;
-            hq_PlanKids_bedDef = bedDef;
-            hq_PlanKids_bed = bed;
-        }
-        if (Ph(2))
-        {
-            uint[] r = hq_PlanKids_r;
-            int bedDef = hq_PlanKids_bedDef;
-            int bed = hq_PlanKids_bed;
-            if (bed < 0) bed = WallPlace(bedDef, WM_CORNER, 0, 0, WIN_AVOID, EF_MANDATORY, r);
-            hq_PlanKids_r = r;
-            hq_PlanKids_bedDef = bedDef;
-            hq_PlanKids_bed = bed;
-        }
-        if (Ph(3))
         {
             int first0 = hq_PlanKids_first0;
             int bed = hq_PlanKids_bed;
@@ -1124,7 +1560,7 @@ public partial class MapGenUdon
             hq_PlanKids_bed = bed;
             hq_PlanKids_r2 = r2;
         }
-        if (Ph(4))
+        if (Ph(2))
         {
             if (hq_PlanKids_sel1 == 1)
             {
@@ -1152,7 +1588,7 @@ public partial class MapGenUdon
                 hq_PlanKids_two = two;
             }
         }
-        if (Ph(5))
+        if (Ph(3))
         {
             if (hq_PlanKids_sel1 == 1)
             {
@@ -1171,14 +1607,14 @@ public partial class MapGenUdon
                 hq_PlanKids_two = two;
             }
         }
-        if (Ph(6))
+        if (Ph(4))
         {
             uint[] r3 = SR(3);
             hq_PlanKids_sel2 = 0;
             if (Fit(3)) hq_PlanKids_sel2 = 1;
             hq_PlanKids_r3 = r3;
         }
-        if (Ph(7))
+        if (Ph(5))
         {
             if (hq_PlanKids_sel2 == 1)
             {
@@ -1190,7 +1626,7 @@ public partial class MapGenUdon
                 hq_PlanKids_cell = cell;
             }
         }
-        if (Ph(8))
+        if (Ph(6))
         {
             if (hq_PlanKids_sel2 == 1 && hq_PlanKids_sel3 == 1)
             {
@@ -1202,7 +1638,7 @@ public partial class MapGenUdon
                 hq_PlanKids_first = first;
             }
         }
-        if (Ph(9))
+        if (Ph(7))
         {
             if (hq_PlanKids_sel2 == 1 && hq_PlanKids_sel3 == 1)
             {
@@ -1215,7 +1651,7 @@ public partial class MapGenUdon
                 hq_PlanKids_ok = ok;
             }
         }
-        if (Ph(10))
+        if (Ph(8))
         {
             if (hq_PlanKids_sel2 == 1 && hq_PlanKids_sel3 == 1)
             {
@@ -1226,7 +1662,7 @@ public partial class MapGenUdon
                 hq_PlanKids_ok = ok;
             }
         }
-        if (Ph(11))
+        if (Ph(9))
         {
             uint[] r4 = SR(4);
             if (RngChance(r4, 800) && Fit(1))
@@ -1235,7 +1671,7 @@ public partial class MapGenUdon
                 if (WallPlace(Dn("k_bookcaseLow"), WM_CENTRE, 0, 0, WIN_AVOID, 0, r4) >= 0) Keep(first, false);
             }
         }
-        if (Ph(12))
+        if (Ph(10))
         {
             uint[] r5 = SR(5);
             if (RngChance(r5, 650) && Fit(1))
@@ -1244,7 +1680,7 @@ public partial class MapGenUdon
                 if (WallPlace(Dn("gen_wardrobe"), WM_ANY, 0, 0, WIN_NEVER, 0, r5) >= 0) Keep(first, false);
             }
         }
-        if (Ph(13))
+        if (Ph(11))
         {
             uint[] r6 = SR(6);
             if (RngChance(r6, 450) && Fit(2))
@@ -1254,14 +1690,14 @@ public partial class MapGenUdon
             }
             // the toy box in a corner, a toy or two beside it
         }
-        if (Ph(14))
+        if (Ph(12))
         {
             uint[] r7 = SR(7);
             hq_PlanKids_sel4 = 0;
             if (RngChance(r7, 600) && Fit(2)) hq_PlanKids_sel4 = 1;
             hq_PlanKids_r7 = r7;
         }
-        if (Ph(15))
+        if (Ph(13))
         {
             if (hq_PlanKids_sel4 == 1)
             {
@@ -1273,7 +1709,7 @@ public partial class MapGenUdon
                 hq_PlanKids_box = box;
             }
         }
-        if (Ph(16))
+        if (Ph(14))
         {
             if (hq_PlanKids_sel4 == 1)
             {
@@ -1290,7 +1726,7 @@ public partial class MapGenUdon
                 hq_PlanKids_box = box;
             }
         }
-        if (Ph(17))
+        if (Ph(15))
         {
             Extras(20, 500, "ck_lampFloor", "wq_cabinetSmall", "ck_plant");
         }
@@ -1301,16 +1737,23 @@ public partial class MapGenUdon
     // boxes of paper beside it; a visitor's seat; in a warehouse office a break table.
     void PlanOffice(bool warehouse)
     {
+        hq_PlanOffice_warehouse = warehouse;
         int room = pRoom, area = AreaM2(room);
         if (Ph(0))
         {
             uint[] r = SR(1);
             int first0 = nEmit;
             hp_PlanOffice_desk = WallPlace(Dn("k_desk"), WM_ANY, 0, 0, WIN_PREFER, EF_MANDATORY, r);
-            if (hp_PlanOffice_desk >= 0 && !Keep(first0, true)) hp_PlanOffice_desk = -1;
-            if (hp_PlanOffice_desk < 0) MandFail(1);
+            hq_PlanOffice_first0 = first0;
         }
         if (Ph(1))
+        {
+            int first0 = hq_PlanOffice_first0;
+            if (hp_PlanOffice_desk >= 0 && !Keep(first0, true)) hp_PlanOffice_desk = -1;
+            if (hp_PlanOffice_desk < 0) MandFail(1);
+            hq_PlanOffice_first0 = first0;
+        }
+        if (Ph(2))
         {
             uint[] r2 = SR(2);
             if (hp_PlanOffice_desk >= 0 && RngChance(r2, 800) && Fit(1))
@@ -1319,20 +1762,37 @@ public partial class MapGenUdon
                 if (RelBeside(Dn("k_trashcan"), hp_PlanOffice_desk, 0, 70, 0, r2) >= 0) Keep(first, false);
             }
         }
-        if (Ph(2))
+        if (Ph(3))
         {
             uint[] r3 = SR(3);
             hp_PlanOffice_shelf = -1;
-            if (Fit(1))
+            hq_PlanOffice_sel1 = 0;
+            if (Fit(1)) hq_PlanOffice_sel1 = 1;
+            hq_PlanOffice_r3 = r3;
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanOffice_sel1 == 1)
             {
+                uint[] r3 = hq_PlanOffice_r3;
                 int first = nEmit;
                 rowN = Fit(2) && RngChance(r3, 600) ? 2 : 1;
                 for (int i = 0; i < rowN; i++) rowDef[i] = Dn("k_bookcase");
                 hp_PlanOffice_shelf = WallRow(0, 1, WM_CENTRE, 0, 0, WIN_AVOID, 0, r3);
-                if (hp_PlanOffice_shelf >= 0 && !Keep(first, false)) hp_PlanOffice_shelf = -1;
+                hq_PlanOffice_r3 = r3;
+                hq_PlanOffice_first = first;
             }
         }
-        if (Ph(3))
+        if (Ph(5))
+        {
+            if (hq_PlanOffice_sel1 == 1)
+            {
+                int first = hq_PlanOffice_first;
+                if (hp_PlanOffice_shelf >= 0 && !Keep(first, false)) hp_PlanOffice_shelf = -1;
+                hq_PlanOffice_first = first;
+            }
+        }
+        if (Ph(6))
         {
             uint[] r4 = SR(4);
             if (hp_PlanOffice_shelf >= 0 && RngChance(r4, warehouse ? 600 : 420) && Fit(2))
@@ -1341,7 +1801,7 @@ public partial class MapGenUdon
                 if (GroupBeside(FindGrp("cardboard"), hp_PlanOffice_shelf, 2, 0, r4) || GroupAt(FindGrp("cardboard"), GenData.A_WALL, 2, WM_NEAR, emitX[hp_PlanOffice_shelf], emitZ[hp_PlanOffice_shelf], 0, r4)) Keep(first, false);
             }
         }
-        if (Ph(4))
+        if (Ph(7))
         {
             uint[] r5 = SR(5);
             if (hp_PlanOffice_desk >= 0 && area >= 16 && RngChance(r5, warehouse ? 350 : 250) && Fit(2))
@@ -1350,34 +1810,74 @@ public partial class MapGenUdon
                 if (WallPlace(Dn("k_desk"), WM_FAR, emitX[hp_PlanOffice_desk], emitZ[hp_PlanOffice_desk], WIN_PREFER, 0, r5) >= 0) Keep(first, false);
             }
         }
-        if (Ph(5))
+        if (Ph(8))
         {
             uint[] r6 = SR(6);
-            if (warehouse)
+            hq_PlanOffice_sel2 = 0;
+            if (warehouse) hq_PlanOffice_sel2 = 1;
+            else if (RngChance(r6, 450) && Fit(2)) hq_PlanOffice_sel2 = 2;
+            hq_PlanOffice_r6 = r6;
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanOffice_sel2 == 1)
             {
+                uint[] r6 = hq_PlanOffice_r6;
                 // the break table: a small round table with chairs in the open part
                 if (RngChance(r6, 450) && Fit(3))
                 {
                     CentrePiece(Dn("r_tableRound"), 0, false, 2, 1, WM_ANY, 0, 0, 0, 0, r6);
                 }
                 uint[] r7 = SR(7);
+                hq_PlanOffice_r6 = r6;
+                hq_PlanOffice_r7 = r7;
+            }
+        }
+        if (Ph(10))
+        {
+            if (hq_PlanOffice_sel2 == 1)
+            {
+                uint[] r7 = hq_PlanOffice_r7;
                 if (RngChance(r7, 350) && Fit(1))
                 {
                     int first = nEmit;
                     if (WallPlace(Dn("s_workbench"), WM_ANY, 0, 0, WIN_ANY, 0, r7) >= 0) Keep(first, false);
                 }
+                hq_PlanOffice_r7 = r7;
             }
-            else if (RngChance(r6, 450) && Fit(2))
+        }
+        if (Ph(11))
+        {
+            if (hq_PlanOffice_sel2 == 2)
             {
+                uint[] r6 = hq_PlanOffice_r6;
                 // the visitor's seat: an armchair in a corner, a small table beside it
                 int first = nEmit;
                 int chair = CornerPlace(Dn("q_armchair"), WM_FAR, hp_PlanOffice_desk >= 0 ? emitX[hp_PlanOffice_desk] : 0, hp_PlanOffice_desk >= 0 ? emitZ[hp_PlanOffice_desk] : 0, true, 0, r6);
+                hq_PlanOffice_r6 = r6;
+                hq_PlanOffice_first = first;
+                hq_PlanOffice_chair = chair;
+            }
+        }
+        if (Ph(12))
+        {
+            if (hq_PlanOffice_sel2 == 2)
+            {
+                uint[] r6 = hq_PlanOffice_r6;
+                int first = hq_PlanOffice_first;
+                int chair = hq_PlanOffice_chair;
                 if (chair >= 0 && Keep(first, false) && Fit(1))
                 {
                     first = nEmit;
                     if (RelBeside(Dn("q_tableSmall"), chair, 0, 60, 0, r6) >= 0) Keep(first, false);
                 }
+                hq_PlanOffice_r6 = r6;
+                hq_PlanOffice_first = first;
+                hq_PlanOffice_chair = chair;
             }
+        }
+        if (Ph(13))
+        {
             Extras(20, 650, "ck_plant", "wq_cabinet", "ck_lampFloor", "wk_bookcaseLow", "wk_sideTable");
         }
     }
@@ -1399,6 +1899,8 @@ public partial class MapGenUdon
             MainDoor(room, out dx, out dz);
             // coats in the corner nearest the outside door
             int rack = -1;
+            hq_PlanHall_sel1 = 0;
+            if (RngChance(r, 900) && Fit(1)) hq_PlanHall_sel1 = 1;
             hq_PlanHall_r = r;
             hq_PlanHall_dx = dx;
             hq_PlanHall_dz = dz;
@@ -1406,30 +1908,44 @@ public partial class MapGenUdon
         }
         if (Ph(1))
         {
-            uint[] r = hq_PlanHall_r;
-            int dx = hq_PlanHall_dx;
-            int dz = hq_PlanHall_dz;
-            int rack = hq_PlanHall_rack;
-            if (RngChance(r, 900) && Fit(1))
+            if (hq_PlanHall_sel1 == 1)
             {
+                uint[] r = hq_PlanHall_r;
+                int dx = hq_PlanHall_dx;
+                int dz = hq_PlanHall_dz;
+                int rack = hq_PlanHall_rack;
                 int first = nEmit;
                 rack = CornerPlace(Dn("k_coatRack"), WM_NEAR, dx, dz, false, 0, r);
-                if (rack >= 0 && !Keep(first, false)) rack = -1;
+                hq_PlanHall_r = r;
+                hq_PlanHall_dx = dx;
+                hq_PlanHall_dz = dz;
+                hq_PlanHall_rack = rack;
+                hq_PlanHall_first = first;
             }
-            uint[] r2 = SR(2);
-            int bench = -1;
-            hq_PlanHall_sel1 = 0;
-            if (RngChance(r2, 700) && Fit(1)) hq_PlanHall_sel1 = 1;
-            hq_PlanHall_r = r;
-            hq_PlanHall_dx = dx;
-            hq_PlanHall_dz = dz;
-            hq_PlanHall_rack = rack;
-            hq_PlanHall_r2 = r2;
-            hq_PlanHall_bench = bench;
         }
         if (Ph(2))
         {
             if (hq_PlanHall_sel1 == 1)
+            {
+                int rack = hq_PlanHall_rack;
+                int first = hq_PlanHall_first;
+                if (rack >= 0 && !Keep(first, false)) rack = -1;
+                hq_PlanHall_rack = rack;
+                hq_PlanHall_first = first;
+            }
+        }
+        if (Ph(3))
+        {
+            uint[] r2 = SR(2);
+            int bench = -1;
+            hq_PlanHall_sel2 = 0;
+            if (RngChance(r2, 700) && Fit(1)) hq_PlanHall_sel2 = 1;
+            hq_PlanHall_r2 = r2;
+            hq_PlanHall_bench = bench;
+        }
+        if (Ph(4))
+        {
+            if (hq_PlanHall_sel2 == 1)
             {
                 int dx = hq_PlanHall_dx;
                 int dz = hq_PlanHall_dz;
@@ -1444,9 +1960,9 @@ public partial class MapGenUdon
                 hq_PlanHall_first = first;
             }
         }
-        if (Ph(3))
+        if (Ph(5))
         {
-            if (hq_PlanHall_sel1 == 1)
+            if (hq_PlanHall_sel2 == 1)
             {
                 int bench = hq_PlanHall_bench;
                 int first = hq_PlanHall_first;
@@ -1455,7 +1971,7 @@ public partial class MapGenUdon
                 hq_PlanHall_first = first;
             }
         }
-        if (Ph(4))
+        if (Ph(6))
         {
             int rack = hq_PlanHall_rack;
             int bench = hq_PlanHall_bench;
@@ -1471,7 +1987,7 @@ public partial class MapGenUdon
             hq_PlanHall_bench = bench;
             hq_PlanHall_r4 = r4;
         }
-        if (Ph(5))
+        if (Ph(7))
         {
             uint[] r4 = hq_PlanHall_r4;
             if (RngChance(r4, 700) && Fit(1))
@@ -1483,7 +1999,7 @@ public partial class MapGenUdon
             hq_PlanHall_r4 = r4;
             hq_PlanHall_r5 = r5;
         }
-        if (Ph(6))
+        if (Ph(8))
         {
             int dx = hq_PlanHall_dx;
             int dz = hq_PlanHall_dz;
@@ -1497,14 +2013,14 @@ public partial class MapGenUdon
             hq_PlanHall_dz = dz;
             hq_PlanHall_r5 = r5;
         }
-        if (Ph(7))
+        if (Ph(9))
         {
             Extras(20, 600, "ck_plant", "ck_lampFloor", "wq_cabinetSmall");
             // (e) loose: a parcel left by the door
             uint[] r7 = SR(7);
             hq_PlanHall_r7 = r7;
         }
-        if (Ph(8))
+        if (Ph(10))
         {
             int dx = hq_PlanHall_dx;
             int dz = hq_PlanHall_dz;
@@ -1578,15 +2094,12 @@ public partial class MapGenUdon
         }
         if (Ph(4))
         {
-            uint[] r2 = hq_PlanBath_r2;
             int first2 = hq_PlanBath_first2;
             int toilet = hq_PlanBath_toilet;
             if (toilet >= 0 && !Keep(first2, true)) toilet = -1;
             if (toilet < 0) MandFail(1);
             int sink = -1;
             first2 = nEmit;
-            if (toilet >= 0) sink = RelBeside(Dn("k_bathSink"), toilet, 0, 320, EF_MANDATORY, r2);
-            hq_PlanBath_r2 = r2;
             hq_PlanBath_first2 = first2;
             hq_PlanBath_toilet = toilet;
             hq_PlanBath_sink = sink;
@@ -1598,6 +2111,7 @@ public partial class MapGenUdon
             uint[] r2 = hq_PlanBath_r2;
             int toilet = hq_PlanBath_toilet;
             int sink = hq_PlanBath_sink;
+            if (toilet >= 0) sink = RelBeside(Dn("k_bathSink"), toilet, 0, 320, EF_MANDATORY, r2);
             if (sink < 0) sink = WallPlace(Dn("k_bathSink"), WM_NEAR, toilet >= 0 ? emitX[toilet] : dx, toilet >= 0 ? emitZ[toilet] : dz, WIN_ANY, EF_MANDATORY, r2);
             hq_PlanBath_dx = dx;
             hq_PlanBath_dz = dz;
@@ -1619,9 +2133,7 @@ public partial class MapGenUdon
         }
         if (Ph(7))
         {
-            int tub = hq_PlanBath_tub;
             int toilet = hq_PlanBath_toilet;
-            int sink = hq_PlanBath_sink;
             uint[] r3 = hq_PlanBath_r3;
             if (toilet >= 0 && RngChance(r3, 750) && Fit(1))
             {
@@ -1629,6 +2141,15 @@ public partial class MapGenUdon
                 if (RelBeside(Dn("k_trashcan"), toilet, 0, 130, 0, r3) >= 0) Keep(first, false);
             }
             uint[] r4 = SR(4);
+            hq_PlanBath_toilet = toilet;
+            hq_PlanBath_r3 = r3;
+            hq_PlanBath_r4 = r4;
+        }
+        if (Ph(8))
+        {
+            int tub = hq_PlanBath_tub;
+            int sink = hq_PlanBath_sink;
+            uint[] r4 = hq_PlanBath_r4;
             if (RngChance(r4, 700) && Fit(1))
             {
                 int mat = Dn("k_doormat"), host = tub >= 0 ? tub : sink;
@@ -1639,12 +2160,11 @@ public partial class MapGenUdon
             hq_PlanBath_sel2 = 0;
             if (RngChance(r5, 600) && Fit(1)) hq_PlanBath_sel2 = 1;
             hq_PlanBath_tub = tub;
-            hq_PlanBath_toilet = toilet;
             hq_PlanBath_sink = sink;
-            hq_PlanBath_r3 = r3;
+            hq_PlanBath_r4 = r4;
             hq_PlanBath_r5 = r5;
         }
-        if (Ph(8))
+        if (Ph(9))
         {
             if (hq_PlanBath_sel2 == 1)
             {
@@ -1656,7 +2176,7 @@ public partial class MapGenUdon
                 hq_PlanBath_washer = washer;
             }
         }
-        if (Ph(9))
+        if (Ph(10))
         {
             if (hq_PlanBath_sel2 == 1)
             {
@@ -1668,7 +2188,7 @@ public partial class MapGenUdon
                 hq_PlanBath_washer = washer;
             }
         }
-        if (Ph(10))
+        if (Ph(11))
         {
             if (hq_PlanBath_sel2 == 1 && hq_PlanBath_sel3 == 1)
             {
@@ -1687,7 +2207,7 @@ public partial class MapGenUdon
                 hq_PlanBath_side = side;
             }
         }
-        if (Ph(11))
+        if (Ph(12))
         {
             if (hq_PlanBath_sel2 == 1 && hq_PlanBath_sel3 == 1)
             {
@@ -1706,7 +2226,7 @@ public partial class MapGenUdon
                 hq_PlanBath_side = side;
             }
         }
-        if (Ph(12))
+        if (Ph(13))
         {
             int dx = hq_PlanBath_dx;
             int dz = hq_PlanBath_dz;
@@ -1721,16 +2241,21 @@ public partial class MapGenUdon
             hq_PlanBath_dz = dz;
             hq_PlanBath_sink = sink;
         }
-        if (Ph(13))
+        if (Ph(14))
         {
             Extras(20, 400, "ck_plant", "wk_trashcan");
             // (e) the cleaning corner by the door: a bucket with a mop or a broom
             uint[] r8 = SR(8);
+            hq_PlanBath_r8 = r8;
+        }
+        if (Ph(15))
+        {
+            uint[] r8 = hq_PlanBath_r8;
             hq_PlanBath_sel4 = 0;
             if (RngChance(r8, 330) && LooseFit(2)) hq_PlanBath_sel4 = 1;
             hq_PlanBath_r8 = r8;
         }
-        if (Ph(14))
+        if (Ph(16))
         {
             if (hq_PlanBath_sel4 == 1)
             {
@@ -1741,7 +2266,7 @@ public partial class MapGenUdon
                 hq_PlanBath_first = first;
             }
         }
-        if (Ph(15))
+        if (Ph(17))
         {
             if (hq_PlanBath_sel4 == 1)
             {
@@ -1762,7 +2287,28 @@ public partial class MapGenUdon
     int hp_PlanOffice_desk;
     int hp_PlanOffice_shelf;
 
-    // locals of the split plans, kept from one phase to the next (autophase3)
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_KitchenRun_c1;
+    int hq_KitchenRun_c2;
+    int hq_KitchenRun_first;
+    int hq_KitchenRun_fr;
+    bool hq_KitchenRun_haveF;
+    bool hq_KitchenRun_haveS;
+    bool hq_KitchenRun_haveV;
+    int hq_KitchenRun_leg;
+    int hq_KitchenRun_m;
+    int hq_KitchenRun_m0;
+    int hq_KitchenRun_n;
+    int hq_KitchenRun_nearX;
+    int hq_KitchenRun_nearZ;
+    int[] hq_KitchenRun_order;
+    bool hq_KitchenRun_placed;
+    int hq_KitchenRun_ret;
+    uint[] hq_KitchenRun_rng;
+    int hq_KitchenRun_room;
+    int hq_KitchenRun_sk;
+    int hq_KitchenRun_sv;
+    int hq_KitchenRun_want;
     int hq_PlanBath_dx;
     int hq_PlanBath_dz;
     int hq_PlanBath_first;
@@ -1770,6 +2316,7 @@ public partial class MapGenUdon
     uint[] hq_PlanBath_r;
     uint[] hq_PlanBath_r2;
     uint[] hq_PlanBath_r3;
+    uint[] hq_PlanBath_r4;
     uint[] hq_PlanBath_r5;
     uint[] hq_PlanBath_r8;
     int hq_PlanBath_sel1;
@@ -1789,6 +2336,7 @@ public partial class MapGenUdon
     bool hq_PlanBedroom_dbl;
     int hq_PlanBedroom_dx;
     int hq_PlanBedroom_dz;
+    int hq_PlanBedroom_first;
     int hq_PlanBedroom_got;
     uint[] hq_PlanBedroom_r;
     uint[] hq_PlanBedroom_r2;
@@ -1797,11 +2345,21 @@ public partial class MapGenUdon
     uint[] hq_PlanBedroom_r8;
     int hq_PlanBedroom_s0;
     int hq_PlanBedroom_sel1;
+    int hq_PlanBedroom_t;
     int hq_PlanBedroom_third;
+    int hq_PlanDining_alt;
+    int hq_PlanDining_bestSeats;
+    int hq_PlanDining_bestX;
+    int hq_PlanDining_bestZ;
     int hq_PlanDining_first0;
+    int hq_PlanDining_k;
+    int hq_PlanDining_nx;
+    int hq_PlanDining_nz;
     uint[] hq_PlanDining_r;
+    int hq_PlanDining_sel1;
     int hq_PlanDining_t;
     int hq_PlanDining_table;
+    int hq_PlanDining_tyaw;
     int hq_PlanDining_yaw;
     int hq_PlanHall_bench;
     int hq_PlanHall_dx;
@@ -1814,6 +2372,7 @@ public partial class MapGenUdon
     uint[] hq_PlanHall_r7;
     int hq_PlanHall_rack;
     int hq_PlanHall_sel1;
+    int hq_PlanHall_sel2;
     int hq_PlanKids_bed;
     int hq_PlanKids_bedDef;
     int hq_PlanKids_box;
@@ -1822,7 +2381,6 @@ public partial class MapGenUdon
     int hq_PlanKids_first;
     int hq_PlanKids_first0;
     bool hq_PlanKids_ok;
-    uint[] hq_PlanKids_r;
     uint[] hq_PlanKids_r2;
     uint[] hq_PlanKids_r3;
     uint[] hq_PlanKids_r7;
@@ -1833,7 +2391,10 @@ public partial class MapGenUdon
     bool hq_PlanKids_two;
     int hq_PlanKitchen_bar;
     int hq_PlanKitchen_bin;
+    int hq_PlanKitchen_centres;
+    int hq_PlanKitchen_def;
     int hq_PlanKitchen_first;
+    uint[] hq_PlanKitchen_r;
     uint[] hq_PlanKitchen_r2;
     uint[] hq_PlanKitchen_r3;
     uint[] hq_PlanKitchen_r5;
@@ -1841,6 +2402,7 @@ public partial class MapGenUdon
     int hq_PlanKitchen_sel1;
     int hq_PlanKitchen_sel2;
     int hq_PlanKitchen_sel3;
+    int hq_PlanKitchen_want;
     int hq_PlanLiving_box;
     int hq_PlanLiving_chZ;
     int hq_PlanLiving_chair;
@@ -1850,7 +2412,9 @@ public partial class MapGenUdon
     int hq_PlanLiving_ctZ;
     int hq_PlanLiving_dx;
     int hq_PlanLiving_dz;
+    int hq_PlanLiving_e;
     int hq_PlanLiving_first;
+    int hq_PlanLiving_k;
     int hq_PlanLiving_lxSofa;
     int hq_PlanLiving_lxTable;
     uint[] hq_PlanLiving_r;
@@ -1859,7 +2423,9 @@ public partial class MapGenUdon
     uint[] hq_PlanLiving_r6;
     uint[] hq_PlanLiving_r8;
     uint[] hq_PlanLiving_r9;
+    int hq_PlanLiving_roll;
     int hq_PlanLiving_sd;
+    int hq_PlanLiving_seg;
     int hq_PlanLiving_sel1;
     int hq_PlanLiving_sel2;
     int hq_PlanLiving_sel3;
@@ -1869,8 +2435,28 @@ public partial class MapGenUdon
     int hq_PlanLiving_sofa;
     int hq_PlanLiving_sofaDef;
     int hq_PlanLiving_ssz;
+    int hq_PlanLiving_t;
     int hq_PlanLiving_tableSide;
     int hq_PlanLiving_tv;
     int hq_PlanLiving_tvDef;
     int hq_PlanLiving_view;
+    int hq_PlanOffice_chair;
+    int hq_PlanOffice_first;
+    int hq_PlanOffice_first0;
+    uint[] hq_PlanOffice_r3;
+    uint[] hq_PlanOffice_r6;
+    uint[] hq_PlanOffice_r7;
+    int hq_PlanOffice_sel1;
+    int hq_PlanOffice_sel2;
+    bool hq_PlanOffice_warehouse;
+    string hq_WallAny_a;
+    string hq_WallAny_b;
+    string hq_WallAny_c;
+    int hq_WallAny_flags;
+    int hq_WallAny_mode;
+    int hq_WallAny_ret;
+    uint[] hq_WallAny_rng;
+    int hq_WallAny_tx;
+    int hq_WallAny_tz;
+    int hq_WallAny_win;
 }

@@ -14,28 +14,19 @@ public partial class MapGen
             GenRng r = SR(1);
             // the prize counter by the door: the till, the prize shelves behind it, the ticket machine
             hp_PlanArcade_first = nEmit;
-            hq_PlanArcade_dx = dx;
-            hq_PlanArcade_dz = dz;
-            hq_PlanArcade_r = r;
-        }
-        if (Ph(1))
-        {
-            int dx = hq_PlanArcade_dx;
-            int dz = hq_PlanArcade_dz;
-            GenRng r = hq_PlanArcade_r;
             int till = WallPlace(Dn("ma_register"), WM_NEAR, dx, dz, WIN_ANY, EF_MANDATORY, ref r);
             hq_PlanArcade_dx = dx;
             hq_PlanArcade_dz = dz;
             hq_PlanArcade_r = r;
             hq_PlanArcade_till = till;
         }
-        if (Ph(2))
+        if (Ph(1))
         {
             int till = hq_PlanArcade_till;
             if (till < 0 || !Keep(hp_PlanArcade_first, true)) { till = -1; MandFail(1); }
             hq_PlanArcade_till = till;
         }
-        if (Ph(3))
+        if (Ph(2))
         {
             GenRng r = hq_PlanArcade_r;
             int till = hq_PlanArcade_till;
@@ -45,7 +36,7 @@ public partial class MapGen
             hq_PlanArcade_till = till;
             hq_PlanArcade_r2 = r2;
         }
-        if (Ph(4))
+        if (Ph(3))
         {
             int dx = hq_PlanArcade_dx;
             int dz = hq_PlanArcade_dz;
@@ -57,50 +48,72 @@ public partial class MapGen
             hq_PlanArcade_dz = dz;
             hq_PlanArcade_r2 = r2;
         }
-        if (Ph(5))
+        if (Ph(4))
         {
             hp_PlanArcade_r3 = SR(3);
             hp_PlanArcade_w0 = hp_PlanArcade_r3.Range(hp_PlanArcade_wall.Length);
         }
-        if (PhLoop(6, 100000))
+        if (PhLoop(5, 100000))
         {
             int k = planIter;
             if (!(k < 2 + cells && Fit(2))) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 hp_PlanArcade_first = nEmit;
                 rowN = 2; rowDef[0] = Dn(hp_PlanArcade_wall[(hp_PlanArcade_w0 + 2 * k) % hp_PlanArcade_wall.Length]); rowDef[1] = Dn(hp_PlanArcade_wall[(hp_PlanArcade_w0 + 2 * k + 1) % hp_PlanArcade_wall.Length]);
                 if (WallRow(0, 2, WM_ANY, 0, 0, WIN_AVOID, 0, ref hp_PlanArcade_r3) >= 0) Keep(hp_PlanArcade_first, false);
             }
         }
-        if (Ph(7))
+        if (Ph(6))
         {
             // the middle: air hockey tables, and machines standing free with room round them
             hp_PlanArcade_r4 = SR(4);
         }
-        if (PhLoop(8, 100000))
+        if (PhLoop(7, 100000))
         {
-            int k = planIter;
-            if (!(k < 1 + cells / 2 && Fit(1))) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
+            if (!PhSubActive())
             {
-                int cell = OpenSpot(3, WM_ANY, 0, 0, 0, ref hp_PlanArcade_r4);
-                if (cell < 0) { PhBreak(); break; }
-                hp_PlanArcade_first = nEmit;
-                if (FreePlace(Dn("ma_airHockey"), cell, hp_PlanArcade_r4.Range(2) * 90, 1, 0, H_FREE) >= 0) Keep(hp_PlanArcade_first, false);
+                int k = planIter;
+                if (!(k < 1 + cells / 2 && Fit(1))) PhBreak();
+                else { hq_PlanArcade_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanArcade_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (Ph(9))
+        if (Ph(8))
         {
             GenRng r5 = SR(5);
             if (Fit(2)) { hp_PlanArcade_first = nEmit; if (PlaceGroup(GenData.FindGrp("plush"), room, GenData.A_WALL, 2, 0, ref r5)) Keep(hp_PlanArcade_first, false); }
     
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(10, PoolLen(new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
+        if (PhLoop(9, PoolLen(new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
             "k_trashcan", "ck_bench", "k_plant" })) && !PoolStep(50, new string[] { "ma_pinball", "ma_slots", "ma_arcade", "ma_dance", "ma_basketball", "ma_claw", "ma_prizeWheel", "ma_vending", "ms_gacha", "hb_stool",
             "k_trashcan", "ck_bench", "k_plant" })) PhBreak();
     }
+    void PlanArcade_L1()
+    {
+        int room = pRoom, cells = roomOuterCells[room];
+        if (Ph(0))
+        {
+            int cell = OpenSpot(3, WM_ANY, 0, 0, 0, ref hp_PlanArcade_r4);
+            if (cell < 0) { hq_PlanArcade_cell = cell; phBreak = true; PhEnd(); return; }
+            hp_PlanArcade_first = nEmit;
+            hq_PlanArcade_cell = cell;
+        }
+        if (Ph(1))
+        {
+            int cell = hq_PlanArcade_cell;
+            if (FreePlace(Dn("ma_airHockey"), cell, hp_PlanArcade_r4.Range(2) * 90, 1, 0, H_FREE) >= 0) Keep(hp_PlanArcade_first, false);
+            hq_PlanArcade_cell = cell;
+        }
+    }
+
 
     // ============================================================================================ SNACK BAR
     void PlanSnackbar()
@@ -170,14 +183,30 @@ public partial class MapGen
         if (Ph(0))
         {
             GenRng r = SR(1);
-            if (!RackRun(2, Dn("gen_rack"), Dn("gen_rack"), WM_CENTRE, 0, 0, ref r)) MandFail(1);
-            hp_PlanPrizeStore_rows = new string[] { "plush", "boxes", "balls", "toyCars", "boardToys", "cardboard" };
+            hq_PlanPrizeStore_r = r;
         }
         if (PhLoop(1, 100000))
         {
+            GenRng r = hq_PlanPrizeStore_r;
+            bool ht1 = false;
+            if (planIter == 0) { hq_RackRun_n = 2; hq_RackRun_a = Dn("gen_rack"); hq_RackRun_b = Dn("gen_rack"); hq_RackRun_mode = WM_CENTRE; hq_RackRun_tx = 0; hq_RackRun_tz = 0; hq_RackRun_rng = r; PhSubReset(); }
+            PhPush(); RackRun_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_RackRun_rng; ht1 = hq_RackRun_ret; PhBreak(); }
+            hq_PlanPrizeStore_r = r;
+            hq_PlanPrizeStore_ht1 = ht1;
+        }
+        if (Ph(2))
+        {
+            bool ht1 = hq_PlanPrizeStore_ht1;
+            if (!ht1) MandFail(1);
+            hp_PlanPrizeStore_rows = new string[] { "plush", "boxes", "balls", "toyCars", "boardToys", "cardboard" };
+            hq_PlanPrizeStore_ht1 = ht1;
+        }
+        if (PhLoop(3, 100000))
+        {
             int k = planIter;
             if (!(k < hp_PlanPrizeStore_rows.Length)) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: "continue" leaves it (UdonSharp sends a do-while's continue back to the top)
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 GenRng rk = SR(2 + k);
                 if (!rk.Chance(k < 2 ? 850 : 550) || !Fit(2)) continue;
@@ -186,7 +215,7 @@ public partial class MapGen
             }
         }
         // the pool a piece a step (Cor: build freezes)
-        if (PhLoop(2, PoolLen(new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) && !PoolStep(50, new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) PhBreak();
+        if (PhLoop(4, PoolLen(new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) && !PoolStep(50, new string[] { "ma_prizes", "s_boxLarge", "ms_handTruck", "dg_boxL", "gen_rack" })) PhBreak();
     }
 
     // ============================================================================================ MIDWAY
@@ -197,37 +226,77 @@ public partial class MapGen
         int room = pRoom, dx = 0, dz = 0;
         if (Ph(0))
         {
+            dx = hq_PlanMidway_dx;
+            dz = hq_PlanMidway_dz;
             FrontMarkers(30);
             MainDoor(room, out dx, out dz);
             GenRng r = SR(1);
             string[] stalls = { "f_stallRed", "f_stallGreen", "ck_food", "ck_drinks", "ck_info" };
             int s0 = r.Range(stalls.Length);
+            hq_PlanMidway_dx = dx;
+            hq_PlanMidway_dz = dz;
             hq_PlanMidway_stalls = stalls;
             hq_PlanMidway_s0 = s0;
         }
         if (PhLoop(1, 100000))
         {
-            string[] stalls = hq_PlanMidway_stalls;
-            int s0 = hq_PlanMidway_s0;
-            int k = planIter;
-            if (!(k < 2 + AreaM2(room) / 24 && Fit(1))) PhBreak();
-            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
+            if (!PhSubActive())
             {
-                GenRng rk = SR(2 + k);
-                int first = nEmit;
-                int st = WallPlace(Dn(stalls[(s0 + k) % stalls.Length]), WM_ANY, 0, 0, WIN_ANY, 0, ref rk);
-                if (st < 0 || !Keep(first, false)) continue;
-                // a game stall's prizes beside it
-                if (GenData.defId[emitDef[st]].StartsWith("f_stall") && Fit(2)) { first = nEmit; if (GroupBeside(GenData.FindGrp(rk.Chance(500) ? "plush" : "balls"), st, 2, 0, ref rk)) Keep(first, false); }
+                int k = planIter;
+                if (!(k < 2 + AreaM2(room) / 24 && Fit(1))) PhBreak();
+                else { hq_PlanMidway_k = k; PhSubBegin(); }
             }
-            hq_PlanMidway_stalls = stalls;
-            hq_PlanMidway_s0 = s0;
+            if (PhSubActive())
+            {
+                PhPush(); PlanMidway_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
         }
         // the pool a piece a step (Cor: build freezes)
         if (PhLoop(2, PoolLen(new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
             "mb_circus", "r_tableRound", "n_planter" })) && !PoolStep(50, new string[] { "ma_claw", "ma_prizeWheel", "ma_basketball", "ma_vending", "ck_toilets", "ck_bench", "ck_trash", "ck_flowers", "f_lamp", "hk_lantern",
             "mb_circus", "r_tableRound", "n_planter" })) PhBreak();
 }
+    void PlanMidway_L1()
+    {
+        int room = pRoom, dx = 0, dz = 0;
+        if (Ph(0))
+        {
+            string[] stalls = hq_PlanMidway_stalls;
+            int s0 = hq_PlanMidway_s0;
+            int k = hq_PlanMidway_k;
+            GenRng rk = SR(2 + k);
+            int first = nEmit;
+            int st = WallPlace(Dn(stalls[(s0 + k) % stalls.Length]), WM_ANY, 0, 0, WIN_ANY, 0, ref rk);
+            hq_PlanMidway_stalls = stalls;
+            hq_PlanMidway_s0 = s0;
+            hq_PlanMidway_rk = rk;
+            hq_PlanMidway_first = first;
+            hq_PlanMidway_st = st;
+        }
+        if (Ph(1))
+        {
+            int first = hq_PlanMidway_first;
+            int st = hq_PlanMidway_st;
+            if (st < 0 || !Keep(first, false)) { hq_PlanMidway_first = first; hq_PlanMidway_st = st; PhEnd(); return; }
+            hq_PlanMidway_first = first;
+            hq_PlanMidway_st = st;
+        }
+        if (Ph(2))
+        {
+            GenRng rk = hq_PlanMidway_rk;
+            int first = hq_PlanMidway_first;
+            int st = hq_PlanMidway_st;
+            // a game stall's prizes beside it
+            if (GenData.defId[emitDef[st]].StartsWith("f_stall") && Fit(2)) { first = nEmit; if (GroupBeside(GenData.FindGrp(rk.Chance(500) ? "plush" : "balls"), st, 2, 0, ref rk)) Keep(first, false); }
+            hq_PlanMidway_rk = rk;
+            hq_PlanMidway_first = first;
+            hq_PlanMidway_st = st;
+        }
+    }
+
 
     // ============================================================================================ RIDES YARD
     // Where the coaster stands: its cars in a row at the station, the station fence and gate, the ride's entrance and
@@ -274,14 +343,24 @@ public partial class MapGen
     string[] hp_PlanPrizeStore_rows;
     int hp_PlanRides_first;
 
-    // locals of the split plans, kept from one phase to the next (autophase3)
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_PlanArcade_cell;
     int hq_PlanArcade_dx;
     int hq_PlanArcade_dz;
+    int hq_PlanArcade_k;
     GenRng hq_PlanArcade_r;
     GenRng hq_PlanArcade_r2;
     int hq_PlanArcade_till;
+    int hq_PlanMidway_dx;
+    int hq_PlanMidway_dz;
+    int hq_PlanMidway_first;
+    int hq_PlanMidway_k;
+    GenRng hq_PlanMidway_rk;
     int hq_PlanMidway_s0;
+    int hq_PlanMidway_st;
     string[] hq_PlanMidway_stalls;
+    bool hq_PlanPrizeStore_ht1;
+    GenRng hq_PlanPrizeStore_r;
     int hq_PlanSnackbar_cell;
     GenRng hq_PlanSnackbar_r;
     GenRng hq_PlanSnackbar_r3;

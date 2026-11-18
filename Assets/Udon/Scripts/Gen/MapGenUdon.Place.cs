@@ -507,6 +507,7 @@ public partial class MapGenUdon
         BuildSegs(room);
         RoomWalkable(room);
         planPhase = 0; planIter = 0; planBroken = false;
+        PhResetAll();
     }
 
     // A plan in phases (Cor: build freezes). A plan that marks its parts with Ph(k) (once) and PhLoop(k, n) (n
@@ -605,9 +606,56 @@ public partial class MapGenUdon
             case GenData.R_CHURCHYARD: PlanChurchyard(); break;
             case GenData.R_GRAVEYARD: PlanGraveyard(); break;
         }
+        return PhAdvance();
+    }
+
+    // The end of a call in phases: the loop phase goes on to its next round, or the next phase is due. True when the
+    // last phase is done.
+    bool PhAdvance()
+    {
+        if (planStay) { planStay = false; return false; }
         if (planLooped && !planBroken && planIter + 1 < planLoopN) { planIter++; return false; }
         planPhase++; planIter = 0; planBroken = false;
         return planPhase > planMax;
+    }
+
+    // Phases a level down (Cor: build freezes): a loop's body, or a helper, that is itself in phases runs between
+    // PhPush and PhPop with phase counters of its own; the caller's wait in phsX meanwhile. A level's phase and
+    // round are kept in phsPhase/phsIter from one step to the next.
+    int phD;
+    bool planStay, phReturn, phBreak;
+    int[] phsPhase = new int[12], phsIter = new int[12], phsMax = new int[12], phsLoopN = new int[12];
+    bool[] phsBroken = new bool[12], phsLooped = new bool[12], phsStay = new bool[12], phsActive = new bool[12];
+
+    void PhPush()
+    {
+        phsPhase[phD] = planPhase; phsIter[phD] = planIter; phsMax[phD] = planMax; phsLoopN[phD] = planLoopN;
+        phsBroken[phD] = planBroken; phsLooped[phD] = planLooped; phsStay[phD] = planStay;
+        phD++;
+        planPhase = phsPhase[phD]; planIter = phsIter[phD];
+        planMax = 0; planLoopN = 0; planBroken = false; planLooped = false; planStay = false;
+    }
+
+    void PhPop()
+    {
+        phsPhase[phD] = planPhase; phsIter[phD] = planIter;
+        phD--;
+        planPhase = phsPhase[phD]; planIter = phsIter[phD]; planMax = phsMax[phD]; planLoopN = phsLoopN[phD];
+        planBroken = phsBroken[phD]; planLooped = phsLooped[phD]; planStay = phsStay[phD];
+    }
+
+    // the level below: from its first phase / is a loop's body under way / a body begins, ends / the caller's
+    // round is not over yet
+    void PhSubReset() { phsPhase[phD + 1] = 0; phsIter[phD + 1] = 0; phsActive[phD + 2] = false; }
+    bool PhSubActive() { return phsActive[phD + 1]; }
+    void PhSubBegin() { PhSubReset(); phsActive[phD + 1] = true; }
+    void PhSubEnd() { phsActive[phD + 1] = false; }
+    void PhStay() { planStay = true; }
+
+    void PhResetAll()
+    {
+        phD = 0; planStay = false; phReturn = false; phBreak = false;
+        for (int i = 0; i < phsActive.Length; i++) phsActive[i] = false;
     }
 
     // The rest of a room's furnishing, a piece a step (Cor: build freezes), in the order PopulateRoom used to do it

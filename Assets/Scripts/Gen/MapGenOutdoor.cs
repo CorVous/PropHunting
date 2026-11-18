@@ -161,18 +161,60 @@ public partial class MapGen
     // A planting island for a stretch of open ground with no edge to plant along: a bush with rocks beside it.
     bool Island(ref GenRng rng)
     {
-        if (!Fit(1)) return false;
-        int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref rng);
-        if (cell < 0) return false;
-        int first = nEmit;
-        int bush = FreePlace(Pick(ref rng, "n_bush", 5, "n_bushDetailed", 4), cell, rng.Range(360), 0, 0, H_NATURE);
-        if (bush < 0 || !Keep(first, false)) return false;
-        if (Fit(2))
+        hq_Island_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); Island_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_Island_rng;
+        return hq_Island_ret;
+    }
+
+    // Island in phases, a step a call (autophase4); Island() above runs them to the end
+    void Island_Body()
+    {
+        if (Ph(0))
         {
-            first = nEmit;
-            if (GroupBeside(RocksAllowed() ? GenData.FindGrp("rocks") : FlowerGroup(ref rng), bush, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
+            GenRng rng = hq_Island_rng;
+            if (!Fit(1)) { hq_Island_ret = false; hq_Island_rng = rng; PhEnd(); return; }
+            int cell = OpenSpot(2, WM_ANY, 0, 0, 0, ref rng);
+            if (cell < 0) { hq_Island_ret = false; hq_Island_rng = rng; hq_Island_cell = cell; PhEnd(); return; }
+            int first = nEmit;
+            hq_Island_rng = rng;
+            hq_Island_cell = cell;
+            hq_Island_first = first;
         }
-        return true;
+        if (Ph(1))
+        {
+            GenRng rng = hq_Island_rng;
+            int cell = hq_Island_cell;
+            int bush = FreePlace(Pick(ref rng, "n_bush", 5, "n_bushDetailed", 4), cell, rng.Range(360), 0, 0, H_NATURE);
+            hq_Island_rng = rng;
+            hq_Island_cell = cell;
+            hq_Island_bush = bush;
+        }
+        if (Ph(2))
+        {
+            int first = hq_Island_first;
+            int bush = hq_Island_bush;
+            if (bush < 0 || !Keep(first, false)) { hq_Island_ret = false; hq_Island_first = first; hq_Island_bush = bush; PhEnd(); return; }
+            hq_Island_first = first;
+            hq_Island_bush = bush;
+        }
+        if (Ph(3))
+        {
+            GenRng rng = hq_Island_rng;
+            int first = hq_Island_first;
+            int bush = hq_Island_bush;
+            if (Fit(2))
+            {
+                first = nEmit;
+                if (GroupBeside(RocksAllowed() ? GenData.FindGrp("rocks") : FlowerGroup(ref rng), bush, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
+            }
+            { hq_Island_ret = true; hq_Island_rng = rng; hq_Island_first = first; hq_Island_bush = bush; PhEnd(); return; }
+            hq_Island_rng = rng;
+            hq_Island_first = first;
+            hq_Island_bush = bush;
+        }
     }
 
     // Small rocks are a feature of a garden, not its filler: outside the wood an area takes at most two clumps of
@@ -364,17 +406,49 @@ public partial class MapGen
     // a specimen tree where the lawn is open, with rocks at its foot now and then (report 15, Ol-specimen and rocks)
     int LawnTree(int k)
     {
-        GenRng r = SR(k);
-        osAvoid = GenData.T_COVERED | GenData.T_SOFT_GROUND | GenData.T_EARTH;
-        int cell = OpenSpot(4, WM_ANY, 0, 0, 0, ref r);
-        if (cell < 0) return -1;
-        int tree = TreeAt(Pick(ref r, "n_treeFat", 6, "n_treeOak", 4), cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, ref r);
-        if (tree >= 0 && r.Chance(550) && Fit(2) && RocksAllowed())
+        hq_LawnTree_k = k;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); LawnTree_Body(); fin = PhAdvance(); PhPop(); }
+        return hq_LawnTree_ret;
+    }
+
+    // LawnTree in phases, a step a call (autophase4); LawnTree() above runs them to the end
+    void LawnTree_Body()
+    {
+        if (Ph(0))
         {
-            int first = nEmit;
-            if (GroupBeside(GenData.FindGrp("rocks"), tree, r.Between(2, 3), 0, ref r)) Keep(first, false);
+            int k = hq_LawnTree_k;
+            GenRng r = SR(k);
+            osAvoid = GenData.T_COVERED | GenData.T_SOFT_GROUND | GenData.T_EARTH;
+            int cell = OpenSpot(4, WM_ANY, 0, 0, 0, ref r);
+            if (cell < 0) { hq_LawnTree_ret = -1; hq_LawnTree_k = k; hq_LawnTree_r = r; hq_LawnTree_cell = cell; PhEnd(); return; }
+            hq_LawnTree_k = k;
+            hq_LawnTree_r = r;
+            hq_LawnTree_cell = cell;
         }
-        return tree;
+        if (Ph(1))
+        {
+            GenRng r = hq_LawnTree_r;
+            int cell = hq_LawnTree_cell;
+            int tree = TreeAt(Pick(ref r, "n_treeFat", 6, "n_treeOak", 4), cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, ref r);
+            hq_LawnTree_r = r;
+            hq_LawnTree_cell = cell;
+            hq_LawnTree_tree = tree;
+        }
+        if (Ph(2))
+        {
+            GenRng r = hq_LawnTree_r;
+            int tree = hq_LawnTree_tree;
+            if (tree >= 0 && r.Chance(550) && Fit(2) && RocksAllowed())
+            {
+                int first = nEmit;
+                if (GroupBeside(GenData.FindGrp("rocks"), tree, r.Between(2, 3), 0, ref r)) Keep(first, false);
+            }
+            { hq_LawnTree_ret = tree; hq_LawnTree_r = r; hq_LawnTree_tree = tree; PhEnd(); return; }
+            hq_LawnTree_r = r;
+            hq_LawnTree_tree = tree;
+        }
     }
 
     int TreeCount(int room, ref GenRng rng)
@@ -440,16 +514,52 @@ public partial class MapGen
     // a bench with its back to the fence or a wall, a small pot beside it (report 15, Pa-bench, Ol-garden bench)
     void BenchAtEdge(int k)
     {
-        GenRng r = SR(k);
-        if (!Fit(1)) return;
-        int first = nEmit;
-        int bench = WallPlace(Pick(ref r, "k_bench", 6, "k_benchCushion", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r);
-        if (bench < 0 || !Keep(first, false)) return;
-        int pot = Dn("n_potSmall");
-        if (r.Chance(450) && Fit(1) && CountInRoom(pot, pRoom) < ScaledCap(GenData.defRoomCap[pot], pRoom))
+        hq_BenchAtEdge_k = k;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); BenchAtEdge_Body(); fin = PhAdvance(); PhPop(); }
+    }
+
+    // BenchAtEdge in phases, a step a call (autophase4); BenchAtEdge() above runs them to the end
+    void BenchAtEdge_Body()
+    {
+        if (Ph(0))
         {
-            first = nEmit;
-            if (RelBeside(pot, bench, 0, 90, 0, ref r) >= 0) Keep(first, false);
+            int k = hq_BenchAtEdge_k;
+            GenRng r = SR(k);
+            if (!Fit(1)) { hq_BenchAtEdge_k = k; hq_BenchAtEdge_r = r; PhEnd(); return; }
+            int first = nEmit;
+            int bench = WallPlace(Pick(ref r, "k_bench", 6, "k_benchCushion", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r);
+            hq_BenchAtEdge_k = k;
+            hq_BenchAtEdge_r = r;
+            hq_BenchAtEdge_first = first;
+            hq_BenchAtEdge_bench = bench;
+        }
+        if (Ph(1))
+        {
+            int first = hq_BenchAtEdge_first;
+            int bench = hq_BenchAtEdge_bench;
+            if (bench < 0 || !Keep(first, false)) { hq_BenchAtEdge_first = first; hq_BenchAtEdge_bench = bench; PhEnd(); return; }
+            int pot = Dn("n_potSmall");
+            hq_BenchAtEdge_first = first;
+            hq_BenchAtEdge_bench = bench;
+            hq_BenchAtEdge_pot = pot;
+        }
+        if (Ph(2))
+        {
+            GenRng r = hq_BenchAtEdge_r;
+            int first = hq_BenchAtEdge_first;
+            int bench = hq_BenchAtEdge_bench;
+            int pot = hq_BenchAtEdge_pot;
+            if (r.Chance(450) && Fit(1) && CountInRoom(pot, pRoom) < ScaledCap(GenData.defRoomCap[pot], pRoom))
+            {
+                first = nEmit;
+                if (RelBeside(pot, bench, 0, 90, 0, ref r) >= 0) Keep(first, false);
+            }
+            hq_BenchAtEdge_r = r;
+            hq_BenchAtEdge_first = first;
+            hq_BenchAtEdge_bench = bench;
+            hq_BenchAtEdge_pot = pot;
         }
     }
 
@@ -463,21 +573,18 @@ public partial class MapGen
             planR = SR(1);
             StonePaths(40, ref planR);
             FrontMarkers(30);
-        }
-        if (Ph(1))
-        {
             DoorSides(50);
             planN = TreeCount(room, ref planR);
             if (planN < 1 && AreaM2(room) >= 30) planN = 1;
         }
-        if (PhLoop(2, planN)) LawnTree(60 + planIter);
-        if (Ph(3))
+        if (PhLoop(1, planN)) LawnTree(60 + planIter);
+        if (Ph(2))
         {
             if (planR.Chance(650)) BenchAtEdge(2);
             GenRng r3 = SR(3);
             hq_PlanLawn_r3 = r3;
         }
-        if (Ph(4))
+        if (Ph(3))
         {
             GenRng r3 = hq_PlanLawn_r3;
             if (r3.Chance(350) && Fit(1))
@@ -489,8 +596,8 @@ public partial class MapGen
             ClearBans();
             hq_PlanLawn_r3 = r3;
         }
-        if (PhLoop(5, 6) && !BorderStep(10, planIter, true)) PhBreak();
-        if (Ph(6))
+        if (PhLoop(4, 6) && !BorderStep(10, planIter, true)) PhBreak();
+        if (Ph(5))
         {
             GenRng r4 = SR(4);
             for (int k = 0; k < 3 && Fit(1); k++) if (!Island(ref r4)) break;
@@ -713,24 +820,75 @@ public partial class MapGen
     // a vegetable plot around a cell: a bed of soil 3 x 2 m with two rows of crops along it
     void VegPlot(int cell, ref GenRng rng)
     {
-        int room = pRoom;
-        int cx = cell % IW, cz = cell / IW;
-        bool alongX = RoomLongAxis(room) == 0;
-        int hw = alongX ? 3 : 2, hd = alongX ? 2 : 3;
-        for (int z = cz - hd; z < cz + hd; z++)
-            for (int x = cx - hw; x < cx + hw; x++)
-            {
-                if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
-                int i = z * IW + x;
-                if (innerRoom[i] == room && occ[i] == 0 && (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR | GenData.T_COVERED)) == 0) tags[i] |= GenData.T_SOFT_GROUND;
-            }
-        string[] crops = { "vegCarrot", "vegPumpkin", "vegMelon" };
-        int c0 = rng.Range(3);
-        int mx = cx * GenData.INNER_MM, mz = cz * GenData.INNER_MM;
-        for (int row = 0; row < 2 && Fit(3); row++)
+        hq_VegPlot_cell = cell;
+        hq_VegPlot_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); VegPlot_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_VegPlot_rng;
+    }
+
+    // VegPlot in phases, a step a call (autophase4); VegPlot() above runs them to the end
+    void VegPlot_Body()
+    {
+        if (Ph(0))
         {
+            int cell = hq_VegPlot_cell;
+            GenRng rng = hq_VegPlot_rng;
+            int room = pRoom;
+            int cx = cell % IW, cz = cell / IW;
+            bool alongX = RoomLongAxis(room) == 0;
+            int hw = alongX ? 3 : 2, hd = alongX ? 2 : 3;
+            for (int z = cz - hd; z < cz + hd; z++)
+                for (int x = cx - hw; x < cx + hw; x++)
+                {
+                    if (x < 0 || z < 0 || x >= IW || z >= IH) continue;
+                    int i = z * IW + x;
+                    if (innerRoom[i] == room && occ[i] == 0 && (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR | GenData.T_COVERED)) == 0) tags[i] |= GenData.T_SOFT_GROUND;
+                }
+            string[] crops = { "vegCarrot", "vegPumpkin", "vegMelon" };
+            int c0 = rng.Range(3);
+            int mx = cx * GenData.INNER_MM, mz = cz * GenData.INNER_MM;
+            hq_VegPlot_cell = cell;
+            hq_VegPlot_rng = rng;
+            hq_VegPlot_room = room;
+            hq_VegPlot_alongX = alongX;
+            hq_VegPlot_crops = crops;
+            hq_VegPlot_c0 = c0;
+            hq_VegPlot_mx = mx;
+            hq_VegPlot_mz = mz;
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int row = planIter;
+                if (!(row < 2 && Fit(3))) PhBreak();
+                else { hq_VegPlot_row = row; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); VegPlot_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+    }
+    void VegPlot_L1()
+    {
+        if (Ph(0))
+        {
+            GenRng rng = hq_VegPlot_rng;
+            int room = hq_VegPlot_room;
+            bool alongX = hq_VegPlot_alongX;
+            string[] crops = hq_VegPlot_crops;
+            int c0 = hq_VegPlot_c0;
+            int mx = hq_VegPlot_mx;
+            int mz = hq_VegPlot_mz;
+            int row = hq_VegPlot_row;
             int g = GenData.FindGrp(crops[(c0 + row) % 3]);
-            if (ChooseMembers(g, room, rng.Between(3, 4), ref rng) < 3) continue;
+            if (ChooseMembers(g, room, rng.Between(3, 4), ref rng) < 3) { hq_VegPlot_rng = rng; hq_VegPlot_room = room; hq_VegPlot_alongX = alongX; hq_VegPlot_crops = crops; hq_VegPlot_c0 = c0; hq_VegPlot_mx = mx; hq_VegPlot_mz = mz; PhEnd(); return; }
             BuildFormation(GenData.GL_ROW, GenData.grpGapMm[g], ref rng);
             int first = nEmit;
             int across = (row == 0 ? -1 : 1) * 450 - fDep / 2;
@@ -738,9 +896,26 @@ public partial class MapGen
             fHost = H_NATURE;
             int e = StampFormation(room, rot, (alongX ? mx : mz) - fLen / 2, (alongX ? mz : mx) + across, -1, 0, g, -1);
             fHost = H_NONE;
+            hq_VegPlot_rng = rng;
+            hq_VegPlot_room = room;
+            hq_VegPlot_alongX = alongX;
+            hq_VegPlot_crops = crops;
+            hq_VegPlot_c0 = c0;
+            hq_VegPlot_mx = mx;
+            hq_VegPlot_mz = mz;
+            hq_VegPlot_first = first;
+            hq_VegPlot_e = e;
+        }
+        if (Ph(1))
+        {
+            int first = hq_VegPlot_first;
+            int e = hq_VegPlot_e;
             if (e >= 0) Keep(first, false);
+            hq_VegPlot_first = first;
+            hq_VegPlot_e = e;
         }
     }
+
 
     // ============================================================================================ PATIO
     // Areas: the paved terrace at the door with the table set on it; loungers at its edge; planters; the rest
@@ -753,25 +928,8 @@ public partial class MapGen
             FrontMarkers(30);
             GenRng r = SR(1);
             // (a) the paving: 4 x 4 m in front of the first door, or against an edge, or in the middle
-            int px0 = 0, pz0 = 0, px1 = 0, pz1 = 0;
+            int px0, pz0, px1, pz1;
             int k = roomDoorCount[room] > 0 ? 0 : -1;
-            hq_PlanPatio_room = room;
-            hq_PlanPatio_r = r;
-            hq_PlanPatio_px0 = px0;
-            hq_PlanPatio_pz0 = pz0;
-            hq_PlanPatio_px1 = px1;
-            hq_PlanPatio_pz1 = pz1;
-            hq_PlanPatio_k = k;
-        }
-        if (Ph(1))
-        {
-            int room = hq_PlanPatio_room;
-            GenRng r = hq_PlanPatio_r;
-            int px0 = hq_PlanPatio_px0;
-            int pz0 = hq_PlanPatio_pz0;
-            int px1 = hq_PlanPatio_px1;
-            int pz1 = hq_PlanPatio_pz1;
-            int k = hq_PlanPatio_k;
             if (k >= 0)
             {
                 int cell = roomDoors[roomDoorStart[room]], d = roomDoorDir[roomDoorStart[room]], o = (d + 2) & 3;
@@ -803,21 +961,16 @@ public partial class MapGen
             int midX = (px0 + px1 + 1) * GenData.INNER_MM / 2, midZ = (pz0 + pz1 + 1) * GenData.INNER_MM / 2;
             hq_PlanPatio_room = room;
             hq_PlanPatio_r = r;
-            hq_PlanPatio_px0 = px0;
-            hq_PlanPatio_pz0 = pz0;
-            hq_PlanPatio_px1 = px1;
-            hq_PlanPatio_pz1 = pz1;
-            hq_PlanPatio_k = k;
             hq_PlanPatio_midX = midX;
             hq_PlanPatio_midZ = midZ;
         }
-        if (Ph(2))
+        if (Ph(1))
         {
             int room = hq_PlanPatio_room;
             for (int q = 1; q < roomDoorCount[room]; q++) { GenRng rq = SR(40 + q); StonePath(room, q, 7 + rq.Range(6), ref rq); }
             hq_PlanPatio_room = room;
         }
-        if (Ph(3))
+        if (Ph(2))
         {
             GenRng r = hq_PlanPatio_r;
             // (b) the table set on the paving
@@ -825,20 +978,23 @@ public partial class MapGen
             hq_PlanPatio_r = r;
             hq_PlanPatio_setDef = setDef;
         }
-        if (Ph(4))
+        if (PhLoop(3, 100000))
         {
             GenRng r = hq_PlanPatio_r;
             int midX = hq_PlanPatio_midX;
             int midZ = hq_PlanPatio_midZ;
             int setDef = hq_PlanPatio_setDef;
-            int set = CentrePiece(setDef, 0, true, 2, 1, WM_NEAR, midX, midZ, GenData.T_COVERED, EF_MANDATORY, ref r);
+            int set = 0;
+            if (planIter == 0) { hq_CentrePiece_def = setDef; hq_CentrePiece_yaw = 0; hq_CentrePiece_bothYaws = true; hq_CentrePiece_ringWant = 2; hq_CentrePiece_ringMin = 1; hq_CentrePiece_mode = WM_NEAR; hq_CentrePiece_tx = midX; hq_CentrePiece_tz = midZ; hq_CentrePiece_need = GenData.T_COVERED; hq_CentrePiece_flags = EF_MANDATORY; hq_CentrePiece_rng = r; PhSubReset(); }
+            PhPush(); CentrePiece_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_CentrePiece_rng; set = hq_CentrePiece_ret; PhBreak(); }
             hq_PlanPatio_r = r;
             hq_PlanPatio_midX = midX;
             hq_PlanPatio_midZ = midZ;
             hq_PlanPatio_setDef = setDef;
             hq_PlanPatio_set = set;
         }
-        if (Ph(5))
+        if (Ph(4))
         {
             GenRng r = hq_PlanPatio_r;
             int midX = hq_PlanPatio_midX;
@@ -850,7 +1006,7 @@ public partial class MapGen
             hq_PlanPatio_midZ = midZ;
             hq_PlanPatio_set = set;
         }
-        if (Ph(6))
+        if (Ph(5))
         {
             GenRng r = hq_PlanPatio_r;
             int midX = hq_PlanPatio_midX;
@@ -872,7 +1028,7 @@ public partial class MapGen
             hq_PlanPatio_set = set;
             hq_PlanPatio_r2 = r2;
         }
-        if (Ph(7))
+        if (Ph(6))
         {
             if (hq_PlanPatio_sel1 == 1)
             {
@@ -892,7 +1048,7 @@ public partial class MapGen
                 hq_PlanPatio_ok = ok;
             }
         }
-        if (Ph(8))
+        if (Ph(7))
         {
             if (hq_PlanPatio_sel1 == 1)
             {
@@ -903,11 +1059,11 @@ public partial class MapGen
                 hq_PlanPatio_ok = ok;
             }
         }
-        if (Ph(9))
+        if (Ph(8))
         {
             DoorSides(50);
         }
-        if (Ph(10))
+        if (Ph(9))
         {
             GenRng r2 = hq_PlanPatio_r2;
             if (r2.Chance(550)) BenchAtEdge(3);
@@ -915,7 +1071,7 @@ public partial class MapGen
             hq_PlanPatio_r2 = r2;
             hq_PlanPatio_r4 = r4;
         }
-        if (Ph(11))
+        if (Ph(10))
         {
             int midX = hq_PlanPatio_midX;
             int midZ = hq_PlanPatio_midZ;
@@ -931,7 +1087,7 @@ public partial class MapGen
             hq_PlanPatio_r4 = r4;
             hq_PlanPatio_r5 = r5;
         }
-        if (Ph(12))
+        if (Ph(11))
         {
             GenRng r5 = hq_PlanPatio_r5;
             if (r5.Chance(300) && Fit(1))
@@ -942,7 +1098,7 @@ public partial class MapGen
             }
             hq_PlanPatio_r5 = r5;
         }
-        if (Ph(13))
+        if (Ph(12))
         {
             int room = hq_PlanPatio_room;
             GenRng r5 = hq_PlanPatio_r5;
@@ -951,18 +1107,18 @@ public partial class MapGen
             hq_PlanPatio_r5 = r5;
             hq_PlanPatio_trees = trees;
         }
-        if (Ph(14))
+        if (Ph(13))
         {
             int trees = hq_PlanPatio_trees;
             for (int t = 0; t < trees; t++) LawnTree(60 + t);
             ClearBans();
             hq_PlanPatio_trees = trees;
         }
-        if (Ph(15))
+        if (Ph(14))
         {
             Borders(10, 6, true);
         }
-        if (Ph(16))
+        if (Ph(15))
         {
             GenRng r6 = SR(6);
             for (int j = 0; j < 2 && Fit(1); j++) if (!Island(ref r6)) break;
@@ -1164,22 +1320,65 @@ public partial class MapGen
     // a bucket of water by the fire.
     int FireRing(int minClr, int tx, int tz, bool soft, ref GenRng rng)
     {
-        int room = pRoom;
-        int fire = CentrePiece(Pick(ref rng, "n_campfire", 5, "s_campfirePit", 3), rng.Range(4) * 90, false, 3, 1, WM_NEAR, tx, tz, 0, EF_MANDATORY, ref rng);
-        if (fire < 0) { MandFail(1); return -1; }
-        // trodden earth around the fire, about 2 m out; in a forest the clearing where no tree stands is wider
-        int fx = FloorDiv(emitX[fire], GenData.INNER_MM), fz = FloorDiv(emitZ[fire], GenData.INNER_MM);
-        for (int z = fz - 6; z <= fz + 6; z++)
-            for (int x = fx - 6; x <= fx + 6; x++)
-            {
-                if (x < 0 || z < 0 || x >= IW || z >= IH || innerRoom[z * IW + x] != room) continue;
-                int dd = (x - fx) * (x - fx) + (z - fz) * (z - fz);
-                if (dd <= 14) tags[z * IW + x] |= GenData.T_EARTH;
-                if (dd <= (soft ? 36 : 14)) tags[z * IW + x] |= GenData.T_GLADE;
-            }
-        // in the wood the tent comes first (a narrow clearing has room for little else), then the gear (PlanForest)
-        if (!soft) FireGear(fire, ref rng);
-        return fire;
+        hq_FireRing_minClr = minClr;
+        hq_FireRing_tx = tx;
+        hq_FireRing_tz = tz;
+        hq_FireRing_soft = soft;
+        hq_FireRing_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); FireRing_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_FireRing_rng;
+        return hq_FireRing_ret;
+    }
+
+    // FireRing in phases, a step a call (autophase4); FireRing() above runs them to the end
+    void FireRing_Body()
+    {
+        if (Ph(0))
+        {
+            int room = pRoom;
+            hq_FireRing_room = room;
+        }
+        if (PhLoop(1, 100000))
+        {
+            int tx = hq_FireRing_tx;
+            int tz = hq_FireRing_tz;
+            GenRng rng = hq_FireRing_rng;
+            int fire = 0;
+            if (planIter == 0) { hq_CentrePiece_def = Pick(ref rng, "n_campfire", 5, "s_campfirePit", 3); hq_CentrePiece_yaw = rng.Range(4) * 90; hq_CentrePiece_bothYaws = false; hq_CentrePiece_ringWant = 3; hq_CentrePiece_ringMin = 1; hq_CentrePiece_mode = WM_NEAR; hq_CentrePiece_tx = tx; hq_CentrePiece_tz = tz; hq_CentrePiece_need = 0; hq_CentrePiece_flags = EF_MANDATORY; hq_CentrePiece_rng = rng; PhSubReset(); }
+            PhPush(); CentrePiece_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { rng = hq_CentrePiece_rng; fire = hq_CentrePiece_ret; PhBreak(); }
+            hq_FireRing_tx = tx;
+            hq_FireRing_tz = tz;
+            hq_FireRing_rng = rng;
+            hq_FireRing_fire = fire;
+        }
+        if (Ph(2))
+        {
+            bool soft = hq_FireRing_soft;
+            GenRng rng = hq_FireRing_rng;
+            int room = hq_FireRing_room;
+            int fire = hq_FireRing_fire;
+            if (fire < 0) { MandFail(1); { hq_FireRing_ret = -1; hq_FireRing_soft = soft; hq_FireRing_rng = rng; hq_FireRing_room = room; hq_FireRing_fire = fire; PhEnd(); return; } }
+            // trodden earth around the fire, about 2 m out; in a forest the clearing where no tree stands is wider
+            int fx = FloorDiv(emitX[fire], GenData.INNER_MM), fz = FloorDiv(emitZ[fire], GenData.INNER_MM);
+            for (int z = fz - 6; z <= fz + 6; z++)
+                for (int x = fx - 6; x <= fx + 6; x++)
+                {
+                    if (x < 0 || z < 0 || x >= IW || z >= IH || innerRoom[z * IW + x] != room) continue;
+                    int dd = (x - fx) * (x - fx) + (z - fz) * (z - fz);
+                    if (dd <= 14) tags[z * IW + x] |= GenData.T_EARTH;
+                    if (dd <= (soft ? 36 : 14)) tags[z * IW + x] |= GenData.T_GLADE;
+                }
+            // in the wood the tent comes first (a narrow clearing has room for little else), then the gear (PlanForest)
+            if (!soft) FireGear(fire, ref rng);
+            { hq_FireRing_ret = fire; hq_FireRing_soft = soft; hq_FireRing_rng = rng; hq_FireRing_room = room; hq_FireRing_fire = fire; PhEnd(); return; }
+            hq_FireRing_soft = soft;
+            hq_FireRing_rng = rng;
+            hq_FireRing_room = room;
+            hq_FireRing_fire = fire;
+        }
     }
 
     // a few logs beside the fire, and the bucket of water
@@ -1203,24 +1402,136 @@ public partial class MapGen
     // facing the fire). offGates: not on the line from an entrance to the fire. Kept, or -1.
     int AroundFire(int def, int fire, int relYaw, int distMin, int distMax, int flags, bool must, bool offGates, ref GenRng rng)
     {
-        int room = pRoom, fx = emitX[fire], fz = emitZ[fire];
-        int a0 = rng.Range(8);
-        for (int k = 0; k < 8; k++)
+        hq_AroundFire_def = def;
+        hq_AroundFire_fire = fire;
+        hq_AroundFire_relYaw = relYaw;
+        hq_AroundFire_distMin = distMin;
+        hq_AroundFire_distMax = distMax;
+        hq_AroundFire_flags = flags;
+        hq_AroundFire_must = must;
+        hq_AroundFire_offGates = offGates;
+        hq_AroundFire_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); AroundFire_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_AroundFire_rng;
+        return hq_AroundFire_ret;
+    }
+
+    // AroundFire in phases, a step a call (autophase4); AroundFire() above runs them to the end
+    void AroundFire_Body()
+    {
+        if (Ph(0))
         {
-            int a = (a0 + k) % 8 * 45;
-            for (int dist = distMin; dist <= distMax; dist += 300)
+            int fire = hq_AroundFire_fire;
+            GenRng rng = hq_AroundFire_rng;
+            int room = pRoom, fx = emitX[fire], fz = emitZ[fire];
+            int a0 = rng.Range(8);
+            hq_AroundFire_fire = fire;
+            hq_AroundFire_rng = rng;
+            hq_AroundFire_room = room;
+            hq_AroundFire_fx = fx;
+            hq_AroundFire_fz = fz;
+            hq_AroundFire_a0 = a0;
+        }
+        if (PhLoop(1, 100000))
+        {
+            if (!PhSubActive())
             {
-                int px = fx + dist * sinTab[a] / 4096, pz = fz + dist * sinTab[(a + 90) % 360] / 4096;
-                int ix = FloorDiv(px, GenData.INNER_MM), iz = FloorDiv(pz, GenData.INNER_MM);
-                if (ix < 0 || iz < 0 || ix >= IW || iz >= IH || innerRoom[iz * IW + ix] != room) break;
-                if (offGates && NearGateLine(px, pz, fx, fz)) break;
-                int first = nEmit;
-                int e = StampAt(def, room, px, pz, (a + relYaw) % 360, flags, -1, fire, false);
-                if (e >= 0 && Keep(first, must)) return e;
+                int k = planIter;
+                if (!(k < 8)) PhBreak();
+                else { hq_AroundFire_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); AroundFire_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        return -1;
+        if (Ph(2))
+        {
+            { hq_AroundFire_ret = -1; PhEnd(); return; }
+        }
     }
+    void AroundFire_L2()
+    {
+        if (Ph(0))
+        {
+            int def = hq_AroundFire_def;
+            int fire = hq_AroundFire_fire;
+            int relYaw = hq_AroundFire_relYaw;
+            int flags = hq_AroundFire_flags;
+            bool offGates = hq_AroundFire_offGates;
+            int room = hq_AroundFire_room;
+            int fx = hq_AroundFire_fx;
+            int fz = hq_AroundFire_fz;
+            int a = hq_AroundFire_a;
+            int dist = hq_AroundFire_dist;
+            int px = fx + dist * sinTab[a] / 4096, pz = fz + dist * sinTab[(a + 90) % 360] / 4096;
+            int ix = FloorDiv(px, GenData.INNER_MM), iz = FloorDiv(pz, GenData.INNER_MM);
+            if (ix < 0 || iz < 0 || ix >= IW || iz >= IH || innerRoom[iz * IW + ix] != room) { hq_AroundFire_def = def; hq_AroundFire_fire = fire; hq_AroundFire_relYaw = relYaw; hq_AroundFire_flags = flags; hq_AroundFire_offGates = offGates; hq_AroundFire_room = room; hq_AroundFire_fx = fx; hq_AroundFire_fz = fz; hq_AroundFire_a = a; phBreak = true; PhEnd(); return; }
+            if (offGates && NearGateLine(px, pz, fx, fz)) { hq_AroundFire_def = def; hq_AroundFire_fire = fire; hq_AroundFire_relYaw = relYaw; hq_AroundFire_flags = flags; hq_AroundFire_offGates = offGates; hq_AroundFire_room = room; hq_AroundFire_fx = fx; hq_AroundFire_fz = fz; hq_AroundFire_a = a; phBreak = true; PhEnd(); return; }
+            int first = nEmit;
+            int e = StampAt(def, room, px, pz, (a + relYaw) % 360, flags, -1, fire, false);
+            hq_AroundFire_def = def;
+            hq_AroundFire_fire = fire;
+            hq_AroundFire_relYaw = relYaw;
+            hq_AroundFire_flags = flags;
+            hq_AroundFire_offGates = offGates;
+            hq_AroundFire_room = room;
+            hq_AroundFire_fx = fx;
+            hq_AroundFire_fz = fz;
+            hq_AroundFire_a = a;
+            hq_AroundFire_first = first;
+            hq_AroundFire_e = e;
+        }
+        if (Ph(1))
+        {
+            bool must = hq_AroundFire_must;
+            int first = hq_AroundFire_first;
+            int e = hq_AroundFire_e;
+            if (e >= 0 && Keep(first, must)) { hq_AroundFire_ret = e; hq_AroundFire_must = must; hq_AroundFire_first = first; hq_AroundFire_e = e; phReturn = true; PhEnd(); return; }
+            hq_AroundFire_must = must;
+            hq_AroundFire_first = first;
+            hq_AroundFire_e = e;
+        }
+    }
+
+    void AroundFire_L1()
+    {
+        if (Ph(0))
+        {
+            int a0 = hq_AroundFire_a0;
+            int k = hq_AroundFire_k;
+            int a = (a0 + k) % 8 * 45;
+            hq_AroundFire_a0 = a0;
+            hq_AroundFire_a = a;
+        }
+        if (PhLoop(1, 100000))
+        {
+            int distMin = hq_AroundFire_distMin;
+            int distMax = hq_AroundFire_distMax;
+            if (!PhSubActive())
+            {
+                if (planIter == 0) hq_AroundFire_dist0 = distMin;
+                int dist = hq_AroundFire_dist0 + planIter * 300;
+                if (!(dist <= distMax)) PhBreak();
+                else { hq_AroundFire_dist = dist; PhSubBegin(); }
+            }
+            hq_AroundFire_distMin = distMin;
+            hq_AroundFire_distMax = distMax;
+            if (PhSubActive())
+            {
+                PhPush(); AroundFire_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { PhEnd(); return; }
+            }
+        }
+    }
+
 
     // is the point within 1.6 m of the straight line from one of the area's entrances to (hx, hz)?
     bool NearGateLine(int px, int pz, int hx, int hz)
@@ -1242,19 +1553,92 @@ public partial class MapGen
     // the wood pile: a stack of logs with the chopping block beside it (the axe may stick in the block)
     void WoodPile(int fire, bool atEdge, ref GenRng rng)
     {
-        if (!Fit(1)) return;
-        int first = nEmit;
-        int stackDef = Pick(ref rng, "n_logStack", 6, "n_logStackLarge", 3);
-        int stack = -1;
-        if (atEdge) stack = WallKeep(stackDef, fire >= 0 ? WM_NEAR : WM_ANY, fire >= 0 ? emitX[fire] : 0, fire >= 0 ? emitZ[fire] : 0, WIN_ANY, 0, ref rng);
-        if (stack < 0 && fire >= 0) stack = AroundFire(stackDef, fire, 90, 2700, 3600, 0, false, false, ref rng);
-        if (stack < 0 && fire >= 0 && stackDef != Dn("n_logStack")) stack = AroundFire(Dn("n_logStack"), fire, 90, 2400, 3600, 0, false, false, ref rng);
-        if (stack < 0 && !atEdge) stack = WallKeep(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, ref rng);
-        if (stack < 0) return;
-        if (rng.Chance(750) && Fit(1))
+        hq_WoodPile_fire = fire;
+        hq_WoodPile_atEdge = atEdge;
+        hq_WoodPile_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); WoodPile_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_WoodPile_rng;
+    }
+
+    // WoodPile in phases, a step a call (autophase4); WoodPile() above runs them to the end
+    void WoodPile_Body()
+    {
+        if (Ph(0))
         {
-            first = nEmit;
-            if (RelBeside(Pick(ref rng, "n_stump", 6, "n_stumpRound", 4), stack, 0, 250, 0, ref rng) >= 0) Keep(first, false);
+            GenRng rng = hq_WoodPile_rng;
+            if (!Fit(1)) { hq_WoodPile_rng = rng; PhEnd(); return; }
+            int first = nEmit;
+            int stackDef = Pick(ref rng, "n_logStack", 6, "n_logStackLarge", 3);
+            int stack = -1;
+            hq_WoodPile_rng = rng;
+            hq_WoodPile_first = first;
+            hq_WoodPile_stackDef = stackDef;
+            hq_WoodPile_stack = stack;
+        }
+        if (Ph(1))
+        {
+            int fire = hq_WoodPile_fire;
+            bool atEdge = hq_WoodPile_atEdge;
+            GenRng rng = hq_WoodPile_rng;
+            int stackDef = hq_WoodPile_stackDef;
+            int stack = hq_WoodPile_stack;
+            if (atEdge) stack = WallKeep(stackDef, fire >= 0 ? WM_NEAR : WM_ANY, fire >= 0 ? emitX[fire] : 0, fire >= 0 ? emitZ[fire] : 0, WIN_ANY, 0, ref rng);
+            hq_WoodPile_fire = fire;
+            hq_WoodPile_atEdge = atEdge;
+            hq_WoodPile_rng = rng;
+            hq_WoodPile_stackDef = stackDef;
+            hq_WoodPile_stack = stack;
+        }
+        if (Ph(2))
+        {
+            int fire = hq_WoodPile_fire;
+            GenRng rng = hq_WoodPile_rng;
+            int stackDef = hq_WoodPile_stackDef;
+            int stack = hq_WoodPile_stack;
+            if (stack < 0 && fire >= 0) stack = AroundFire(stackDef, fire, 90, 2700, 3600, 0, false, false, ref rng);
+            hq_WoodPile_fire = fire;
+            hq_WoodPile_rng = rng;
+            hq_WoodPile_stackDef = stackDef;
+            hq_WoodPile_stack = stack;
+        }
+        if (Ph(3))
+        {
+            int fire = hq_WoodPile_fire;
+            GenRng rng = hq_WoodPile_rng;
+            int stackDef = hq_WoodPile_stackDef;
+            int stack = hq_WoodPile_stack;
+            if (stack < 0 && fire >= 0 && stackDef != Dn("n_logStack")) stack = AroundFire(Dn("n_logStack"), fire, 90, 2400, 3600, 0, false, false, ref rng);
+            hq_WoodPile_fire = fire;
+            hq_WoodPile_rng = rng;
+            hq_WoodPile_stackDef = stackDef;
+            hq_WoodPile_stack = stack;
+        }
+        if (Ph(4))
+        {
+            bool atEdge = hq_WoodPile_atEdge;
+            GenRng rng = hq_WoodPile_rng;
+            int stack = hq_WoodPile_stack;
+            if (stack < 0 && !atEdge) stack = WallKeep(Dn("n_logStack"), WM_ANY, 0, 0, WIN_ANY, 0, ref rng);
+            if (stack < 0) { hq_WoodPile_atEdge = atEdge; hq_WoodPile_rng = rng; hq_WoodPile_stack = stack; PhEnd(); return; }
+            hq_WoodPile_atEdge = atEdge;
+            hq_WoodPile_rng = rng;
+            hq_WoodPile_stack = stack;
+        }
+        if (Ph(5))
+        {
+            GenRng rng = hq_WoodPile_rng;
+            int first = hq_WoodPile_first;
+            int stack = hq_WoodPile_stack;
+            if (rng.Chance(750) && Fit(1))
+            {
+                first = nEmit;
+                if (RelBeside(Pick(ref rng, "n_stump", 6, "n_stumpRound", 4), stack, 0, 250, 0, ref rng) >= 0) Keep(first, false);
+            }
+            hq_WoodPile_rng = rng;
+            hq_WoodPile_first = first;
+            hq_WoodPile_stack = stack;
         }
     }
 
@@ -1284,10 +1668,13 @@ public partial class MapGen
             StonePaths(40, ref r);
             hq_PlanFirepit_r = r;
         }
-        if (Ph(1))
+        if (PhLoop(1, 100000))
         {
             GenRng r = hq_PlanFirepit_r;
-            int fire = FireRing(6, RoomMidX(room), RoomMidZ(room), false, ref r);
+            int fire = 0;
+            if (planIter == 0) { hq_FireRing_minClr = 6; hq_FireRing_tx = RoomMidX(room); hq_FireRing_tz = RoomMidZ(room); hq_FireRing_soft = false; hq_FireRing_rng = r; PhSubReset(); }
+            PhPush(); FireRing_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) { r = hq_FireRing_rng; fire = hq_FireRing_ret; PhBreak(); }
             hq_PlanFirepit_r = r;
             hq_PlanFirepit_fire = fire;
         }
@@ -1421,6 +1808,7 @@ public partial class MapGen
 
     void PlanForest(bool camp)
     {
+        hq_PlanForest_camp = camp;
         int room = pRoom, area = AreaM2(room);
         // in three parts a step each (Cor: build freezes): the clearing and the camp, the stands of trees, the rest
         if (Ph(0))
@@ -1431,57 +1819,269 @@ public partial class MapGen
             if (hub < 0) hub = roomCells[roomCellStart[room] + roomCellCount[room] / 2];
             int hubX = hub % IW * GenData.INNER_MM + 250, hubZ = hub / IW * GenData.INNER_MM + 250;
             int fire = -1, tent = -1;
+            hq_PlanForest_r = r;
+            hq_PlanForest_hub = hub;
+            hq_PlanForest_hubX = hubX;
+            hq_PlanForest_hubZ = hubZ;
+            hq_PlanForest_fire = fire;
+            hq_PlanForest_tent = tent;
+        }
+        if (Ph(1))
+        {
+            GenRng r = hq_PlanForest_r;
+            int hub = hq_PlanForest_hub;
+            int hubX = hq_PlanForest_hubX;
+            int hubZ = hq_PlanForest_hubZ;
+            int fire = hq_PlanForest_fire;
             if (camp)
             {
                 // (b) the camp in its clearing: the fire in the middle, the tent facing it
                 fire = FireRing(7, hubX, hubZ, true, ref r);
                 if (fire >= 0) { hubX = emitX[fire]; hubZ = emitZ[fire]; hub = FloorDiv(hubZ, GenData.INNER_MM) * IW + FloorDiv(hubX, GenData.INNER_MM); }
             }
+            hq_PlanForest_r = r;
+            hq_PlanForest_hub = hub;
+            hq_PlanForest_hubX = hubX;
+            hq_PlanForest_hubZ = hubZ;
+            hq_PlanForest_fire = fire;
+        }
+        if (Ph(2))
+        {
+            int fire = hq_PlanForest_fire;
             FindGates(room);
-            if (camp && fire >= 0)
+            hq_PlanForest_sel1 = 0;
+            if (camp && fire >= 0) hq_PlanForest_sel1 = 1;
+            hq_PlanForest_fire = fire;
+        }
+        if (Ph(3))
+        {
+            if (hq_PlanForest_sel1 == 1)
             {
                 // the tent across the fire from the way in, its door to the fire; the small tent if the large one has no room
                 GenRng r2 = SR(2);
                 int tentDef = Pick(ref r2, "n_tentOpen", 5, "n_tentClosed", 3);
-                tent = AroundFire(tentDef, fire, 180, 2600, 3800, EF_MANDATORY, true, true, ref r2);
+                hq_PlanForest_r2 = r2;
+                hq_PlanForest_tentDef = tentDef;
+            }
+        }
+        if (PhLoop(4, 100000))
+        {
+            if (!(hq_PlanForest_sel1 == 1)) PhBreak();
+            else
+            {
+                int fire = hq_PlanForest_fire;
+                int tent = hq_PlanForest_tent;
+                GenRng r2 = hq_PlanForest_r2;
+                int tentDef = hq_PlanForest_tentDef;
+                if (planIter == 0) { hq_AroundFire_def = tentDef; hq_AroundFire_fire = fire; hq_AroundFire_relYaw = 180; hq_AroundFire_distMin = 2600; hq_AroundFire_distMax = 3800; hq_AroundFire_flags = EF_MANDATORY; hq_AroundFire_must = true; hq_AroundFire_offGates = true; hq_AroundFire_rng = r2; PhSubReset(); }
+                PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r2 = hq_AroundFire_rng; tent = hq_AroundFire_ret; PhBreak(); }
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+                hq_PlanForest_tentDef = tentDef;
+            }
+        }
+        if (Ph(5))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int fire = hq_PlanForest_fire;
+                int tent = hq_PlanForest_tent;
+                GenRng r2 = hq_PlanForest_r2;
+                int tentDef = hq_PlanForest_tentDef;
                 if (tent < 0 && tentDef != Dn("n_tentClosed")) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2600, 3800, EF_MANDATORY, true, true, ref r2);
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+                hq_PlanForest_tentDef = tentDef;
+            }
+        }
+        if (Ph(6))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int hubX = hq_PlanForest_hubX;
+                int hubZ = hq_PlanForest_hubZ;
+                int tent = hq_PlanForest_tent;
+                GenRng r2 = hq_PlanForest_r2;
+                int tentDef = hq_PlanForest_tentDef;
                 // a narrow clearing: the tent with its back to the fence, as near the fire as the fence allows
                 if (tent < 0) tent = WallKeep(tentDef, WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
+                hq_PlanForest_hubX = hubX;
+                hq_PlanForest_hubZ = hubZ;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+                hq_PlanForest_tentDef = tentDef;
+            }
+        }
+        if (Ph(7))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int hubX = hq_PlanForest_hubX;
+                int hubZ = hq_PlanForest_hubZ;
+                int tent = hq_PlanForest_tent;
+                GenRng r2 = hq_PlanForest_r2;
                 if (tent < 0) tent = WallKeep(Dn("n_tentClosed"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
+                hq_PlanForest_hubX = hubX;
+                hq_PlanForest_hubZ = hubZ;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+            }
+        }
+        if (Ph(8))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int fire = hq_PlanForest_fire;
+                int tent = hq_PlanForest_tent;
+                GenRng r2 = hq_PlanForest_r2;
                 if (tent < 0) tent = AroundFire(Dn("n_tentClosed"), fire, 180, 2300, 3800, EF_MANDATORY, true, false, ref r2);
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+            }
+        }
+        if (Ph(9))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int fire = hq_PlanForest_fire;
+                int tent = hq_PlanForest_tent;
+                GenRng r2 = hq_PlanForest_r2;
                 // a clearing too narrow for any tent (a strip of wood two cells long): a bedroll laid out by the fire,
                 // its foot to the fire, the gear beside it as beside a tent
                 if (tent < 0) tent = AroundFire(Dn("s_bedroll"), fire, 0, 1500, 2700, EF_MANDATORY, true, false, ref r2);
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+            }
+        }
+        if (Ph(10))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int hubX = hq_PlanForest_hubX;
+                int hubZ = hq_PlanForest_hubZ;
+                int tent = hq_PlanForest_tent;
+                GenRng r2 = hq_PlanForest_r2;
                 if (tent < 0) tent = WallKeep(Dn("s_bedroll"), WM_NEAR, hubX, hubZ, WIN_ANY, EF_MANDATORY, ref r2);
                 if (tent < 0) MandFail(1);
+                hq_PlanForest_hubX = hubX;
+                hq_PlanForest_hubZ = hubZ;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r2 = r2;
+            }
+        }
+        if (Ph(11))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int fire = hq_PlanForest_fire;
                 FireSeats(fire, true, 8);
                 GenRng rgear = SR(9);
-                FireGear(fire, ref rgear);
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_rgear = rgear;
             }
+        }
+        if (Ph(12))
+        {
+            if (hq_PlanForest_sel1 == 1)
+            {
+                int fire = hq_PlanForest_fire;
+                GenRng rgear = hq_PlanForest_rgear;
+                FireGear(fire, ref rgear);
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_rgear = rgear;
+            }
+        }
+        if (Ph(13))
+        {
+            int hub = hq_PlanForest_hub;
+            int fire = hq_PlanForest_fire;
             // a piece of forest of one cell (4 x 4 m) is too small for a path of its own
             if (camp || roomOuterCells[room] >= 2)
                 for (int g = 0; g < nGate; g++) { GenRng rg = SR(20 + g); Track(room, gateCell[g], hub, ref rg); }
-            if (camp && fire >= 0)
+            hq_PlanForest_sel2 = 0;
+            if (camp && fire >= 0) hq_PlanForest_sel2 = 1;
+            hq_PlanForest_hub = hub;
+            hq_PlanForest_fire = fire;
+        }
+        if (Ph(14))
+        {
+            if (hq_PlanForest_sel2 == 1)
             {
+                int tent = hq_PlanForest_tent;
                 GenRng r3 = SR(3);
-                if (tent >= 0 && Fit(2))
-                {
-                    // the gear beside the tent: a box or a chest with a barrel
-                    int first = nEmit;
-                    FSet(Pick(ref r3, "s_box", 5, "s_chest", 4), Dn("s_barrel"));
-                    if (FormBeside(GenData.GL_ROW, 80, tent, 0, ref r3) >= 0) Keep(first, false);
-                }
+                hq_PlanForest_sel3 = 0;
+                if (tent >= 0 && Fit(2)) hq_PlanForest_sel3 = 1;
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r3 = r3;
+            }
+        }
+        if (Ph(15))
+        {
+            if (hq_PlanForest_sel2 == 1 && hq_PlanForest_sel3 == 1)
+            {
+                GenRng r3 = hq_PlanForest_r3;
+                // the gear beside the tent: a box or a chest with a barrel
+                int first = nEmit;
+                FSet(Pick(ref r3, "s_box", 5, "s_chest", 4), Dn("s_barrel"));
+                hq_PlanForest_r3 = r3;
+                hq_PlanForest_first = first;
+            }
+        }
+        if (Ph(16))
+        {
+            if (hq_PlanForest_sel2 == 1 && hq_PlanForest_sel3 == 1)
+            {
+                int tent = hq_PlanForest_tent;
+                GenRng r3 = hq_PlanForest_r3;
+                int first = hq_PlanForest_first;
+                if (FormBeside(GenData.GL_ROW, 80, tent, 0, ref r3) >= 0) Keep(first, false);
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r3 = r3;
+                hq_PlanForest_first = first;
+            }
+        }
+        if (Ph(17))
+        {
+            if (hq_PlanForest_sel2 == 1)
+            {
+                int tent = hq_PlanForest_tent;
+                GenRng r3 = hq_PlanForest_r3;
                 if (tent >= 0 && r3.Chance(600) && Fit(2))
                 {
                     int first = nEmit;
                     if (GroupBeside(GenData.FindGrp("tools"), tent, 2, 0, ref r3)) Keep(first, false);
                 }
                 GenRng r4 = SR(4);
-                if (r4.Chance(800)) WoodPile(fire, false, ref r4);
+                hq_PlanForest_tent = tent;
+                hq_PlanForest_r3 = r3;
+                hq_PlanForest_r4 = r4;
             }
-            planHX = hubX; planHZ = hubZ;
         }
-        if (Ph(1))
+        if (Ph(18))
+        {
+            if (hq_PlanForest_sel2 == 1)
+            {
+                int fire = hq_PlanForest_fire;
+                GenRng r4 = hq_PlanForest_r4;
+                if (r4.Chance(800)) WoodPile(fire, false, ref r4);
+                hq_PlanForest_fire = fire;
+                hq_PlanForest_r4 = r4;
+            }
+        }
+        if (Ph(19))
+        {
+            int hubX = hq_PlanForest_hubX;
+            int hubZ = hq_PlanForest_hubZ;
+            planHX = hubX; planHZ = hubZ;
+            hq_PlanForest_hubX = hubX;
+            hq_PlanForest_hubZ = hubZ;
+        }
+        if (Ph(20))
         {
             // (b) trees in stands, away from the path and the clearing; open ground between the stands
             GenRng rt = SR(5);
@@ -1492,31 +2092,36 @@ public partial class MapGen
             standN = 0;
             int main0 = Pick(ref rt, "n_treeDefault", 6, "n_treePineTall", 6, "n_treeOak", 5);
             int left = trees;
-            for (int s = 0; s < stands && left > 0; s++)
+            hq_PlanForest_rt = rt;
+            hq_PlanForest_stands = stands;
+            hq_PlanForest_main0 = main0;
+            hq_PlanForest_left = left;
+        }
+        if (PhLoop(21, 100000))
+        {
+            int stands = hq_PlanForest_stands;
+            int left = hq_PlanForest_left;
+            if (!PhSubActive())
             {
-                // the candidate farthest from the stands so far, with room for crowns
-                int best = -1, bestD = -1;
-                for (int k = 0; k < 14; k++)
-                {
-                    int i = roomCells[roomCellStart[room] + rt.Range(roomCellCount[room])];
-                    if ((tags[i] & (GenData.T_PATH | GenData.T_GLADE | GenData.T_NO_SPAWN)) != 0 || occ[i] != 0) continue;
-                    int x = i % IW * GenData.INNER_MM + 250, z = i / IW * GenData.INNER_MM + 250;
-                    int dmin = 1 << 28;
-                    for (int q = 0; q < standN; q++) { int dd = Abs(standX[q] - x) + Abs(standZ[q] - z); if (dd < dmin) dmin = dd; }
-                    int hx, hz;
-                    FullHalf(main0, 0, out hx, out hz);
-                    if (!WallsClear(x - hx, z - hz, x + hx, z + hz, true)) dmin /= 8;   // too near an edge for a crown
-                    if (dmin > bestD) { bestD = dmin; best = i; }
-                }
-                if (best < 0) break;
-                int sx = best % IW * GenData.INNER_MM + 250, sz = best / IW * GenData.INNER_MM + 250;
-                int kind = s == 0 ? main0 : (rt.Chance(190) ? Dn("n_treePineRound") : Pick(ref rt, "n_treeDefault", 6, "n_treePineTall", 6, "n_treeOak", 5));
-                int accent = rt.Chance(400) ? Pick(ref rt, "n_treePineRound", 4, "n_treeOak", 4, "n_treeDefault", 4) : -1;
-                int want = left < 3 ? left : rt.Between(3, left < 5 ? left : 5);
-                int got = Stand(sx, sz, want, kind, accent, ref rt);
-                left -= got;
-                if (got > 0 && standN < standX.Length) { standX[standN] = sx; standZ[standN] = sz; standN++; }
+                int s = planIter;
+                if (!(s < stands && left > 0)) PhBreak();
+                else { hq_PlanForest_s = s; PhSubBegin(); }
             }
+            hq_PlanForest_stands = stands;
+            hq_PlanForest_left = left;
+            if (PhSubActive())
+            {
+                PhPush(); PlanForest_L1(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(22))
+        {
+            GenRng rt = hq_PlanForest_rt;
+            int main0 = hq_PlanForest_main0;
+            int left = hq_PlanForest_left;
             // crowns have to stay inside the fence (G31), so a stand near an edge comes out short: the trees still
             // missing join the stands that stand, wherever a crown has the room
             for (int tries = left * 12; tries > 0 && left > 0 && standN > 0; tries--)
@@ -1524,62 +2129,112 @@ public partial class MapGen
                 int s = rt.Range(standN), a = rt.Range(360), rad = 1200 + rt.Range(2400);
                 if (TreeAt(main0, standX[s] + rad * sinTab[a] / 4096, standZ[s] + rad * sinTab[(a + 90) % 360] / 4096, ref rt) >= 0) left--;
             }
+            hq_PlanForest_rt = rt;
+            hq_PlanForest_main0 = main0;
+            hq_PlanForest_left = left;
         }
         // (c) undergrowth: bushes at the edge of a stand and along the fence
-        if (Ph(2))
+        if (Ph(23))
         {
             GenRng r6 = SR(6);
             int bushes = 1 + area / 28;
-            for (int b = 0; b < bushes && Fit(1); b++)
-            {
-                int first = nEmit;
-                bool ok = false;
-                if (standN > 0 && r6.Chance(600))
-                {
-                    int s = r6.Range(standN), a = r6.Range(360), rad = 1500 + r6.Range(1200);
-                    int px = standX[s] + rad * sinTab[a] / 4096, pz = standZ[s] + rad * sinTab[(a + 90) % 360] / 4096;
-                    int ix = FloorDiv(px, GenData.INNER_MM), iz = FloorDiv(pz, GenData.INNER_MM);
-                    if (ix >= 0 && iz >= 0 && ix < IW && iz < IH && innerRoom[iz * IW + ix] == room && (tags[iz * IW + ix] & GenData.T_GLADE) == 0)
-                        ok = StampAt(Pick(ref r6, "n_bush", 5, "n_bushDetailed", 4), room, px, pz, r6.Range(360), 0, -1, H_NATURE, false) >= 0;
-                }
-                if (!ok) ok = WallPlace(Pick(ref r6, "n_bushLarge", 5, "n_bush", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r6) >= 0;
-                if (ok) Keep(first, false);
-            }
-            // (d) dead wood as one feature: a fallen log, a stump beside it, mushrooms at the stump
+            hq_PlanForest_r6 = r6;
+            hq_PlanForest_bushes = bushes;
         }
-        if (Ph(3))
+        if (PhLoop(24, 100000))
+        {
+            int bushes = hq_PlanForest_bushes;
+            if (!PhSubActive())
+            {
+                int b = planIter;
+                if (!(b < bushes && Fit(1))) PhBreak();
+                else { hq_PlanForest_b = b; PhSubBegin(); }
+            }
+            hq_PlanForest_bushes = bushes;
+            if (PhSubActive())
+            {
+                PhPush(); PlanForest_L2(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(25))
         {
             GenRng r7 = SR(7);
             if (r7.Chance(camp ? 350 : 800) && Fit(2)) DeadWood(ref r7);
             // a boulder with smaller rocks beside it
         }
-        if (Ph(4))
+        if (Ph(26))
         {
             GenRng r8 = SR(8);
-            if (r8.Chance(camp ? 300 : 600) && Fit(2))
+            hq_PlanForest_sel4 = 0;
+            if (r8.Chance(camp ? 300 : 600) && Fit(2)) hq_PlanForest_sel4 = 1;
+            hq_PlanForest_r8 = r8;
+        }
+        if (Ph(27))
+        {
+            if (hq_PlanForest_sel4 == 1)
             {
+                GenRng r8 = hq_PlanForest_r8;
                 int cell = SoftSpot(ref r8);
                 int first = nEmit;
+                hq_PlanForest_r8 = r8;
+                hq_PlanForest_cell = cell;
+                hq_PlanForest_first = first;
+            }
+        }
+        if (Ph(28))
+        {
+            if (hq_PlanForest_sel4 == 1)
+            {
+                GenRng r8 = hq_PlanForest_r8;
+                int cell = hq_PlanForest_cell;
                 int rock = cell >= 0 ? FreePlace(Pick(ref r8, "n_rockLarge", 5, "n_rockTall", 3), cell, r8.Range(360), 0, 0, H_NATURE) : -1;
+                hq_PlanForest_r8 = r8;
+                hq_PlanForest_cell = cell;
+                hq_PlanForest_rock = rock;
+            }
+        }
+        if (Ph(29))
+        {
+            if (hq_PlanForest_sel4 == 1)
+            {
+                GenRng r8 = hq_PlanForest_r8;
+                int first = hq_PlanForest_first;
+                int rock = hq_PlanForest_rock;
                 if (rock >= 0 && Keep(first, false) && Fit(2))
                 {
                     first = nEmit;
                     if (GroupBeside(GenData.FindGrp("rocks"), rock, r8.Between(2, 3), 0, ref r8)) Keep(first, false);
                 }
+                hq_PlanForest_r8 = r8;
+                hq_PlanForest_first = first;
+                hq_PlanForest_rock = rock;
             }
-            // mushrooms at the foot of a tree, a drift of flowers by the path, a signpost at an entrance
         }
-        if (Ph(5))
+        if (Ph(30))
         {
             GenRng r9 = SR(9);
             int clumps = camp ? 1 : 1 + area / 50;
-            for (int m = 0; m < clumps && Fit(2); m++)
+            hq_PlanForest_r9 = r9;
+            hq_PlanForest_clumps = clumps;
+        }
+        if (PhLoop(31, 100000))
+        {
+            GenRng r9 = hq_PlanForest_r9;
+            int clumps = hq_PlanForest_clumps;
+            int m = planIter;
+            if (!(m < clumps && Fit(2))) PhBreak();
+            else for (int once = 0; once < 1; once++)   // one pass: break and continue leave it
             {
                 int first = nEmit;
                 if (PlaceGroup(GenData.FindGrp("mushrooms"), room, GenData.A_BESIDE, r9.Between(2, Fit(4) ? 4 : 2), 0, ref r9)) Keep(first, false);
             }
+            hq_PlanForest_r9 = r9;
+            hq_PlanForest_clumps = clumps;
         }
-        if (Ph(6))
+        if (Ph(32))
         {
             GenRng r10 = SR(10);
             if (r10.Chance(600) && Fit(3))
@@ -1588,32 +2243,34 @@ public partial class MapGen
                 if (GroupAt(FlowerGroup(ref r10), GenData.A_SOFT, r10.Between(3, Fit(5) ? 5 : 3), WM_NEAR, planHX, planHZ, 0, ref r10)) Keep(first, false);
             }
         }
-        if (Ph(7))
+        if (Ph(33))
         {
             GenRng r11 = SR(11);
             if (nGate > 0 && r11.Chance(400) && Fit(1)) Signpost(gateCell[0], ref r11);
             // fill up to the area's budget: more undergrowth at the fence, rocks and stumps on open ground (G29)
         }
-        if (Ph(8))
+        if (Ph(34))
         {
             GenRng r12 = SR(12);
-            for (int k = 0; k < 10 && Fit(1); k++)
-            {
-                int first = nEmit;
-                int roll = r12.Range(10);
-                bool ok;
-                if (roll < 4) ok = WallPlace(Pick(ref r12, "n_bushLarge", 5, "n_bush", 4, "n_bushDetailed", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r12) >= 0;
-                else if (roll < 7 && Fit(2)) ok = GroupAt(GenData.FindGrp("rocks"), GenData.A_SOFT, r12.Between(2, 3), WM_ANY, 0, 0, 0, ref r12);
-                else
-                {
-                    int cell = SoftSpot(ref r12);
-                    ok = cell >= 0 && FreePlace(Pick(ref r12, "n_stump", 5, "n_stumpRound", 4, "n_bush", 3), cell, r12.Range(360), 0, 0, H_NATURE) >= 0;
-                }
-                if (ok) Keep(first, false);
-            }
-            // grass tufts in patches under the stands (ground cover, not props)
+            hq_PlanForest_r12 = r12;
         }
-        if (Ph(9))
+        if (PhLoop(35, 100000))
+        {
+            if (!PhSubActive())
+            {
+                int k = planIter;
+                if (!(k < 10 && Fit(1))) PhBreak();
+                else { hq_PlanForest_k = k; PhSubBegin(); }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); PlanForest_L3(); bool fin = PhAdvance(); PhPop();
+                if (fin) PhSubEnd(); else PhStay();
+                if (phBreak) { phBreak = false; PhBreak(); }
+                if (phReturn) { phReturn = false; PhEnd(); return; }
+            }
+        }
+        if (Ph(36))
         {
             GenRng r13 = SR(13);
             int type = roomType[room];
@@ -1629,6 +2286,129 @@ public partial class MapGen
             }
         }
     }
+    void PlanForest_L1()
+    {
+        bool camp = hq_PlanForest_camp;
+        int room = pRoom, area = AreaM2(room);
+        if (Ph(0))
+        {
+            GenRng rt = hq_PlanForest_rt;
+            int main0 = hq_PlanForest_main0;
+            int left = hq_PlanForest_left;
+            int s = hq_PlanForest_s;
+            // the candidate farthest from the stands so far, with room for crowns
+            int best = -1, bestD = -1;
+            for (int k = 0; k < 14; k++)
+            {
+                int i = roomCells[roomCellStart[room] + rt.Range(roomCellCount[room])];
+                if ((tags[i] & (GenData.T_PATH | GenData.T_GLADE | GenData.T_NO_SPAWN)) != 0 || occ[i] != 0) continue;
+                int x = i % IW * GenData.INNER_MM + 250, z = i / IW * GenData.INNER_MM + 250;
+                int dmin = 1 << 28;
+                for (int q = 0; q < standN; q++) { int dd = Abs(standX[q] - x) + Abs(standZ[q] - z); if (dd < dmin) dmin = dd; }
+                int hx, hz;
+                FullHalf(main0, 0, out hx, out hz);
+                if (!WallsClear(x - hx, z - hz, x + hx, z + hz, true)) dmin /= 8;   // too near an edge for a crown
+                if (dmin > bestD) { bestD = dmin; best = i; }
+            }
+            if (best < 0) { hq_PlanForest_rt = rt; hq_PlanForest_main0 = main0; hq_PlanForest_left = left; phBreak = true; PhEnd(); return; }
+            int sx = best % IW * GenData.INNER_MM + 250, sz = best / IW * GenData.INNER_MM + 250;
+            int kind = s == 0 ? main0 : (rt.Chance(190) ? Dn("n_treePineRound") : Pick(ref rt, "n_treeDefault", 6, "n_treePineTall", 6, "n_treeOak", 5));
+            int accent = rt.Chance(400) ? Pick(ref rt, "n_treePineRound", 4, "n_treeOak", 4, "n_treeDefault", 4) : -1;
+            int want = left < 3 ? left : rt.Between(3, left < 5 ? left : 5);
+            hq_PlanForest_rt = rt;
+            hq_PlanForest_main0 = main0;
+            hq_PlanForest_left = left;
+            hq_PlanForest_sx = sx;
+            hq_PlanForest_sz = sz;
+            hq_PlanForest_kind = kind;
+            hq_PlanForest_accent = accent;
+            hq_PlanForest_want = want;
+        }
+        if (Ph(1))
+        {
+            GenRng rt = hq_PlanForest_rt;
+            int left = hq_PlanForest_left;
+            int sx = hq_PlanForest_sx;
+            int sz = hq_PlanForest_sz;
+            int kind = hq_PlanForest_kind;
+            int accent = hq_PlanForest_accent;
+            int want = hq_PlanForest_want;
+            int got = Stand(sx, sz, want, kind, accent, ref rt);
+            left -= got;
+            if (got > 0 && standN < standX.Length) { standX[standN] = sx; standZ[standN] = sz; standN++; }
+            hq_PlanForest_rt = rt;
+            hq_PlanForest_left = left;
+            hq_PlanForest_sx = sx;
+            hq_PlanForest_sz = sz;
+            hq_PlanForest_kind = kind;
+            hq_PlanForest_accent = accent;
+            hq_PlanForest_want = want;
+        }
+    }
+
+    void PlanForest_L2()
+    {
+        bool camp = hq_PlanForest_camp;
+        int room = pRoom, area = AreaM2(room);
+        if (Ph(0))
+        {
+            GenRng r6 = hq_PlanForest_r6;
+            int first = nEmit;
+            bool ok = false;
+            if (standN > 0 && r6.Chance(600))
+            {
+                int s = r6.Range(standN), a = r6.Range(360), rad = 1500 + r6.Range(1200);
+                int px = standX[s] + rad * sinTab[a] / 4096, pz = standZ[s] + rad * sinTab[(a + 90) % 360] / 4096;
+                int ix = FloorDiv(px, GenData.INNER_MM), iz = FloorDiv(pz, GenData.INNER_MM);
+                if (ix >= 0 && iz >= 0 && ix < IW && iz < IH && innerRoom[iz * IW + ix] == room && (tags[iz * IW + ix] & GenData.T_GLADE) == 0)
+                    ok = StampAt(Pick(ref r6, "n_bush", 5, "n_bushDetailed", 4), room, px, pz, r6.Range(360), 0, -1, H_NATURE, false) >= 0;
+            }
+            if (!ok) ok = WallPlace(Pick(ref r6, "n_bushLarge", 5, "n_bush", 4), WM_ANY, 0, 0, WIN_ANY, 0, ref r6) >= 0;
+            hq_PlanForest_r6 = r6;
+            hq_PlanForest_first = first;
+            hq_PlanForest_ok = ok;
+        }
+        if (Ph(1))
+        {
+            int first = hq_PlanForest_first;
+            bool ok = hq_PlanForest_ok;
+            if (ok) Keep(first, false);
+            hq_PlanForest_first = first;
+            hq_PlanForest_ok = ok;
+        }
+    }
+
+    void PlanForest_L3()
+    {
+        bool camp = hq_PlanForest_camp;
+        int room = pRoom, area = AreaM2(room);
+        if (Ph(0))
+        {
+            GenRng r12 = hq_PlanForest_r12;
+            int first = nEmit;
+            int roll = r12.Range(10);
+            bool ok = false;
+            if (roll < 4) ok = WallPlace(Pick(ref r12, "n_bushLarge", 5, "n_bush", 4, "n_bushDetailed", 3), WM_ANY, 0, 0, WIN_ANY, 0, ref r12) >= 0;
+            else if (roll < 7 && Fit(2)) ok = GroupAt(GenData.FindGrp("rocks"), GenData.A_SOFT, r12.Between(2, 3), WM_ANY, 0, 0, 0, ref r12);
+            else
+            {
+                int cell = SoftSpot(ref r12);
+                ok = cell >= 0 && FreePlace(Pick(ref r12, "n_stump", 5, "n_stumpRound", 4, "n_bush", 3), cell, r12.Range(360), 0, 0, H_NATURE) >= 0;
+            }
+            hq_PlanForest_r12 = r12;
+            hq_PlanForest_first = first;
+            hq_PlanForest_ok = ok;
+        }
+        if (Ph(1))
+        {
+            int first = hq_PlanForest_first;
+            bool ok = hq_PlanForest_ok;
+            if (ok) Keep(first, false);
+            hq_PlanForest_first = first;
+            hq_PlanForest_ok = ok;
+        }
+    }
+
 
     // a free cell of forest floor off the path and out of the clearing, with a little room around it
     int SoftSpot(ref GenRng rng) { return SoftSpot(2, ref rng); }
@@ -1678,35 +2458,193 @@ public partial class MapGen
     // a fallen log with a stump beside it and mushrooms at the stump (report 15, F-log and fungi, F-felled spot)
     void DeadWood(ref GenRng rng)
     {
-        int cell = SoftSpot(ref rng);
-        if (cell < 0) return;
-        int first = nEmit;
-        int logDef = Pick(ref rng, "n_log", 5, "n_logLarge", 3, "s_treeLog", 3);
-        int log = FreePlace(logDef, cell, rng.Range(360), 0, 0, H_NATURE);
-        if (log < 0 || !Keep(first, false)) return;
-        int stump = -1;
-        if (Fit(1))
+        hq_DeadWood_rng = rng;
+        PhSubReset();
+        bool fin = false;
+        while (!fin) { PhPush(); DeadWood_Body(); fin = PhAdvance(); PhPop(); }
+        rng = hq_DeadWood_rng;
+    }
+
+    // DeadWood in phases, a step a call (autophase4); DeadWood() above runs them to the end
+    void DeadWood_Body()
+    {
+        if (Ph(0))
         {
-            first = nEmit;
-            int sd = Pick(ref rng, "n_stump", 6, "n_stumpRound", 4);
-            int side = rng.Chance(500) ? 1 : -1;
-            stump = Rel(sd, log, side * (Sx(logDef) / 2 + 350 + Sx(sd) / 2), rng.Between(-400, 400), rng.Range(360), 0);
-            if (stump < 0) stump = Rel(sd, log, -side * (Sx(logDef) / 2 + 350 + Sx(sd) / 2), 0, rng.Range(360), 0);
-            if (stump >= 0 && !Keep(first, false)) stump = -1;
+            GenRng rng = hq_DeadWood_rng;
+            int cell = SoftSpot(ref rng);
+            if (cell < 0) { hq_DeadWood_rng = rng; hq_DeadWood_cell = cell; PhEnd(); return; }
+            int first = nEmit;
+            hq_DeadWood_rng = rng;
+            hq_DeadWood_cell = cell;
+            hq_DeadWood_first = first;
         }
-        if (Fit(2))
+        if (Ph(1))
         {
-            first = nEmit;
-            if (GroupBeside(GenData.FindGrp("mushrooms"), stump >= 0 ? stump : log, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
+            GenRng rng = hq_DeadWood_rng;
+            int cell = hq_DeadWood_cell;
+            int logDef = Pick(ref rng, "n_log", 5, "n_logLarge", 3, "s_treeLog", 3);
+            int log = FreePlace(logDef, cell, rng.Range(360), 0, 0, H_NATURE);
+            hq_DeadWood_rng = rng;
+            hq_DeadWood_cell = cell;
+            hq_DeadWood_logDef = logDef;
+            hq_DeadWood_log = log;
+        }
+        if (Ph(2))
+        {
+            int first = hq_DeadWood_first;
+            int log = hq_DeadWood_log;
+            if (log < 0 || !Keep(first, false)) { hq_DeadWood_first = first; hq_DeadWood_log = log; PhEnd(); return; }
+            int stump = -1;
+            hq_DeadWood_sel1 = 0;
+            if (Fit(1)) hq_DeadWood_sel1 = 1;
+            hq_DeadWood_first = first;
+            hq_DeadWood_log = log;
+            hq_DeadWood_stump = stump;
+        }
+        if (Ph(3))
+        {
+            if (hq_DeadWood_sel1 == 1)
+            {
+                GenRng rng = hq_DeadWood_rng;
+                int first = hq_DeadWood_first;
+                int logDef = hq_DeadWood_logDef;
+                int log = hq_DeadWood_log;
+                int stump = hq_DeadWood_stump;
+                first = nEmit;
+                int sd = Pick(ref rng, "n_stump", 6, "n_stumpRound", 4);
+                int side = rng.Chance(500) ? 1 : -1;
+                stump = Rel(sd, log, side * (Sx(logDef) / 2 + 350 + Sx(sd) / 2), rng.Between(-400, 400), rng.Range(360), 0);
+                if (stump < 0) stump = Rel(sd, log, -side * (Sx(logDef) / 2 + 350 + Sx(sd) / 2), 0, rng.Range(360), 0);
+                hq_DeadWood_rng = rng;
+                hq_DeadWood_first = first;
+                hq_DeadWood_logDef = logDef;
+                hq_DeadWood_log = log;
+                hq_DeadWood_stump = stump;
+            }
+        }
+        if (Ph(4))
+        {
+            if (hq_DeadWood_sel1 == 1)
+            {
+                int first = hq_DeadWood_first;
+                int stump = hq_DeadWood_stump;
+                if (stump >= 0 && !Keep(first, false)) stump = -1;
+                hq_DeadWood_first = first;
+                hq_DeadWood_stump = stump;
+            }
+        }
+        if (Ph(5))
+        {
+            GenRng rng = hq_DeadWood_rng;
+            int first = hq_DeadWood_first;
+            int log = hq_DeadWood_log;
+            int stump = hq_DeadWood_stump;
+            if (Fit(2))
+            {
+                first = nEmit;
+                if (GroupBeside(GenData.FindGrp("mushrooms"), stump >= 0 ? stump : log, rng.Between(2, 3), 0, ref rng)) Keep(first, false);
+            }
+            hq_DeadWood_rng = rng;
+            hq_DeadWood_first = first;
+            hq_DeadWood_log = log;
+            hq_DeadWood_stump = stump;
         }
     }
 
-    // locals of the split plans, kept from one phase to the next (autophase3)
+    // locals of the split plans and helpers, kept from one phase to the next (autophase4)
+    int hq_AroundFire_a;
+    int hq_AroundFire_a0;
+    int hq_AroundFire_def;
+    int hq_AroundFire_dist;
+    int hq_AroundFire_dist0;
+    int hq_AroundFire_distMax;
+    int hq_AroundFire_distMin;
+    int hq_AroundFire_e;
+    int hq_AroundFire_fire;
+    int hq_AroundFire_first;
+    int hq_AroundFire_flags;
+    int hq_AroundFire_fx;
+    int hq_AroundFire_fz;
+    int hq_AroundFire_k;
+    bool hq_AroundFire_must;
+    bool hq_AroundFire_offGates;
+    int hq_AroundFire_relYaw;
+    int hq_AroundFire_ret;
+    GenRng hq_AroundFire_rng;
+    int hq_AroundFire_room;
+    int hq_BenchAtEdge_bench;
+    int hq_BenchAtEdge_first;
+    int hq_BenchAtEdge_k;
+    int hq_BenchAtEdge_pot;
+    GenRng hq_BenchAtEdge_r;
+    int hq_DeadWood_cell;
+    int hq_DeadWood_first;
+    int hq_DeadWood_log;
+    int hq_DeadWood_logDef;
+    GenRng hq_DeadWood_rng;
+    int hq_DeadWood_sel1;
+    int hq_DeadWood_stump;
+    int hq_FireRing_fire;
+    int hq_FireRing_minClr;
+    int hq_FireRing_ret;
+    GenRng hq_FireRing_rng;
+    int hq_FireRing_room;
+    bool hq_FireRing_soft;
+    int hq_FireRing_tx;
+    int hq_FireRing_tz;
+    int hq_Island_bush;
+    int hq_Island_cell;
+    int hq_Island_first;
+    bool hq_Island_ret;
+    GenRng hq_Island_rng;
+    int hq_LawnTree_cell;
+    int hq_LawnTree_k;
+    GenRng hq_LawnTree_r;
+    int hq_LawnTree_ret;
+    int hq_LawnTree_tree;
     int hq_PlanFirepit_fire;
     GenRng hq_PlanFirepit_r;
     GenRng hq_PlanFirepit_r2;
     GenRng hq_PlanFirepit_r3;
     int hq_PlanFirepit_trees;
+    int hq_PlanForest_accent;
+    int hq_PlanForest_b;
+    int hq_PlanForest_bushes;
+    bool hq_PlanForest_camp;
+    int hq_PlanForest_cell;
+    int hq_PlanForest_clumps;
+    int hq_PlanForest_fire;
+    int hq_PlanForest_first;
+    int hq_PlanForest_hub;
+    int hq_PlanForest_hubX;
+    int hq_PlanForest_hubZ;
+    int hq_PlanForest_k;
+    int hq_PlanForest_kind;
+    int hq_PlanForest_left;
+    int hq_PlanForest_main0;
+    bool hq_PlanForest_ok;
+    GenRng hq_PlanForest_r;
+    GenRng hq_PlanForest_r12;
+    GenRng hq_PlanForest_r2;
+    GenRng hq_PlanForest_r3;
+    GenRng hq_PlanForest_r4;
+    GenRng hq_PlanForest_r6;
+    GenRng hq_PlanForest_r8;
+    GenRng hq_PlanForest_r9;
+    GenRng hq_PlanForest_rgear;
+    int hq_PlanForest_rock;
+    GenRng hq_PlanForest_rt;
+    int hq_PlanForest_s;
+    int hq_PlanForest_sel1;
+    int hq_PlanForest_sel2;
+    int hq_PlanForest_sel3;
+    int hq_PlanForest_sel4;
+    int hq_PlanForest_stands;
+    int hq_PlanForest_sx;
+    int hq_PlanForest_sz;
+    int hq_PlanForest_tent;
+    int hq_PlanForest_tentDef;
+    int hq_PlanForest_want;
     int hq_PlanGarden_cell;
     int hq_PlanGarden_first;
     bool hq_PlanGarden_ok;
@@ -1723,14 +2661,9 @@ public partial class MapGen
     int hq_PlanGarden_trees;
     GenRng hq_PlanLawn_r3;
     int hq_PlanPatio_first;
-    int hq_PlanPatio_k;
     int hq_PlanPatio_midX;
     int hq_PlanPatio_midZ;
     bool hq_PlanPatio_ok;
-    int hq_PlanPatio_px0;
-    int hq_PlanPatio_px1;
-    int hq_PlanPatio_pz0;
-    int hq_PlanPatio_pz1;
     GenRng hq_PlanPatio_r;
     GenRng hq_PlanPatio_r2;
     GenRng hq_PlanPatio_r4;
@@ -1746,4 +2679,21 @@ public partial class MapGen
     GenRng hq_PlanYard_r;
     GenRng hq_PlanYard_r9;
     string[] hq_PlanYard_rows;
+    bool hq_VegPlot_alongX;
+    int hq_VegPlot_c0;
+    int hq_VegPlot_cell;
+    string[] hq_VegPlot_crops;
+    int hq_VegPlot_e;
+    int hq_VegPlot_first;
+    int hq_VegPlot_mx;
+    int hq_VegPlot_mz;
+    GenRng hq_VegPlot_rng;
+    int hq_VegPlot_room;
+    int hq_VegPlot_row;
+    bool hq_WoodPile_atEdge;
+    int hq_WoodPile_fire;
+    int hq_WoodPile_first;
+    GenRng hq_WoodPile_rng;
+    int hq_WoodPile_stack;
+    int hq_WoodPile_stackDef;
 }
