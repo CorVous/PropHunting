@@ -380,6 +380,49 @@ public class PHGame : UdonSharpBehaviour
         for (int i = k - 1; i > 0; i--) { int j = Random.Range(0, i + 1); int t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
         int hunters = (k == 1 && soloHides) ? 0 : Hunters(k);
         for (int i = 0; i < k; i++) slotRole[idx[i]] = i < hunters ? ROLE_HUNTER : ROLE_HIDER;
+        debugRound = false; debugQuick = false;
+        BeginRound();
+    }
+
+    // ------------------------------------------------------------------ debug rounds (the lobby's DEBUG plaque)
+    // SPAWN AS HUNTER / SPAWN AS HIDER: the host starts a round at once in that role, wherever they stand and
+    // however few players there are. Anyone else standing in the zone plays the other side. Such a round does not
+    // end when a side runs out (a lone hunter can walk the map), only on the clock or with END ROUND; a lone
+    // hunter's wait while the hiders hide is cut to a few seconds; the map's run is not counted.
+    [UdonSynced] public bool debugRound;
+    bool debugQuick;
+
+    public void DebugHunter() { DebugStart(ROLE_HUNTER); }
+    public void DebugHider() { DebugStart(ROLE_HIDER); }
+
+    void DebugStart(int role)
+    {
+        if (!IsHost || phase != PH_LOBBY) return;
+        AssignSlots();
+        int me = SlotOf(Networking.LocalPlayer.playerId);
+        if (me < 0) return;
+        int others = 0;
+        for (int i = 0; i < slots.Length; i++)
+        {
+            slotRole[i] = ROLE_NONE;
+            if (slotPlayer[i] == 0) continue;
+            if (i == me) slotRole[i] = role;
+            else if (slots[i].inZone) { slotRole[i] = role == ROLE_HUNTER ? ROLE_HIDER : ROLE_HUNTER; others++; }
+        }
+        debugRound = true; debugQuick = role == ROLE_HUNTER && others == 0;
+        BeginRound();
+    }
+
+    // END ROUND: the host ends a round at once, from anywhere (a debug aid; nobody wins)
+    public void DebugEnd()
+    {
+        if (!IsHost || phase == PH_LOBBY) return;
+        BackToLobby();
+    }
+
+    // the map and the round's start, the roles being set
+    void BeginRound()
+    {
         mapSize = RoundSize();
         mapDensity = densityChoice;
         // the next map of this size's rotation, or a shared seed as a one-off (D8)
@@ -494,7 +537,7 @@ public class PHGame : UdonSharpBehaviour
                 if (AllReady() || Left <= 0f) SetPhase(PH_BRIEF, BRIEF);
                 break;
             case PH_BRIEF:
-                if (Left <= 0f) SetPhase(PH_HIDE, hidePhase[mapSize]);
+                if (Left <= 0f) SetPhase(PH_HIDE, debugQuick ? 3f : hidePhase[mapSize]);
                 break;
             case PH_HIDE:
                 if (Left <= 0f) SetPhase(PH_HUNT, HuntLength);
@@ -507,7 +550,8 @@ public class PHGame : UdonSharpBehaviour
                     if (slotRole[i] == ROLE_HIDER && !slots[i].caught) hiders++;
                     if (slotRole[i] == ROLE_HUNTER && !slots[i].hunterOut) hunters++;
                 }
-                if (hiders == 0) End(false, "Every hider was caught");
+                if (debugRound) { if (Left <= 0f) End(hiders > 0, "Debug round: time's up"); }
+                else if (hiders == 0) End(false, "Every hider was caught");
                 else if (hunters == 0) End(true, "Every hunter is out");
                 else if (Left <= 0f) End(true, "Time's up: a hider was still uncaught");
                 break;
@@ -528,7 +572,7 @@ public class PHGame : UdonSharpBehaviour
     {
         hidersWin = hiders; endReason = why;
         // the run counts; a map at its cap retires and a new one takes its slot (D6)
-        if (lastRot >= 0)
+        if (lastRot >= 0 && !debugRound)
         {
             rotRuns[lastRot]++;
             if (rotRuns[lastRot] >= runCap) NewMap(lastRot);

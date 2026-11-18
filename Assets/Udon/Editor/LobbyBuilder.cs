@@ -295,10 +295,14 @@ public static class LobbyBuilder
     // Debug: a small sign beside the panel that builds a fresh random map for the presser and takes them there (PHExplore)
     public static PHExplore BuildExplore(Transform lobby, PHGame game, Vector3 localPos)
     {
-        var cv = Canvas(lobby, "ExploreDebug", localPos, Quaternion.identity, new Vector2(300f, 130f), 0.006f, true);
+        // the DEBUG plaque: explore a map outside a round; start a round at once as a hunter or as a hider; end the round
+        var cv = Canvas(lobby, "ExploreDebug", localPos, Quaternion.identity, new Vector2(300f, 346f), 0.006f, true);
         var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
-        Txt(cv, "Label", new Vector2(0, 42), new Vector2(280, 24), "DEBUG", future, 14, C("e1cfa5"), TextAlignmentOptions.Center);
-        var bimg = Img(cv, "Button", new Vector2(0, -12), new Vector2(270, 64), sRound, new Color(1f, 1f, 1f, 0.01f), 3f);
+        Txt(cv, "Label", new Vector2(0, 150), new Vector2(280, 24), "DEBUG", future, 14, C("e1cfa5"), TextAlignmentOptions.Center);
+        DebugButton(cv, game, "SPAWN AS HUNTER", nameof(PHGame.DebugHunter), new Vector2(0, 24), C("e98a6b"));
+        DebugButton(cv, game, "SPAWN AS HIDER", nameof(PHGame.DebugHider), new Vector2(0, -48), C("8fc7e8"));
+        DebugButton(cv, game, "END ROUND", nameof(PHGame.DebugEnd), new Vector2(0, -120), C("d9d2bd"));
+        var bimg = Img(cv, "Button", new Vector2(0, 96), new Vector2(270, 64), sRound, new Color(1f, 1f, 1f, 0.01f), 3f);
         bimg.raycastTarget = true;
         var bt = bimg.gameObject.AddComponent<Button>();
         var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = bimg;
@@ -313,6 +317,22 @@ public static class LobbyBuilder
         var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(ex);
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, udon.SendCustomEvent, nameof(PHExplore.Press));
         return ex;
+    }
+
+    // a button of the DEBUG plaque that calls one of PHGame's methods (PHButton): host only, as the game checks
+    static void DebugButton(Transform cv, PHGame game, string label, string action, Vector2 at, Color colour)
+    {
+        var bimg = Img(cv, "Button " + label, at, new Vector2(270, 64), sRound, new Color(1f, 1f, 1f, 0.01f), 3f);
+        bimg.raycastTarget = true;
+        var bt = bimg.gameObject.AddComponent<Button>();
+        var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = bimg;
+        Img(bimg.transform, "Face", Vector2.zero, new Vector2(270, 64), sTile, colour, 2f);
+        Txt(bimg.transform, "Text", new Vector2(0, 3), new Vector2(256, 40), label, future, 16, C("1e190f"), TextAlignmentOptions.Center);
+        var btn = bimg.gameObject.AddUdonSharpComponent<PHButton>();
+        btn.game = game; btn.action = action;
+        UdonSharpEditorUtility.CopyProxyToUdon(btn);
+        var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, udon.SendCustomEvent, nameof(PHButton.Press));
     }
 
     static AudioClip Clip(string n) { return AssetDatabase.LoadAssetAtPath<AudioClip>(Root + "Audio/" + n + ".ogg"); }
