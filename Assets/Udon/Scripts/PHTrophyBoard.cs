@@ -4,8 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // The Trophies board on the spawn wall (Cor, 2026-11-19): hunter trophies on the left, hider trophies on the
-// right, 40 each, every card with its name, its goal written out, a rough range of rounds to earn it and, for the
-// ones that count up, a bar. Each player sees their own: each half is sorted closest-to-done first, the earned ones
+// right, 40 each, every card with its name, its goal written out and, for the ones that count up, a
+// bar (no rounds estimate: Cor). Each player sees their own: each half is sorted closest-to-done first, the earned ones
 // at the end. The cards are built by the scene builder; this only moves and colours them.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHTrophyBoard : UdonSharpBehaviour
@@ -14,7 +14,7 @@ public class PHTrophyBoard : UdonSharpBehaviour
     public RectTransform[] card;         // 44, by trophy number
     public Image[] cardBg;
     public RawImage[] medal;
-    public GameObject[] tick, bar, rounds;
+    public GameObject[] tick, bar;
     public RectTransform[] barFill;
     public TextMeshProUGUI[] progText;
     public TextMeshProUGUI countHunter, countHider;
@@ -27,19 +27,7 @@ public class PHTrophyBoard : UdonSharpBehaviour
     float[] key;
     int[] rank;
 
-    void Start() { Refresh(); if (store != null && store.game != null && store.game.text != null) store.game.text.Register(this); }
-
-    // the "N-M rounds" line of each card in the player's language (PHText; the rest of the board is baked labels)
-    public void _OnTextLanguage()
-    {
-        PHText tx = store.game.text;
-        for (int t = 0; t < rounds.Length && t < store.tLo.Length; t++)
-        {
-            if (rounds[t] == null) continue;
-            TextMeshProUGUI r = rounds[t].GetComponent<TextMeshProUGUI>();
-            if (r != null) r.text = tx.F2("store.rounds", store.tLo[t].ToString(), store.tHi[t].ToString());
-        }
-    }
+    void Start() { Refresh(); }
 
     public void Refresh()
     {
@@ -60,7 +48,6 @@ public class PHTrophyBoard : UdonSharpBehaviour
             cardBg[t].color = got ? (goofyCard ? goofy : cool) : plain;
             medal[t].color = got ? Color.white : medalOff;
             tick[t].SetActive(got);
-            rounds[t].SetActive(!got);
             bool counted = !got && target > 0;
             bar[t].SetActive(counted);
             if (counted)

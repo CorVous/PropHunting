@@ -112,7 +112,7 @@ public static partial class LobbyBuilder
         store.shelfMelee = melee; store.shelfGun = guns;
         BuildOpeningTrim(root, roomW);
         store.dialog = BuildStoreDialog(root, store, text);
-        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 2.75f, -5.2f));   // west wall, left of the score pad (Cor)
+        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 2.75f, 0f));   // the middle of the west wall (the score pad went north: Cor)
         UdonSharpEditorUtility.CopyProxyToUdon(store);
         int conv = 0; foreach (var w in cat) if (meshByName.ContainsKey(w.id.Replace(':', '_'))) conv++;
         Debug.Log("[store] " + n + " weapons (" + conv + " with models), " + T + " trophies; picks numbered " + (gameMelee != null ? "from PHWeapons" : "later (no PHWeapons in the scene)"));
@@ -189,16 +189,14 @@ public static partial class LobbyBuilder
             shelf.itemPos[i] = new Vector3(-centre.x * s, -mn.y * s + 0.01f, -centre.z * s);
         }
 
-        // no cabinet (Cor): the shelves rise out of a black hole in the floor and go into one at the ceiling, two thin
-        // dark rods at the ends
+        // no cabinet (Cor): the shelves rise out of a black hole in the floor and go into one at the ceiling, nothing
+        // at their ends (Cor: no posts)
         Material wood = Mat("StoreWood", C("b07848")), woodDark = Mat("StoreWoodDark", C("7d5232")), back = Mat("StoreBack", C("efe2c2"));
         Material cream = Mat("LobbyCream", C("f3e7c9")), felt = Mat("StoreFelt", C("173d2c")), red = Mat("StoreRed", C("d8473a"));
         Material yellow = Mat("StoreYellow", C("f2c45a")), coral = Mat("StoreCoral", C("f19a8a")), gold = Mat("StoreGold", C("e2b13c"));
         float halfW = Cols * SlotW / 2f;
         var voidMat = Mat("StoreVoid", C("030303"));
         Slab(t, "FloorHole", new Vector3(0f, 0.006f, Depth / 2f + 0.02f), new Vector3(2 * halfW + 0.16f, 0.012f, Depth + 0.14f), voidMat);
-        Slab(t, "RodL", new Vector3(halfW + 0.04f, Ceiling / 2f, Depth - 0.05f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
-        Slab(t, "RodR", new Vector3(-halfW - 0.04f, Ceiling / 2f, Depth - 0.05f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
 
         // the shelf rows (one more than show, out of sight) with ten places each
         var mat = ShelfMat();
@@ -208,7 +206,7 @@ public static partial class LobbyBuilder
         int slots = roots * Cols;
         shelf.items = new Transform[slots]; shelf.itemMf = new MeshFilter[slots]; shelf.itemMr = new MeshRenderer[slots];
         shelf.tagShop = new GameObject[slots]; shelf.tagCool = new GameObject[slots]; shelf.tagGoofy = new GameObject[slots];
-        shelf.sel = new GameObject[slots]; shelf.price = new TextMeshPro[slots];
+        shelf.price = new TextMeshPro[slots];
         for (int r = 0; r < roots; r++)
         {
             var row = new GameObject("Row" + r).transform;
@@ -243,22 +241,18 @@ public static partial class LobbyBuilder
                 shelf.itemMr[k].sharedMaterial = mat;
                 shelf.itemMr[k].shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
-                // the tags on the shelf's lip: a price (shop), a star (trophy: gold cool, coral goofy), the red
-                // strip under the weapon being carried
+                // the tags on the shelf's lip: a price with the lobby's own coin (shop), a star (trophy: gold cool,
+                // coral goofy). The weapon being carried glows (PHShelf, the shader's _Glow).
                 float lipZ = Depth / 2f + 0.005f;
                 var shop = new GameObject("PriceTag").transform; shop.SetParent(place, false);
                 Slab(shop, "Tag", new Vector3(0f, -0.03f, lipZ), new Vector3(0.22f, 0.075f, 0.012f), felt);
-                Disc(shop, "Coin", new Vector3(-0.075f, -0.03f, lipZ + 0.008f), 0.05f, gold);
-                shop.GetChild(1).localRotation = Quaternion.Euler(90f, 0f, 0f);
+                MapCoin(shop, new Vector3(-0.075f, -0.03f, lipZ + 0.012f), 0.06f, true);
                 var pt = WorldText(shop, "Price", new Vector3(0.025f, -0.03f, lipZ + 0.008f), Quaternion.Euler(0f, 180f, 0f), "200", 0.6f, C("f6d773"), new Vector2(0.16f, 0.07f));
                 pt.font = future;
                 shelf.tagShop[k] = shop.gameObject; shelf.price[k] = pt;
                 shelf.tagCool[k] = StarTag(place, "CoolTag", lipZ, yellow);
                 shelf.tagGoofy[k] = StarTag(place, "GoofyTag", lipZ, coral);
-                var selGo = new GameObject("Carried").transform; selGo.SetParent(place, false);
-                Slab(selGo, "Strip", new Vector3(0f, -0.068f, lipZ + 0.004f), new Vector3(SlotW - 0.06f, 0.03f, 0.012f), red);
-                shelf.sel[k] = selGo.gameObject;
-                shop.gameObject.SetActive(false); shelf.tagCool[k].SetActive(false); shelf.tagGoofy[k].SetActive(false); selGo.gameObject.SetActive(false);
+                shop.gameObject.SetActive(false); shelf.tagCool[k].SetActive(false); shelf.tagGoofy[k].SetActive(false);
             }
         }
 
@@ -274,7 +268,7 @@ public static partial class LobbyBuilder
         Oval(tilt, "Plate", Vector3.zero, new Vector3(1.0f, 0.04f, 0.52f), felt);
         RoundButton(tilt, shelf, "Up", new Vector3(0.21f, 0.025f, -0.06f), true);
         RoundButton(tilt, shelf, "Down", new Vector3(-0.21f, 0.025f, -0.06f), false);
-        Disc(tilt, "Coin", new Vector3(0.15f, 0.023f, 0.16f), 0.09f, gold);
+        MapCoin(tilt, new Vector3(0.15f, 0.035f, 0.16f), 0.1f, false);
         var coins = WorldText(tilt, "Coins", new Vector3(-0.15f, 0.025f, 0.16f), Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, 180f, 0f), "0", 1.1f, C("f6d773"), new Vector2(0.32f, 0.12f));
         coins.font = future; coins.alignment = TextAlignmentOptions.Left;
         shelf.cartCoins = coins;
@@ -283,13 +277,75 @@ public static partial class LobbyBuilder
         return shelf;
     }
 
+    // a trophy weapon's tag as in the mock-up: a little yellow (coral: goofy) tag with a dark five-pointed star on it,
+    // a real raised star (Cor), not a text asterisk
     static GameObject StarTag(Transform place, string name, float lipZ, Material m)
     {
         var tag = new GameObject(name).transform; tag.SetParent(place, false);
         Slab(tag, "Tag", new Vector3(0f, -0.03f, lipZ), new Vector3(0.09f, 0.075f, 0.012f), m);
-        var s = WorldText(tag, "Star", new Vector3(0f, -0.04f, lipZ + 0.008f), Quaternion.Euler(0f, 180f, 0f), "*", 1.2f, C("1e190f"), new Vector2(0.08f, 0.08f));
-        s.font = future;
+        var star = new GameObject("Star");
+        star.transform.SetParent(tag, false);
+        star.transform.localPosition = new Vector3(0f, -0.031f, lipZ + 0.006f);
+        star.AddComponent<MeshFilter>().sharedMesh = StarMesh();
+        var r = star.AddComponent<MeshRenderer>(); r.sharedMaterial = Mat("StoreInk", C("1e190f"));
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         return tag.gameObject;
+    }
+
+    // a five-pointed star, 0.064 m across, raised 6 mm towards +z (its back at z = 0)
+    static Mesh StarMesh()
+    {
+        const string path = "Assets/Udon/Generated/StoreStar.asset";
+        var m = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        bool fresh = m == null;
+        if (fresh) m = new Mesh { name = "StoreStar" };
+        const float R = 0.032f, r = 0.013f, D = 0.006f;
+        var ring = new Vector3[10];
+        for (int i = 0; i < 10; i++)
+        {
+            float a = (90f + i * 36f) * Mathf.Deg2Rad, rr = (i & 1) == 0 ? R : r;
+            ring[i] = new Vector3(Mathf.Cos(a) * rr, Mathf.Sin(a) * rr, 0f);
+        }
+        var v = new List<Vector3>(); var n = new List<Vector3>(); var tri = new List<int>();
+        // the face, a fan from the middle (facing +z)
+        v.Add(new Vector3(0f, 0f, D)); n.Add(Vector3.forward);
+        for (int i = 0; i < 10; i++) { v.Add(ring[i] + new Vector3(0f, 0f, D)); n.Add(Vector3.forward); }
+        for (int i = 0; i < 10; i++) { tri.Add(0); tri.Add(1 + (i + 1) % 10); tri.Add(1 + i); }
+        // the sides
+        for (int i = 0; i < 10; i++)
+        {
+            Vector3 a = ring[i], b = ring[(i + 1) % 10];
+            Vector3 o = Vector3.Cross(b - a, Vector3.forward).normalized;
+            int s = v.Count;
+            v.Add(a); v.Add(b); v.Add(a + new Vector3(0f, 0f, D)); v.Add(b + new Vector3(0f, 0f, D));
+            n.Add(o); n.Add(o); n.Add(o); n.Add(o);
+            tri.Add(s); tri.Add(s + 2); tri.Add(s + 1); tri.Add(s + 1); tri.Add(s + 2); tri.Add(s + 3);
+        }
+        m.Clear(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(tri, 0); m.RecalculateBounds();
+        // the side winding is checked against the normals: flip any triangle that faces the wrong way
+        var tv = m.triangles;
+        for (int i = 0; i < tv.Length; i += 3)
+        {
+            Vector3 fn = Vector3.Cross(v[tv[i + 1]] - v[tv[i]], v[tv[i + 2]] - v[tv[i]]);
+            // (Unity's front side is the one this cross product points to)
+            if (Vector3.Dot(fn, n[tv[i]]) < 0f) { int x = tv[i + 1]; tv[i + 1] = tv[i + 2]; tv[i + 2] = x; }
+        }
+        m.triangles = tv;
+        if (fresh) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    // the lobby's own gold coin (KayKit Board Game Bits, the stacks by the north wall: Cor), `dia` across, centred on
+    // `at`: standing up facing +z (a tag on the shelf's lip) or lying flat
+    static GameObject MapCoin(Transform parent, Vector3 at, float dia, bool upright)
+    {
+        var go = Piece(parent, "board-game-bits/coin_10_gold", Vector3.zero, dia, 0f, false);
+        go.name = "Coin";
+        if (upright) go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        var b = Bounds(go);
+        go.transform.position += parent.TransformPoint(at) - b.center;
+        foreach (var r in go.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return go;
     }
 
     // a shelf board with rounded corners and a rounded front and back edge: w x d, h thick (bottom at y = 0), r the
@@ -378,7 +434,8 @@ public static partial class LobbyBuilder
         arrow.transform.localRotation = Quaternion.Euler(0f, up ? 180f : 0f, 0f);   // (the panel's -z is away from the player: up)
         arrow.transform.localScale = Vector3.one * 1.15f;
         arrow.AddComponent<MeshFilter>().sharedMesh = ArrowMesh();
-        arrow.AddComponent<MeshRenderer>().sharedMaterial = Mat("StoreInk", C("1e190f"));
+        var ar = arrow.AddComponent<MeshRenderer>(); ar.sharedMaterial = Mat("StoreInk", C("1e190f"));
+        ar.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         var btn = key.gameObject.AddUdonSharpComponent<PHButton>();
         btn.target = shelf; btn.action = action;
         UdonSharpEditorUtility.CopyProxyToUdon(btn);
@@ -448,7 +505,6 @@ public static partial class LobbyBuilder
         holder.SetParent(parent, false);
         var dlg = holder.gameObject.AddUdonSharpComponent<PHStoreDialog>();
         dlg.store = store;
-        dlg.roundsFormat = Get(text, "store.rounds");
         var cv = Canvas(holder, "Card", Vector3.zero, Quaternion.identity, new Vector2(380, 200), 0.0025f, true);
         dlg.root = cv.gameObject;
         Img(cv, "Shadow", new Vector2(0, -6), new Vector2(380, 200), sRound, C("0e2a1e"), 2f);
@@ -457,21 +513,17 @@ public static partial class LobbyBuilder
 
         var buy = Rect(cv, "Buy", Vector2.zero, new Vector2(380, 200)).gameObject;
         dlg.buyGroup = buy;
-        Img(buy.transform, "IconBack", new Vector2(-100, 0), new Vector2(150, 150), sRound, C("f3e7c9"), 2f);
-        var ri = Rect(buy.transform, "Icon", new Vector2(-100, 0), new Vector2(140, 140)).gameObject.AddComponent<RawImage>();
-        ri.texture = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Lobby/WeaponIcons.png"); ri.raycastTarget = false;
-        dlg.icon = ri;
-        var bb = StoreButton(buy.transform, dlg, "BuyPress", new Vector2(75, -20), new Vector2(170, 76), C("d8473a"), "", Color.white);
+        Txt(buy.transform, "Question", new Vector2(-24, 44), new Vector2(300, 44), Get(text, "store.confirm"), future, 28, C("f6d773"), TextAlignmentOptions.Center);
+        var bb = StoreButton(buy.transform, dlg, "BuyPress", new Vector2(0, -36), new Vector2(190, 76), C("d8473a"), "", Color.white);
         dlg.buyButton = bb;
-        var coinImg = Img(bb.transform, "Coin", new Vector2(-50, 2), new Vector2(34, 34), sRound, C("f2c45a"), 4f);
-        dlg.priceText = Txt(bb.transform, "Price", new Vector2(18, 3), new Vector2(100, 50), "200", future, 34, Color.white, TextAlignmentOptions.Center);
+        Img(bb.transform, "Coin", new Vector2(-56, 2), new Vector2(36, 36), sRound, C("f2c45a"), 4f);
+        dlg.priceText = Txt(bb.transform, "Price", new Vector2(16, 3), new Vector2(110, 50), "200", future, 34, Color.white, TextAlignmentOptions.Center);
 
         var tro = Rect(cv, "Trophy", Vector2.zero, new Vector2(380, 200)).gameObject;
         dlg.trophyGroup = tro;
         dlg.nameText = Txt(tro.transform, "Name", new Vector2(-20, 58), new Vector2(300, 36), "", future, 22, C("f6d773"), TextAlignmentOptions.Left);
         dlg.goalText = Txt(tro.transform, "Goal", new Vector2(-6, 0), new Vector2(330, 80), "", future, 18, Color.white, TextAlignmentOptions.TopLeft);
         dlg.goalText.enableWordWrapping = true;
-        dlg.roundsText = Txt(tro.transform, "Rounds", new Vector2(-6, -70), new Vector2(330, 30), "", future, 16, C("f2c45a"), TextAlignmentOptions.Left);
         buy.SetActive(false); tro.SetActive(false);
         UdonSharpEditorUtility.CopyProxyToUdon(dlg);
         return dlg;
@@ -526,10 +578,9 @@ public static partial class LobbyBuilder
 
         int T = PHStore.TROPHIES;
         board.card = new RectTransform[T]; board.cardBg = new Image[T]; board.medal = new RawImage[T];
-        board.tick = new GameObject[T]; board.bar = new GameObject[T]; board.rounds = new GameObject[T];
+        board.tick = new GameObject[T]; board.bar = new GameObject[T];
         board.barFill = new RectTransform[T]; board.progText = new TextMeshProUGUI[T];
         var icons = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Lobby/WeaponIcons.png");
-        string roundsFmt = Get(text, "store.rounds");
         for (int t = 0; t < T; t++)
         {
             int slot = t % PHStore.HUNTER_TROPHIES, h = t / PHStore.HUNTER_TROPHIES;
@@ -554,8 +605,6 @@ public static partial class LobbyBuilder
             board.barFill[t] = fill;
             board.progText[t] = Txt(bar.transform, "Count", new Vector2(92, 0), new Vector2(70, 18), "", future, 11, C("6b5d40"), TextAlignmentOptions.Left);
             board.bar[t] = bar;
-            string est = roundsFmt.Replace("{0}", store.tLo[t].ToString()).Replace("{1}", store.tHi[t].ToString());
-            board.rounds[t] = Txt(card, "Rounds", new Vector2(tx + tw / 2, -40), new Vector2(tw, 18), est, future, 11, C("21573f"), TextAlignmentOptions.Left).gameObject;
             var tick = Img(card, "Tick", new Vector2(CardW / 2 - 20, CardH / 2 - 20), new Vector2(26, 26), sRound, C("21573f"), 10f);
             Img(tick.transform, "A", new Vector2(-4, -2), new Vector2(9, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, -45f);
             Img(tick.transform, "B", new Vector2(2, 1), new Vector2(15, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, 50f);

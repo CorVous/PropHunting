@@ -27,7 +27,7 @@ public class PHShelf : UdonSharpBehaviour
     public Transform[] items;        // row * cols + column
     public MeshFilter[] itemMf;
     public MeshRenderer[] itemMr;
-    public GameObject[] tagShop, tagCool, tagGoofy, sel;
+    public GameObject[] tagShop, tagCool, tagGoofy;
     public TextMeshPro[] price;
     public float baseY = 0.9f, rowH = 0.62f;
 
@@ -48,6 +48,9 @@ public class PHShelf : UdonSharpBehaviour
     int turnDir;
     MaterialPropertyBlock mpb;
     VRCPlayerApi local;
+    float leashX;                    // where the panel stays while the player moves a little (reaching to click)
+    bool aside;                      // the player has stepped up past the panel: it waits at their side
+    float asideDir = 1f;
 
     void Start()
     {
@@ -103,6 +106,7 @@ public class PHShelf : UdonSharpBehaviour
                 items[k].localRotation = itemRot;
                 items[k].localScale = Vector3.one * itemScale[c];
                 mpb.SetFloat("_Dither", own ? 0f : 1f);
+                mpb.SetFloat("_Glow", store.Picked(c) ? 1f : 0f);   // the one being carried glows (Cor)
                 itemMr[k].SetPropertyBlock(mpb);
             }
             bool trophy = any && !own && store.wTrophy[c] >= 0;
@@ -111,7 +115,6 @@ public class PHShelf : UdonSharpBehaviour
             if (shop) price[k].text = store.wPrice[c].ToString();
             tagCool[k].SetActive(trophy && cat != PHStore.CAT_GOOFY);
             tagGoofy[k].SetActive(trophy && cat == PHStore.CAT_GOOFY);
-            sel[k].SetActive(any && store.Picked(c));
         }
     }
 
@@ -168,12 +171,15 @@ public class PHShelf : UdonSharpBehaviour
         Vector3 lp = transform.InverseTransformPoint(local.GetPosition());
         if (lp.z < 0f || lp.z > 9f || lp.y < -1f || lp.y > 4f) return;   // not in front of this wall
         Vector3 cp = cart.localPosition;
-        float follow = 1f - Mathf.Exp(-10f * Time.deltaTime);
-        // when the player steps up to the shelves, past the panel, it slides 1 m to their side (Cor), towards the
-        // half's longer end, and comes back in front of them when they step back
-        bool close = lp.z < cartZ + 0.45f;
-        float side = lp.x + 1f <= cartMax ? 1f : -1f;
-        float want = Mathf.Clamp(close ? lp.x + side : lp.x, cartMin, cartMax);
+        float follow = 1f - Mathf.Exp(-5f * Time.deltaTime);
+        // it follows the player on a leash: it stays put while they shift or reach within 0.45 m of it (Cor: it moved
+        // when reaching for a button), and only trails them when they walk further
+        leashX = Mathf.Clamp(leashX, lp.x - 0.45f, lp.x + 0.45f);
+        // when the player steps right up to the shelves, past the panel's line, it slides 1 m to their side (Cor),
+        // towards the half's longer end, and comes back in front of them once they step back well clear of it
+        if (!aside && lp.z < cartZ - 0.15f) { aside = true; asideDir = lp.x + 1f <= cartMax ? 1f : -1f; }
+        else if (aside && lp.z > cartZ + 0.3f) { aside = false; leashX = lp.x; }
+        float want = Mathf.Clamp(aside ? lp.x + asideDir : leashX, cartMin, cartMax);
         cp.x = Mathf.Lerp(cp.x, want, follow);
         cp.z = cartZ;
         // its height follows the player's size (Cor): the plate (panelY up in the panel) at 60% of their eye height

@@ -262,17 +262,19 @@ public static class WorldSceneBuilder
         game.history = LobbyBuilder.BuildTrail(lobby.transform, game, builder, new Vector3(0f, 4.98f, RoomD / 2 - 0.22f));
         LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 0.9f + 1.68f, RoomD / 2 - 0.12f));   // 7.2 x 3.36 m, bottom 0.9 m up
         LobbyBuilder.BuildFailNotice(lobby.transform, game, new Vector3(0f, 0.9f + 3.36f + 0.5f, RoomD / 2 - 0.12f));   // just over the panel
-        LobbyBuilder.BuildExplore(lobby.transform, game, new Vector3(5.9f, 1.7f, RoomD / 2 - 0.12f));   // right of the panel (Cor: the credits take the left); the DEBUG plaque: explore a map, spawn as hunter / hider, end round
-        // the last round's results, a score pad on the west wall
-        LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 3.9f));   // right of the Trophies board (Cor)
+        // the last round's results: a score pad right of the panel (Cor: smaller, beside the options board; the credits
+        // take the left), 3.5 x 2.45 m, level with the panel
+        LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(5.6f, 0.9f + 1.68f, RoomD / 2 - 0.12f), 0f, 0.0025f);
         local.panelUiText = null; local.resultsText = null;
         // the credits (from CREDITS.md), on the north wall left of the host panel
         BuildCredits(lobby.transform);
         // the language board: a lectern ahead and right of the spawn disc, turned towards it
         LobbyBuilder.BuildLanguageBoard(lobby.transform, game, new Vector3(2.7f, 0f, -RoomD / 2 + 3.6f), 28f);
 
-        // the profiler (its plaque right of the DEBUG plaque) and the scripts it watches: every one that runs each frame
-        var prof = LobbyBuilder.BuildProfiler(lobby.transform, game, new Vector3(7.95f, 1.55f, RoomD / 2 - 0.12f));
+        // the DEBUG plaque (explore a map, spawn as hunter / hider, end round, theme) and the profiler on a sign standing
+        // left of the spawn, the language board's twin (Cor: no wall space for debug); the scripts the profiler watches:
+        // every one that runs each frame
+        var prof = LobbyBuilder.BuildDebugSign(lobby.transform, game, new Vector3(-2.9f, 0f, -RoomD / 2 + 3.6f), -28f);
         {
             string[] names = { "PHGame", "PHLocal", "PHSlot", "PHHiderBody", "PHKnock", "PHLamps", "PHLobbyCull", "PHPanel", "PHScorePad", "PHSun", "PHView", "PHDoors", "PHWeapons", "MapBuilderUdon" };
             var list = new System.Collections.Generic.List<UdonSharp.UdonSharpBehaviour>();

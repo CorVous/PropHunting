@@ -439,10 +439,10 @@ public static partial class LobbyBuilder
     }
 
     // Debug: a small sign beside the panel that builds a fresh random map for the presser and takes them there (PHExplore)
-    public static PHExplore BuildExplore(Transform lobby, PHGame game, Vector3 localPos)
+    public static PHExplore BuildExplore(Transform lobby, PHGame game, Vector3 localPos, float scale = 0.006f)
     {
         // the DEBUG plaque: explore a map outside a round; start a round at once as a hunter or as a hider; end the round
-        var cv = Canvas(lobby, "ExploreDebug", localPos, Quaternion.identity, new Vector2(300f, 418f), 0.006f, true);
+        var cv = Canvas(lobby, "ExploreDebug", localPos, Quaternion.identity, new Vector2(300f, 418f), scale, true);
         var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
         Txt(cv, "Label", new Vector2(0, 186), new Vector2(280, 24), "DEBUG", future, 14, C("e1cfa5"), TextAlignmentOptions.Center);
         DebugButton(cv, game, "SPAWN AS HUNTER", nameof(PHGame.DebugHunter), new Vector2(0, 60), C("e98a6b"));
@@ -469,9 +469,9 @@ public static partial class LobbyBuilder
 
     // The PROFILER plaque: START PROFILING and STOP PROFILING (PHProfiler: frame times, hitches, the scripts' cost and
     // the map builds, written to the debug log). Each player's own client; the caller lists the scripts to watch.
-    public static PHProfiler BuildProfiler(Transform lobby, PHGame game, Vector3 localPos)
+    public static PHProfiler BuildProfiler(Transform lobby, PHGame game, Vector3 localPos, float scale = 0.006f)
     {
-        var cv = Canvas(lobby, "ProfilerDebug", localPos, Quaternion.identity, new Vector2(300f, 250f), 0.006f, true);
+        var cv = Canvas(lobby, "ProfilerDebug", localPos, Quaternion.identity, new Vector2(300f, 250f), scale, true);
         var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
         Txt(cv, "Label", new Vector2(0, 102), new Vector2(280, 24), "PROFILER", future, 14, C("e1cfa5"), TextAlignmentOptions.Center);
         var prof = cv.gameObject.AddUdonSharpComponent<PHProfiler>();
@@ -480,6 +480,23 @@ public static partial class LobbyBuilder
         DebugButton(cv, game, "START PROFILING", nameof(PHProfiler.Begin), new Vector2(0, 48), C("9bd18a"), prof);
         DebugButton(cv, game, "STOP PROFILING", nameof(PHProfiler.End), new Vector2(0, -24), C("e98a6b"), prof);
         return prof;
+    }
+
+    // The test build's DEBUG and PROFILER plaques on a sign of their own standing on the floor (Cor: the full game has
+    // no debug buttons, so they should take no wall space): two wooden legs and a board, the plaques side by side on
+    // its face (its -z, which faces the room). Returns the profiler, for the caller to give its scripts.
+    public static PHProfiler BuildDebugSign(Transform lobby, PHGame game, Vector3 localPos, float yaw)
+    {
+        var root = new GameObject("DebugSign").transform;
+        root.SetParent(lobby, false);
+        root.localPosition = localPos; root.localRotation = Quaternion.Euler(0f, yaw, 0f);
+        var wood = Mat("StoreWoodDark", C("7d5232"));
+        Box(root, "LegL", new Vector3(-1.15f, 0.95f, 0.06f), new Vector3(0.1f, 1.9f, 0.1f), wood);
+        Box(root, "LegR", new Vector3(1.15f, 0.95f, 0.06f), new Vector3(0.1f, 1.9f, 0.1f), wood);
+        Slab(root, "Board", new Vector3(0f, 1.42f, 0.03f), new Vector3(2.62f, 1.74f, 0.05f), wood);
+        const float k = 0.0038f;   // 300 canvas units: 1.14 m
+        BuildExplore(root, game, new Vector3(-0.63f, 1.42f, 0f), k);
+        return BuildProfiler(root, game, new Vector3(0.63f, 1.42f + (418f - 250f) * k / 2f, 0f), k);
     }
 
     // a button of the DEBUG plaque that calls one of PHGame's methods (PHButton): host only, as the game checks
@@ -559,9 +576,9 @@ public static partial class LobbyBuilder
     const float SW = 1400f, SH = 980f;
     static Vector2 S(float x, float y) { return new Vector2(x - SW / 2, SH / 2 - y); }
 
-    public static PHScorePad BuildScorePad(Transform lobby, PHGame game, PHLocal local, Vector3 localPos)
+    public static PHScorePad BuildScorePad(Transform lobby, PHGame game, PHLocal local, Vector3 localPos, float yaw = -90f, float scale = 0.0043f)
     {
-        var cv = Canvas(lobby, "ScorePad", localPos, Quaternion.Euler(0f, -90f, 0f), new Vector2(SW, SH), 0.0043f, false);
+        var cv = Canvas(lobby, "ScorePad", localPos, Quaternion.Euler(0f, yaw, 0f), new Vector2(SW, SH), scale, false);
         Img(cv, "Shadow", S(700, 500), new Vector2(SW, SH), sRound, C("c9b98f"), 3f);
         Img(cv, "Paper", S(700, 490), new Vector2(SW, SH - 20), sRound, C("fbf4df"), 3f);
         for (int i = 0; i < 22; i++) Img(cv, "Line" + i, S(700, 64 + i * 41), new Vector2(SW - 24, 2), null, C("d8e3ef"));
@@ -1016,7 +1033,7 @@ public static partial class LobbyBuilder
         // (the east wall is the weapon wall: LobbyBuilder.Store.cs, built after the weapons)
 
         // giant pieces (feet on the floor; sizes are the largest dimension in metres)
-        Piece(root, "board-game-bits/D6_A_red", L(19.6f, 1.0f), 2.3f, 20f, true);   // (clear of the weapon wall's opening)
+        Piece(root, "board-game-bits/D6_A_red", L(20.0f, 1.0f), 2.3f, 20f, true);   // (clear of the weapon wall's panel and the score pad)
         Piece(root, "board-game-bits/D20_blue", L(17.0f, 20.4f), 1.8f, -15f, true);   // (clear of the weapon wall)
         Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(2.4f, 5.0f), 1, 1.4f);
         Piece(root, "furniture-bits/couch_pillows", L(5.6f, 15.0f), 2.6f, 270f, true);   // facing the Trophies board
