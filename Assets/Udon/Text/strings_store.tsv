@@ -1,0 +1,98 @@
+key	en	ja	ko	zh-CN	zh-HK	es	fr	de	pt-BR	ru
+store.buy	{0}									
+store.short	Not enough coins									
+store.coins	{0}									
+store.unlock_by	Unlock: {0}									
+store.rounds	{0}-{1} rounds									
+store.progress	{0} / {1}									
+store.earned	{0} / {1}									
+store.new_trophy	Trophy! {0}									
+store.coins_earned	+{0} coins									
+trophy.first_catch.name	First Catch									
+trophy.first_catch.goal	Catch a hider.									
+trophy.hat_trick.name	Hat Trick									
+trophy.hat_trick.goal	Catch 3 hiders in one round.									
+trophy.sharp_eye.name	Sharp Eye									
+trophy.sharp_eye.goal	Catch 3 hiders in one round without hitting a wrong prop.									
+trophy.clean_sweep.name	Clean Sweep									
+trophy.clean_sweep.goal	Catch every hider in a round (3 or more).									
+trophy.quick_draw.name	Quick Draw									
+trophy.quick_draw.goal	Catch a hider in the first 15 s of the hunt.									
+trophy.buzzer_beater.name	Buzzer Beater									
+trophy.buzzer_beater.goal	Catch the last hider in the final 10 s.									
+trophy.ten_catches.name	Ten Catches									
+trophy.ten_catches.goal	Catch 10 hiders in total.									
+trophy.hundred.name	Hundred									
+trophy.hundred.goal	Catch 100 hiders in total.									
+trophy.good_as_new.name	Good as New									
+trophy.good_as_new.goal	Finish a round without hitting a wrong prop.									
+trophy.weathered.name	Weathered									
+trophy.weathered.goal	Get through a final stand with your weapon in one piece.									
+trophy.pack_leader.name	Pack Leader									
+trophy.pack_leader.goal	Win 10 rounds as a hunter.									
+trophy.globetrotter_hunt.name	Globetrotter									
+trophy.globetrotter_hunt.goal	Catch a hider in town, medieval and space.									
+trophy.old_hand_hunt.name	Old Hand									
+trophy.old_hand_hunt.goal	Play 50 rounds as a hunter.									
+trophy.snapped.name	Snapped									
+trophy.snapped.goal	Have your weapon break.									
+trophy.furniture_hater.name	Furniture Hater									
+trophy.furniture_hater.goal	Hit 9 wrong props in one round without breaking your weapon.									
+trophy.bonk_collector.name	Bonk Collector									
+trophy.bonk_collector.goal	Hit 250 wrong props in total.									
+trophy.swing_and_a_miss.name	Swing and a Miss									
+trophy.swing_and_a_miss.goal	Swing 100 times in one round.									
+trophy.splinters.name	Splinters									
+trophy.splinters.goal	Have your weapon break in the first 30 s.									
+trophy.close_shave.name	Close Shave									
+trophy.close_shave.goal	Catch a hider with your weapon at 10% or less.									
+trophy.shot_down.name	Shot Down									
+trophy.shot_down.goal	Have your weapon broken by a hider's shots.									
+trophy.empty_handed.name	Empty Handed									
+trophy.empty_handed.goal	Finish 10 rounds as a hunter with no catches.									
+trophy.scrapper.name	Scrapper									
+trophy.scrapper.goal	Vote to scrap a map.									
+trophy.survivor.name	Survivor									
+trophy.survivor.goal	Survive a round as a hider.									
+trophy.untouched.name	Untouched									
+trophy.untouched.goal	Survive a round with full health.									
+trophy.last_prop.name	Last Prop Standing									
+trophy.last_prop.goal	Be the last hider left, and survive.									
+trophy.ten_survivals.name	Ten Survivals									
+trophy.ten_survivals.goal	Survive 10 rounds in total.									
+trophy.fifty_survivals.name	Fifty Survivals									
+trophy.fifty_survivals.goal	Survive 50 rounds in total.									
+trophy.on_a_roll.name	On a Roll									
+trophy.on_a_roll.goal	Survive 5 rounds in a row as a hider.									
+trophy.first_shot.name	First Shot									
+trophy.first_shot.goal	Hit a hunter in the final stand.									
+trophy.sharpshooter.name	Sharpshooter									
+trophy.sharpshooter.goal	Land 10 shots in one final stand.									
+trophy.giant_slayer.name	Giant Slayer									
+trophy.giant_slayer.goal	Break a hunter's weapon in the final stand.									
+trophy.props_win.name	Props Win									
+trophy.props_win.goal	Win 10 rounds as a hider.									
+trophy.globetrotter_hide.name	Globetrotter									
+trophy.globetrotter_hide.goal	Survive in town, medieval and space.									
+trophy.old_hand_hide.name	Old Hand									
+trophy.old_hand_hide.goal	Play 50 rounds as a hider.									
+trophy.long_haul.name	Long Haul									
+trophy.long_haul.goal	Survive a round on a large map.									
+trophy.found_instantly.name	Found Instantly									
+trophy.found_instantly.goal	Get caught in the first 10 s of the hunt.									
+trophy.close_call.name	Close Call									
+trophy.close_call.goal	Survive with 25 health or less.									
+trophy.quick_change.name	Quick Change									
+trophy.quick_change.goal	Use all 3 prop changes in one hunt, and survive.									
+trophy.bouncy.name	Bouncy									
+trophy.bouncy.goal	Hop 200 times as a prop.									
+trophy.chameleon.name	Chameleon									
+trophy.chameleon.goal	Be 25 different props in total.									
+trophy.spray_and_pray.name	Spray and Pray									
+trophy.spray_and_pray.goal	Fire 20 shots in one final stand.									
+trophy.full_house.name	Full House									
+trophy.full_house.goal	Play a round with 10 or more people.									
+trophy.usual_suspect.name	Usual Suspect									
+trophy.usual_suspect.goal	Be the first hider caught, 5 times.									
+trophy.wallflower.name	Wallflower									
+trophy.wallflower.goal	Survive without moving once the hunt starts.									
