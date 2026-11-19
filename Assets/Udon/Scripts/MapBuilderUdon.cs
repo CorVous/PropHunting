@@ -871,7 +871,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         // a build scrapped between stages 26 and 27 had made the collision mesh but not handed it over yet
         if (collMesh != null) { Destroy(collMesh); collMesh = null; }
         nLights = 0;   // the old points (and lamp props they follow) are gone
-        built = false; busy = false; stage = 0;
+        built = false; busy = false; stage = 0; cellSub = 0;
     }
 
     // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
@@ -982,7 +982,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 else { FinishGround(); stage = 2; cursor = 0; phase = "Raising walls"; }
                 break;
             case 2:
-                if (cursor < W * H) { CellWalls(cursor); cursor++; progress = 0.2f + 0.2f * cursor / (W * H); }
+                if (cursor < W * H)
+                {
+                    // a cell's four edges a step each, then its building (CellWalls)
+                    if (cellSub < 4) { CellEdge(cursor, cellSub); cellSub++; }
+                    else { CellBody(cursor); cellSub = 0; cursor++; progress = 0.2f + 0.2f * cursor / (W * H); }
+                }
                 else { stage = 20; cursor = 0; }
                 break;
             // the rest of the architecture, a piece a step (Cor: build freezes)
@@ -2841,27 +2846,40 @@ public class MapBuilderUdon : UdonSharpBehaviour
     readonly int[] DX = { 0, 1, 0, -1 };
     readonly int[] DZ = { 1, 0, -1, 0 };
 
+    // A cell's walls, in five steps of the build (Perf: one step a cell came to 18-20 ms on XL maps): its four edges,
+    // one a step (CellEdge), then the building's slab and walls (CellBody); the same work in the same order as before
+    int cellSub;   // stage 2: the part of the cell at the cursor next (0-3 its edges, 4 its building)
+
     void CellWalls(int c)
+    {
+        for (int d = 0; d < 4; d++) CellEdge(c, d);
+        CellBody(c);
+    }
+
+    void CellEdge(int c, int d)
     {
         int x = c % W, z = c / W;
         int zone = cellZone[c];
-        for (int d = 0; d < 4; d++)
-        {
-            int nx = x + DX[d], nz = z + DZ[d];
-            bool inGrid = InGrid(nx, nz);
-            int n = inGrid ? nz * W + nx : -1;
-            if ((d == 2 || d == 3) && inGrid) continue;
-            if (zone == GenData.Z_NONE && (n < 0 || cellZone[n] == GenData.Z_NONE)) continue;
-            int type = gen.EdgeType(x, z, d);
-            if (type == GenData.E_NONE) continue;
-            int off = gen.EdgeOff(x, z, d);
-            bool horizontal = d == 0 || d == 2;
-            int ecx = d == 1 ? x + 1 : x, ecz = d == 0 ? z + 1 : z;
-            int cellLow = (d == 0 || d == 1) ? c : n, cellHigh = (d == 0 || d == 1) ? n : c;
-            if (cellLow >= 0 && cellZone[cellLow] == GenData.Z_NONE) cellLow = -1;
-            if (cellHigh >= 0 && cellZone[cellHigh] == GenData.Z_NONE) cellHigh = -1;
-            Edge(horizontal, ecx, ecz, type, off, cellLow, cellHigh);
-        }
+        int nx = x + DX[d], nz = z + DZ[d];
+        bool inGrid = InGrid(nx, nz);
+        int n = inGrid ? nz * W + nx : -1;
+        if ((d == 2 || d == 3) && inGrid) return;
+        if (zone == GenData.Z_NONE && (n < 0 || cellZone[n] == GenData.Z_NONE)) return;
+        int type = gen.EdgeType(x, z, d);
+        if (type == GenData.E_NONE) return;
+        int off = gen.EdgeOff(x, z, d);
+        bool horizontal = d == 0 || d == 2;
+        int ecx = d == 1 ? x + 1 : x, ecz = d == 0 ? z + 1 : z;
+        int cellLow = (d == 0 || d == 1) ? c : n, cellHigh = (d == 0 || d == 1) ? n : c;
+        if (cellLow >= 0 && cellZone[cellLow] == GenData.Z_NONE) cellLow = -1;
+        if (cellHigh >= 0 && cellZone[cellHigh] == GenData.Z_NONE) cellHigh = -1;
+        Edge(horizontal, ecx, ecz, type, off, cellLow, cellHigh);
+    }
+
+    void CellBody(int c)
+    {
+        int x = c % W, z = c / W;
+        int zone = cellZone[c];
         if (IsBuilding(zone))
         {
             lv = CellOff(c);
