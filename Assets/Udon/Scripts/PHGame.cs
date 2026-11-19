@@ -76,6 +76,7 @@ public class PHGame : UdonSharpBehaviour
     public const int UNLOCK_LAPSE_MS = 60000, HOST_IDLE_MS = 300000, CLAIM_WINDOW_MS = 30000;
     [UdonSynced] public bool hidersWin;
     [UdonSynced] public string endReason = "";
+    [UdonSynced] public bool timeUp;   // the round ended on the clock (the "time over" call is heard first)
 
     // ---- synced: the host's settings (G14, G44)
     [UdonSynced] public bool sizeAuto = true;
@@ -623,10 +624,10 @@ public class PHGame : UdonSharpBehaviour
                     if (slotRole[i] == ROLE_HIDER && !slots[i].caught) hiders++;
                     if (slotRole[i] == ROLE_HUNTER && !slots[i].hunterOut) hunters++;
                 }
-                if (debugRound) { if (Left <= 0f) End(hiders > 0, "Debug round: time's up"); }
-                else if (hiders == 0) End(false, "Every hider was caught");
-                else if (hunters == 0) End(true, "Every hunter is out");
-                else if (Left <= 0f) End(true, "Time's up: a hider was still uncaught");
+                if (debugRound) { if (Left <= 0f) End(hiders > 0, "Debug round: time's up", true); }
+                else if (hiders == 0) End(false, "Every hider was caught", false);
+                else if (hunters == 0) End(true, "Every hunter is out", false);
+                else if (Left <= 0f) End(true, "Time's up: a hider was still uncaught", true);
                 break;
             case PH_END:
                 if (Left <= 0f) BackToLobby();
@@ -641,9 +642,9 @@ public class PHGame : UdonSharpBehaviour
         return true;
     }
 
-    void End(bool hiders, string why)
+    void End(bool hiders, string why, bool clock)
     {
-        hidersWin = hiders; endReason = why;
+        hidersWin = hiders; endReason = why; timeUp = clock;
         // the run counts; a map at its cap retires and a new one takes its slot (D6)
         if (lastRot >= 0 && !debugRound)
         {

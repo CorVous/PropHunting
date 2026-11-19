@@ -114,8 +114,7 @@ public class PHLocal : UdonSharpBehaviour
                 if (role == PHGame.ROLE_HIDER) body.frozen = false;
                 break;
             case PHGame.PH_HUNT:
-                sound.Play("go", 0.8f);
-                sound.Play("jingles_PIZZI07", 0.5f);
+                PlayThen("go", 0.8f, "jingles_PIZZI07", 0.5f);
                 if (role == PHGame.ROLE_HUNTER)
                 {
                     me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
@@ -131,8 +130,10 @@ public class PHLocal : UdonSharpBehaviour
                 break;
             case PHGame.PH_END:
                 ShowReveal(true);
-                sound.Play("time_over", 0.8f);
-                if (role != PHGame.ROLE_NONE) sound.Play((role == PHGame.ROLE_HIDER) == game.hidersWin ? "you_win" : "game_over", 0.8f);
+                // "time over" only when the clock ended it, then the result once it has been said (Cor: they overlapped)
+                string result = role == PHGame.ROLE_NONE ? "" : ((role == PHGame.ROLE_HIDER) == game.hidersWin ? "you_win" : "game_over");
+                if (game.timeUp) PlayThen("time_over", 0.8f, result, 0.8f);
+                else if (result != "") sound.Play(result, 0.8f);
                 SetFrozen(true);
                 Say((game.hidersWin ? "Hiders win. " : "Hunters win. ") + game.endReason, 10f);
                 break;
@@ -140,6 +141,35 @@ public class PHLocal : UdonSharpBehaviour
     }
 
     public void OnSlotChanged(PHSlot s) { }
+
+    // ------------------------------------------------------------------ calls one after the other
+    // A call and the one that follows it (Cor: "the time over and you win sounds overlap"): the second starts when
+    // the first has been heard out, and a little after. Only while the round and the phase are still the ones it was
+    // queued in: a round that ended or moved on meanwhile drops it. One waits at a time; a newer one replaces it.
+    const float CALL_GAP = 0.15f;
+    string queuedCall = "";
+    float queuedVolume, queuedAt;
+    int queuedRound = -1, queuedPhase = -1;
+
+    void PlayThen(string first, float volume, string then, float thenVolume)
+    {
+        sound.Play(first, volume);
+        if (then == "") { queuedCall = ""; return; }
+        AudioClip c = sound.Clip(first);
+        float wait = (c != null ? c.length : 0f) + CALL_GAP;
+        queuedCall = then; queuedVolume = thenVolume; queuedAt = Time.time + wait;
+        queuedRound = game.round; queuedPhase = game.phase;
+        SendCustomEventDelayedSeconds(nameof(PlayQueued), wait);
+    }
+
+    public void PlayQueued()
+    {
+        if (queuedCall == "" || Time.time < queuedAt - 0.05f) return;   // (an earlier call's wait, ended early)
+        string c = queuedCall;
+        queuedCall = "";
+        if (game.round != queuedRound || game.phase != queuedPhase) return;
+        sound.Play(c, queuedVolume);
+    }
 
     // ------------------------------------------------------------------ ghosts and voices (Cor, G6, G8, G18, J5)
     // A ghost is a caught hider, an eliminated hunter or someone who joined mid-round. Ghosts see each other and
@@ -433,7 +463,7 @@ public class PHLocal : UdonSharpBehaviour
         bool eg = game.Endgame;
         if (eg && !wasEndgame && role != PHGame.ROLE_NONE)
         {
-            sound.Play("hurry_up", 0.8f); sound.Play("jingles_HIT03", 0.6f);
+            PlayThen("hurry_up", 0.8f, "jingles_HIT03", 0.6f);
             Say("45 seconds! Taunts come twice as often; wrong props and hits count double.", 4f);
             float iv = game.tauntInterval * 0.5f;
             if (nextForced > Time.time + iv) nextForced = Time.time + iv;
@@ -579,7 +609,8 @@ public class PHLocal : UdonSharpBehaviour
         }
         if (!SetDisguise(d)) { sound.Play("error_004", 0.5f); if (game.phase == PHGame.PH_HUNT) changesLeft++; return; }
         lastChange = Time.time;
-        sound.Play("powerUp1", 0.5f);
+        // one soft pluck, at once (Cor: the three rising tones were not immediate)
+        sound.Play("pluck_002", 0.5f);
         Say("You are a " + DefName(d).ToLower(), 2f);
     }
 
