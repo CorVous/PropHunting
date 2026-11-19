@@ -487,14 +487,15 @@ public static class LobbyBuilder
     // Made from CREDITS.md at the project's root each time the world is built (and by PropHunt > Rebuild credits board),
     // so it follows the file: the packs table grouped by maker, then the "Asset" table (other assets, other licences),
     // in three columns; the "Other software:" paragraph as fine print. 1500 canvas units wide; the height follows the text.
-    const float CW = 1500f;
+    const float CW = 1900f;   // four makers side by side (6.8 m at the lobby's scale)
     // the board's heading and Cor's note above the list (Cor's words, 2026-11-19)
     const string CreditsTitle = "Disclosures!!!";
     // the world's source, on a banner under the title (Cor: prominent, with its licence)
-    const string CreditsSource = "SOURCE CODE:  github.com/CorVous/PropHunting   ·   AGPL v3.0";
+    const string CreditsRepo = "github.com/CorVous/PropHunting";
+    const string CreditsSource = "SOURCE CODE:  " + CreditsRepo + "   ·   AGPL v3.0";
     const string CreditsIntro = "Heya! This map is super vibe coded! I normally like to put in a lot more effort and authorship into my work, but this was (as of writing) made in a week to show to my friends because I wasn't happy with current prop hunt maps! Plus I think even if you're using AI, practice makes perfect! None of the assets were diffusion generated (what most people would call \"Generative AI\") though, and below is a list of the awesome creators of the CC0 public domain asset packs that you should check out! Either if you need free assets or are looking to find awesome assets! Below is everything that was used for this project!";
 
-    class CreditRow { public string name, right; public int maker; public bool tall; }   // tall: the details on a line of their own
+    class CreditRow { public string name, right, url; public int maker; public bool tall; }   // tall: the details on a line of their own
 
     public static Transform BuildCredits(Transform lobby, Vector3 localPos, Quaternion rot, float scale)
     {
@@ -505,16 +506,17 @@ public static class LobbyBuilder
         // the makers (the bullet list: "- **Kenney** (www.kenney.nl)"), the table rows, the licence paragraphs
         var makerName = new System.Collections.Generic.List<string>();
         var makerSub = new System.Collections.Generic.List<string>();
+        var makerUrl = new System.Collections.Generic.List<string>();
         var rows = new System.Collections.Generic.List<CreditRow>();
         var notes = new System.Collections.Generic.List<string>();
-        int col = -1, colMaker = -1, colUse = -1, colCount = -1, colLic = -1, otherGroup = -1;
+        int colSrc = -1, col = -1, colMaker = -1, colUse = -1, colCount = -1, colLic = -1, otherGroup = -1;
         bool otherTable = false;
         var para = new System.Text.StringBuilder();
         // the fine print: the "Other software:" paragraph (Unity, the VRChat SDK); every asset is a row of the list
         System.Action flush = () =>
         {
             string p = para.ToString().Trim(); para.Length = 0;
-            if (p.StartsWith("Other software")) notes.Add(MdPlain(p));
+            // (none: Cor, the board needs no Unity / VRChat SDK line)
         };
         foreach (var raw in lines)
         {
@@ -530,14 +532,16 @@ public static class LobbyBuilder
                     col = 0;
                     // the "Asset" table (assets that are not packs, other licences): one group of its own, after the makers
                     otherTable = cells[0] == "Asset";
-                    if (otherTable && otherGroup < 0) { makerName.Add("Other assets"); makerSub.Add(""); otherGroup = makerName.Count - 1; }
+                    if (otherTable && otherGroup < 0) { makerName.Add("Other assets"); makerSub.Add(""); makerUrl.Add(""); otherGroup = makerName.Count - 1; }
                     colMaker = System.Array.IndexOf(cells, "Maker"); colUse = System.Array.IndexOf(cells, "Used for");
                     colCount = System.Array.FindIndex(cells, c => c.StartsWith("Items")); colLic = System.Array.IndexOf(cells, "Licence");
+                    colSrc = System.Array.IndexOf(cells, "Source");
                     continue;
                 }
                 if (col < 0) continue;
                 var r = new CreditRow();
                 r.name = PackName(cells[0]);
+                r.url = colSrc >= 0 ? cells[colSrc] : "";
                 string maker = colMaker >= 0 ? cells[colMaker] : "";
                 string use = colUse >= 0 ? System.Text.RegularExpressions.Regex.Replace(cells[colUse], @"\s*\([^)]*\)", "") : "";
                 string lic = colLic >= 0 ? cells[colLic] : "";
@@ -550,7 +554,7 @@ public static class LobbyBuilder
                     continue;
                 }
                 r.maker = makerName.FindIndex(m => maker.StartsWith(m, System.StringComparison.OrdinalIgnoreCase));
-                if (r.maker < 0) { makerName.Add(maker); makerSub.Add(""); r.maker = makerName.Count - 1; }
+                if (r.maker < 0) { makerName.Add(maker); makerSub.Add(""); makerUrl.Add(""); r.maker = makerName.Count - 1; }
                 r.right = use + (colCount >= 0 ? "  ·  " + cells[colCount] : "") + (lic.StartsWith("CC0") ? "" : "  ·  " + lic);
                 rows.Add(r);
                 continue;
@@ -565,6 +569,8 @@ public static class LobbyBuilder
                 rest = System.Text.RegularExpressions.Regex.Replace(rest, @"\s*\(([^)]*)\)", "  ·  $1").Trim();
                 if (rest.StartsWith("·")) rest = rest.Substring(1).Trim();
                 makerSub.Add(rest);
+                var site = System.Text.RegularExpressions.Regex.Match(bullet.Groups[2].Value, @"\(([^)\s]+\.[^)\s]+)\)");
+                makerUrl.Add(site.Success ? (site.Groups[1].Value.StartsWith("http") ? site.Groups[1].Value : "https://" + site.Groups[1].Value) : "");
                 continue;
             }
             if (ln.Length == 0 || ln.StartsWith("#") || ln.StartsWith("- ")) { flush(); continue; }
@@ -572,6 +578,8 @@ public static class LobbyBuilder
             para.Append(ln);
         }
         flush();
+        // a hint where the fine print was: everything with a link can be clicked for it (CopyLink)
+        notes.Add("Click a name, a maker or the source banner: VRChat opens a text box with its link, ready to copy.");
 
         // the order on the board: maker by maker, then by name; one column per maker (Cor), each a short list that
         // scrolls (its own scroll bar) when it holds more than visRows
@@ -594,7 +602,7 @@ public static class LobbyBuilder
         float notesH = 0f;
         foreach (var n in notes)
         {
-            var t = Txt(cv, "Note", Vector2.zero, new Vector2(innerW, 20), Clean(n, future), future, 13, C("6b5d40"), TextAlignmentOptions.TopLeft);
+            var t = Txt(cv, "Note", Vector2.zero, new Vector2(innerW, 20), Clean(n, future), future, 14, C("6b5d40"), TextAlignmentOptions.Top);
             t.enableWordWrapping = true;
             float h = t.GetPreferredValues(t.text, innerW, 0f).y;
             t.rectTransform.sizeDelta = new Vector2(innerW, h);
@@ -624,6 +632,7 @@ public static class LobbyBuilder
         var banner = Img(cv, "SourceBanner", Q(CW / 2, 124), new Vector2(1120, 56), sTile, RowColour[1], 2f);
         var src = Txt(banner.transform, "Text", new Vector2(0, 3), new Vector2(1060, 40), Clean(CreditsSource, future), future, 24, C("1e190f"), TextAlignmentOptions.Center);
         src.enableAutoSizing = true; src.fontSizeMin = 16f; src.fontSizeMax = 24f;
+        CopyLink(banner.transform, Vector2.zero, new Vector2(1120, 56), "https://" + CreditsRepo, C("1e190f"));
         intro.rectTransform.anchoredPosition = Q(CW / 2, introTop + introH / 2);
         intro.transform.SetAsLastSibling();
 
@@ -656,6 +665,8 @@ public static class LobbyBuilder
             var st = Txt(tile.transform, "Site", new Vector2(colW / 2 - 16, 2), new Vector2(subW, 24), Clean(makerSub[m], future), future, 13, C("1e190f", 0.75f), TextAlignmentOptions.Right);
             st.rectTransform.pivot = new Vector2(1f, 0.5f);
             st.enableAutoSizing = true; st.fontSizeMin = 8f; st.fontSizeMax = 13f;
+            if (subW < 60f) st.gameObject.SetActive(false);
+            if (makerUrl[m].Length > 0) CopyLink(tile.transform, Vector2.zero, new Vector2(colW, headH - 14), makerUrl[m], C("1e190f"));
             y += headH;
 
             // the list: a masked viewport (it takes the drag), the rows on a content rect, a scroll bar on the right
@@ -682,11 +693,20 @@ public static class LobbyBuilder
                 Img(row, "Pip", new Vector2(-listW / 2 + 8, top), new Vector2(12, 12), sRound, makerColour[r.maker % 4], 6f);
                 var nt = Txt(row, "Name", new Vector2(-listW / 2 + 24, top), new Vector2(listW - 24, rowH), Clean(r.name, future), future, 17, ink, TextAlignmentOptions.Left);
                 nt.rectTransform.pivot = new Vector2(0f, 0.5f);
+                nt.overflowMode = TextOverflowModes.Ellipsis;
                 var ut = r.tall
                     ? Txt(row, "Use", new Vector2(-listW / 2 + 24, top - rowH * 0.62f), new Vector2(listW - 24, rowH * 0.7f), Clean(r.right, future), future, 12, C("8a7b5a"), TextAlignmentOptions.Left)
                     : Txt(row, "Use", new Vector2(listW / 2, 1), new Vector2(listW * 0.5f, rowH), Clean(r.right, future), future, 12, C("8a7b5a"), TextAlignmentOptions.Right);
                 ut.rectTransform.pivot = new Vector2(r.tall ? 0f : 1f, 0.5f);
                 ut.enableAutoSizing = true; ut.fontSizeMin = 8f; ut.fontSizeMax = 12f;
+                if (!r.tall)
+                {
+                    // the details take what they need (up to 45%), the name the rest (cut with an ellipsis if need be)
+                    float uw = Mathf.Min(ut.GetPreferredValues(ut.text).x + 4f, listW * 0.45f);
+                    ut.rectTransform.sizeDelta = new Vector2(uw, rowH);
+                    nt.rectTransform.sizeDelta = new Vector2(listW - 24 - uw - 10, rowH);
+                }
+                if (r.url.StartsWith("http")) CopyLink(row, Vector2.zero, new Vector2(listW, h), r.url, C("6d5524"));
             }
             if (!scrolls) continue;
             var sr = vp.gameObject.AddComponent<ScrollRect>();
@@ -729,11 +749,39 @@ public static class LobbyBuilder
         return cv;
     }
 
+    // A link (VRChat worlds cannot open a browser): a field over the thing, holding its address with the text hidden.
+    // Clicking it brings up VRChat's text box with the address, ready to copy; a faint tint shows on hover. PHCopyLink
+    // puts the address back if it is edited.
+    static void CopyLink(Transform parent, Vector2 pos, Vector2 size, string url, Color tint)
+    {
+        var hit = Img(parent, "Link", pos, size, sRound, new Color(tint.r, tint.g, tint.b, 1f), 3f);
+        hit.raycastTarget = true;
+        var area = Rect(hit.transform, "Text Area", Vector2.zero, size);
+        area.gameObject.AddComponent<RectMask2D>();
+        var tx = Txt(area, "Text", Vector2.zero, size, "", future, 12, new Color(0f, 0f, 0f, 0f), TextAlignmentOptions.Center);
+        var input = hit.gameObject.AddComponent<TMP_InputField>();
+        input.textViewport = area; input.textComponent = tx; input.fontAsset = future;
+        input.lineType = TMP_InputField.LineType.SingleLine; input.targetGraphic = hit;
+        input.customCaretColor = true; input.caretColor = new Color(0f, 0f, 0f, 0f); input.selectionColor = new Color(0f, 0f, 0f, 0f);
+        input.text = url;
+        var nav = input.navigation; nav.mode = Navigation.Mode.None; input.navigation = nav;
+        var cb = input.colors;
+        cb.normalColor = new Color(1f, 1f, 1f, 0f); cb.highlightedColor = new Color(1f, 1f, 1f, 0.12f);
+        cb.pressedColor = new Color(1f, 1f, 1f, 0.2f); cb.selectedColor = new Color(1f, 1f, 1f, 0.12f); cb.disabledColor = new Color(1f, 1f, 1f, 0f);
+        input.colors = cb;
+        var link = hit.gameObject.AddUdonSharpComponent<PHCopyLink>();
+        link.field = input; link.url = url;
+        UdonSharpEditorUtility.CopyProxyToUdon(link);
+        var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(link);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onEndEdit, udon.SendCustomEvent, nameof(PHCopyLink.Restore));
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onValueChanged, udon.SendCustomEvent, nameof(PHCopyLink.Restore));
+    }
+
     // "KayKit : Board Game Bits 1.0 (`board-game-bits`)" -> "Board Game Bits"
     static string PackName(string s)
     {
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\s*\(`[^`]*`\)", "");
-        s = System.Text.RegularExpressions.Regex.Replace(s, @"^(KayKit\s*[:\-]\s*|Kenney\s*:\s*)", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"^\w+\s*(:|\s-)\s*", "");   // the maker's prefix ("Kenney: ", "KayKit - ", "Quaternius: ")
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+\d+(\.\d+)+(-[\w.]+)?$", "");
         return s.Trim();
     }
