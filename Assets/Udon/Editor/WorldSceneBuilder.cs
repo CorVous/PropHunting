@@ -259,7 +259,7 @@ public static class WorldSceneBuilder
         // A world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR.
         // the map trail above it (PHHistory): the maps played here, with their photos; made first, since the panel's
         // REPLAY card is one of its cards
-        game.history = LobbyBuilder.BuildTrail(lobby.transform, game, builder, new Vector3(0f, 5.05f, RoomD / 2 - 0.22f));
+        game.history = LobbyBuilder.BuildTrail(lobby.transform, game, builder, new Vector3(0f, 4.98f, RoomD / 2 - 0.22f));
         LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 0.9f + 1.68f, RoomD / 2 - 0.12f));   // 7.2 x 3.36 m, bottom 0.9 m up
         LobbyBuilder.BuildFailNotice(lobby.transform, game, new Vector3(0f, 0.9f + 3.36f + 0.5f, RoomD / 2 - 0.12f));   // just over the panel
         LobbyBuilder.BuildExplore(lobby.transform, game, new Vector3(5.9f, 1.7f, RoomD / 2 - 0.12f));   // right of the panel (Cor: the credits take the left); the DEBUG plaque: explore a map, spawn as hunter / hider, end round

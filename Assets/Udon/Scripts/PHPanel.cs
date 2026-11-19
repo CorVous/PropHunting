@@ -42,7 +42,7 @@ public class PHPanel : UdonSharpBehaviour
     public TMP_InputField seedInput;
     public GameObject seedInputRoot, confirmRoot;           // shown on Claim host instead of its text while it cannot be used
     // the bar buttons (PHPanelTile index -2 - k): 0 unlock/lock host, 1 claim host, 2 the seed field, 3 play anyway,
-    // 4 discard, 5 retire the picked map, 6 the REPLAY card, 7 scrap vote, 8 undo (a vote; the host's is at once),
+    // 4 discard, 5 unused (Cor: no retire button), 6 the REPLAY card, 7 scrap vote, 8 undo (a vote; the host's is at once),
     // 9 and 10 the arrows beside REPLAY (older, newer)
     public TextMeshProUGUI replayCaption;
     public RectTransform[] hostButton;
@@ -135,12 +135,6 @@ public class PHPanel : UdonSharpBehaviour
             if (!host || !game.seedNeedsConfirm) { Deny(-2 - k); return; }
             Queue(select, 0f, 1f);
             if (k == 3) game.SeedPlayAnyway(); else game.SeedDiscard();
-        }
-        else if (k == 5)
-        {
-            if (!CanEdit || !game.CanReplay()) { Deny(-7); return; }
-            Queue(drop, 0f, 0.8f);
-            game.HostRetire();
         }
         else if (k == 6)
         {
@@ -383,7 +377,6 @@ public class PHPanel : UdonSharpBehaviour
             if (seedInputRoot.activeSelf != entry) seedInputRoot.SetActive(entry);
             bool anyPick = pk >= 0 && pk < game.rotRuns.Length && game.rotSeed[pk] != 0;
             runsText.text = anyPick ? game.text.F1("maps.played", game.rotRuns[pk].ToString()) : "";
-            Fade(5, hostNow && lobby && anyPick);
             int need = game.VotesNeeded();
             scrapText.text = game.text.F2("panel.scrapVotes", game.ScrapVotes().ToString(), need.ToString());
             undoText.text = game.text.F2("panel.undoVotes", game.UndoVotes().ToString(), need.ToString());
