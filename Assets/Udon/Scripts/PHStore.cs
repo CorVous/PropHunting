@@ -48,7 +48,7 @@ public class PHStore : UdonSharpBehaviour
 
     // the counters in st
     public const int S_CATCH = 0, S_HROUNDS = 1, S_PROUNDS = 2, S_SURV = 3, S_HWINS = 4, S_PWINS = 5, S_WRONG = 6,
-        S_EMPTY = 7, S_STREAK = 8, S_FIRST = 9, S_THEME_H = 10, S_THEME_P = 11, S_PROPS = 12, STATS = 24;
+        S_EMPTY = 7, S_STREAK = 8, S_FIRST = 9, S_THEME_H = 10, S_THEME_P = 11, S_PROPS = 12, S_HOPS = 13, STATS = 24;
 
     // the trophies by number (strings_store.tsv lists them in this order)
     const int T_FIRST_CATCH = 0, T_HAT_TRICK = 1, T_SHARP_EYE = 2, T_CLEAN_SWEEP = 3, T_QUICK_DRAW = 4, T_BUZZER = 5,
@@ -71,6 +71,9 @@ public class PHStore : UdonSharpBehaviour
     Vector3 rStart;
     bool rStartSet;
     int lastDef = -1;
+    // the melee work's counters (PHLocal, PHHiderBody: per session, never reset), read by name so this compiles
+    // without that work; a missing one reads -1 and its trophy waits. Kept as they were at the hunt's start.
+    int c0Swings, c0Shots, c0ShotHits, c0Broke, c0Changes, c0MyBroken, lastHops = -1;
 
     void Start()
     {
@@ -220,6 +223,17 @@ public class PHStore : UdonSharpBehaviour
             }
         }
 
+        // Bouncy: hops as a prop, added up across rounds
+        if (live && game.local != null)
+        {
+            int hops = Counter(game.local.body, "hops");
+            if (hops >= 0)
+            {
+                if (lastHops >= 0 && hops > lastHops) { st[S_HOPS] += hops - lastHops; if (!got[T_BOUNCY] && st[S_HOPS] >= 200) Earn(T_BOUNCY); }
+                lastHops = hops;
+            }
+        }
+
         if (phase == PHGame.PH_HUNT && lastPhase != PHGame.PH_HUNT) BeginRound(me);
         if (phase == PHGame.PH_HUNT && inRound) Watch(me);
         if (lastPhase == PHGame.PH_HUNT && phase != PHGame.PH_HUNT && inRound)
@@ -248,6 +262,24 @@ public class PHStore : UdonSharpBehaviour
         rSize = game.mapSize;
         rQuick = false; rBuzzer = false; rShave = false; rSplinter = false; rAlone = false; rMoved = false; rStand = false;
         rStartSet = false;
+        c0Swings = Counter(game.local, "statSwings"); c0Shots = Counter(game.local, "statShots");
+        c0ShotHits = Counter(game.local, "statShotHits"); c0Broke = Counter(game.local, "statWeaponsBroken");
+        c0Changes = Counter(game.local, "statPropChanges"); c0MyBroken = Counter(game.local, "myWeaponBroken");
+    }
+
+    int Counter(UdonSharpBehaviour b, string field)
+    {
+        if (b == null) return -1;
+        object o = b.GetProgramVariable(field);
+        if (o == null) return -1;
+        return (int)o;
+    }
+
+    // how much a counter grew since the hunt began (-1: the counter isn't there)
+    int Grew(UdonSharpBehaviour b, string field, int at0)
+    {
+        int now = Counter(b, field);
+        return now < 0 || at0 < 0 ? -1 : now - at0;
     }
 
     void Watch(PHSlot me)
@@ -306,6 +338,8 @@ public class PHStore : UdonSharpBehaviour
             if (wrong >= 9 && !me.hunterOut) Earn(T_FURNITURE);
             if (rSplinter) Earn(T_SPLINTERS);
             if (rShave) Earn(T_CLOSE_SHAVE);
+            if (Grew(game.local, "statSwings", c0Swings) >= 100) Earn(T_SWING);
+            if (Grew(game.local, "myWeaponBroken", c0MyBroken) > 0 && Counter(game.local, "lastBrokenBy") > 0) Earn(T_SHOT_DOWN);
         }
         else
         {
@@ -334,6 +368,12 @@ public class PHStore : UdonSharpBehaviour
             if (!survived && me.survivedMs <= 10000) Earn(T_FOUND);
             if (survived && me.health > 0 && me.health <= 25) Earn(T_CLOSE_CALL);
             if (survived && !rMoved && rStartSet) Earn(T_WALLFLOWER);
+            int hitsNow = Grew(game.local, "statShotHits", c0ShotHits);
+            if (hitsNow >= 1) Earn(T_FIRST_SHOT);
+            if (hitsNow >= 10) Earn(T_SHARPSHOOTER);
+            if (Grew(game.local, "statWeaponsBroken", c0Broke) >= 1) Earn(T_GIANT_SLAYER);
+            if (Grew(game.local, "statShots", c0Shots) >= 20) Earn(T_SPRAY);
+            if (survived && Grew(game.local, "statPropChanges", c0Changes) >= 3) Earn(T_QUICK_CHANGE);
         }
         if (rPeople >= 10) Earn(T_FULL_HOUSE);
         CheckCounts();
@@ -381,6 +421,7 @@ public class PHStore : UdonSharpBehaviour
             case T_OLD_P: return st[S_PROUNDS];
             case T_CHAMELEON: return st[S_PROPS];
             case T_USUAL: return st[S_FIRST];
+            case T_BOUNCY: return st[S_HOPS];
         }
         return 0;
     }
@@ -392,7 +433,7 @@ public class PHStore : UdonSharpBehaviour
             case T_TEN: return 10; case T_HUNDRED: return 100; case T_PACK_LEADER: return 10;
             case T_GLOBE_H: return 3; case T_OLD_H: return 50; case T_BONK: return 250; case T_EMPTY: return 10;
             case T_TEN_SURV: return 10; case T_FIFTY_SURV: return 50; case T_ON_A_ROLL: return 5; case T_PROPS_WIN: return 10;
-            case T_GLOBE_P: return 3; case T_OLD_P: return 50; case T_CHAMELEON: return 25; case T_USUAL: return 5;
+            case T_GLOBE_P: return 3; case T_OLD_P: return 50; case T_CHAMELEON: return 25; case T_USUAL: return 5; case T_BOUNCY: return 200;
         }
         return 0;
     }
