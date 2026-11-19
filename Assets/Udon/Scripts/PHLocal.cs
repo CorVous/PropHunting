@@ -200,6 +200,25 @@ public class PHLocal : UdonSharpBehaviour
         Say("A round is on: you walk the map as a ghost until it ends.", 5f);
     }
 
+    // Never trap a player: the stations cannot be left by hand, and only the player's own slot lets them out. Seated
+    // in a slot that is no longer theirs (the host's table moved or dropped them mid-round), they would stay in it,
+    // parked under the map by its new owner, for good. Checked once a second.
+    float nextStray;
+
+    void UpdateStrayStation()
+    {
+        if (Time.time < nextStray) return;
+        nextStray = Time.time + 1f;
+        int mine = game.SlotOf(Networking.LocalPlayer.playerId);
+        for (int i = 0; i < game.slots.Length; i++)
+        {
+            PHSlot o = game.slots[i];
+            if (i == mine || o == null || !o.seated) continue;
+            o.station.ExitStation(Networking.LocalPlayer);
+            o.seated = false;
+        }
+    }
+
     float nextVoice;
     VRCPlayerApi[] voicePlayers = new VRCPlayerApi[90];
 
@@ -400,7 +419,7 @@ public class PHLocal : UdonSharpBehaviour
         VRCPlayerApi me = Networking.LocalPlayer;
         if (!value || !me.IsUserInVR()) return;
         // VR: a grip with the hand on or close to a door works it (grab-open)
-        if (doors != null && InRound())
+        if (CanWorkDoors())
         {
             bool left = args.handType == VRC.Udon.Common.HandType.LEFT;
             Vector3 hand = me.GetTrackingData(left ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand).position;
@@ -429,10 +448,14 @@ public class PHLocal : UdonSharpBehaviour
         return p == PHGame.PH_HIDE || p == PHGame.PH_HUNT || p == PHGame.PH_BRIEF;
     }
 
+    // doors are for the living players of the round: a ghost (caught, out, or joined mid-round) is unseen, and a
+    // door it opened would give a hider away
+    bool CanWorkDoors() { return doors != null && InRound() && role != PHGame.ROLE_NONE && !IsGhost(); }
+
     // desktop: the door (or the openable prop) under the cross-hair, within the role's reach of the prop
     bool TryDoor()
     {
-        if (doors == null || !InRound()) return false;
+        if (!CanWorkDoors()) return false;
         float reach = role == PHGame.ROLE_HUNTER ? HUNTER_HANDLE_RANGE : HANDLE_RANGE;
         if (!Aim(reach + 1f)) return false;
         if (!hit.collider.gameObject.name.StartsWith("door")) return false;
@@ -472,6 +495,7 @@ public class PHLocal : UdonSharpBehaviour
         wasEndgame = eg;
         UpdateForcedTaunt();
         UpdateVoices();
+        UpdateStrayStation();
         UpdateJoiner();
         UpdateHud();
         UpdateHover();
@@ -494,7 +518,7 @@ public class PHLocal : UdonSharpBehaviour
     void UpdateHover()
     {
         int phase = game.phase;
-        bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT) && !aimOverride;
+        bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT) && !aimOverride && !IsGhost();
         Collider c = null;
         canPick = can;
         aimDist = TAKE_RANGE;
@@ -596,6 +620,9 @@ public class PHLocal : UdonSharpBehaviour
 
     void TryTakeDisguise()
     {
+        // a caught hider (a ghost) picks nothing: it gave them health 1 and shrank them again (PilotTake comes here too)
+        PHSlot s = Me();
+        if (s == null || s.caught || s.ghost || role != PHGame.ROLE_HIDER || !InRound()) return;
         if (!Aim(TAKE_RANGE)) return;
         int e = EmitOf(hit.collider.transform);
         if (e < 0) return;
@@ -615,10 +642,15 @@ public class PHLocal : UdonSharpBehaviour
         Say("You are a " + DefName(d).ToLower(), 2f);
     }
 
+    int lastShotSlot = -1, lastShotHealth;
+    float lastShotAt = -99f;
+
     void Fire()
     {
         PHSlot s = Me();
-        if (s == null || s.hunterOut || Time.time < nextDart) return;
+        // (PilotFire comes here without InputUse's checks)
+        if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT) return;
+        if (s.hunterOut || Time.time < nextDart) return;
         nextDart = Time.time + DART_INTERVAL;
         sound.Play("switch_002", 0.5f);
         lastHitName = "nothing";
@@ -630,10 +662,15 @@ public class PHLocal : UdonSharpBehaviour
         {
             PHSlot target = game.slots[h];
             if (target.caught) return;
+            // the target's health as synced, less this hunter's own darts it may not have heard of yet (a second dart
+            // within the sync delay counted a second catch)
+            int was = target.health;
+            if (h == lastShotSlot && Time.time - lastShotAt < 2f && lastShotHealth < was) was = lastShotHealth;
+            lastShotSlot = h; lastShotAt = Time.time; lastShotHealth = was - damage;
             target.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PHSlot.TakeHit), damage, Networking.LocalPlayer.playerId);
             s.hits++;
             s.hunterHealth = Mathf.Min(HUNTER_HEALTH, s.hunterHealth + HIT_REWARD);
-            if (target.health - damage <= 0) s.catches++;
+            if (was > 0 && was - damage <= 0) s.catches++;
             s.Send();
             sound.Play("confirmation_002", 0.8f);
             sound.PlayAt("impactPunch_medium_000", hit.point, 14f, 0.8f, 1f);
@@ -696,6 +733,7 @@ public class PHLocal : UdonSharpBehaviour
     public void OnHit(int damage, bool nowCaught, int shooter)
     {
         PHSlot s = Me();
+        if (s == null) return;   // (the slot table may not have this player yet)
         if (nowCaught)
         {
             Say("You were caught! You walk as a ghost until the round ends.", 5f);
@@ -706,7 +744,7 @@ public class PHLocal : UdonSharpBehaviour
             s.StartGhost();
             SetFrozen(false);
         }
-        else Say("Hit! " + (s != null ? s.health.ToString() : "?") + " health left. Move!", 2.5f);
+        else Say("Hit! " + s.health + " health left. Move!", 2.5f);
     }
 
     // ------------------------------------------------------------------ HUD

@@ -57,7 +57,7 @@ public class PHLamps : UdonSharpBehaviour
         for (int s = 0; s < used; s++)
         {
             int p = pointOf[s];
-            if (p < 0 || p >= builder.nLights || follow[p] == null) continue;
+            if (pool[s] == null || p < 0 || p >= builder.nLights || follow[p] == null) continue;   // (Place skips an empty pool entry too)
             Transform t = pool[s].transform;
             Vector3 w = follow[p].TransformPoint(pos[p]);
             if ((t.position - w).sqrMagnitude < 0.0004f) continue;

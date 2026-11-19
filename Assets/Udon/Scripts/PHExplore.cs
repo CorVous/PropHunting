@@ -19,7 +19,9 @@ public class PHExplore : UdonSharpBehaviour
     public void Press()
     {
         MapBuilderUdon builder = game.builder;
-        if (generating || game.phase != PHGame.PH_LOBBY || builder.busy)
+        // (not while a round's map is still being made: back in the lobby early, PHGame goes on stepping the generator
+        // and would build and report it over this one)
+        if (generating || game.phase != PHGame.PH_LOBBY || builder.busy || game.building)
         {
             if (sfx != null && error != null) sfx.PlayOneShot(error);
             return;
@@ -27,6 +29,9 @@ public class PHExplore : UdonSharpBehaviour
         if (sfx != null && select != null) sfx.PlayOneShot(select);
         generating = true;
         builder.Clear();
+        // the doors' list pointed at the props just destroyed, and the round does not change in the lobby, so PHDoors
+        // would keep it (IndexOf then reads the null objects array); with objects null this empties it
+        if (game.local != null && game.local.doors != null) game.local.doors.ListDoors();
         uint seed = game.ThemedSeed();   // of the debug THEME button's theme, if one is chosen
         game.gen.Begin(seed, game.RoundSize(), game.densityChoice, 0);
         label.text = "GENERATING...";

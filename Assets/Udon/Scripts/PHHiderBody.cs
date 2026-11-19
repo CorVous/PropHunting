@@ -145,10 +145,26 @@ public class PHHiderBody : UdonSharpBehaviour
     // ------------------------------------------------------------------ shape
     public void Begin(Vector3 at, float facing)
     {
-        pos = at; yaw = facing; stationYaw = facing; lag = Vector3.zero;
-        velY = 0f; grounded = false; lifting = false;
+        pos = at; home = at; yaw = facing; stationYaw = facing; lag = Vector3.zero;
+        velY = 0f; grounded = false; lifting = false; stuckFor = 0f; loose = false;
+        settle = true;
         active = true; ghost = false;
         turnHeld = false; wasTurning = false; keyDir = 0;
+    }
+
+    Vector3 home;   // where the round started (a fall out of the map comes back here)
+
+    // A spawn can hold the starting disguise partly inside something: an outdoor spawn cell against a building is
+    // 0.25 m from the wall line and the facade's collider reaches 0.28-0.43 m out. The first frame after Begin (the
+    // disguise is set by then, PHLocal.StartingDisguise) it is moved to the nearest place it fits. The player was
+    // just teleported, so the view goes with it (no lag).
+    bool settle;
+    void Settle()
+    {
+        settle = false;
+        if (mask == 0 || Fits(pos, yaw)) return;
+        // (FitHere moves the prop by Shift: the seat, and the view, stay where the player landed)
+        if (FitHere()) home = pos;
     }
 
     public void End() { active = false; }
@@ -157,6 +173,7 @@ public class PHHiderBody : UdonSharpBehaviour
     public void SetProp(int def)
     {
         ghost = false;
+        lifting = false;   // (a lift planned for the old box could end the new one inside the ledge's edge)
         Vector3 size = new Vector3(game.gen.defSx[def], game.gen.defSy[def], game.gen.defSz[def]) / 1000f;
         SetBox(size);
         SetShape(def, size);
@@ -412,6 +429,7 @@ public class PHHiderBody : UdonSharpBehaviour
     void UpdateBody()
     {
         if (!active) return;
+        if (settle) Settle();
         VRCPlayerApi me = Networking.LocalPlayer;
         float dt = Mathf.Min(Time.deltaTime, 0.1f);
         bool vr = me.IsUserInVR();
@@ -849,7 +867,8 @@ public class PHHiderBody : UdonSharpBehaviour
             else { pos.y -= fall; grounded = false; }
         }
         if (!grounded && blocked && ledge > 0f && delta.sqrMagnitude > 1e-10f) TryLedge(delta.normalized);
-        if (pos.y < -20f) { pos.y = 2f; velY = 0f; }
+        // fell out of the map: back where the round started (the same x and z could be off the map, and fall forever)
+        if (pos.y < -20f) { pos = home; velY = 0f; lag = Vector3.zero; narrow = false; half = fullHalf; }
     }
 
     void TryLedge(Vector3 forward)
@@ -876,7 +895,8 @@ public class PHHiderBody : UdonSharpBehaviour
     public bool TryYaw(float newYaw)
     {
         if (Mathf.Abs(Mathf.DeltaAngle(yaw, newYaw)) < 0.01f) return true;
-        if (Mathf.Abs(half.x - half.z) < 0.03f || Fits(pos, newYaw)) { yaw = newYaw; return true; }
+        // (always asked, a square prop too: turned 15 or 45 degrees its corners reach further, into a wall it stood against)
+        if (Fits(pos, newYaw)) { yaw = newYaw; return true; }
         for (float d = 3f; d <= 15f; d += 3f)
         {
             if (Fits(pos, newYaw + d)) { yaw = newYaw + d; return true; }
@@ -988,6 +1008,7 @@ public class PHHiderBody : UdonSharpBehaviour
         if (Fits(pos, yaw) || Nudge(yaw, Mathf.Max(fullHalf.x, fullHalf.z) + 0.6f) || !canSqueeze) return;
         Vector3 dir = delta; dir.y = 0f;
         dir.Normalize();
+        if (dir.sqrMagnitude < 0.5f) return;   // (a push too slight to have a way: Normalize gives zero)
         SqueezeBox(dir);
         if (BlockedOn(pos, dir, 0.3f)) { half = fullHalf; return; }
         narrow = true; loose = true; narrowSince = Time.time;

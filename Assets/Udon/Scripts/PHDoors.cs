@@ -25,11 +25,19 @@ public class PHDoors : UdonSharpBehaviour
     int[] partCount = new int[MAX];
     float[] t = new float[MAX];
     int listedFor = -1;
+    // The listed map is the round's (open[] applies), or an Explore map built only here (PHExplore: same round, a
+    // different seed): then the synced open[] belongs to another map and doors swing on this client alone.
+    bool forRound;
+    bool[] localOpen = new bool[MAX];
+
+    bool Want(int i) { return forRound ? (open[i] && round == game.round) : localOpen[i]; }
 
     // the openables of the map that was just built (called on every client)
     public void ListDoors()
     {
         count = 0;
+        forRound = game.gen.seed == game.seed && game.gen.size == game.mapSize;
+        for (int i = 0; i < MAX; i++) { localOpen[i] = false; t[i] = 0f; }
         GameObject[] objs = game.builder.objects;
         if (objs == null) return;
         int[] emitDef = game.gen.emitDef, defFlags = game.gen.defFlags;
@@ -59,11 +67,13 @@ public class PHDoors : UdonSharpBehaviour
     // the openable a collider belongs to (a door part, or the prop itself), or -1
     public int IndexOf(Transform hitPart)
     {
+        if (game.builder.objects == null) return -1;   // (the map is being rebuilt)
         Transform tr = hitPart;
         while (tr != null && tr.parent != game.builder.propRoot) tr = tr.parent;
         if (tr == null) return -1;
         for (int i = 0; i < count; i++)
         {
+            if (emitOf[i] >= game.builder.objects.Length) continue;
             GameObject o = game.builder.objects[emitOf[i]];
             if (o != null && o.transform == tr) return i;
         }
@@ -93,14 +103,18 @@ public class PHDoors : UdonSharpBehaviour
     public void Toggle(int i)
     {
         if (i < 0 || i >= count) return;
-        if (!Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);
-        if (round != game.round) { for (int k = 0; k < MAX; k++) open[k] = false; round = game.round; }
-        open[i] = !open[i];
-        RequestSerialization();
-        if (game.local != null && game.local.sound != null && game.builder.objects != null)
+        if (!forRound) localOpen[i] = !localOpen[i];   // an Explore map: nothing synced
+        else
+        {
+            if (!Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);
+            if (round != game.round) { for (int k = 0; k < MAX; k++) open[k] = false; round = game.round; }
+            open[i] = !open[i];
+            RequestSerialization();
+        }
+        if (game.local != null && game.local.sound != null && game.builder.objects != null && emitOf[i] < game.builder.objects.Length)
         {
             GameObject o = game.builder.objects[emitOf[i]];
-            if (o != null) game.local.sound.PlayAt(open[i] ? "doorOpen_1" : "doorClose_1", o.transform.position, 10f, 0.8f, 1f);
+            if (o != null) game.local.sound.PlayAt(Want(i) ? "doorOpen_1" : "doorClose_1", o.transform.position, 10f, 0.8f, 1f);
         }
     }
 
@@ -111,10 +125,10 @@ public class PHDoors : UdonSharpBehaviour
     {
         // others hear a door that changed (a hider shutting themselves in is a clue)
         // (not while the map is being rebuilt: the old list's props are gone, objects is null)
-        if (game.builder.objects == null || listedFor != game.round) return;
+        if (game.builder.objects == null || listedFor != game.round || !forRound) return;
         for (int i = 0; i < count; i++)
         {
-            bool want = open[i] && round == game.round;
+            bool want = Want(i);
             if ((t[i] > 0.5f) != want && game.local != null && game.local.sound != null)
             {
                 GameObject o = game.builder.objects[emitOf[i]];
@@ -149,7 +163,7 @@ public class PHDoors : UdonSharpBehaviour
         float step = Time.deltaTime / SWING_TIME;
         for (int i = 0; i < count; i++)
         {
-            float target = (open[i] && round == game.round) ? 1f : 0f;
+            float target = Want(i) ? 1f : 0f;
             if (Mathf.Approximately(t[i], target)) continue;
             t[i] = Mathf.MoveTowards(t[i], target, step);
             float e = t[i] * t[i] * (3f - 2f * t[i]);

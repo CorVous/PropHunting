@@ -754,6 +754,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             collisionCollider.sharedMesh = null;
             if (cm != null) Destroy(cm);
         }
+        // a build scrapped between stages 26 and 27 had made the collision mesh but not handed it over yet
+        if (collMesh != null) { Destroy(collMesh); collMesh = null; }
+        nLights = 0;   // the old points (and lamp props they follow) are gone
         built = false; busy = false; stage = 0;
     }
 
@@ -2006,7 +2009,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             {
                 // review 10: the sphere read as a lumpy blob; a flat disc with bands suits the style
                 MeshFilter mf = moon.GetComponent<MeshFilter>();
-                if (mf != null) mf.sharedMesh = PlanetDisc();
+                // one disc for every space map (a new one each build was never freed with the moon)
+                if (planetMesh == null) planetMesh = PlanetDisc();
+                if (mf != null) mf.sharedMesh = planetMesh;
                 moon.transform.rotation = Quaternion.LookRotation(-dir, Vector3.up);
             }
             if (moon != null)
@@ -2091,6 +2096,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             PlaceSky(skyPrefabs[k % 2 == 0 ? SKY_HILL_A : SKY_HILL_B], p, Rand01(U32(k + 8401)) * 360f, 1.0f + Rand01(U32(k + 8501)) * 0.5f);
         }
     }
+
+    Mesh planetMesh;
 
     Mesh PlanetDisc()
     {
@@ -2688,7 +2695,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // ------------------------------------------------------------------ props
     void MakeProp(int e)
     {
-        GameObject prefab = propPrefabs[emitDef[e]];
+        // (baked prefabs older than the generator's defs: skip the prop rather than halt the build)
+        int pd = emitDef[e];
+        if (pd < 0 || pd >= propPrefabs.Length) return;
+        GameObject prefab = propPrefabs[pd];
         if (prefab == null) return;
         GameObject go = Instantiate(prefab);
         Transform t = go.transform;

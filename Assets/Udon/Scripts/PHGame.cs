@@ -30,7 +30,7 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public string pendingCode = "";
     [UdonSynced] public string seedStatus = "";
     [UdonSynced] public bool seedNeedsConfirm;
-    string confirmCode = "";
+    [UdonSynced] string confirmCode = "";   // (synced: a new host can still "play anyway")
 
     // ---- map rotation (C1, C6, D2-D6, D8, G49): three maps per size, played in turn; each keeps its run count
     // while the group plays other sizes. After runCap runs (host setting, default 10) a map retires and a new
@@ -240,12 +240,12 @@ public class PHGame : UdonSharpBehaviour
         }
         if (handoverPending)
         {
-            if (Now < claimWindowEndMs) return;
+            if (Now - claimWindowEndMs < 0) return;   // (a difference: server time wraps)
             // nobody claimed it: the player who has been here longest takes it
             handoverPending = false;
             int best = -1;
             for (int i = 0; i < slotPlayer.Length; i++)
-                if (slotPlayer[i] != 0 && Utilities.IsValid(VRCPlayerApi.GetPlayerById(slotPlayer[i])) && (best < 0 || slotJoinMs[i] < slotJoinMs[best])) best = i;
+                if (slotPlayer[i] != 0 && Utilities.IsValid(VRCPlayerApi.GetPlayerById(slotPlayer[i])) && (best < 0 || slotJoinMs[i] - slotJoinMs[best] < 0)) best = i;
             if (best >= 0 && slotPlayer[best] != me.playerId)
             {
                 VRCPlayerApi heir = VRCPlayerApi.GetPlayerById(slotPlayer[best]);
@@ -352,8 +352,16 @@ public class PHGame : UdonSharpBehaviour
     public void VoteScrap() { PHSlot s = LocalSlot(); if (s == null || phase != PH_LOBBY || lastRot < 0) return; s.scrapVote = s.scrapVote == voteId ? 0 : voteId; s.Send(); }
     public void VoteUndo() { PHSlot s = LocalSlot(); if (s == null || phase != PH_LOBBY || undoRot < 0) return; s.undoVote = s.undoVote == voteId ? 0 : voteId; s.Send(); }
 
-    public int ScrapVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (slotPlayer[i] != 0 && slots[i].scrapVote == voteId) n++; return n; }
-    public int UndoVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (slotPlayer[i] != 0 && slots[i].undoVote == voteId) n++; return n; }
+    public int ScrapVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (Seated(i) && slots[i].scrapVote == voteId) n++; return n; }
+    public int UndoVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (Seated(i) && slots[i].undoVote == voteId) n++; return n; }
+
+    // the slot's player has taken it over (until then a reused slot still shows the last player's vote)
+    bool Seated(int i)
+    {
+        if (slotPlayer[i] == 0) return false;
+        VRCPlayerApi o = Networking.GetOwner(slots[i].gameObject);
+        return Utilities.IsValid(o) && o.playerId == slotPlayer[i];
+    }
     public int VotesNeeded() { return VRCPlayerApi.GetPlayerCount() / 2 + 1; }
     public bool CanScrap() { return phase == PH_LOBBY && lastRot >= 0; }
     public bool CanUndo() { return phase == PH_LOBBY && undoRot >= 0; }
@@ -402,7 +410,10 @@ public class PHGame : UdonSharpBehaviour
         AssignSlots();
         int[] idx = new int[slots.Length];
         int k = 0;
-        for (int i = 0; i < slots.Length; i++) { slotRole[i] = ROLE_NONE; if (slotPlayer[i] != 0 && slots[i].inZone) idx[k++] = i; }
+        for (int i = 0; i < slots.Length; i++) if (slotPlayer[i] != 0 && slots[i].inZone) idx[k++] = i;
+        // (counted again after the slot table's tidy: someone may have just left; never a round with nobody in it)
+        if (k < Mathf.Max(1, minPlayers)) { RequestSerialization(); return; }
+        for (int i = 0; i < slots.Length; i++) slotRole[i] = ROLE_NONE;
         for (int i = k - 1; i > 0; i--) { int j = Random.Range(0, i + 1); int t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
         int hunters = (k == 1 && soloHides) ? 0 : Hunters(k);
         for (int i = 0; i < k; i++) slotRole[idx[i]] = i < hunters ? ROLE_HUNTER : ROLE_HIDER;
@@ -416,7 +427,7 @@ public class PHGame : UdonSharpBehaviour
     // end when a side runs out (a lone hunter can walk the map), only on the clock or with END ROUND; a lone
     // hunter's wait while the hiders hide is cut to a few seconds; the map's run is not counted.
     [UdonSynced] public bool debugRound;
-    bool debugQuick;
+    [UdonSynced] bool debugQuick;   // (synced: a host who takes over in BRIEF keeps the short hide)
 
     public void DebugHunter() { DebugStart(ROLE_HUNTER); }
     public void DebugHider() { DebugStart(ROLE_HIDER); }
@@ -609,7 +620,17 @@ public class PHGame : UdonSharpBehaviour
                 }
                 if (finished)
                 {
-                    if (gen.failed) { building = false; Debug.LogError("[PHGame] map generation failed: " + gen.failReason); }
+                    if (gen.failed)
+                    {
+                        building = false; Debug.LogError("[PHGame] map generation failed: " + gen.failReason);
+                        // the same seed fails on every client: back to the lobby at once (not after the 2 min wait,
+                        // then a round on no map), and the rotation's map is replaced so it does not come up again
+                        if (IsHost && phase == PH_LOADING && genRound == round)
+                        {
+                            if (lastRot >= 0) { NewMap(lastRot); lastRot = -1; }
+                            BackToLobby();
+                        }
+                    }
                     else
                     {
                         builder.BeginBuild();
@@ -624,8 +645,17 @@ public class PHGame : UdonSharpBehaviour
                 if (me != null) me.ReportReady(round);
             }
         }
+        // readiness again while loading, in case the report was lost (the slot not yet ours when the map was done)
+        if (phase == PH_LOADING && builtRound == round && !building && Time.time >= nextReady)
+        {
+            nextReady = Time.time + 1f;
+            PHSlot me = LocalSlot();
+            if (me != null && me.readyRound != round && RoleOf(SlotOf(Networking.LocalPlayer.playerId)) != ROLE_NONE) me.ReportReady(round);
+        }
         if (IsHost) { HostSweep(); HostTick(); HostHandover(); HostVotes(); }
     }
+
+    float nextReady;
 
     // ------------------------------------------------------------------ the host's clock
     void HostTick()
@@ -675,7 +705,8 @@ public class PHGame : UdonSharpBehaviour
         if (lastRot >= 0 && !debugRound)
         {
             rotRuns[lastRot]++;
-            if (rotRuns[lastRot] >= runCap) NewMap(lastRot);
+            // (a retired map is gone: SCRAP would otherwise scrap its unplayed replacement)
+            if (rotRuns[lastRot] >= runCap) { NewMap(lastRot); lastRot = -1; }
         }
         voteId++;
         SetPhase(PH_END, ROUND_END);

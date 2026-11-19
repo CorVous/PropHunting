@@ -377,7 +377,8 @@ public class PHSlot : UdonSharpBehaviour
         float dy = shownPos.y - lastY;
         lastY = shownPos.y;
         if (Mathf.Abs(dy) > 0.5f) dy = 0f;
-        hopVY = Mathf.Lerp(hopVY, Mathf.Clamp(dy / dt, -12f, 12f), 1f - Mathf.Exp(-25f * dt));
+        // (over the frame's real length: after a hitch dt is held to 0.033 and dy / dt read as a fast hop or fall)
+        hopVY = Mathf.Lerp(hopVY, Mathf.Clamp(dy / Time.deltaTime, -12f, 12f), 1f - Mathf.Exp(-25f * dt));
         // (in the air until the shown prop is down too: elsewhere it follows the synced place a little behind)
         bool air = airborne || shownPos.y - propPos.y > 0.015f;
         if (air)

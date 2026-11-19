@@ -67,7 +67,10 @@ public class PHSeed : UdonSharpBehaviour
         genVersion = 0; size = 0; seed = 0; flags = 0;
         if (text == null) return TYPO;
         string t = text.Trim().ToUpper();
-        if (t.Length > 1 && t.Substring(0, 1) == "V")
+        // (V is also a code letter: a bare code like V123-4567-89AB keeps its first group)
+        int symbols = 0;
+        for (int i = 0; i < t.Length; i++) if (t.Substring(i, 1) != "-" && t.Substring(i, 1) != " ") symbols++;
+        if (symbols != 12 && t.Length > 1 && t.Substring(0, 1) == "V")
         {
             int end = 1;
             while (end < t.Length && "0123456789".IndexOf(t.Substring(end, 1)) >= 0) end++;

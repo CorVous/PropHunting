@@ -154,7 +154,8 @@ public class PHKnock : UdonSharpBehaviour
     public override void OnDeserialization()
     {
         // a knock that has just started: everyone hears it
-        if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0) KnockSound(pos);
+        // (only on a built map: a late joiner still generating has no prop table yet, and a bad index halts this script)
+        if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0 && game.MapReady && emit < game.gen.emitDef.Length) KnockSound(pos);
         wasMoving = moving; heardEmit = emit;
         // a knock of another prop took this one over: the old prop stays where it lay
         shownEmit = emit;
