@@ -252,6 +252,15 @@ public static class TextBaker
         {
             if (perFont[f].Count == 0 || fontFile[f] == null) { if (fontFile[f] == null && perFont[f].Count > 0) Debug.LogError("[prophunt] text: missing " + FontDir + f + "-Bold.ttf (Tools/make_l10n_fonts.py)"); continue; }
             var fa = Atlas(fontFile[f], FontDir + f + " SDF.asset", new string(perFont[f].ToArray()));
+            // Unity sometimes hands over a font face with no glyphs (an old import after a git checkout): reimport and retry
+            for (int retry = 0; retry < 3 && fa != null && fa.characterTable.Count == 0; retry++)
+            {
+                Debug.LogWarning("[prophunt] text: " + f + " gave an empty atlas, reimporting its TTF and trying again");
+                AssetDatabase.ImportAsset(FontDir + f + "-Bold.ttf", ImportAssetOptions.ForceUpdate);
+                var font = AssetDatabase.LoadAssetAtPath<Font>(FontDir + f + "-Bold.ttf");
+                UnityEngine.TextCore.LowLevel.FontEngine.LoadFontFace(font, 56);
+                fa = Atlas(font, FontDir + f + " SDF.asset", new string(perFont[f].ToArray()));
+            }
             if (fa != null) chain.Add(fa);
         }
         var latinChars = new string(latin.ToArray());

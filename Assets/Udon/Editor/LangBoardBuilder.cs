@@ -31,7 +31,10 @@ public static partial class LobbyBuilder
         Img(cv, "BoardShadow", LP(LW / 2, LH / 2 + 5), new Vector2(LW - 8, LH - 8), sRound, C("173d2c"), 1.6f);
         Img(cv, "BoardEdge", LP(LW / 2, LH / 2), new Vector2(LW - 8, LH - 8), sRound, BoardEdge, 1.6f);
         Img(cv, "Board", LP(LW / 2, LH / 2), new Vector2(LW - 18, LH - 18), sRound, Cream, 1.6f);
-        Img(cv, "Globe", LP(98, LH / 2), new Vector2(170, 170), Icon("globe"), Color.white);
+        Img(cv, "Globe", LP(98, LH / 2 - 12), new Vector2(150, 150), Icon("globe"), Color.white);
+        // Cor: say that the translations are machine made (the row lang.machine, in the picked language)
+        var note = Txt(cv, "MachineNote", LP(98, LH - 40), new Vector2(160, 34), "Machine translated", future, 13, C("6d5524", 0.8f), TextAlignmentOptions.Center);
+        note.enableWordWrapping = true;
 
         var board = root.gameObject.AddUdonSharpComponent<PHLangBoard>();
         board.text = game != null ? game.text : null;
