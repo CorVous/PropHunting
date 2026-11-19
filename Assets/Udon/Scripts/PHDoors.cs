@@ -53,6 +53,7 @@ public class PHDoors : UdonSharpBehaviour
             count++;
         }
         listedFor = game.round;
+        idle = false;
         Apply();
     }
 
@@ -93,6 +94,7 @@ public class PHDoors : UdonSharpBehaviour
     public void Toggle(int i)
     {
         if (i < 0 || i >= count) return;
+        idle = false;
         if (!Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);
         if (round != game.round) { for (int k = 0; k < MAX; k++) open[k] = false; round = game.round; }
         open[i] = !open[i];
@@ -119,6 +121,7 @@ public class PHDoors : UdonSharpBehaviour
                 if (o != null) game.local.sound.PlayAt(want ? "doorOpen_1" : "doorClose_1", o.transform.position, 10f, 0.8f, 1f);
             }
         }
+        idle = false;
     }
 
     // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
@@ -140,13 +143,23 @@ public class PHDoors : UdonSharpBehaviour
         Apply();
     }
 
+    // Perf: every listed door (up to 256) was looked at every frame though almost all rest. Once a frame finds every
+    // door where it should be, the loop waits (idle) until something can change that: a toggle here, a sync from
+    // the owner, a new list, or a new round (which shuts them all).
+    bool idle;
+    int idleRound = -1, idleGameRound = -1;
+
     void Apply()
     {
+        if (idle && idleRound == round && idleGameRound == game.round) return;
+        idleRound = round; idleGameRound = game.round;
+        bool still = true;
         float step = Time.deltaTime / SWING_TIME;
         for (int i = 0; i < count; i++)
         {
             float target = (open[i] && round == game.round) ? 1f : 0f;
             if (Mathf.Approximately(t[i], target)) continue;
+            still = false;
             t[i] = Mathf.MoveTowards(t[i], target, step);
             float e = t[i] * t[i] * (3f - 2f * t[i]);
             for (int k = 0; k < partCount[i]; k++)
@@ -155,5 +168,6 @@ public class PHDoors : UdonSharpBehaviour
                 if (part != null) part.localRotation = Quaternion.Euler(0f, sign[i * MAX_PARTS + k] * OPEN_ANGLE * e, 0f);
             }
         }
+        idle = still;
     }
 }
