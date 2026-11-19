@@ -255,7 +255,7 @@ public static class WorldSceneBuilder
         return sb.ToString();
     }
 
-    // PHView: the hider's health (desktop low on the screen, VR on the left wrist) and the third-person view
+    // PHView: the hider's health (desktop low on the screen, VR above the screen device) and the third-person view
     // (desktop lower right corner, VR a grabbable panel)
     static void BuildView(Transform parent, PHGame game, PHLocal local)
     {
@@ -306,17 +306,6 @@ public static class WorldSceneBuilder
         prt.anchoredPosition = new Vector2(-24f, 24f); prt.sizeDelta = new Vector2(420f, 280f);   // a margin inside the screen's edge; clear of the health bar (centre, 140 each side) down to 4:3 (Cor: bigger)
         view.desktopPip = pip;
         view.desktopRoot = desk.transform;
-
-        // VR: the left wrist
-        var wrist = new GameObject("Wrist");
-        wrist.transform.SetParent(viewGo.transform, false);
-        wrist.layer = 5;
-        var wc = wrist.AddComponent<Canvas>(); wc.renderMode = RenderMode.WorldSpace;
-        wrist.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 40);
-        wrist.transform.localScale = Vector3.one * 0.0004f;
-        HealthBar(wrist.transform, sprite, Vector2.zero, new Vector2(180f, 26f), out bar, out fill);
-        view.wristHealthBar = bar; view.wristHealth = fill;
-        view.wristRoot = wrist.transform;
 
         // VR: the third-person panel, grabbable
         var panel = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -374,6 +363,19 @@ public static class WorldSceneBuilder
         for (int i = 0; i < 4; i++)
             Part(casing, PrimitiveType.Cube, "Slot" + i, new Vector3(0.07f + i * 0.022f, -0.175f, -0.0105f), Vector3.zero, new Vector3(0.008f, 0.04f, 0.002f), dark);
         view.casing = casing;
+        // VR: the hider's health, a slim bar a little above the screen device (Cor: "can the health go above the camera
+        // view in vr? anchored along with it?"). A child of the casing, so it is carried, put down and sized with it;
+        // no collider, clear of the handle (its top at 0.164) and of the taunt button on the chin
+        var vrHealth = new GameObject("ScreenHealth");
+        vrHealth.transform.SetParent(casing, false);
+        vrHealth.layer = 5;
+        var vhc = vrHealth.AddComponent<Canvas>(); vhc.renderMode = RenderMode.WorldSpace;
+        var vhr = vrHealth.GetComponent<RectTransform>();
+        vhr.sizeDelta = new Vector2(360f, 20f);
+        vhr.localPosition = new Vector3(0f, 0.19f, 0f); vhr.localRotation = Quaternion.identity;
+        vhr.localScale = Vector3.one * 0.001f;   // canvas units are millimetres: a bar 34 cm by 1.6 cm
+        HealthBar(vrHealth.transform, sprite, Vector2.zero, new Vector2(340f, 16f), out bar, out fill);
+        view.vrHealthBar = bar; view.vrHealth = fill;
         var button = Empty(viewGo.transform, "TauntButton");
         Part(button, PrimitiveType.Cylinder, "Base", new Vector3(0f, 0f, -0.006f), new Vector3(90f, 0f, 0f), new Vector3(0.082f, 0.006f, 0.082f), dark);
         var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
