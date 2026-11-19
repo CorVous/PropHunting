@@ -127,11 +127,15 @@ public static class TextBaker
         // static labels: the first row whose English is the label's whole text
         var byEnglish = new Dictionary<string, int>();
         for (int k = 0; k < t.keys.Count; k++) if (!byEnglish.ContainsKey(t.rows[k][0])) byEnglish[t.rows[k][0]] = k;
+        // labels a builder baked in capitals ("FIRST CATCH" for the row "First Catch"): the Kenney fonts draw lower case
+        // as small capitals, so the row's own text is shown
+        var byUpper = new Dictionary<string, int>();
+        for (int k = 0; k < t.keys.Count; k++) { string u = t.rows[k][0].ToUpperInvariant(); if (u != t.rows[k][0] && !byUpper.ContainsKey(u)) byUpper[u] = k; }
         var labels = new List<TMP_Text>(); var labelKey = new List<int>();
         foreach (var tmp in Object.FindObjectsOfType<TMP_Text>(true))
         {
             if (tmp.GetComponentInParent<TMP_InputField>(true) != null && tmp.GetComponentInParent<TMP_InputField>(true).textComponent == tmp) continue;
-            if (byEnglish.TryGetValue(tmp.text.Trim(), out int k)) { labels.Add(tmp); labelKey.Add(k); }
+            if (byEnglish.TryGetValue(tmp.text.Trim(), out int k) || byUpper.TryGetValue(tmp.text.Trim(), out k)) { labels.Add(tmp); labelKey.Add(k); }
         }
         text.labels = labels.ToArray(); text.labelKey = labelKey.ToArray();
         // longer languages shrink to fit their label instead of spilling out (Cor: "make sure all the text stays
@@ -284,24 +288,8 @@ public static class TextBaker
         }
         fa.atlasPopulationMode = AtlasPopulationMode.Static;
         string name = Path.GetFileNameWithoutExtension(path);
-        var old = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
-        if (old != null)
-        {
-            // keep the asset (and its GUID: fallback lists point at it); swap in the new glyphs and atlas
-            EditorUtility.CopySerialized(fa, old);
-            foreach (var sub in AssetDatabase.LoadAllAssetRepresentationsAtPath(path)) Object.DestroyImmediate(sub, true);
-            var tex = fa.atlasTextures[0]; tex.name = name + " Atlas";
-            var mat = fa.material; mat.name = name + " Material";
-            AssetDatabase.AddObjectToAsset(tex, old);
-            AssetDatabase.AddObjectToAsset(mat, old);
-            old.atlasTextures = new[] { tex };
-            old.material = mat;
-            mat.SetTexture(ShaderUtilities.ID_MainTex, tex);
-            old.name = name;
-            EditorUtility.SetDirty(old);
-            Object.DestroyImmediate(fa);
-            return old;
-        }
+        // a fresh asset every bake (the fallback lists are set again right after)
+        if (AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path) != null) AssetDatabase.DeleteAsset(path);
         AssetDatabase.CreateAsset(fa, path);
         fa.atlasTextures[0].name = name + " Atlas";
         AssetDatabase.AddObjectToAsset(fa.atlasTextures[0], fa);

@@ -27,7 +27,19 @@ public class PHTrophyBoard : UdonSharpBehaviour
     float[] key;
     int[] rank;
 
-    void Start() { Refresh(); }
+    void Start() { Refresh(); if (store != null && store.game != null && store.game.text != null) store.game.text.Register(this); }
+
+    // the "N-M rounds" line of each card in the player's language (PHText; the rest of the board is baked labels)
+    public void _OnTextLanguage()
+    {
+        PHText tx = store.game.text;
+        for (int t = 0; t < rounds.Length && t < store.tLo.Length; t++)
+        {
+            if (rounds[t] == null) continue;
+            TextMeshProUGUI r = rounds[t].GetComponent<TextMeshProUGUI>();
+            if (r != null) r.text = tx.F2("store.rounds", store.tLo[t].ToString(), store.tHi[t].ToString());
+        }
+    }
 
     public void Refresh()
     {
