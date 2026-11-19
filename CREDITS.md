@@ -13,7 +13,7 @@ no credit is required; it is given here with thanks.
 |---|---|---|---|---|---|
 | KayKit - Character Pack : Adventurers 2.0 (`kaykit-adventurers`) | KayKit (Kay Lousberg) | weapons | 8 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-adventurers |
 | KayKit - Character Pack : Skeletons 1.1 (`kaykit-skeletons`) | KayKit (Kay Lousberg) | weapons | 3 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-skeletons |
-| KayKit : Board Game Bits 1.0 (`board-game-bits`) | KayKit (Kay Lousberg) | models | 20 | CC0-1.0 | https://kaylousberg.itch.io/board-game-bits |
+| KayKit : Board Game Bits 1.0 (`board-game-bits`) | KayKit (Kay Lousberg) | models | 7 | CC0-1.0 | https://kaylousberg.itch.io/board-game-bits |
 | KayKit : Fantasy Weapons Bits 1.0 (`fantasy-weapons-bits`) | KayKit (Kay Lousberg) | the medieval hunters' mace, weapons | 13 | CC0-1.0 | https://kaylousberg.itch.io/fantasy-weapons-bits |
 | KayKit : Furniture Bits 1.0 (`furniture-bits`) | KayKit (Kay Lousberg) | models | 39 | CC0-1.0 | https://kaylousberg.itch.io/furniture-bits |
 | KayKit : Halloween Bits 1.0 (`halloween-bits`) | KayKit (Kay Lousberg) | models | 11 | CC0-1.0 | https://kaylousberg.itch.io/halloween-bits |
