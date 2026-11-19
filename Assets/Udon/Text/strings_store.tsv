@@ -52,6 +52,40 @@ trophy.empty_handed.name	Empty Handed
 trophy.empty_handed.goal	Finish 10 rounds as a hunter with no catches.									
 trophy.scrapper.name	Scrapper									
 trophy.scrapper.goal	Vote to scrap a map.									
+trophy.first_hunt.name	First Hunt									
+trophy.first_hunt.goal	Play a round as a hunter.									
+trophy.double.name	Double									
+trophy.double.goal	Catch 2 hiders in one round.									
+trophy.five_catches.name	Five Catches									
+trophy.five_catches.goal	Catch 5 hiders in total.									
+trophy.twenty_five_catches.name	Twenty-Five Catches									
+trophy.twenty_five_catches.goal	Catch 25 hiders in total.									
+trophy.fifty_catches.name	Fifty Catches									
+trophy.fifty_catches.goal	Catch 50 hiders in total.									
+trophy.ten_hunts.name	Ten Hunts									
+trophy.ten_hunts.goal	Play 10 rounds as a hunter.									
+trophy.regular_hunter.name	Regular Hunter									
+trophy.regular_hunter.goal	Play 25 rounds as a hunter.									
+trophy.first_win_hunt.name	First Win									
+trophy.first_win_hunt.goal	Win a round as a hunter.									
+trophy.three_wins_hunt.name	Three Wins									
+trophy.three_wins_hunt.goal	Win 3 rounds as a hunter.									
+trophy.top_dog.name	Top Dog									
+trophy.top_dog.goal	Win 25 rounds as a hunter.									
+trophy.town_watch.name	Town Watch									
+trophy.town_watch.goal	Catch a hider on a town map.									
+trophy.village_watch.name	Village Watch									
+trophy.village_watch.goal	Catch a hider on a medieval map.									
+trophy.station_watch.name	Station Watch									
+trophy.station_watch.goal	Catch a hider on a space map.									
+trophy.fifty_bonks.name	Fifty Bonks									
+trophy.fifty_bonks.goal	Hit 50 wrong props in total.									
+trophy.steady_hand.name	Steady Hand									
+trophy.steady_hand.goal	Finish 5 rounds as a hunter without hitting a wrong prop.									
+trophy.last_stand.name	Last Stand									
+trophy.last_stand.goal	Catch a hider in the final stand.									
+trophy.quick_pair.name	Quick Pair									
+trophy.quick_pair.goal	Catch 2 hiders in the first minute of the hunt.									
 trophy.survivor.name	Survivor									
 trophy.survivor.goal	Survive a round as a hider.									
 trophy.untouched.name	Untouched									
@@ -96,3 +130,37 @@ trophy.usual_suspect.name	Usual Suspect
 trophy.usual_suspect.goal	Be the first hider caught, 5 times.									
 trophy.wallflower.name	Wallflower									
 trophy.wallflower.goal	Survive without moving once the hunt starts.									
+trophy.first_hide.name	First Hide									
+trophy.first_hide.goal	Play a round as a hider.									
+trophy.three_survivals.name	Three Survivals									
+trophy.three_survivals.goal	Survive 3 rounds in total.									
+trophy.twenty_five_survivals.name	Twenty-Five Survivals									
+trophy.twenty_five_survivals.goal	Survive 25 rounds in total.									
+trophy.ten_hides.name	Ten Hides									
+trophy.ten_hides.goal	Play 10 rounds as a hider.									
+trophy.regular_hider.name	Regular Hider									
+trophy.regular_hider.goal	Play 25 rounds as a hider.									
+trophy.first_win_hide.name	First Win									
+trophy.first_win_hide.goal	Win a round as a hider.									
+trophy.three_wins_hide.name	Three Wins									
+trophy.three_wins_hide.goal	Win 3 rounds as a hider.									
+trophy.prop_royalty.name	Prop Royalty									
+trophy.prop_royalty.goal	Win 25 rounds as a hider.									
+trophy.hidden_minute.name	Hidden Minute									
+trophy.hidden_minute.goal	Stay hidden for 1 minute in a round.									
+trophy.two_minutes.name	Two Minutes									
+trophy.two_minutes.goal	Stay hidden for 2 minutes in a round.									
+trophy.town_hider.name	Town Hider									
+trophy.town_hider.goal	Survive on a town map.									
+trophy.village_hider.name	Village Hider									
+trophy.village_hider.goal	Survive on a medieval map.									
+trophy.station_hider.name	Station Hider									
+trophy.station_hider.goal	Survive on a space map.									
+trophy.ten_props.name	Ten Props									
+trophy.ten_props.goal	Be 10 different props in total.									
+trophy.hoppy.name	Hoppy									
+trophy.hoppy.goal	Hop 50 times as a prop.									
+trophy.back_to_back.name	Back to Back									
+trophy.back_to_back.goal	Survive 2 rounds in a row as a hider.									
+trophy.stand_your_ground.name	Stand Your Ground									
+trophy.stand_your_ground.goal	Still be hiding when the final stand begins.									

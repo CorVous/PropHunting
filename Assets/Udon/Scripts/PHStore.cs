@@ -9,7 +9,8 @@ using VRC.SDK3.Persistence;
 //   weapons     the catalog of Tools/weapon_catalog.json, baked by the scene builder (StoreBuilder): starters and
 //               the 10 free weapons a side (Tools/store_free.json) are free; a new player carries a random free one; cool and goofy ones come from trophies, shop ones are bought. What the player carries is
 //               written to their PHSlot (meleeChoice / gunChoice, the melee work's synced picks)
-//   trophies    44: 22 hunter ones unlock melee weapons, 22 hider ones guns. Watched from the player's own PHSlot
+//   trophies    78: 39 hunter ones unlock melee weapons, 39 hider ones guns (Cor: half the weapons; the hardest
+//               give the most interesting). Watched from the player's own PHSlot
 //               (a light 0.25 s check during the round, 1 s otherwise) and settled when the round ends
 // Everything is kept in VRChat's player data (PlayerData: per player, per world), read when it is restored.
 // The catalog may only grow at the end: owned weapons are a bit per catalog position.
@@ -35,7 +36,7 @@ public class PHStore : UdonSharpBehaviour
     public string[] tKey, tName, tGoal;
     public int[] tLo, tHi;       // a rough range of rounds to earn it
     public int[] tWeapon;        // the catalog weapon it unlocks
-    public const int TROPHIES = 44, HUNTER_TROPHIES = 22;
+    public const int TROPHIES = 78, HUNTER_TROPHIES = 39;
 
     // ---- the player's own (saved)
     [System.NonSerialized] public int coins;
@@ -48,17 +49,23 @@ public class PHStore : UdonSharpBehaviour
 
     // the counters in st
     public const int S_CATCH = 0, S_HROUNDS = 1, S_PROUNDS = 2, S_SURV = 3, S_HWINS = 4, S_PWINS = 5, S_WRONG = 6,
-        S_EMPTY = 7, S_STREAK = 8, S_FIRST = 9, S_THEME_H = 10, S_THEME_P = 11, S_PROPS = 12, S_HOPS = 13, STATS = 24;
+        S_EMPTY = 7, S_STREAK = 8, S_FIRST = 9, S_THEME_H = 10, S_THEME_P = 11, S_PROPS = 12, S_HOPS = 13, S_CLEAN = 14, STATS = 24;
 
     // the trophies by number (strings_store.tsv lists them in this order)
     const int T_FIRST_CATCH = 0, T_HAT_TRICK = 1, T_SHARP_EYE = 2, T_CLEAN_SWEEP = 3, T_QUICK_DRAW = 4, T_BUZZER = 5,
         T_TEN = 6, T_HUNDRED = 7, T_GOOD_AS_NEW = 8, T_WEATHERED = 9, T_PACK_LEADER = 10, T_GLOBE_H = 11, T_OLD_H = 12,
         T_SNAPPED = 13, T_FURNITURE = 14, T_BONK = 15, T_SWING = 16, T_SPLINTERS = 17, T_CLOSE_SHAVE = 18, T_SHOT_DOWN = 19,
         T_EMPTY = 20, T_SCRAPPER = 21,
-        T_SURVIVOR = 22, T_UNTOUCHED = 23, T_LAST_PROP = 24, T_TEN_SURV = 25, T_FIFTY_SURV = 26, T_ON_A_ROLL = 27,
-        T_FIRST_SHOT = 28, T_SHARPSHOOTER = 29, T_GIANT_SLAYER = 30, T_PROPS_WIN = 31, T_GLOBE_P = 32, T_OLD_P = 33,
-        T_LONG_HAUL = 34, T_FOUND = 35, T_CLOSE_CALL = 36, T_QUICK_CHANGE = 37, T_BOUNCY = 38, T_CHAMELEON = 39,
-        T_SPRAY = 40, T_FULL_HOUSE = 41, T_USUAL = 42, T_WALLFLOWER = 43;
+        T_FIRST_HUNT = 22, T_DOUBLE = 23, T_FIVE = 24, T_TWENTY_FIVE = 25, T_FIFTY = 26, T_TEN_HUNTS = 27,
+        T_REG_HUNTER = 28, T_WIN1_H = 29, T_WIN3_H = 30, T_TOP_DOG = 31, T_TOWN_H = 32, T_VILLAGE_H = 33, T_STATION_H = 34,
+        T_FIFTY_BONKS = 35, T_STEADY = 36, T_LAST_STAND = 37, T_QUICK_PAIR = 38,
+        T_SURVIVOR = 39, T_UNTOUCHED = 40, T_LAST_PROP = 41, T_TEN_SURV = 42, T_FIFTY_SURV = 43, T_ON_A_ROLL = 44,
+        T_FIRST_SHOT = 45, T_SHARPSHOOTER = 46, T_GIANT_SLAYER = 47, T_PROPS_WIN = 48, T_GLOBE_P = 49, T_OLD_P = 50,
+        T_LONG_HAUL = 51, T_FOUND = 52, T_CLOSE_CALL = 53, T_QUICK_CHANGE = 54, T_BOUNCY = 55, T_CHAMELEON = 56,
+        T_SPRAY = 57, T_FULL_HOUSE = 58, T_USUAL = 59, T_WALLFLOWER = 60,
+        T_FIRST_HIDE = 61, T_THREE_SURV = 62, T_TWENTY_FIVE_SURV = 63, T_TEN_HIDES = 64, T_REG_HIDER = 65, T_WIN1_P = 66,
+        T_WIN3_P = 67, T_ROYALTY = 68, T_MINUTE = 69, T_TWO_MINUTES = 70, T_TOWN_P = 71, T_VILLAGE_P = 72, T_STATION_P = 73,
+        T_TEN_PROPS = 74, T_HOPPY = 75, T_BACK_TO_BACK = 76, T_STAND = 77;
 
     // coins (Cor approved): a round, a catch, surviving, every 20 s hidden before being caught, winning
     public const int COIN_ROUND = 10, COIN_CATCH = 15, COIN_SURVIVE = 25, COIN_WIN = 10, COIN_HIDDEN_MS = 20000;
@@ -67,7 +74,8 @@ public class PHStore : UdonSharpBehaviour
     int lastPhase = -1;
     bool inRound;
     int rRole, rCatches, rHiders, rPeople, rTheme, rSize;
-    bool rQuick, rBuzzer, rShave, rSplinter, rAlone, rMoved, rStand;
+    bool rQuick, rBuzzer, rShave, rSplinter, rAlone, rMoved, rStand, rStandCatch, rPair, rStandHide;
+    int rEarly;
     Vector3 rStart;
     bool rStartSet;
     int lastDef = -1;
@@ -170,8 +178,8 @@ public class PHStore : UdonSharpBehaviour
         if (c < 0 || c >= wId.Length) return;
         if (own[c]) { Pick(c); return; }
         if (dialog == null) return;
-        if (wCat[c] == CAT_SHOP) dialog.ShowBuy(c, at, facing);
-        else dialog.ShowTrophy(c, at, facing);
+        if (wTrophy[c] >= 0) dialog.ShowTrophy(c, at, facing);
+        else dialog.ShowBuy(c, at, facing);
         Play("click_001", 0.6f);
     }
 
@@ -187,7 +195,7 @@ public class PHStore : UdonSharpBehaviour
 
     public bool Buy(int c)
     {
-        if (c < 0 || own[c] || wCat[c] != CAT_SHOP || coins < wPrice[c] || !loaded) { Play("error_004", 0.5f); return false; }
+        if (c < 0 || own[c] || wCat[c] != CAT_SHOP || wTrophy[c] >= 0 || coins < wPrice[c] || !loaded) { Play("error_004", 0.5f); return false; }
         coins -= wPrice[c];
         own[c] = true;
         Play("jingles_PIZZI07", 0.7f);
@@ -235,6 +243,7 @@ public class PHStore : UdonSharpBehaviour
             {
                 defs[me.def >> 3] |= (byte)(1 << (me.def & 7));
                 st[S_PROPS]++;
+                if (!got[T_TEN_PROPS] && st[S_PROPS] >= 10) Earn(T_TEN_PROPS);
                 if (!got[T_CHAMELEON] && st[S_PROPS] >= 25) Earn(T_CHAMELEON); else Save();
             }
         }
@@ -245,7 +254,12 @@ public class PHStore : UdonSharpBehaviour
             int hops = Counter(game.local.body, "hops");
             if (hops >= 0)
             {
-                if (lastHops >= 0 && hops > lastHops) { st[S_HOPS] += hops - lastHops; if (!got[T_BOUNCY] && st[S_HOPS] >= 200) Earn(T_BOUNCY); }
+                if (lastHops >= 0 && hops > lastHops)
+                {
+                    st[S_HOPS] += hops - lastHops;
+                    if (!got[T_HOPPY] && st[S_HOPS] >= 50) Earn(T_HOPPY);
+                    if (!got[T_BOUNCY] && st[S_HOPS] >= 200) Earn(T_BOUNCY);
+                }
                 lastHops = hops;
             }
         }
@@ -277,6 +291,7 @@ public class PHStore : UdonSharpBehaviour
         rTheme = game.gen != null ? game.gen.mapTheme : 0;
         rSize = game.mapSize;
         rQuick = false; rBuzzer = false; rShave = false; rSplinter = false; rAlone = false; rMoved = false; rStand = false;
+        rStandCatch = false; rPair = false; rStandHide = false; rEarly = 0;
         rStartSet = false;
         c0Swings = Counter(game.local, "statSwings"); c0Shots = Counter(game.local, "statShots");
         c0ShotHits = Counter(game.local, "statShotHits"); c0Broke = Counter(game.local, "statWeaponsBroken");
@@ -310,6 +325,8 @@ public class PHStore : UdonSharpBehaviour
                 if (into <= 15f) rQuick = true;
                 if (left <= 10f) rBuzzer = true;
                 if (me.hunterHealth <= 10) rShave = true;
+                if (game.Endgame) rStandCatch = true;
+                if (into <= 60f) { rEarly++; if (rEarly >= 2) rPair = true; }
             }
             if (me.hunterOut && into <= 30f) rSplinter = true;
             if (game.Endgame && !me.hunterOut) rStand = true;
@@ -317,6 +334,7 @@ public class PHStore : UdonSharpBehaviour
         else
         {
             if (!rStartSet) { rStart = me.propPos; rStartSet = true; }
+            if (game.Endgame && !me.caught) rStandHide = true;
             else if (!me.caught && (me.propPos - rStart).sqrMagnitude > 0.36f) rMoved = true;
             if (!me.caught && rHiders >= 2)
             {
@@ -354,6 +372,15 @@ public class PHStore : UdonSharpBehaviour
             if (wrong >= 9 && !me.hunterOut) Earn(T_FURNITURE);
             if (rSplinter) Earn(T_SPLINTERS);
             if (rShave) Earn(T_CLOSE_SHAVE);
+            if (wrong == 0 && !me.hunterOut) st[S_CLEAN]++;
+            Earn(T_FIRST_HUNT);
+            if (catches >= 2) Earn(T_DOUBLE);
+            if (won) Earn(T_WIN1_H);
+            if (catches > 0 && rTheme == 0) Earn(T_TOWN_H);
+            if (catches > 0 && rTheme == 2) Earn(T_VILLAGE_H);
+            if (catches > 0 && rTheme == 1) Earn(T_STATION_H);
+            if (rStandCatch) Earn(T_LAST_STAND);
+            if (rPair) Earn(T_QUICK_PAIR);
             if (Grew(game.local, "statSwings", c0Swings) >= 100) Earn(T_SWING);
             if (Grew(game.local, "myWeaponBroken", c0MyBroken) > 0 && Counter(game.local, "lastBrokenBy") > 0) Earn(T_SHOT_DOWN);
         }
@@ -384,6 +411,14 @@ public class PHStore : UdonSharpBehaviour
             if (!survived && me.survivedMs <= 10000) Earn(T_FOUND);
             if (survived && me.health > 0 && me.health <= 25) Earn(T_CLOSE_CALL);
             if (survived && !rMoved && rStartSet) Earn(T_WALLFLOWER);
+            Earn(T_FIRST_HIDE);
+            if (won) Earn(T_WIN1_P);
+            if (survived || me.survivedMs >= 60000) Earn(T_MINUTE);
+            if ((survived && game.HuntLength >= 120f) || me.survivedMs >= 120000) Earn(T_TWO_MINUTES);
+            if (survived && rTheme == 0) Earn(T_TOWN_P);
+            if (survived && rTheme == 2) Earn(T_VILLAGE_P);
+            if (survived && rTheme == 1) Earn(T_STATION_P);
+            if (rStandHide) Earn(T_STAND);
             int hitsNow = Grew(game.local, "statShotHits", c0ShotHits);
             if (hitsNow >= 1) Earn(T_FIRST_SHOT);
             if (hitsNow >= 10) Earn(T_SHARPSHOOTER);
@@ -417,6 +452,24 @@ public class PHStore : UdonSharpBehaviour
         if (st[S_PROUNDS] >= 50) Earn(T_OLD_P);
         if (st[S_PROPS] >= 25) Earn(T_CHAMELEON);
         if (st[S_FIRST] >= 5) Earn(T_USUAL);
+        if (st[S_CATCH] >= 5) Earn(T_FIVE);
+        if (st[S_CATCH] >= 25) Earn(T_TWENTY_FIVE);
+        if (st[S_CATCH] >= 50) Earn(T_FIFTY);
+        if (st[S_HROUNDS] >= 10) Earn(T_TEN_HUNTS);
+        if (st[S_HROUNDS] >= 25) Earn(T_REG_HUNTER);
+        if (st[S_HWINS] >= 3) Earn(T_WIN3_H);
+        if (st[S_HWINS] >= 25) Earn(T_TOP_DOG);
+        if (st[S_WRONG] >= 50) Earn(T_FIFTY_BONKS);
+        if (st[S_CLEAN] >= 5) Earn(T_STEADY);
+        if (st[S_SURV] >= 3) Earn(T_THREE_SURV);
+        if (st[S_SURV] >= 25) Earn(T_TWENTY_FIVE_SURV);
+        if (st[S_PROUNDS] >= 10) Earn(T_TEN_HIDES);
+        if (st[S_PROUNDS] >= 25) Earn(T_REG_HIDER);
+        if (st[S_PWINS] >= 3) Earn(T_WIN3_P);
+        if (st[S_PWINS] >= 25) Earn(T_ROYALTY);
+        if (st[S_PROPS] >= 10) Earn(T_TEN_PROPS);
+        if (st[S_STREAK] >= 2) Earn(T_BACK_TO_BACK);
+        if (st[S_HOPS] >= 50) Earn(T_HOPPY);
     }
 
     // how far along a counted trophy is: x of n (n 0 for one done in one go)
@@ -424,8 +477,17 @@ public class PHStore : UdonSharpBehaviour
     {
         switch (t)
         {
-            case T_TEN: case T_HUNDRED: return st[S_CATCH];
-            case T_PACK_LEADER: return st[S_HWINS];
+            case T_TEN: case T_HUNDRED: case T_FIVE: case T_TWENTY_FIVE: case T_FIFTY: return st[S_CATCH];
+            case T_PACK_LEADER: case T_WIN3_H: case T_TOP_DOG: return st[S_HWINS];
+            case T_TEN_HUNTS: case T_REG_HUNTER: return st[S_HROUNDS];
+            case T_FIFTY_BONKS: return st[S_WRONG];
+            case T_STEADY: return st[S_CLEAN];
+            case T_THREE_SURV: case T_TWENTY_FIVE_SURV: return st[S_SURV];
+            case T_TEN_HIDES: case T_REG_HIDER: return st[S_PROUNDS];
+            case T_WIN3_P: case T_ROYALTY: return st[S_PWINS];
+            case T_TEN_PROPS: return st[S_PROPS];
+            case T_BACK_TO_BACK: return st[S_STREAK];
+            case T_HOPPY: return st[S_HOPS];
             case T_GLOBE_H: return Count3(st[S_THEME_H]);
             case T_OLD_H: return st[S_HROUNDS];
             case T_BONK: return st[S_WRONG];
@@ -450,6 +512,11 @@ public class PHStore : UdonSharpBehaviour
             case T_GLOBE_H: return 3; case T_OLD_H: return 50; case T_BONK: return 250; case T_EMPTY: return 10;
             case T_TEN_SURV: return 10; case T_FIFTY_SURV: return 50; case T_ON_A_ROLL: return 5; case T_PROPS_WIN: return 10;
             case T_GLOBE_P: return 3; case T_OLD_P: return 50; case T_CHAMELEON: return 25; case T_USUAL: return 5; case T_BOUNCY: return 200;
+            case T_FIVE: return 5; case T_TWENTY_FIVE: return 25; case T_FIFTY: return 50; case T_TEN_HUNTS: return 10;
+            case T_REG_HUNTER: return 25; case T_WIN3_H: return 3; case T_TOP_DOG: return 25; case T_FIFTY_BONKS: return 50;
+            case T_STEADY: return 5; case T_THREE_SURV: return 3; case T_TWENTY_FIVE_SURV: return 25; case T_TEN_HIDES: return 10;
+            case T_REG_HIDER: return 25; case T_WIN3_P: return 3; case T_ROYALTY: return 25; case T_TEN_PROPS: return 10;
+            case T_BACK_TO_BACK: return 2; case T_HOPPY: return 50;
         }
         return 0;
     }

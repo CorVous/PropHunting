@@ -1,0 +1,470 @@
+[
+ {
+  "key": "first_catch",
+  "weapon": "melee:fantasy-weapons-bits:halberd",
+  "lo": 1,
+  "hi": 8
+ },
+ {
+  "key": "hat_trick",
+  "weapon": "melee:fantasy-weapons-bits:hammer_A",
+  "lo": 4,
+  "hi": 20
+ },
+ {
+  "key": "sharp_eye",
+  "weapon": "melee:kenney-food-kit:loaf-baguette",
+  "lo": 20,
+  "hi": 60
+ },
+ {
+  "key": "clean_sweep",
+  "weapon": "melee:quaternius-zombieapocalypsekit:WoodenBat_Saw",
+  "lo": 30,
+  "hi": 100
+ },
+ {
+  "key": "quick_draw",
+  "weapon": "melee:quaternius-piratekit:Weapon_Lute",
+  "lo": 20,
+  "hi": 80
+ },
+ {
+  "key": "buzzer_beater",
+  "weapon": "melee:quaternius-zombieapocalypsekit:WoodenBat_Barbed",
+  "lo": 30,
+  "hi": 120
+ },
+ {
+  "key": "ten_catches",
+  "weapon": "melee:quaternius-low-poly-food-pack:Tentacle",
+  "lo": 15,
+  "hi": 40
+ },
+ {
+  "key": "hundred",
+  "weapon": "melee:fantasy-weapons-bits:axe_A",
+  "lo": 200,
+  "hi": 400
+ },
+ {
+  "key": "good_as_new",
+  "weapon": "melee:kenney-survival-kit:fish-large",
+  "lo": 5,
+  "hi": 25
+ },
+ {
+  "key": "weathered",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Axe_Double",
+  "lo": 2,
+  "hi": 10
+ },
+ {
+  "key": "pack_leader",
+  "weapon": "melee:quaternius-lowpoly-medieval-weapons:Scythe",
+  "lo": 60,
+  "hi": 100
+ },
+ {
+  "key": "globetrotter_hunt",
+  "weapon": "melee:quaternius-junkfood:Hotdog",
+  "lo": 10,
+  "hi": 40
+ },
+ {
+  "key": "old_hand_hunt",
+  "weapon": "melee:kaykit-adventurers:axe_2handed",
+  "lo": 150,
+  "hi": 250
+ },
+ {
+  "key": "snapped",
+  "weapon": "melee:kenney-food-kit:banana",
+  "lo": 5,
+  "hi": 25
+ },
+ {
+  "key": "furniture_hater",
+  "weapon": "melee:mixed-bag-1:chicken_plushie_A",
+  "lo": 10,
+  "hi": 50
+ },
+ {
+  "key": "bonk_collector",
+  "weapon": "melee:fantasy-weapons-bits:hammer_B",
+  "lo": 150,
+  "hi": 300
+ },
+ {
+  "key": "swing_and_a_miss",
+  "weapon": "melee:rpg-tools-bits:hammer",
+  "lo": 1,
+  "hi": 8
+ },
+ {
+  "key": "splinters",
+  "weapon": "melee:rpg-tools-bits:mallet",
+  "lo": 1,
+  "hi": 8
+ },
+ {
+  "key": "close_shave",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Sword_big_Golden",
+  "lo": 30,
+  "hi": 150
+ },
+ {
+  "key": "shot_down",
+  "weapon": "melee:quaternius-low-poly-medieval-weapons:Katana",
+  "lo": 40,
+  "hi": 200
+ },
+ {
+  "key": "empty_handed",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Axe_Double_Golden",
+  "lo": 80,
+  "hi": 160
+ },
+ {
+  "key": "scrapper",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Axe_small_Golden",
+  "lo": 1,
+  "hi": 2
+ },
+ {
+  "key": "first_hunt",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Hammer_Double",
+  "lo": 1,
+  "hi": 6
+ },
+ {
+  "key": "double",
+  "weapon": "melee:quaternius-piratekit:Weapon_Sword_2",
+  "lo": 2,
+  "hi": 10
+ },
+ {
+  "key": "five_catches",
+  "weapon": "melee:quaternius-cubeworldkit:Axe_Diamond",
+  "lo": 6,
+  "hi": 20
+ },
+ {
+  "key": "twenty_five_catches",
+  "weapon": "melee:quaternius-piratekit:Weapon_DoubleAxe",
+  "lo": 50,
+  "hi": 110
+ },
+ {
+  "key": "fifty_catches",
+  "weapon": "melee:quaternius-cubeworldkit:Sword_Diamond",
+  "lo": 100,
+  "hi": 200
+ },
+ {
+  "key": "ten_hunts",
+  "weapon": "melee:mixed-bag-1:umbrella_pink",
+  "lo": 30,
+  "hi": 50
+ },
+ {
+  "key": "regular_hunter",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Hammer_Double_Golden",
+  "lo": 75,
+  "hi": 125
+ },
+ {
+  "key": "first_win_hunt",
+  "weapon": "melee:fantasy-weapons-bits:hammer_C",
+  "lo": 2,
+  "hi": 10
+ },
+ {
+  "key": "three_wins_hunt",
+  "weapon": "melee:mixed-bag-1:guitar_A",
+  "lo": 10,
+  "hi": 25
+ },
+ {
+  "key": "top_dog",
+  "weapon": "melee:kaykit-skeletons:Skeleton_Axe",
+  "lo": 150,
+  "hi": 250
+ },
+ {
+  "key": "town_watch",
+  "weapon": "melee:kaykit-skeletons:Skeleton_Blade",
+  "lo": 2,
+  "hi": 12
+ },
+ {
+  "key": "village_watch",
+  "weapon": "melee:kenney-holiday-kit:candy-cane-red",
+  "lo": 4,
+  "hi": 25
+ },
+ {
+  "key": "station_watch",
+  "weapon": "melee:fantasy-weapons-bits:wand_A",
+  "lo": 4,
+  "hi": 25
+ },
+ {
+  "key": "fifty_bonks",
+  "weapon": "melee:kenney-food-kit:fish",
+  "lo": 30,
+  "hi": 60
+ },
+ {
+  "key": "steady_hand",
+  "weapon": "melee:kenney-minigolf-kit:club-red",
+  "lo": 25,
+  "hi": 100
+ },
+ {
+  "key": "last_stand",
+  "weapon": "melee:quaternius-zombieapocalypsekit:Guitar",
+  "lo": 8,
+  "hi": 30
+ },
+ {
+  "key": "quick_pair",
+  "weapon": "melee:kenney-food-kit:frying-pan",
+  "lo": 20,
+  "hi": 80
+ },
+ {
+  "key": "survivor",
+  "weapon": "gun:quaternius-low-poly-guns:ak47",
+  "lo": 1,
+  "hi": 4
+ },
+ {
+  "key": "untouched",
+  "weapon": "gun:kenney-blaster-kit:blaster-p",
+  "lo": 2,
+  "hi": 8
+ },
+ {
+  "key": "last_prop",
+  "weapon": "gun:kenney-blaster-kit:blaster-o",
+  "lo": 10,
+  "hi": 40
+ },
+ {
+  "key": "ten_survivals",
+  "weapon": "gun:kaykit-skeletons:Skeleton_Crossbow",
+  "lo": 20,
+  "hi": 35
+ },
+ {
+  "key": "fifty_survivals",
+  "weapon": "gun:kenney-blaster-kit:blaster-f",
+  "lo": 110,
+  "hi": 160
+ },
+ {
+  "key": "on_a_roll",
+  "weapon": "gun:quaternius-scifigun:Pistol",
+  "lo": 30,
+  "hi": 100
+ },
+ {
+  "key": "first_shot",
+  "weapon": "gun:kaykit-adventurers:crossbow_1handed",
+  "lo": 3,
+  "hi": 10
+ },
+ {
+  "key": "sharpshooter",
+  "weapon": "gun:quaternius-scifimodularguns:Crossbow_1",
+  "lo": 20,
+  "hi": 80
+ },
+ {
+  "key": "giant_slayer",
+  "weapon": "gun:quaternius-sci-fi-essentials-kit:Gun_Pistol",
+  "lo": 30,
+  "hi": 120
+ },
+ {
+  "key": "props_win",
+  "weapon": "gun:quaternius-piratekit:Weapon_Pistol",
+  "lo": 25,
+  "hi": 40
+ },
+ {
+  "key": "globetrotter_hide",
+  "weapon": "gun:quaternius-scifigun:Ray Gun",
+  "lo": 5,
+  "hi": 20
+ },
+ {
+  "key": "old_hand_hide",
+  "weapon": "gun:quaternius-sci-fi-essentials-kit:Gun_Rifle",
+  "lo": 60,
+  "hi": 80
+ },
+ {
+  "key": "long_haul",
+  "weapon": "gun:quaternius-toonshootergamekit:RocketLauncher",
+  "lo": 5,
+  "hi": 20
+ },
+ {
+  "key": "found_instantly",
+  "weapon": "gun:quaternius-scifimodularguns:Pistol_1",
+  "lo": 20,
+  "hi": 80
+ },
+ {
+  "key": "close_call",
+  "weapon": "gun:quaternius-toonshootergamekit:GrenadeLauncher",
+  "lo": 15,
+  "hi": 60
+ },
+ {
+  "key": "quick_change",
+  "weapon": "gun:quaternius-lowpoly-survival-pack:FlareGun",
+  "lo": 5,
+  "hi": 20
+ },
+ {
+  "key": "bouncy",
+  "weapon": "gun:quaternius-toonshootergamekit:ShortCannon",
+  "lo": 1,
+  "hi": 5
+ },
+ {
+  "key": "chameleon",
+  "weapon": "gun:kenney-mini-characters:weapon-shooter",
+  "lo": 15,
+  "hi": 25
+ },
+ {
+  "key": "spray_and_pray",
+  "weapon": "gun:kenney-blaster-kit:blaster-m",
+  "lo": 3,
+  "hi": 10
+ },
+ {
+  "key": "full_house",
+  "weapon": "gun:kenney-space-kit:weapon_gun",
+  "lo": 1,
+  "hi": 40
+ },
+ {
+  "key": "usual_suspect",
+  "weapon": "gun:quaternius-scifimodularguns:SMG_1",
+  "lo": 30,
+  "hi": 60
+ },
+ {
+  "key": "wallflower",
+  "weapon": "gun:quaternius-piratekit:Weapon_AxeRifle",
+  "lo": 5,
+  "hi": 20
+ },
+ {
+  "key": "first_hide",
+  "weapon": "gun:kenney-space-kit:weapon_rifle",
+  "lo": 1,
+  "hi": 2
+ },
+ {
+  "key": "three_survivals",
+  "weapon": "gun:quaternius-piratekit:Weapon_DoubleShotgun",
+  "lo": 4,
+  "hi": 10
+ },
+ {
+  "key": "twenty_five_survivals",
+  "weapon": "gun:quaternius-scifigun:LongPistol",
+  "lo": 55,
+  "hi": 80
+ },
+ {
+  "key": "ten_hides",
+  "weapon": "gun:quaternius-scifigun:Lightning Gun",
+  "lo": 12,
+  "hi": 16
+ },
+ {
+  "key": "regular_hider",
+  "weapon": "gun:quaternius-zombieapocalypsekit:Pistol",
+  "lo": 30,
+  "hi": 40
+ },
+ {
+  "key": "first_win_hide",
+  "weapon": "gun:kenney-blaster-kit:blaster-e",
+  "lo": 1,
+  "hi": 4
+ },
+ {
+  "key": "three_wins_hide",
+  "weapon": "gun:quaternius-scifimodularguns:Crossbow_2",
+  "lo": 4,
+  "hi": 12
+ },
+ {
+  "key": "prop_royalty",
+  "weapon": "gun:kenney-blaster-kit:blaster-n",
+  "lo": 60,
+  "hi": 100
+ },
+ {
+  "key": "hidden_minute",
+  "weapon": "gun:quaternius-scifimodularguns:Grenade_1",
+  "lo": 1,
+  "hi": 4
+ },
+ {
+  "key": "two_minutes",
+  "weapon": "gun:kenney-blaster-kit:blaster-k",
+  "lo": 2,
+  "hi": 8
+ },
+ {
+  "key": "town_hider",
+  "weapon": "gun:quaternius-sci-fi-essentials-kit:Gun_Revolver",
+  "lo": 2,
+  "hi": 8
+ },
+ {
+  "key": "village_hider",
+  "weapon": "gun:holiday-bits:snowball_cannon",
+  "lo": 3,
+  "hi": 15
+ },
+ {
+  "key": "station_hider",
+  "weapon": "gun:quaternius-low-poly-guns:RocketLauncher",
+  "lo": 3,
+  "hi": 15
+ },
+ {
+  "key": "ten_props",
+  "weapon": "gun:kaykit-adventurers:crossbow_2handed",
+  "lo": 5,
+  "hi": 10
+ },
+ {
+  "key": "hoppy",
+  "weapon": "gun:quaternius-scifimodularguns:Grenade_3",
+  "lo": 1,
+  "hi": 3
+ },
+ {
+  "key": "back_to_back",
+  "weapon": "gun:kenney-blaster-kit:blaster-c",
+  "lo": 3,
+  "hi": 10
+ },
+ {
+  "key": "stand_your_ground",
+  "weapon": "gun:kenney-blaster-kit:blaster-q",
+  "lo": 3,
+  "hi": 10
+ }
+]

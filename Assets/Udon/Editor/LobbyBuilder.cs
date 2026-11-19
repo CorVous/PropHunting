@@ -897,13 +897,13 @@ public static partial class LobbyBuilder
 
         // giant pieces (feet on the floor; sizes are the largest dimension in metres)
         Piece(root, "board-game-bits/D6_A_red", L(20.8f, 2.2f), 2.3f, 20f, true);
-        Piece(root, "board-game-bits/D20_blue", L(4.8f, 18.6f), 1.8f, -15f, true);   // (clear of the weapon wall)
+        Piece(root, "board-game-bits/D20_blue", L(17.0f, 20.4f), 1.8f, -15f, true);   // (clear of the weapon wall)
         Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(2.4f, 5.0f), 1, 1.4f);
-        Piece(root, "furniture-bits/couch_pillows", L(2.3f, 15.0f), 2.6f, 90f, true);
-        Piece(root, "furniture-bits/armchair", L(2.3f, 18.3f), 1.5f, 90f, true);
-        Piece(root, "furniture-bits/lamp_standing", L(1.7f, 16.9f), 2.4f, 0f, false);
-        Piece(root, "board-game-bits/pawn_A_blue", L(18.3f, 17.0f), 2.4f, 0f, true);   // (clear of the Trophies board)
-        Piece(root, "board-game-bits/flag_A_red", L(5.2f, 20.0f), 2.6f, 200f, true);
+        Piece(root, "furniture-bits/couch_pillows", L(5.6f, 15.0f), 2.6f, 270f, true);   // facing the Trophies board
+        Piece(root, "furniture-bits/armchair", L(5.6f, 18.3f), 1.5f, 270f, true);
+        Piece(root, "furniture-bits/lamp_standing", L(6.3f, 16.9f), 2.4f, 0f, false);
+        Piece(root, "board-game-bits/pawn_A_blue", L(9.2f, 20.3f), 2.4f, 0f, true);
+        Piece(root, "board-game-bits/flag_A_red", L(14.8f, 20.3f), 2.6f, 200f, true);
         Piece(root, "board-game-bits/domino_tile_6-6", L(19.4f, 19.5f), 2.4f, 25f, true);
         Piece(root, "furniture-bits/cactus_medium_A", L(22.2f, 20.0f), 1.6f, 0f, true);
         Piece(root, "furniture-bits/lamp_standing", L(22.3f, 18.4f), 2.4f, 0f, false);
@@ -912,7 +912,7 @@ public static partial class LobbyBuilder
         // the two standing lamps light the room around them (Point Light Volumes: Cor, VRC Light Volumes); the shelf's
         // small lamps get a faint glow
         Color warm = new Color(1f, 0.82f, 0.58f);
-        LampBuilder.MakeLight(root, "LampLightCouch", L(1.7f, 16.9f, 2.05f), warm, 2.2f, 0.9f);
+        LampBuilder.MakeLight(root, "LampLightCouch", L(6.3f, 16.9f, 2.05f), warm, 2.2f, 0.9f);
         LampBuilder.MakeLight(root, "LampLightCorner", L(22.3f, 18.4f, 2.05f), warm, 2.2f, 0.9f);
         LampBuilder.MakeLight(root, "LampLightShelf", L(roomW - 0.6f, roomD / 2 - 0.0f, 2.6f), warm, 0.8f, 0.6f);   // between the weapon wall's halves
 

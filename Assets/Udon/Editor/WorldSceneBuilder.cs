@@ -250,7 +250,7 @@ public static class WorldSceneBuilder
         LobbyBuilder.BuildFailNotice(lobby.transform, game, new Vector3(0f, 0.9f + 3.36f + 0.5f, RoomD / 2 - 0.12f));   // just over the panel
         LobbyBuilder.BuildExplore(lobby.transform, game, new Vector3(5.9f, 1.7f, RoomD / 2 - 0.12f));   // right of the panel (Cor: the credits take the left); the DEBUG plaque: explore a map, spawn as hunter / hider, end round
         // the last round's results, a score pad on the west wall
-        LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
+        LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 3.9f));   // right of the Trophies board (Cor)
         local.panelUiText = null; local.resultsText = null;
         // the credits (from CREDITS.md), on the north wall left of the host panel
         BuildCredits(lobby.transform);

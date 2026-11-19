@@ -8,9 +8,10 @@ using UnityEngine.UI;
 
 // The weapon store (Cor, 2026-11-19; mock-up https://claude.ai/artifact/3mxFCbw1ypkM12yCjgjDtT):
 //   the weapon wall   the east wall: two paternoster shelves (PHShelf), guns on the north half, melee on the south,
-//                     every weapon of the catalog, a cart with up / down and the coins following the player
+//                     every weapon of the catalog, floor to ceiling out of black holes, a floating panel with
+//                     up / down and the coins following the player
 //   the dialog        the buy card / trophy note over a clicked weapon (PHStoreDialog)
-//   the Trophies board  the spawn (south) wall under the PROPHUNT name (PHTrophyBoard)
+//   the Trophies board  the west wall, left of the score pad (PHTrophyBoard)
 //   PHStore           the catalog, the trophies' texts, the player's coins and trophies
 // Data: Tools/weapon_catalog.json (the melee work's), Tools/store_prices.json, Assets/Udon/Text/strings_store.tsv
 // Tools/store_free.json and Assets/Lobby/WeaponIcons.png (Tools/make_store.py makes the last three). Models: the sub-assets of
@@ -21,7 +22,8 @@ public static partial class LobbyBuilder
     [System.Serializable] class StoreCatalog { public string note; public StoreWeapon[] weapons; }
     [System.Serializable] class StoreWeapon { public string id, kind, category, pack, model, thumb; public int sheet; }
 
-    const float SlotW = 0.55f, RowH = 0.62f, BaseY = 0.92f, Depth = 0.5f;
+    const float SlotW = 0.55f, RowH = 0.85f, BaseY = 0.15f, Depth = 0.5f, Ceiling = 7f;
+    const int Shown = 8;
     const int Cols = 10;
 
     public static PHStore BuildStore(Transform lobby, PHGame game, PHAudio sound, float roomW, float roomD)
@@ -63,7 +65,6 @@ public static partial class LobbyBuilder
         store.game = game; store.sound = sound;
         store.wId = new string[n]; store.wKind = new int[n]; store.wCat = new int[n]; store.wPrice = new int[n];
         store.wTrophy = new int[n]; store.wGameIdx = new int[n];
-        var coolM = new List<int>(); var goofM = new List<int>(); var coolG = new List<int>(); var goofG = new List<int>();
         for (int i = 0; i < n; i++)
         {
             var w = cat[i];
@@ -75,11 +76,15 @@ public static partial class LobbyBuilder
             store.wTrophy[i] = -1;
             string[] list = store.wKind[i] == 0 ? gameMelee : gameGun;
             store.wGameIdx[i] = list != null ? System.Array.IndexOf(list, w.id) : -1;
-            if (store.wCat[i] == PHStore.CAT_COOL) (store.wKind[i] == 0 ? coolM : coolG).Add(i);
-            if (store.wCat[i] == PHStore.CAT_GOOFY) (store.wKind[i] == 0 ? goofM : goofG).Add(i);
         }
 
-        // the trophies, in strings_store.tsv's order: hunter ones give melee (13 cool, 9 goofy), hider ones guns
+        // the trophies, in strings_store.tsv's order; each one's weapon and rounds-to-earn range from
+        // Tools/store_trophies.json (make_store.py: the hardest trophy gives the most interesting weapon)
+        var tw = new Dictionary<string, string>(); var tlo = new Dictionary<string, int>(); var thi = new Dictionary<string, int>();
+        string tp = System.IO.Path.Combine(proj, "Tools", "store_trophies.json");
+        if (System.IO.File.Exists(tp))
+            foreach (Match m in Regex.Matches(System.IO.File.ReadAllText(tp), "\"key\":\\s*\"([^\"]+)\",\\s*\"weapon\":\\s*\"([^\"]+)\",\\s*\"lo\":\\s*(\\d+),\\s*\"hi\":\\s*(\\d+)"))
+            { tw[m.Groups[1].Value] = m.Groups[2].Value; tlo[m.Groups[1].Value] = int.Parse(m.Groups[3].Value); thi[m.Groups[1].Value] = int.Parse(m.Groups[4].Value); }
         var keys = new List<string>();
         foreach (var k in text.Keys) if (k.StartsWith("trophy.") && k.EndsWith(".name")) keys.Add(k.Substring(7, k.Length - 12));
         int T = PHStore.TROPHIES, H = PHStore.HUNTER_TROPHIES;
@@ -91,12 +96,10 @@ public static partial class LobbyBuilder
             store.tKey[t] = keys[t];
             store.tName[t] = Get(text, "trophy." + keys[t] + ".name");
             store.tGoal[t] = Get(text, "trophy." + keys[t] + ".goal");
-            int r = t % H;
-            var pool = t < H ? (r < 13 ? coolM : goofM) : (r < 13 ? coolG : goofG);
-            int idx = r < 13 ? r : r - 13;
-            store.tWeapon[t] = idx < pool.Count ? pool[idx] : -1;
-            if (store.tWeapon[t] >= 0) store.wTrophy[store.tWeapon[t]] = t;
-            store.tLo[t] = TrophyRounds[t, 0]; store.tHi[t] = TrophyRounds[t, 1];
+            string wid; store.tWeapon[t] = tw.TryGetValue(keys[t], out wid) ? System.Array.IndexOf(store.wId, wid) : -1;
+            if (store.tWeapon[t] < 0) Debug.LogError("[store] trophy " + keys[t] + " has no weapon (store_trophies.json)");
+            else store.wTrophy[store.tWeapon[t]] = t;
+            int lo, hi; store.tLo[t] = tlo.TryGetValue(keys[t], out lo) ? lo : 1; store.tHi[t] = thi.TryGetValue(keys[t], out hi) ? hi : 1;
         }
 
         // the wall: two halves on the east wall (x = roomW / 2), facing west into the room
@@ -104,7 +107,7 @@ public static partial class LobbyBuilder
         var guns = BuildShelf(root, store, 1, cat, meshByName, new Vector3(roomW / 2f, 0f, 3.15f));
         store.shelfMelee = melee; store.shelfGun = guns;
         store.dialog = BuildStoreDialog(root, store, text);
-        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(0f, 1.95f, -roomD / 2f + 0.06f));
+        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 2.75f, -5.2f));   // west wall, left of the score pad (Cor)
         UdonSharpEditorUtility.CopyProxyToUdon(store);
         int conv = 0; foreach (var w in cat) if (meshByName.ContainsKey(w.id.Replace(':', '_'))) conv++;
         Debug.Log("[store] " + n + " weapons (" + conv + " with models), " + T + " trophies; picks numbered " + (gameMelee != null ? "from PHWeapons" : "later (no PHWeapons in the scene)"));
@@ -144,15 +147,17 @@ public static partial class LobbyBuilder
         var shelf = go.AddUdonSharpComponent<PHShelf>();
         shelf.store = store; shelf.kind = kind; shelf.baseY = BaseY; shelf.rowH = RowH;
 
-        // the order: starters, trophy weapons (cool, goofy), then the shop from cheap to dear
+        // the order: the free ones, the trophy weapons (quickest trophy first), then the shop from cheap to dear
         var order = new List<int>();
-        for (int c = 0; c < 4; c++)
-        {
-            var part = new List<int>();
-            for (int i = 0; i < cat.Length; i++) if (store.wKind[i] == kind && store.wCat[i] == c) part.Add(i);
-            if (c == PHStore.CAT_SHOP) part.Sort((a, b) => store.wPrice[a] != store.wPrice[b] ? store.wPrice[a].CompareTo(store.wPrice[b]) : a.CompareTo(b));
-            order.AddRange(part);
-        }
+        var part = new List<int>();
+        for (int i = 0; i < cat.Length; i++) if (store.wKind[i] == kind && store.wCat[i] == PHStore.CAT_STARTER) part.Add(i);
+        order.AddRange(part); part.Clear();
+        for (int i = 0; i < cat.Length; i++) if (store.wKind[i] == kind && store.wCat[i] != PHStore.CAT_STARTER && store.wTrophy[i] >= 0) part.Add(i);
+        part.Sort((a, b) => { int ta = store.wTrophy[a], tb = store.wTrophy[b]; int da = store.tLo[ta] + store.tHi[ta], db = store.tLo[tb] + store.tHi[tb]; return da != db ? da.CompareTo(db) : ta.CompareTo(tb); });
+        order.AddRange(part); part.Clear();
+        for (int i = 0; i < cat.Length; i++) if (store.wKind[i] == kind && store.wCat[i] != PHStore.CAT_STARTER && store.wTrophy[i] < 0) part.Add(i);
+        part.Sort((a, b) => store.wPrice[a] != store.wPrice[b] ? store.wPrice[a].CompareTo(store.wPrice[b]) : a.CompareTo(b));
+        order.AddRange(part);
         shelf.order = order.ToArray();
 
         // each model fitted into its place: melee stands up (its length +Z up), guns lie along the shelf (barrel to
@@ -179,36 +184,39 @@ public static partial class LobbyBuilder
             shelf.itemPos[i] = new Vector3(-centre.x * s, -mn.y * s + 0.01f, -centre.z * s);
         }
 
-        // the cabinet: a cream back, wooden sides, a valance over the top and a kick panel under the bottom shelf,
-        // both deep enough to hide the shelves going round
+        // no cabinet (Cor): the shelves rise out of a black hole in the floor and go into one at the ceiling, two thin
+        // dark rods at the ends
         Material wood = Mat("StoreWood", C("b07848")), woodDark = Mat("StoreWoodDark", C("7d5232")), back = Mat("StoreBack", C("efe2c2"));
         Material cream = Mat("LobbyCream", C("f3e7c9")), felt = Mat("StoreFelt", C("173d2c")), red = Mat("StoreRed", C("d8473a"));
         Material yellow = Mat("StoreYellow", C("f2c45a")), coral = Mat("StoreCoral", C("f19a8a")), gold = Mat("StoreGold", C("e2b13c"));
         float halfW = Cols * SlotW / 2f;
-        float top = BaseY + 4 * RowH;
-        Slab(t, "Back", new Vector3(0f, (BaseY + top) / 2f, 0.03f), new Vector3(2 * halfW + 0.1f, top - BaseY + 0.4f, 0.04f), back);
-        Box(t, "SideL", new Vector3(halfW + 0.07f, (top + 0.55f) / 2f, Depth / 2f), new Vector3(0.14f, top + 0.55f, Depth), wood);
-        Box(t, "SideR", new Vector3(-halfW - 0.07f, (top + 0.55f) / 2f, Depth / 2f), new Vector3(0.14f, top + 0.55f, Depth), wood);
-        Box(t, "Valance", new Vector3(0f, top + 0.24f, Depth / 2f + 0.03f), new Vector3(2 * halfW, 0.62f, Depth + 0.06f), cream);
-        Slab(t, "ValanceTrim", new Vector3(0f, top - 0.06f, Depth + 0.07f), new Vector3(2 * halfW, 0.06f, 0.02f), wood);
-        Box(t, "Kick", new Vector3(0f, (BaseY - 0.05f) / 2f, Depth / 2f + 0.03f), new Vector3(2 * halfW, BaseY - 0.05f, Depth + 0.06f), wood);
-        Slab(t, "KickTrim", new Vector3(0f, BaseY - 0.1f, Depth + 0.07f), new Vector3(2 * halfW, 0.05f, 0.02f), woodDark);
+        var voidMat = Mat("StoreVoid", C("030303"));
+        Slab(t, "FloorHole", new Vector3(0f, 0.006f, Depth / 2f + 0.02f), new Vector3(2 * halfW + 0.16f, 0.012f, Depth + 0.14f), voidMat);
+        Box(t, "CeilingHole", new Vector3(0f, Ceiling + 0.4f, Depth / 2f + 0.02f), new Vector3(2 * halfW + 0.16f, 0.8f, Depth + 0.14f), voidMat);
+        Slab(t, "RodL", new Vector3(halfW + 0.04f, Ceiling / 2f, Depth / 2f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
+        Slab(t, "RodR", new Vector3(-halfW - 0.04f, Ceiling / 2f, Depth / 2f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
 
-        // the five shelf rows (one out of sight) with ten places each
+        // the shelf rows (one more than show, out of sight) with ten places each
         var mat = ShelfMat();
-        shelf.rows = new Transform[5];
-        int slots = 5 * Cols;
+        int roots = Shown + 1;
+        shelf.shown = Shown;
+        shelf.rows = new Transform[roots];
+        int slots = roots * Cols;
         shelf.items = new Transform[slots]; shelf.itemMf = new MeshFilter[slots]; shelf.itemMr = new MeshRenderer[slots];
         shelf.tagShop = new GameObject[slots]; shelf.tagCool = new GameObject[slots]; shelf.tagGoofy = new GameObject[slots];
         shelf.sel = new GameObject[slots]; shelf.price = new TextMeshPro[slots];
-        for (int r = 0; r < 5; r++)
+        for (int r = 0; r < roots; r++)
         {
             var row = new GameObject("Row" + r).transform;
             row.SetParent(t, false);
             row.localPosition = new Vector3(0f, BaseY + r * RowH, 0f);
             shelf.rows[r] = row;
-            Slab(row, "Board", new Vector3(0f, -0.03f, Depth / 2f), new Vector3(2 * halfW, 0.05f, Depth - 0.04f), wood);
-            Slab(row, "Lip", new Vector3(0f, -0.03f, Depth - 0.01f), new Vector3(2 * halfW, 0.07f, 0.02f), woodDark);
+            var board = new GameObject("Board");   // rounded off (Cor)
+            board.transform.SetParent(row, false);
+            board.transform.localPosition = new Vector3(0f, -0.045f, Depth / 2f);
+            board.AddComponent<MeshFilter>().sharedMesh = RoundedBoard(2 * halfW + 0.06f, Depth - 0.02f, 0.045f, 0.1f);
+            var br = board.AddComponent<MeshRenderer>(); br.sharedMaterial = wood;
+            br.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             for (int c = 0; c < Cols; c++)
             {
                 int k = r * Cols + c;
@@ -221,7 +229,7 @@ public static partial class LobbyBuilder
                 ps.shelf = shelf; ps.index = k;
                 UdonSharpEditorUtility.CopyProxyToUdon(ps);
                 var pu = UdonSharpEditorUtility.GetBackingUdonBehaviour(ps);
-                pu.proximity = 4f; pu.interactText = "";
+                pu.proximity = 8f; pu.interactText = "";   // (the high shelves: clicked from the floor)
 
                 var item = new GameObject("Item");
                 item.transform.SetParent(place, false);
@@ -250,21 +258,20 @@ public static partial class LobbyBuilder
             }
         }
 
-        // the cart on its rail, 1.2 m out: up / down, and the coins
-        float cz = 1.2f;
-        Slab(t, "Rail", new Vector3(0f, 0.015f, cz), new Vector3(2 * halfW, 0.03f, 0.08f), wood);
-        var cart = new GameObject("Cart").transform;
+        // the floating panel (Cor: round buttons, slanted towards the player, no rail), 1 m out at hip height: up /
+        // down, and the coins. Its own +z faces the player; the plate tilts its top towards them.
+        float cz = 1.0f;
+        var cart = new GameObject("Panel").transform;
         cart.SetParent(t, false); cart.localPosition = new Vector3(0f, 0f, cz);
-        shelf.cart = cart; shelf.cartMin = -halfW + 0.4f; shelf.cartMax = halfW - 0.4f; shelf.cartZ = cz;
-        Slab(cart, "Body", new Vector3(0f, 0.45f, 0f), new Vector3(0.78f, 0.9f, 0.34f), cream);
-        Slab(cart, "Top", new Vector3(0f, 0.91f, 0f), new Vector3(0.86f, 0.04f, 0.42f), wood);
-        CartButton(cart, shelf, "Up", new Vector3(0.2f, 0.98f, 0f), true);
-        CartButton(cart, shelf, "Down", new Vector3(-0.2f, 0.98f, 0f), false);
-        Slab(cart, "Purse", new Vector3(0f, 0.6f, 0.172f), new Vector3(0.5f, 0.16f, 0.012f), felt);
-        var coin = new GameObject("Coin").transform; coin.SetParent(cart, false);
-        Disc(coin, "Disc", new Vector3(0.17f, 0.6f, 0.182f), 0.1f, gold);   // (+x is the player's left)
-        coin.GetChild(0).localRotation = Quaternion.Euler(90f, 0f, 0f);
-        var coins = WorldText(cart, "Coins", new Vector3(-0.05f, 0.6f, 0.182f), Quaternion.Euler(0f, 180f, 0f), "0", 1.1f, C("f6d773"), new Vector2(0.28f, 0.14f));
+        shelf.cart = cart; shelf.cartMin = -halfW + 0.3f; shelf.cartMax = halfW - 0.3f; shelf.cartZ = cz;
+        var tilt = new GameObject("Tilt").transform;
+        tilt.SetParent(cart, false); tilt.localPosition = new Vector3(0f, 1.05f, 0f); tilt.localRotation = Quaternion.Euler(35f, 0f, 0f);
+        Oval(tilt, "Rim", new Vector3(0f, -0.012f, 0f), new Vector3(0.66f, 0.03f, 0.36f), woodDark);
+        Oval(tilt, "Plate", Vector3.zero, new Vector3(0.62f, 0.03f, 0.32f), felt);
+        RoundButton(tilt, shelf, "Up", new Vector3(0.13f, 0.02f, -0.04f), true);
+        RoundButton(tilt, shelf, "Down", new Vector3(-0.13f, 0.02f, -0.04f), false);
+        Disc(tilt, "Coin", new Vector3(0.09f, 0.018f, 0.1f), 0.06f, gold);
+        var coins = WorldText(tilt, "Coins", new Vector3(-0.03f, 0.02f, 0.1f), Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, 180f, 0f), "0", 0.75f, C("f6d773"), new Vector2(0.2f, 0.08f));
         coins.font = future; coins.alignment = TextAlignmentOptions.Left;
         shelf.cartCoins = coins;
 
@@ -279,6 +286,94 @@ public static partial class LobbyBuilder
         var s = WorldText(tag, "Star", new Vector3(0f, -0.04f, lipZ + 0.008f), Quaternion.Euler(0f, 180f, 0f), "*", 1.2f, C("1e190f"), new Vector2(0.08f, 0.08f));
         s.font = future;
         return tag.gameObject;
+    }
+
+    // a shelf board with rounded corners and a rounded front and back edge: w x d, h thick (bottom at y = 0), r the
+    // corners' radius
+    static Mesh RoundedBoard(float w, float d, float h, float r)
+    {
+        string path = "Assets/Udon/Generated/StoreBoard.asset";
+        var m = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        bool fresh = m == null;
+        if (fresh) m = new Mesh { name = "StoreBoard" };
+        // the outline: a rounded rectangle, 6 steps per corner, counter-clockwise from above
+        var ring = new List<Vector2>();
+        float hx = w / 2f - r, hz = d / 2f - r;
+        Vector2[] centres = { new Vector2(hx, hz), new Vector2(-hx, hz), new Vector2(-hx, -hz), new Vector2(hx, -hz) };
+        for (int c = 0; c < 4; c++)
+            for (int s = 0; s <= 6; s++)
+            {
+                float a = (c * 90f + s * 15f) * Mathf.Deg2Rad;
+                ring.Add(centres[c] + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r);
+            }
+        // the side is a half round (the edge rounded off, top to bottom), 4 steps
+        const int E = 4;
+        var v = new List<Vector3>(); var n = new List<Vector3>(); var tri = new List<int>();
+        int N = ring.Count;
+        for (int e = 0; e <= E; e++)
+        {
+            float a = -90f + 180f * e / E, ca = Mathf.Cos(a * Mathf.Deg2Rad), sa = Mathf.Sin(a * Mathf.Deg2Rad);
+            for (int i = 0; i < N; i++)
+            {
+                Vector2 p = ring[i], o = p.normalized;
+                // the outward direction of this outline point (its corner's centre to it, or straight out on a side)
+                Vector2 cc = new Vector2(Mathf.Clamp(p.x, -hx, hx), Mathf.Clamp(p.y, -hz, hz));
+                Vector2 dir = (p - cc).sqrMagnitude > 1e-8f ? (p - cc).normalized : o;
+                float bulge = h / 2f * ca;
+                v.Add(new Vector3(p.x - dir.x * h / 2f + dir.x * bulge, h / 2f + h / 2f * sa, p.y - dir.y * h / 2f + dir.y * bulge));
+                n.Add(new Vector3(dir.x * ca, sa, dir.y * ca));
+            }
+        }
+        for (int e = 0; e < E; e++)
+            for (int i = 0; i < N; i++)
+            {
+                int a0 = e * N + i, a1 = e * N + (i + 1) % N, b0 = a0 + N, b1 = a1 + N;
+                tri.Add(a0); tri.Add(b0); tri.Add(a1); tri.Add(a1); tri.Add(b0); tri.Add(b1);
+            }
+        // the top and bottom: fans from a middle point
+        int top = v.Count; v.Add(new Vector3(0f, h, 0f)); n.Add(Vector3.up);
+        int tr = v.Count; for (int i = 0; i < N; i++) { v.Add(v[E * N + i]); n.Add(Vector3.up); }
+        for (int i = 0; i < N; i++) { tri.Add(top); tri.Add(tr + (i + 1) % N); tri.Add(tr + i); }
+        int bot = v.Count; v.Add(Vector3.zero); n.Add(Vector3.down);
+        int brr = v.Count; for (int i = 0; i < N; i++) { v.Add(v[i]); n.Add(Vector3.down); }
+        for (int i = 0; i < N; i++) { tri.Add(bot); tri.Add(brr + i); tri.Add(brr + (i + 1) % N); }
+        m.Clear(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(tri, 0); m.RecalculateBounds();
+        if (fresh) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
+        return m;
+    }
+
+    // a flattened cylinder (an oval plate)
+    static void Oval(Transform root, string name, Vector3 pos, Vector3 size, Material m)
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        go.name = name;
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = pos; go.transform.localScale = new Vector3(size.x, size.y / 2f, size.z);
+        go.GetComponent<MeshRenderer>().sharedMaterial = m;
+        go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+    }
+
+    // a round button on the floating panel: a pale cap with an arrow, pressed like any world button (PHButton)
+    static void RoundButton(Transform panel, PHShelf shelf, string action, Vector3 at, bool up)
+    {
+        var key = new GameObject(action).transform;
+        key.SetParent(panel, false); key.localPosition = at;
+        Oval(key, "Cap", new Vector3(0f, 0.02f, 0f), new Vector3(0.15f, 0.04f, 0.15f), Mat("StoreKey", C("e1cfa5")));
+        var arrow = new GameObject("Arrow");
+        arrow.transform.SetParent(key, false);
+        arrow.transform.localPosition = new Vector3(0f, 0.042f, 0f);
+        arrow.transform.localRotation = Quaternion.Euler(0f, up ? 180f : 0f, 0f);   // (the panel's -z is away from the player: up)
+        arrow.transform.localScale = Vector3.one * 0.7f;
+        arrow.AddComponent<MeshFilter>().sharedMesh = ArrowMesh();
+        arrow.AddComponent<MeshRenderer>().sharedMaterial = Mat("StoreInk", C("1e190f"));
+        var btn = key.gameObject.AddUdonSharpComponent<PHButton>();
+        btn.target = shelf; btn.action = action;
+        UdonSharpEditorUtility.CopyProxyToUdon(btn);
+        var u = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
+        u.proximity = 3f; u.interactText = up ? "Up" : "Down";
+        var col = key.gameObject.AddComponent<SphereCollider>(); col.radius = 0.09f; col.center = new Vector3(0f, 0.02f, 0f);
+        col.isTrigger = true;   // the panel follows the player: nothing on it may push them
     }
 
     // an up / down button on the cart: a pale key with an arrow, pressed like any world button (PHButton)
@@ -379,13 +474,15 @@ public static partial class LobbyBuilder
     }
 
     // ------------------------------------------------------------------ the Trophies board (south wall)
-    // 2800 x 700 canvas units at 4 mm: 11.2 x 2.8 m. Two halves of 4 x 6 cards (22 used), a count over each.
-    const float CardW = 330f, CardH = 100f, Gap = 10f, HalfW = 4 * CardW + 3 * Gap;
+    // 2900 x 1190 canvas units at 3.7 mm: 10.7 x 4.4 m, on the west wall. Two halves of 4 x 10 cards (39 used), a
+    // count over each.
+    const int BoardCols = 4;
+    const float CardW = 330f, CardH = 100f, Gap = 10f, HalfW = BoardCols * CardW + (BoardCols - 1) * Gap;
 
     static PHTrophyBoard BuildTrophyBoard(Transform lobby, PHStore store, Dictionary<string, string> text, Vector3 at)
     {
-        const float W = 2800f, Hh = 700f;
-        var cv = Canvas(lobby, "Trophies", at, Quaternion.Euler(0f, 180f, 0f), new Vector2(W, Hh), 0.004f, false);
+        const float W = 2900f, Hh = 1190f;
+        var cv = Canvas(lobby, "Trophies", at, Quaternion.Euler(0f, -90f, 0f), new Vector2(W, Hh), 0.0037f, false);
         var board = cv.gameObject.AddUdonSharpComponent<PHTrophyBoard>();
         board.store = store;
         board.progressFormat = Get(text, "store.progress");
@@ -398,13 +495,13 @@ public static partial class LobbyBuilder
         float y0 = Hh / 2f - 60f - CardH / 2f;                  // under the heading
         board.halfShift = halfShift;
         board.place = new Vector2[PHStore.HUNTER_TROPHIES];
-        for (int i = 0; i < board.place.Length; i++) board.place[i] = new Vector2(x0 + (i % 4) * (CardW + Gap), y0 - (i / 4) * (CardH + Gap));
+        for (int i = 0; i < board.place.Length; i++) board.place[i] = new Vector2(x0 + (i % BoardCols) * (CardW + Gap), y0 - (i / BoardCols) * (CardH + Gap));
         for (int h = 0; h < 2; h++)
         {
             float cx = (h == 0 ? -1 : 1) * halfShift / 2f;
             Img(cv, h == 0 ? "HunterDot" : "HiderDot", new Vector2(cx - HalfW / 2f + 18, Hh / 2f - 32), new Vector2(30, 30), sRound, h == 0 ? C("d8473a") : C("7fb3e6"), 6f);
             Img(cv, "Rule", new Vector2(cx, Hh / 2f - 54), new Vector2(HalfW, 4), sDash, C("c9a46a"), 2f);
-            var count = Txt(cv, h == 0 ? "HunterCount" : "HiderCount", new Vector2(cx + HalfW / 2f - 60, Hh / 2f - 32), new Vector2(120, 30), "0 / 22", future, 20, C("6b5d40"), TextAlignmentOptions.Right);
+            var count = Txt(cv, h == 0 ? "HunterCount" : "HiderCount", new Vector2(cx + HalfW / 2f - 60, Hh / 2f - 32), new Vector2(120, 30), "0 / 39", future, 20, C("6b5d40"), TextAlignmentOptions.Right);
             if (h == 0) board.countHunter = count; else board.countHider = count;
         }
 

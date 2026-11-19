@@ -4,10 +4,11 @@ using UnityEngine;
 using VRC.SDKBase;
 
 // One half of the weapon wall on the lobby's east wall (Cor, 2026-11-19): a paternoster shelf with every weapon of
-// one kind on it, ten to a shelf, four shelves showing. Owned weapons are solid, the rest dithered (the
+// one kind on it, ten to a shelf, floor to ceiling: the shelves come up out of a black hole in the floor and go into
+// one at the ceiling (Cor), eight showing. Owned weapons are solid, the rest dithered (the
 // PropHunt/ShelfWeapon shader's _Dither) with a price tag (shop) or a star (trophy). A cart on a rail at the
-// player's feet follows them along this half and carries the up / down buttons (PHButton -> Up / Down) and the
-// player's coins. Clicking a weapon (PHShelfSlot) carries it, or opens the buy dialog or the trophy's note
+// A small floating panel (two round buttons, PHButton -> Up / Down, and the player's coins), slanted towards them,
+// follows them along this half. Clicking a weapon (PHShelfSlot) carries it, or opens the buy dialog or the trophy's note
 // (PHStore.Clicked). Everything here is the local player's own: nothing is synced.
 // This object's space: x along the wall (x = 0 the half's middle; column 0 at +x, the player's left), y up from
 // the floor, z out of the wall into the room.
@@ -34,7 +35,9 @@ public class PHShelf : UdonSharpBehaviour
     public float cartMin = -2.5f, cartMax = 2.5f, cartZ = 1.2f;
     public TextMeshPro cartCoins;
 
-    const int COLS = 10, SHOWN = 4, ROOTS = 5;
+    public int shown = 8;            // shelves showing (one more row root goes round out of sight)
+    const int COLS = 10;
+    int SHOWN, ROOTS;
     const float TURN = 0.4f;
     int[] content;                   // catalog index per slot (-1 empty)
     int[] ro;                        // the row root at each place: 0 bottom .. 3 top, 4 out of sight
@@ -47,6 +50,7 @@ public class PHShelf : UdonSharpBehaviour
 
     void Start()
     {
+        SHOWN = shown; ROOTS = shown + 1;
         content = new int[ROOTS * COLS];
         ro = new int[ROOTS];
         for (int i = 0; i < ROOTS; i++) ro[i] = i;
@@ -100,11 +104,12 @@ public class PHShelf : UdonSharpBehaviour
                 mpb.SetFloat("_Dither", own ? 0f : 1f);
                 itemMr[k].SetPropertyBlock(mpb);
             }
-            bool shop = any && !own && cat == PHStore.CAT_SHOP;
+            bool trophy = any && !own && store.wTrophy[c] >= 0;
+            bool shop = any && !own && !trophy && cat == PHStore.CAT_SHOP;
             tagShop[k].SetActive(shop);
             if (shop) price[k].text = store.wPrice[c].ToString();
-            tagCool[k].SetActive(any && !own && cat == PHStore.CAT_COOL);
-            tagGoofy[k].SetActive(any && !own && cat == PHStore.CAT_GOOFY);
+            tagCool[k].SetActive(trophy && cat != PHStore.CAT_GOOFY);
+            tagGoofy[k].SetActive(trophy && cat == PHStore.CAT_GOOFY);
             sel[k].SetActive(any && store.Picked(c));
         }
     }

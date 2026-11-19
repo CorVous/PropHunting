@@ -2,6 +2,7 @@
   Assets/Udon/Text/strings_store.tsv   every text the weapon wall and the Trophies board show (English; the
                                        localization work fills the other columns)
   Tools/store_prices.json              the shop weapons' prices (edit by hand; run again keeps them)
+  Tools/store_trophies.json            every trophy's weapon and rounds-to-earn range (hardest -> most interesting)
   Tools/store_free.json                the free weapons: 10 cheap shop weapons a side, picked once at random (Cor);
                                        a new player carries a random one of them. Run again keeps the pick
   Assets/Lobby/WeaponIcons.png         a 16 x 12 atlas of 128 px icons, one per catalog weapon in catalog order
@@ -42,6 +43,24 @@ HUNT = [
     ('shot_down', 'Shot Down', "Have your weapon broken by a hider's shots.", 40, 200),
     ('empty_handed', 'Empty Handed', 'Finish 10 rounds as a hunter with no catches.', 80, 160),
     ('scrapper', 'Scrapper', 'Vote to scrap a map.', 1, 2),
+    # (Cor: half the weapons from trophies) the quicker goals and steps of the ones above
+    ('first_hunt', 'First Hunt', 'Play a round as a hunter.', 1, 6),
+    ('double', 'Double', 'Catch 2 hiders in one round.', 2, 10),
+    ('five_catches', 'Five Catches', 'Catch 5 hiders in total.', 6, 20),
+    ('twenty_five_catches', 'Twenty-Five Catches', 'Catch 25 hiders in total.', 50, 110),
+    ('fifty_catches', 'Fifty Catches', 'Catch 50 hiders in total.', 100, 200),
+    ('ten_hunts', 'Ten Hunts', 'Play 10 rounds as a hunter.', 30, 50),
+    ('regular_hunter', 'Regular Hunter', 'Play 25 rounds as a hunter.', 75, 125),
+    ('first_win_hunt', 'First Win', 'Win a round as a hunter.', 2, 10),
+    ('three_wins_hunt', 'Three Wins', 'Win 3 rounds as a hunter.', 10, 25),
+    ('top_dog', 'Top Dog', 'Win 25 rounds as a hunter.', 150, 250),
+    ('town_watch', 'Town Watch', 'Catch a hider on a town map.', 2, 12),
+    ('village_watch', 'Village Watch', 'Catch a hider on a medieval map.', 4, 25),
+    ('station_watch', 'Station Watch', 'Catch a hider on a space map.', 4, 25),
+    ('fifty_bonks', 'Fifty Bonks', 'Hit 50 wrong props in total.', 30, 60),
+    ('steady_hand', 'Steady Hand', 'Finish 5 rounds as a hunter without hitting a wrong prop.', 25, 100),
+    ('last_stand', 'Last Stand', 'Catch a hider in the final stand.', 8, 30),
+    ('quick_pair', 'Quick Pair', 'Catch 2 hiders in the first minute of the hunt.', 20, 80),
 ]
 HIDE = [
     ('survivor', 'Survivor', 'Survive a round as a hider.', 1, 4),
@@ -66,7 +85,49 @@ HIDE = [
     ('full_house', 'Full House', 'Play a round with 10 or more people.', 1, 40),
     ('usual_suspect', 'Usual Suspect', 'Be the first hider caught, 5 times.', 30, 60),
     ('wallflower', 'Wallflower', 'Survive without moving once the hunt starts.', 5, 20),
+    ('first_hide', 'First Hide', 'Play a round as a hider.', 1, 2),
+    ('three_survivals', 'Three Survivals', 'Survive 3 rounds in total.', 4, 10),
+    ('twenty_five_survivals', 'Twenty-Five Survivals', 'Survive 25 rounds in total.', 55, 80),
+    ('ten_hides', 'Ten Hides', 'Play 10 rounds as a hider.', 12, 16),
+    ('regular_hider', 'Regular Hider', 'Play 25 rounds as a hider.', 30, 40),
+    ('first_win_hide', 'First Win', 'Win a round as a hider.', 1, 4),
+    ('three_wins_hide', 'Three Wins', 'Win 3 rounds as a hider.', 4, 12),
+    ('prop_royalty', 'Prop Royalty', 'Win 25 rounds as a hider.', 60, 100),
+    ('hidden_minute', 'Hidden Minute', 'Stay hidden for 1 minute in a round.', 1, 4),
+    ('two_minutes', 'Two Minutes', 'Stay hidden for 2 minutes in a round.', 2, 8),
+    ('town_hider', 'Town Hider', 'Survive on a town map.', 2, 8),
+    ('village_hider', 'Village Hider', 'Survive on a medieval map.', 3, 15),
+    ('station_hider', 'Station Hider', 'Survive on a space map.', 3, 15),
+    ('ten_props', 'Ten Props', 'Be 10 different props in total.', 5, 10),
+    ('hoppy', 'Hoppy', 'Hop 50 times as a prop.', 1, 3),
+    ('back_to_back', 'Back to Back', 'Survive 2 rounds in a row as a hider.', 3, 10),
+    ('stand_your_ground', 'Stand Your Ground', 'Still be hiding when the final stand begins.', 3, 10),
 ]
+
+# Cor: plain weapons are quick to earn and cheap, the coolest take the longest and cost the most. The shop weapons
+# by looks, most interesting first (ranked from the sheets, 2026-11-19); the first 17 of each side became trophy
+# weapons, the other 39 are priced in thirds: 400, 200, 100. Cor's cool and goofy picks top the trophy order.
+APPEAL = {
+    'melee': ['Guitar', 'guitar_A', 'fish-large', 'banana', 'candy-cane-red', 'wand_A', 'Axe_Diamond', 'hammer_A',
+              'Skeleton_Blade', 'Axe_Double', 'Weapon_Sword_2', 'hammer_C', 'halberd', 'hammer', 'mallet',
+              'Hammer_Double', 'Axe_small_Golden',
+              'Axe_Gold', 'Sword_Gold', 'sword_2handed_color', 'axe_1handed', 'axe_B', 'Sword_Golden', 'Dagger_Golden',
+              'Axe#44', 'Spear#46', 'Club', 'sword_2handed', 'Weapon_Dagger', 'Weapon_Sword_1',
+              'pickaxe', 'wrench_A', 'wrench_B', 'tool-pickaxe', 'tool-shovel', 'Axe_Bronze', 'Hammer_Small', 'Axe#37',
+              'sword_E', 'sword_C', 'dagger', 'sword_1handed', 'Dagger_2',
+              'sword_B', 'sword_A', 'spear_A', 'Sword_Wood', 'Sword_Bronze', 'SimpleAxe', 'Axe#32', 'Sword', 'Knife',
+              'Knife_1', 'Knife_2', 'Spear#26', 'Spear#34'],
+    'gun': ['RocketLauncher', 'Crossbow_2', 'crossbow_2handed', 'Weapon_DoubleShotgun', 'crossbow_1handed', 'blaster-m',
+            'blaster-c', 'blaster-q', 'blaster-p', 'blaster-k', 'Gun_Revolver', 'ShortCannon', 'ak47', 'blaster-e',
+            'Grenade_1', 'Grenade_3', 'weapon_rifle',
+            'blaster-a', 'blaster-d', 'blaster-g', 'blaster-j', 'blaster-l', 'blaster-r', 'Pistol#45', 'Revolver#46',
+            'Revolver_Small', 'Weapon_Rifle', 'Sniper', 'Shotgun#49', 'AR_5',
+            'AR_1', 'AR_3', 'Pistol_2', 'SMG_2', 'Sniper_1', 'Sniper_3', 'Gun_Sniper', 'Shotgun#51', 'SubmachineGun_1',
+            'SubmachineGun_3', 'AssaultRifle_1', 'Pistol_1', 'Pistol_3',
+            'Pistol_5', 'Shotgun_1', 'Shotgun_SawedOff', 'SniperRifle_1', 'P90', 'Pistol#23', 'Revolver#24', 'Rifle#25',
+            'Shotgun#26', 'SniperRifle', 'Uzi', 'Gun', 'Rifle#32'],
+}
+NEW_TROPHY_WEAPONS = 17
 
 UI = [
     ('store.buy', '{0}'),                        # the buy button: the price beside a coin
@@ -164,8 +225,41 @@ def free():
     print('wrote', p, len(out), 'free weapons')
 
 
+def plan():
+    """prices by looks, and every trophy's weapon: the hardest trophy gets the most interesting weapon"""
+    free_ids = set(json.load(open(os.path.join(ROOT, 'Tools', 'store_free.json'), encoding='utf8')))
+    prices, trophies = {}, []
+    for kind, lst in (('melee', HUNT), ('gun', HIDE)):
+        shop = [w['id'] for w in CAT if w['kind'] == kind and w['category'] == 'shop' and w['id'] not in free_ids]
+        model = {i: i.split(':')[2] for i in shop}
+        order = []
+        for name in APPEAL[kind]:
+            if '#' in name:
+                order.append(shop[int(name.split('#')[1])])
+            else:
+                hits = [i for i in shop if model[i] == name]
+                assert len(hits) == 1, (kind, name, hits)
+                order.append(hits[0])
+        assert sorted(order) == sorted(shop), (kind, len(order), len(shop))
+        new, sell = order[:NEW_TROPHY_WEAPONS], order[NEW_TROPHY_WEAPONS:]
+        third = len(sell) // 3
+        for k, i in enumerate(sell):
+            prices[i] = 400 if k < third else (200 if k < 2 * third else 100)
+        weapons = [w['id'] for w in CAT if w['kind'] == kind and w['category'] == 'cool'] +                   [w['id'] for w in CAT if w['kind'] == kind and w['category'] == 'goofy'] + new
+        assert len(weapons) == len(lst), (kind, len(weapons), len(lst))
+        hard = sorted(range(len(lst)), key=lambda k: (-(lst[k][3] + lst[k][4]), k))
+        got = {}
+        for rank, k in enumerate(hard):
+            got[k] = weapons[rank]
+        for k, tr in enumerate(lst):
+            trophies.append({'key': tr[0], 'weapon': got[k], 'lo': tr[3], 'hi': tr[4]})
+    json.dump(prices, open(os.path.join(ROOT, 'Tools', 'store_prices.json'), 'w', encoding='utf8'), indent=1, sort_keys=True)
+    json.dump(trophies, open(os.path.join(ROOT, 'Tools', 'store_trophies.json'), 'w', encoding='utf8'), indent=1)
+    print('wrote store_prices.json', len(prices), 'and store_trophies.json', len(trophies))
+
+
 if __name__ == '__main__':
     folder = sys.argv[sys.argv.index('--thumbs') + 1] if '--thumbs' in sys.argv else None
-    assert len(HUNT) == 22 and len(HIDE) == 22
-    tsv(); prices(); free()
+    assert len(HUNT) == 39 and len(HIDE) == 39
+    tsv(); prices(); free(); plan()
     if '--no-icons' not in sys.argv: icons(folder)
