@@ -216,7 +216,12 @@ public class PHView : UdonSharpBehaviour
         {
             vrHealthBar.SetActive(hider);
             if (hider) vrHealth.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
-            if (vrPanel.gameObject.activeSelf != hider) vrPanel.gameObject.SetActive(hider);
+            if (vrPanel.gameObject.activeSelf != hider)
+            {
+                // still in the hand when the hiding ends (caught, round over): let go first, so the hand is not left holding a hidden pickup
+                if (!hider && vrPanelPickup != null && vrPanelPickup.IsHeld) vrPanelPickup.Drop();
+                vrPanel.gameObject.SetActive(hider);
+            }
             if (devicesOn != hider) ShowDevices(hider);
             UpdateMini(s, hider);
         }
@@ -631,6 +636,7 @@ public class PHView : UdonSharpBehaviour
         }
         if (!vr)
         {
+            if (desktopRoot == null) return;
             // The canvas fills the screen, 900 units high whatever the field of view and as wide as the screen is,
             // so what is anchored to a corner sits in the screen's corner (Cor: the controls ran into VRChat's own).
             // Placed from the screen's own camera (the head's tracking data where there is none); its size and its

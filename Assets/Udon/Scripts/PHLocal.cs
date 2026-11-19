@@ -408,8 +408,9 @@ public class PHLocal : UdonSharpBehaviour
         bool vr = Networking.LocalPlayer.IsUserInVR();
         // desktop: a click on a door within reach works it (C7), before anything else
         if (!vr && TryDoor()) return;
-        // VR: a hider's left trigger turns the prop (PHHiderBody); the selector in the right hand picks
-        if (vr && role == PHGame.ROLE_HIDER && args.handType == VRC.Udon.Common.HandType.LEFT) return;
+        // VR: a hider's left trigger turns the prop (PHHiderBody); the selector in the right hand picks. A hunter's
+        // dart flies from the right hand too (Aim), so a left trigger fires nothing (it shot where the right hand pointed)
+        if (vr && args.handType == VRC.Udon.Common.HandType.LEFT) return;
         if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) TryTakeDisguise();
         else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT) Fire();
     }
@@ -728,6 +729,8 @@ public class PHLocal : UdonSharpBehaviour
         if (Time.time - lastTaunt < TAUNT_COOLDOWN) return;
         lastTaunt = Time.time;
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.PlayTaunt), Random.Range(0, 1000));
+        // a taunt of their own counts as the forced one (the warning says "or taunt now"): its clock starts again
+        if (nextForced >= 0f) { nextForced = Time.time + ForcedInterval(); warned = false; checkPos = Networking.LocalPlayer.GetPosition(); }
     }
 
     // a hunter's dart reached this player's prop (PHSlot.TakeHit, on the owner)

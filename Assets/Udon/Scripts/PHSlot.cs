@@ -166,6 +166,8 @@ public class PHSlot : UdonSharpBehaviour
     public void PlayTaunt(int pick)
     {
         if (voice == null || game.local == null || game.local.sound == null) return;
+        // (a taunt arriving late, after the hunt or the hider's catch, stays silent: taunts are sent only then)
+        if (game.phase != PHGame.PH_HUNT || caught) return;
         PHAudio a = game.local.sound;
         AudioClip c = a.Clip(a.Pick(a.taunts, pick));
         if (c == null) return;
