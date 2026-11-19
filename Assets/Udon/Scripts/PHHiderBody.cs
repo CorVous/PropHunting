@@ -183,7 +183,7 @@ public class PHHiderBody : UdonSharpBehaviour
         fullHalf = half;
         narrowHalf = new Vector3(Mathf.Min(half.x, SQUEEZE_HALF), Mathf.Min(half.y, SQUEEZE_HALF_Y), Mathf.Min(half.z, SQUEEZE_HALF));
         canSqueeze = narrowHalf != fullHalf;
-        narrow = false;
+        narrow = false; squeezeHalf = Vector3.zero;
     }
 
     // A big prop squeezes through a doorway (Cor: make it easier for large props to get through doors). Where the
@@ -195,33 +195,114 @@ public class PHHiderBody : UdonSharpBehaviour
     bool canSqueeze, narrow;
     Vector3 squeezeAxis;   // the way through the gap it is squeezing through
     float narrowSince;
+    // The narrow box is turned to the way through, not with the prop, its narrow side across (Cor: "going into a
+    // doorway with a long object diagonally seems to get the object stuck"; turned with the prop, 45 degrees made the
+    // box about 40% wider across the door). squeezeHalf is that box in the way through's frame (x across, z along).
+    Vector3 squeezeHalf;
+    float squeezeYaw;
+    // where the gap is: gapAt on the way through, and how far along it its sides go on (a wall's thickness)
+    Vector3 gapAt;
+    float gapDepth, gapFound;
+
+    float BoxYaw() { return half == squeezeHalf ? squeezeYaw : yaw; }
+
+    // the narrow box for squeezing along dir
+    void SqueezeBox(Vector3 dir)
+    {
+        squeezeYaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+        squeezeHalf = new Vector3(Mathf.Min(narrowHalf.x, narrowHalf.z), narrowHalf.y, Mathf.Max(narrowHalf.x, narrowHalf.z));
+        half = squeezeHalf;
+    }
+
+    // Held to the way through only while in the gap (Cor: hiders must not get stuck): until the narrow box's back is
+    // past the far end of the gap's sides. Out of it the prop moves freely as the narrow box until its own fits:
+    // a long prop through a door at a slant needs more room beyond than a corridor or a furnished room has, and held
+    // to the axis there it could only go on into what stopped it, or back.
+    // (and only in line with it: pushed aside out there, walking back held to the axis ran it into a jamb; not held,
+    // it looks for the gap again when stopped)
+    bool Held()
+    {
+        if (!narrow) return false;
+        Vector3 off = pos - gapAt; off.y = 0f;
+        float along = Vector3.Dot(off, squeezeAxis);
+        return along - squeezeHalf.z < gapDepth + 0.02f && (off - squeezeAxis * along).sqrMagnitude < 0.08f * 0.08f;
+    }
 
     // Is what lies ahead (along dir, from 'from') a gap narrower than the prop: something within the prop's own half
-    // width on both sides, a little past its front? A doorway's two jambs, two cupboards. Without this a prop
-    // walking along a wall took a table against that wall, or a door frame's edge, for a gap, squeezed "through"
-    // along the wall, and could then only move along it (Cor: stuck near a doorway until it let go).
+    // width on both sides, from the narrow box's back to a little past the prop's own front? A doorway's two jambs,
+    // two cupboards. Without this a prop walking along a wall took a table against that wall, or a door frame's
+    // edge, for a gap, squeezed "through" along the wall, and could then only move along it (Cor: stuck near a
+    // doorway until it let go). Looked for along the narrow box and not only past the prop's front: a long prop at a
+    // slant is stopped by a jamb with its centre far back and its front already past the wall, where nothing is on
+    // either side, and one wedged in the doorway has the jambs beside its centre.
+    // Sets gapFound (how far ahead the sides start) and gapDepth (how far on they go).
     bool GapAhead(Vector3 from, Vector3 dir, Vector3 side)
     {
         Quaternion q = Rot();
         Vector3 r = q * Vector3.right, f = q * Vector3.forward;
-        float across = Mathf.Abs(Vector3.Dot(side, r)) * fullHalf.x + Mathf.Abs(Vector3.Dot(side, f)) * fullHalf.z;
+        // (and a hand's width more: a slanted prop no wider than the door straight across still wedges in it, across
+        // the wall's depth, and stands off the middle of it)
+        float across = Mathf.Abs(Vector3.Dot(side, r)) * fullHalf.x + Mathf.Abs(Vector3.Dot(side, f)) * fullHalf.z + 0.15f;
         float front = Mathf.Abs(Vector3.Dot(dir, r)) * fullHalf.x + Mathf.Abs(Vector3.Dot(dir, f)) * fullHalf.z;
         Vector3 mid = from + Vector3.up * Mathf.Min(fullHalf.y, 0.9f);
-        RaycastHit h;
-        for (int k = 0; k < 4; k++)
+        for (float s = -squeezeHalf.z; s < front + 0.55f; s += 0.1f)
         {
-            Vector3 at = mid + dir * (front + 0.05f + 0.15f * k);
-            if (Physics.Raycast(at, side, out h, across, mask, QueryTriggerInteraction.Ignore)
-                && Physics.Raycast(at, -side, out h, across, mask, QueryTriggerInteraction.Ignore)) return true;
+            if (!SidesAt(mid + dir * s, side, across)) continue;
+            gapFound = s; gapDepth = 0f;
+            for (float d = 0.05f; d < 1f && SidesAt(mid + dir * (s + d), side, across); d += 0.05f) gapDepth = d;
+            return true;
         }
         return false;
+    }
+
+    // Squeezing, out of the gap and stopped while going back towards it (or on towards it): lined up with the gap it
+    // came through again and held to it, where the narrow box has room to step aside onto its line and gets through.
+    // Pushed aside out there, the look for a gap may not see this one again (Cor: hiders must not get stuck).
+    bool BackIntoGap(Vector3 start, Vector3 delta, bool step)
+    {
+        Vector3 off = start - gapAt; off.y = 0f;
+        float along = Vector3.Dot(off, squeezeAxis);
+        Vector3 dir = along > 0f ? -squeezeAxis : squeezeAxis;
+        if (Vector3.Dot(dir, delta) < 0.25f * delta.magnitude) return false;
+        Vector3 aside = off - squeezeAxis * along;
+        float d = aside.magnitude;
+        if (d > 1f) return false;
+        if (d > 1e-4f && SweepH(start, -aside / d, d)) return false;
+        Vector3 from = start - aside;
+        if (BlockedOn(from, dir, Mathf.Abs(along) + gapDepth + squeezeHalf.z)) return false;
+        // going back: the gap's far end is now its near one
+        if (dir != squeezeAxis) { gapAt += squeezeAxis * gapDepth; squeezeAxis = dir; squeezeYaw += 180f; }
+        narrowSince = Time.time;
+        Shift(from);
+        SlideMove(dir * delta.magnitude, step);
+        return true;
+    }
+
+    bool SidesAt(Vector3 at, Vector3 side, float across)
+    {
+        RaycastHit h;
+        return Physics.Raycast(at, side, out h, across, mask, QueryTriggerInteraction.Ignore)
+            && Physics.Raycast(at, -side, out h, across, mask, QueryTriggerInteraction.Ignore);
+    }
+
+    // A long prop at a slant can fit with its own shape inside a doorway, wedged from jamb to jamb, and from there it
+    // can only move along its own length: straight on or straight back the jambs stop it (Cor: the player walks in
+    // straight, the prop is at an angle). So the squeeze ends where the prop fits only once its own box is
+    // clear of the gap, through or back out, or when it stands square to the way through and can slide along it.
+    bool SqueezeDone()
+    {
+        Quaternion q = Rot();
+        float ext = Mathf.Abs(Vector3.Dot(squeezeAxis, q * Vector3.right)) * fullHalf.x + Mathf.Abs(Vector3.Dot(squeezeAxis, q * Vector3.forward)) * fullHalf.z;
+        float along = Vector3.Dot(pos - gapAt, squeezeAxis);
+        if (along - ext > gapDepth || along + ext < 0f) return true;
+        return Mathf.Abs(Mathf.Sin(2f * (yaw - squeezeYaw) * Mathf.Deg2Rad)) < 0.1f;
     }
 
     void SqueezeAfterMove()
     {
         half = fullHalf;
-        if (Fits(pos, yaw)) { narrow = false; return; }
-        half = narrowHalf;
+        if (Fits(pos, yaw) && SqueezeDone()) { narrow = false; return; }
+        half = squeezeHalf;
         if (Time.time - narrowSince < SQUEEZE_TIME) return;
         // too long in the gap: out to the nearest place its own box fits
         half = fullHalf;
@@ -233,14 +314,14 @@ public class PHHiderBody : UdonSharpBehaviour
                 Vector3 at = pos + new Vector3(Mathf.Cos(a) * d, 0f, Mathf.Sin(a) * d);
                 if (!Fits(at, yaw)) continue;
                 // not through a wall: the narrow box can get there
-                half = narrowHalf;
+                half = squeezeHalf;
                 bool wall = SweepH(pos, (at - pos).normalized, d);
                 half = fullHalf;
                 if (wall) continue;
                 Shift(at); narrow = false;
                 return;
             }
-        half = narrowHalf;
+        half = squeezeHalf;
         narrowSince = Time.time;   // nowhere yet: look again later
     }
 
@@ -394,7 +475,7 @@ public class PHHiderBody : UdonSharpBehaviour
         RaycastHit r;   // (an out parameter into a field is not written back in Udon)
         // A tenth of a degree off: at exactly 90 or 270 degrees PhysX sweeps a box that is longer than wide as if it
         // were not turned, and short sweeps miss the walls (a prop facing east or west walked through them)
-        Quaternion q = Quaternion.Euler(0f, yaw + 0.1f, 0f);
+        Quaternion q = Quaternion.Euler(0f, BoxYaw() + 0.1f, 0f);
         bool any = Physics.BoxCast(c, h, dir, out r, q, dist + GAP, mask, QueryTriggerInteraction.Ignore);
         if (Fitted() && (any || Physics.CheckBox(c, h, q, mask, QueryTriggerInteraction.Ignore)))
         {
@@ -447,7 +528,7 @@ public class PHHiderBody : UdonSharpBehaviour
         Vector3 h = new Vector3(half.x - 0.005f, half.y - RAISE * 0.5f, half.z - 0.005f);
         Vector3 c = from + Vector3.up * (half.y + RAISE * 0.5f);
         RaycastHit r;
-        Quaternion q = Rot();
+        Quaternion q = Quaternion.Euler(0f, BoxYaw(), 0f);
         bool any = Physics.BoxCast(c, h, Vector3.down, out r, q, dist + RAISE, mask, QueryTriggerInteraction.Ignore);
         if (Fitted() && (any || Physics.CheckBox(c, h, q, mask, QueryTriggerInteraction.Ignore)))   // (as SweepH)
         {
@@ -478,7 +559,7 @@ public class PHHiderBody : UdonSharpBehaviour
         Vector3 h = new Vector3(half.x - 0.005f, half.y - RAISE * 0.5f, half.z - 0.005f);
         Vector3 c = from + Vector3.up * (half.y + RAISE * 0.5f);
         RaycastHit r;
-        Quaternion q = Rot();
+        Quaternion q = Quaternion.Euler(0f, BoxYaw(), 0f);
         bool any = Physics.BoxCast(c, h, Vector3.up, out r, q, dist + GAP, mask, QueryTriggerInteraction.Ignore);
         if (!Fitted()) return any ? Mathf.Max(0f, r.distance - GAP) : dist;
         if (!any && !Physics.CheckBox(c, h, q, mask, QueryTriggerInteraction.Ignore)) return dist;   // (as SweepH)
@@ -507,6 +588,7 @@ public class PHHiderBody : UdonSharpBehaviour
 
     bool hitSomething;
     Vector3 firstNormal;   // of the first thing a Slide met
+    bool firstArch;        // and whether that was the architecture (a wall, a jamb) and not a prop
 
     Vector3 Slide(Vector3 from, Vector3 delta)
     {
@@ -518,7 +600,7 @@ public class PHHiderBody : UdonSharpBehaviour
             if (dist < 1e-5f) break;
             Vector3 dir = remaining / dist;
             if (!SweepH(p, dir, dist)) { p += remaining; break; }
-            if (!hitSomething) firstNormal = hit.normal;
+            if (!hitSomething) { firstNormal = hit.normal; firstArch = hit.collider == game.builder.collisionCollider; }
             hitSomething = true;
             float travel = Mathf.Max(0f, hit.distance - GAP);
             p += dir * travel;
@@ -583,8 +665,8 @@ public class PHHiderBody : UdonSharpBehaviour
         blocked = false;
         Vector3 delta = new Vector3(wish.x, 0f, wish.z) * dt;
         // squeezing through a gap: only along it, forwards or back (walking at a slant slid the narrow box off
-        // along the wall beside the door)
-        if (narrow && delta.sqrMagnitude > 1e-10f)
+        // along the wall beside the door), while in it (Held)
+        if (narrow && delta.sqrMagnitude > 1e-10f && Held())
         {
             float along = Vector3.Dot(delta, squeezeAxis), len = delta.magnitude;
             delta = Mathf.Abs(along) > 0.2f * len ? squeezeAxis * (along > 0f ? len : -len) : Vector3.zero;
@@ -593,33 +675,52 @@ public class PHHiderBody : UdonSharpBehaviour
         {
             Vector3 start = pos;
             SlideMove(delta, wasGrounded);
-            if (blocked && canSqueeze && !narrow && mask != 0)
+            // (also when squeezing but out of the gap, as the narrow box: back into the doorway it came through, or on
+            // into the next)
+            if (blocked && canSqueeze && !Held() && mask != 0)
             {
                 // straight through what stopped it (not along the way it was going: one seldom walks square at a
                 // door), from where it stands or from up to half a metre to either side along the wall
-                // (and, when that is a thing standing by the door and not the wall, square along the way it is going)
-                for (int tryN = 0; tryN < 2 && !narrow; tryN++)
+                // (and, when that is a thing standing by the door and not the wall, square along the way it is going;
+                // last, straight through what stopped it as it faces, for a gap between props at a slant)
+                bool was = narrow, found = narrow && BackIntoGap(start, delta, wasGrounded);
+                Vector3 keepHalf = squeezeHalf, keepAxis = squeezeAxis, keepAt = gapAt;
+                float keepYaw = squeezeYaw, keepDepth = gapDepth;
+                for (int tryN = 0; tryN < 3 && !found; tryN++)
                 {
                 Vector3 n = firstNormal; n.y = 0f;
+                // a doorway is always square to the map's grid; a slanted prop's corner meets a jamb's edge, whose
+                // normal points anywhere, and squeezing that way slid the narrow box along the wall
+                if (tryN == 0) n = Mathf.Abs(n.x) > Mathf.Abs(n.z) ? new Vector3(n.x > 0f ? 1f : -1f, 0f, 0f) : new Vector3(0f, 0f, n.z > 0f ? 1f : -1f);
                 if (tryN == 1) n = Mathf.Abs(delta.x) > Mathf.Abs(delta.z) ? new Vector3(delta.x > 0f ? -1f : 1f, 0f, 0f) : new Vector3(0f, 0f, delta.z > 0f ? -1f : 1f);
-                if (n.sqrMagnitude > 1e-6f)
+                // (not at the architecture: a doorway is square, and squeezing at a slant there slid along the wall)
+                if (tryN == 2 && (firstArch || Mathf.Abs(n.x) < 0.02f || Mathf.Abs(n.z) < 0.02f)) continue;
+                // never across the way the player walks: held to it, they could not move on at all
+                if (n.sqrMagnitude > 1e-6f && Vector3.Dot(-n, delta) > 0.25f * delta.magnitude)
                 {
                     n.Normalize();
                     Vector3 along = new Vector3(-n.z, 0f, n.x);
-                    half = narrowHalf;
-                    for (int k = 0; k < 7 && !narrow; k++)
+                    SqueezeBox(-n);
+                    for (int k = 0; k < 7 && !found; k++)
                     {
                         float off = ((k + 1) / 2) * 0.16f * ((k & 1) == 1 ? 1f : -1f);   // 0, then 0.16, 0.32, 0.48 to either side
                         if (off != 0f && SweepH(start, off > 0f ? along : -along, Mathf.Abs(off))) continue;
                         Vector3 from = start + along * off;
-                        if (BlockedOn(from, -n, SQUEEZE_PASS)) continue;
                         if (!GapAhead(from, -n, along)) continue;   // a way past a thing on one side is no gap: walk round it
-                        narrow = true; narrowSince = Time.time; squeezeAxis = -n;
+                        // and the narrow box gets into it (a slanted long prop is stopped with its centre over a metre
+                        // short of the wall: a fixed reach ended before the jambs, and it squeezed off the gap's line)
+                        if (BlockedOn(from, -n, Mathf.Max(SQUEEZE_PASS, gapFound + 0.1f))) continue;
+                        found = true; narrow = true; narrowSince = Time.time; squeezeAxis = -n;
+                        gapAt = from - n * gapFound;
                         Shift(from);
                         SlideMove(-n * delta.magnitude, wasGrounded);
                     }
-                    if (!narrow) half = fullHalf;
                 }
+                }
+                if (!found)
+                {
+                    squeezeHalf = keepHalf; squeezeAxis = keepAxis; gapAt = keepAt; squeezeYaw = keepYaw; gapDepth = keepDepth;
+                    half = was ? squeezeHalf : fullHalf;
                 }
             }
             if (blocked && !narrow && mask != 0)
@@ -631,19 +732,19 @@ public class PHHiderBody : UdonSharpBehaviour
             if (mask != 0) Unstick(start, delta, dt);
             // a corrected prop makes its way back under the player while they move: alone, flat, no further than
             // they moved this step (or 1.5 m/s), as far as walls let it; the seat does not move from this
-            if (mask != 0 && !narrow && (lag.x != 0f || lag.z != 0f))
+            if (mask != 0 && !Held() && (lag.x != 0f || lag.z != 0f))
             {
                 Vector3 back = new Vector3(lag.x, 0f, lag.z);
                 float most = Mathf.Max(delta.magnitude, 1.5f * dt);
                 if (back.sqrMagnitude > most * most) back = back.normalized * most;
-                bool keepBlocked = blocked, keepHit = hitSomething;
+                bool keepBlocked = blocked, keepHit = hitSomething, keepArch = firstArch;
                 Vector3 keepNormal = firstNormal;
                 Vector3 p2 = Slide(pos, back);
                 p2.y = pos.y;
                 lag -= p2 - pos;
                 pos = p2;
                 if (lag.x * lag.x + lag.z * lag.z < 1e-6f) { lag.x = 0f; lag.z = 0f; }
-                blocked = keepBlocked; hitSomething = keepHit; firstNormal = keepNormal;
+                blocked = keepBlocked; hitSomething = keepHit; firstNormal = keepNormal; firstArch = keepArch;
             }
         }
         if (narrow) SqueezeAfterMove();
