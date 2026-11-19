@@ -241,6 +241,7 @@ public static class WorldSceneBuilder
             knocks[i] = k;
         }
         game.knocks = knocks;
+        WeaponBuilder.Build(gameGo.transform, game, local, slots);   // the hunters' weapons, the hiders' guns, their effects (PHWeapons)
 
         // the host panel on the north wall, above the zone (G50, G51): every setting and START, the "Board Game"
         // design (LobbyBuilder). Everyone can read it; only the host's presses count (PHPanel and PHGame check).
@@ -257,7 +258,7 @@ public static class WorldSceneBuilder
         // the profiler (its plaque right of the DEBUG plaque) and the scripts it watches: every one that runs each frame
         var prof = LobbyBuilder.BuildProfiler(lobby.transform, game, new Vector3(7.95f, 1.55f, RoomD / 2 - 0.12f));
         {
-            string[] names = { "PHGame", "PHLocal", "PHSlot", "PHHiderBody", "PHKnock", "PHLamps", "PHLobbyCull", "PHPanel", "PHScorePad", "PHSun", "PHView", "PHDoors", "MapBuilderUdon" };
+            string[] names = { "PHGame", "PHLocal", "PHSlot", "PHHiderBody", "PHKnock", "PHLamps", "PHLobbyCull", "PHPanel", "PHScorePad", "PHSun", "PHView", "PHDoors", "PHWeapons", "MapBuilderUdon" };
             var list = new System.Collections.Generic.List<UdonSharp.UdonSharpBehaviour>();
             var groups = new System.Collections.Generic.List<int>();
             foreach (var u in Object.FindObjectsOfType<UdonSharp.UdonSharpBehaviour>(true))

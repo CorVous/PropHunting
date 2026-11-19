@@ -9,8 +9,9 @@ using TMPro;
 //   Hider: Use (desktop click, VR right trigger) on a prop within 4 m becomes it (G5, G25); the avatar shrinks
 //          to the prop's eye height, sits in its parked station and the synced prop follows them. The VR left
 //          trigger turns the prop (PHHiderBody). Taunt: T on desktop, the button on the screen device in VR (PHView).
-//   Hunter: Use fires the tagger (05 section 5.3): a hider's prop takes a hit (sent to its owner), a real prop
-//          costs health (G17) and gets knocked, anything else is a miss. Hunters walk through props (G45).
+//   Hunter: strikes with a melee weapon (PHWeapons; desktop click, VR swing): a hider's prop takes a hit (sent to
+//          its owner), a real prop wears the weapon (G17) and gets knocked, anything else costs nothing. Hunters walk
+//          through props (G45).
 //   Everyone: frozen during the reveal; hunters wait in the lobby during BRIEF and HIDE. Hiders are free from the
 //   moment they land on the map (BRIEF), so the hiding time is BRIEF + HIDE.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -31,13 +32,13 @@ public class PHLocal : UdonSharpBehaviour
     float nextPanel;
 
     // ---- balance (Balance.cs)
-    public const float TAKE_RANGE = 4f, DART_RANGE = 25f, DART_INTERVAL = 0.5f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 8f;
-    public const int DART_DAMAGE = 25, HIT_REWARD = 5, HUNTER_HEALTH = 100, HUNT_CHANGES = 3;
+    public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 8f;
+    public const int HIT_DAMAGE = 25, HUNTER_HEALTH = 100, HUNT_CHANGES = 3;   // HUNTER_HEALTH: a new weapon's condition
     public const float HUNT_CHANGE_COOLDOWN = 5f;
     public const int LAYER_PROPS_SOLID = 11, LAYER_PROPS_WALKTHROUGH = 17;
 
     int role, slotIndex = -1;
-    float nextDart, lastChange = -99f, lastTaunt = -99f;
+    float lastChange = -99f, lastTaunt = -99f;
     int changesLeft;
     float originalEye = -1f;
     int lastCharged = -1;
@@ -449,11 +450,20 @@ public class PHLocal : UdonSharpBehaviour
         bool vr = Networking.LocalPlayer.IsUserInVR();
         // desktop: a click on a door within reach works it (C7), before anything else
         if (!vr && TryDoor()) return;
-        // VR: a hider's left trigger turns the prop (PHHiderBody); the selector in the right hand picks. A hunter's
-        // dart flies from the right hand too (Aim), so a left trigger fires nothing (it shot where the right hand pointed)
+        // VR: a hider's left trigger turns the prop (PHHiderBody); the selector in the right hand picks
         if (vr && args.handType == VRC.Udon.Common.HandType.LEFT) return;
-        if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) TryTakeDisguise();
-        else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT) Fire();
+        if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT))
+        {
+            // the final stand (Cor): no new disguises; the selector shoots hunters instead
+            if (game.Endgame) HiderShoot();
+            else
+            {
+                if (canPick && weapons != null) weapons.FireSelector();   // the selector kicks with every pull
+                TryTakeDisguise();
+            }
+        }
+        // a hunter: desktop clicks to slash (PHWeapons strikes as the weapon comes across); VR swings the hand instead
+        else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT && !vr && weapons != null) weapons.DesktopSwing();
     }
 
     // VR: the grips work doors (a hider taunts with the button on the screen device, PHView; desktop: T)
@@ -562,7 +572,7 @@ public class PHLocal : UdonSharpBehaviour
     void UpdateHover()
     {
         int phase = game.phase;
-        bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT) && !aimOverride && !IsGhost();
+        bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || (phase == PHGame.PH_HUNT && !game.Endgame)) && !aimOverride && !IsGhost();
         Collider c = null;
         canPick = can;
         aimDist = TAKE_RANGE;
@@ -619,7 +629,7 @@ public class PHLocal : UdonSharpBehaviour
     [HideInInspector] public string lastHitName = "";
     [HideInInspector] public Vector3 aimOrigin, aimDir;
 
-    public void PilotFire() { Fire(); }
+    public void PilotFire() { MeleeDesktopStrike(); }
     public void PilotTake() { TryTakeDisguise(); }
     public void PilotTaunt() { Taunt(); }
     public int Role() { return role; }
@@ -687,6 +697,7 @@ public class PHLocal : UdonSharpBehaviour
         // a caught hider (a ghost) picks nothing: it gave them health 1 and shrank them again (PilotTake comes here too)
         PHSlot s = Me();
         if (s == null || s.caught || s.ghost || role != PHGame.ROLE_HIDER || !InRound()) return;
+        if (game.Endgame) return;   // the final stand: the disguise is kept to the end (Cor)
         if (!Aim(TAKE_RANGE)) return;
         int e = EmitOf(hit.collider.transform);
         if (e < 0) return;
@@ -701,52 +712,191 @@ public class PHLocal : UdonSharpBehaviour
         }
         if (!SetDisguise(d)) { sound.Play("error_004", 0.5f); if (game.phase == PHGame.PH_HUNT) changesLeft++; return; }
         lastChange = Time.time;
+        statPropChanges++;
         // one soft pluck, at once (Cor: the three rising tones were not immediate)
         sound.Play("pluck_002", 0.5f);
         Say("You are a " + DefName(d).ToLower(), 2f);
     }
 
+    // ------------------------------------------------------------------ the final stand: hiders shoot back (Cor)
+    // In the endgame a hider's selector fires at hunters: a hit takes a small chunk out of the hunter's weapon
+    // (SHOT_WEAR of its condition; it can break it). Nobody sees a hider's gun until their first shot; from then on
+    // it hangs at their prop for everyone (PHSlot.armed, PHWeapons). A shot is a ray from the eyes (desktop) or the
+    // right hand (VR); the hunters are found along it by their bodies' place (Udon cannot tell whose collider a ray
+    // met), nearer than the first wall or prop.
+    public const float SHOT_RANGE = 30f, SHOT_INTERVAL = 1.6f, SHOT_BODY = 0.35f;
+    public const int SHOT_WEAR = 5;
+    float nextShot;   // (Cor: a relatively low rate of fire)
+
+    public bool CanShoot()
+    {
+        PHSlot s = Me();
+        return s != null && role == PHGame.ROLE_HIDER && game.Endgame && s.def >= 0 && !s.caught && !s.ghost;
+    }
+
+    public void PilotShoot() { HiderShoot(); }
+
+    void HiderShoot()
+    {
+        if (!CanShoot() || Time.time < nextShot) return;
+        nextShot = Time.time + SHOT_INTERVAL;
+        PHSlot s = Me();
+        Vector3 o, dir;
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (aimOverride) { o = aimOrigin; dir = aimDir.normalized; }
+        else
+        {
+            VRCPlayerApi.TrackingData t = me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+            o = t.position; dir = (me.IsUserInVR() ? AimRotation(t.rotation) : t.rotation) * Vector3.forward;
+        }
+        float wall = SHOT_RANGE;
+        RaycastHit r;
+        if (Physics.Raycast(o, dir, out r, SHOT_RANGE, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore)) wall = r.distance;
+        // the nearest hunter whose body (a 0.35 m thick upright segment, feet to head) the ray passes, before the wall
+        int best = -1; float bestT = wall;
+        for (int i = 0; i < game.slots.Length; i++)
+        {
+            if (game.RoleOf(i) != PHGame.ROLE_HUNTER || game.slots[i].hunterOut) continue;
+            VRCPlayerApi p = VRCPlayerApi.GetPlayerById(game.slotPlayer[i]);
+            if (p == null || !Utilities.IsValid(p) || p.isLocal) continue;
+            Vector3 feet = p.GetPosition();
+            float top = Mathf.Max(0.5f, p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position.y - feet.y + 0.15f);
+            float tAt = RayToUpright(o, dir, feet, top);
+            if (tAt < 0f || tAt >= bestT) continue;
+            best = i; bestT = tAt;
+        }
+        Vector3 end = o + dir * bestT;
+        if (!s.armed) { s.armed = true; s.Send(); }
+        if (weapons != null) weapons.FireSelector();
+        statShots++;
+        s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Shot), end, best);
+        if (best >= 0)
+        {
+            statShotHits++;
+            if (weapons != null) weapons.WatchBreak(best);
+            game.slots[best].SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PHSlot.TakeShot), SHOT_WEAR, Networking.LocalPlayer.playerId);
+            sound.Play("confirmation_002", 0.6f);
+        }
+    }
+
+    // how far along the ray it passes within SHOT_BODY of the upright segment feet .. feet + up * height; -1 if not
+    float RayToUpright(Vector3 o, Vector3 dir, Vector3 feet, float height)
+    {
+        // closest approach in the ground plane, then check the height there
+        Vector2 o2 = new Vector2(o.x - feet.x, o.z - feet.z), d2 = new Vector2(dir.x, dir.z);
+        float dd = d2.sqrMagnitude;
+        float t = dd > 1e-6f ? Mathf.Max(0f, -Vector2.Dot(o2, d2) / dd) : 0f;
+        Vector2 c = o2 + d2 * t;
+        if (c.sqrMagnitude > SHOT_BODY * SHOT_BODY) return -1f;
+        float y = o.y + dir.y * t - feet.y;
+        if (y < -0.1f || y > height) return -1f;
+        return t;
+    }
+
+    // a hider's shot hit this player (PHSlot.TakeShot, on the owner): a chunk off the weapon, and out if it breaks
+    public void OnShot(int wear, int shooter)
+    {
+        PHSlot s = Me();
+        if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut) return;
+        s.hunterHealth -= wear;
+        sound.Play("impactMetal_light_002", 0.8f);
+        if (s.hunterHealth <= 0)
+        {
+            s.hunterHealth = 0; s.hunterOut = true;
+            myWeaponBroken++; lastBrokenBy = shooter;
+            myWeaponBroken++; lastBrokenBy = 0;
+            sound.Play("you_lose", 0.7f);
+            s.StartGhost();
+        }
+        s.Send();
+    }
+
+    // ------------------------------------------------------------------ the hunter's weapon (PHWeapons)
+    // A strike, from a desktop slash (MeleeDesktopStrike) or a VR swing (PHWeapons.VrSwing): a hider's prop takes a
+    // hit (sent to its owner), a real prop wears the weapon (G17: a chunk comes off it; at nothing left it breaks and
+    // the hunter is out) and gets knocked, anything else costs nothing. No healing on a hider hit (Cor): just no wear.
+    public PHWeapons weapons;
+    public const float MELEE_REACH = 2.2f;
+    // this player's own tallies for the session (the trophies read them; nothing synced, rounds do not reset them)
+    [HideInInspector] public int statSwings, statPropHits, statHiderHits, statShots, statShotHits, statWeaponsBroken, statPropChanges, myWeaponBroken;
+    [HideInInspector] public int lastBrokenBy;   // whose final-stand shot broke this player's weapon last (player id; 0 = a prop did)
     int lastShotSlot = -1, lastShotHealth;
     float lastShotAt = -99f;
 
-    void Fire()
+    public bool CanStrike()
     {
         PHSlot s = Me();
-        // (PilotFire comes here without InputUse's checks)
-        if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT) return;
-        if (s.hunterOut || Time.time < nextDart) return;
-        nextDart = Time.time + DART_INTERVAL;
-        sound.Play("switch_002", 0.5f);
+        return s != null && role == PHGame.ROLE_HUNTER && game.phase == PHGame.PH_HUNT && !s.hunterOut && !aimOverride;
+    }
+
+    // a hider's selector shows (PHWeapons: desktop, in the view) while they can pick
+    public bool ShowsSelector() { return canPick || CanShoot(); }
+
+    // desktop: what lies within reach in front of the eyes, as the slash comes across
+    public void MeleeDesktopStrike()
+    {
+        PHSlot s = Me();
+        if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut) return;
+        float reach = MELEE_REACH * Mathf.Clamp(Networking.LocalPlayer.GetAvatarEyeHeightAsMeters() / 1.6f, 0.5f, 2f);
         lastHitName = "nothing";
-        if (!Aim(DART_RANGE)) return;
-        lastHitName = hit.collider.gameObject.name + " (" + hit.collider.transform.root.name + ")";
-        int damage = game.Endgame ? DART_DAMAGE * 2 : DART_DAMAGE;
-        int h = HiderOf(hit.collider.transform);
+        if (!Reach(reach)) { s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), Aim0(), 0); return; }
+        MeleeStrike(hit.collider, hit.point, hit.point - Aim0(), false);
+    }
+
+    // a wide, short sphere cast from the eyes (a slash is easier to land than a dart)
+    bool Reach(float range)
+    {
+        RaycastHit r;
+        bool any;
+        Vector3 o, dir;
+        if (aimOverride) { o = aimOrigin; dir = aimDir; }
+        else
+        {
+            VRCPlayerApi.TrackingData t = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+            o = t.position; dir = t.rotation * Vector3.forward;
+        }
+        any = Physics.SphereCast(o, 0.15f, dir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
+        hit = r;
+        return any;
+    }
+
+    public void MeleeStrike(Collider c, Vector3 point, Vector3 dir, bool vr)
+    {
+        PHSlot s = Me();
+        if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut || c == null) return;
+        lastHitName = c.gameObject.name + " (" + c.transform.root.name + ")";
+        int h = HiderOf(c.transform);
         if (h >= 0)
         {
             PHSlot target = game.slots[h];
             if (target.caught) return;
-            // the target's health as synced, less this hunter's own darts it may not have heard of yet (a second dart
+            int damage = game.Endgame ? HIT_DAMAGE * 2 : HIT_DAMAGE;
+            // the target's health as synced, less this hunter's own hits it may not have heard of yet (a second hit
             // within the sync delay counted a second catch)
-            // (the dart's base damage is sent; the hider's own client scales it by their size, PHSlot.TakeHit, and the
+            // (the base damage is sent; the hider's own client scales it by their size, PHSlot.TakeHit, and the
             // same scaling here predicts the catch)
             int was = target.health, takes = target.HitDamage(damage);
             if (h == lastShotSlot && Time.time - lastShotAt < 2f && lastShotHealth < was) was = lastShotHealth;
             lastShotSlot = h; lastShotAt = Time.time; lastShotHealth = was - takes;
             target.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PHSlot.TakeHit), damage, Networking.LocalPlayer.playerId);
-            s.hits++;
-            s.hunterHealth = Mathf.Min(HUNTER_HEALTH, s.hunterHealth + HIT_REWARD);
+            s.hits++; statHiderHits++;
             if (was > 0 && was - takes <= 0) s.catches++;
             s.Send();
             sound.Play("confirmation_002", 0.8f);
-            sound.PlayAt("impactPunch_medium_000", hit.point, 14f, 0.8f, 1f);
-            Say("Hit!", 1.5f);
+            s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), point, 3);
             return;
         }
-        int e = EmitOf(hit.collider.transform);
-        if (e < 0) return;   // a wall or a door: nothing happens
-        KnockProp(e, hit.point - Aim0(), hit.point);
-        // a real prop: it costs health (G17), but the same prop again within 5 s costs nothing
+        int e = EmitOf(c.transform);
+        if (e < 0)
+        {
+            // a wall or a door: nothing happens but sparks (a VR swing through the air never gets here)
+            s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), point, 1);
+            return;
+        }
+        KnockProp(e, dir, point);
+        statPropHits++;
+        s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), point, 2);
+        // a real prop: it wears the weapon (G17), but the same prop again within 5 s costs nothing
         if (e == lastCharged && Time.time - lastChargedAt < WRONG_SAME_WINDOW) return;
         lastCharged = e; lastChargedAt = Time.time;
         int penalty = game.wrongPenalty;
@@ -754,10 +904,14 @@ public class PHLocal : UdonSharpBehaviour
         if (game.Endgame) penalty *= 2;
         s.wrongProps++;
         s.hunterHealth -= penalty;
-        if (s.hunterHealth <= 0) { s.hunterHealth = 0; s.hunterOut = true; Say("Out of health: you walk as a ghost until the round ends.", 4f); s.StartGhost(); }
-        else Say("Just a " + DefName(game.gen.emitDef[e]).ToLower() + ". -" + penalty + " health", 2f);
+        if (s.hunterHealth <= 0)
+        {
+            // the weapon breaks (PHWeapons shows it for everyone): out, a ghost until the round ends
+            s.hunterHealth = 0; s.hunterOut = true;
+            sound.Play("you_lose", 0.7f);
+            s.StartGhost();
+        }
         s.Send();
-        sound.Play("error_006", 0.6f);
     }
 
     Vector3 Aim0()

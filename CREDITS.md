@@ -12,12 +12,13 @@ no credit is required; it is given here with thanks.
 | Pack | Maker | Used for | Items used | Licence | Source |
 |---|---|---|---|---|---|
 | KayKit : Board Game Bits 1.0 (`board-game-bits`) | KayKit (Kay Lousberg) | models | 7 | CC0-1.0 | https://kaylousberg.itch.io/board-game-bits |
+| KayKit : Fantasy Weapons Bits 1.0 (`fantasy-weapons-bits`) | KayKit (Kay Lousberg) | the medieval hunters' mace | 1 | CC0-1.0 | https://kaylousberg.itch.io/fantasy-weapons-bits |
 | KayKit : Furniture Bits 1.0 (`furniture-bits`) | KayKit (Kay Lousberg) | models | 39 | CC0-1.0 | https://kaylousberg.itch.io/furniture-bits |
 | KayKit : Halloween Bits 1.0 (`halloween-bits`) | KayKit (Kay Lousberg) | models | 11 | CC0-1.0 | https://kaylousberg.itch.io/halloween-bits |
 | KayKit : Holiday Bits 1.0 (`holiday-bits`) | KayKit (Kay Lousberg) | models | 20 | CC0-1.0 | https://kaylousberg.itch.io/holiday-bits |
 | KayKit - Dungeon Pack 1.1 (`kaykit-dungeon-pack`) | KayKit (Kay Lousberg) | models | 65 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-dungeon-pack |
 | KayKit - Medieval Hexagon Pack 1.0 (`kaykit-medieval-hexagon`) | KayKit (Kay Lousberg) | models | 20 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-medieval-hexagon |
-| Kenney: Blaster Kit (`kenney-blaster-kit`) | Kenney | models | 2 | CC0-1.0 | https://kenney.nl/assets/blaster-kit |
+| Kenney: Blaster Kit (`kenney-blaster-kit`) | Kenney | models, the hiders' gun | 3 | CC0-1.0 | https://kenney.nl/assets/blaster-kit |
 | Kenney: Board Game Icons (`kenney-board-game-icons`) | Kenney | lobby tile shapes | 1 | CC0-1.0 | https://kenney.nl/assets/board-game-icons |
 | Kenney: Building Kit (`kenney-building-kit`) | Kenney | town facades (Udon world) | 3 | CC0-1.0 | https://kenney.nl/assets/building-kit |
 | Kenney: Car Kit (`kenney-car-kit`) | Kenney | models | 32 | CC0-1.0 | https://kenney.nl/assets/car-kit |
@@ -31,7 +32,7 @@ no credit is required; it is given here with thanks.
 | Kenney: Furniture Kit (`kenney-furniture-kit`) | Kenney | models | 63 | CC0-1.0 | https://kenney.nl/assets/furniture-kit |
 | Kenney: Graveyard Kit (`kenney-graveyard-kit`) | Kenney | models | 40 | CC0-1.0 | https://kenney.nl/assets/graveyard-kit |
 | Kenney: Holiday Kit (`kenney-holiday-kit`) | Kenney | models | 11 | CC0-1.0 | https://kenney.nl/assets/holiday-kit |
-| Kenney: Impact Sounds (`kenney-impact-sounds`) | Kenney | sounds | 25 | CC0-1.0 | https://kenney.nl/assets/impact-sounds |
+| Kenney: Impact Sounds (`kenney-impact-sounds`) | Kenney | sounds | 27 | CC0-1.0 | https://kenney.nl/assets/impact-sounds |
 | Kenney: Interface Sounds (`kenney-interface-sounds`) | Kenney | sounds | 21 | CC0-1.0 | https://kenney.nl/assets/interface-sounds |
 | Kenney: Kenney Fonts (`kenney-kenney-fonts`) | Kenney | fonts (Future, Future Narrow, Rocket) | 3 | CC0-1.0 | https://kenney.nl/assets/kenney-fonts |
 | Kenney: Mini Arcade (`kenney-mini-arcade`) | Kenney | models | 12 | CC0-1.0 | https://kenney.nl/assets/mini-arcade |
@@ -39,10 +40,11 @@ no credit is required; it is given here with thanks.
 | Kenney: Mini Skate (`kenney-mini-skate`) | Kenney | models | 14 | CC0-1.0 | https://kenney.nl/assets/mini-skate |
 | Kenney: Music Jingles (`kenney-music-jingles`) | Kenney | sounds | 10 | CC0-1.0 | https://kenney.nl/assets/music-jingles |
 | Kenney: Nature Kit (`kenney-nature-kit`) | Kenney | models | 83 | CC0-1.0 | https://kenney.nl/assets/nature-kit |
-| Kenney: RPG Audio (`kenney-rpg-audio`) | Kenney | sounds | 6 | CC0-1.0 | https://kenney.nl/assets/rpg-audio |
+| Kenney: RPG Audio (`kenney-rpg-audio`) | Kenney | sounds | 9 | CC0-1.0 | https://kenney.nl/assets/rpg-audio |
+| Kenney: Sci-fi Sounds (`kenney-sci-fi-sounds`) | Kenney | sounds | 1 | CC0-1.0 | https://kenney.nl/assets/sci-fi-sounds |
 | Kenney: Space Kit (`kenney-space-kit`) | Kenney | models | 62 | CC0-1.0 | https://kenney.nl/assets/space-kit |
 | Kenney: Space Station Kit (`kenney-space-station-kit`) | Kenney | models | 30 | CC0-1.0 | https://kenney.nl/assets/space-station-kit |
-| Kenney: Survival Kit (`kenney-survival-kit`) | Kenney | models | 40 | CC0-1.0 | https://kenney.nl/assets/survival-kit |
+| Kenney: Survival Kit (`kenney-survival-kit`) | Kenney | models, hunters' hammers | 41 | CC0-1.0 | https://kenney.nl/assets/survival-kit |
 | Kenney: Toy Car Kit (`kenney-toy-car-kit`) | Kenney | models | 4 | CC0-1.0 | https://kenney.nl/assets/toy-car-kit |
 | Kenney: Voiceover Pack (`kenney-voiceover-pack`) | Kenney | sounds | 8 | CC0-1.0 | https://kenney.nl/assets/voiceover-pack |
 | KayKit - Mixed Bag 1 (`mixed-bag-1`) | KayKit (Kay Lousberg) | models | 13 | CC0-1.0 | https://kaylousberg.itch.io/mixed-bag-1 |

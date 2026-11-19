@@ -1,0 +1,1616 @@
+{
+ "note": "Weapon catalog (Cor 2026-11-19). category: starter (free), cool / goofy (achievement unlocks), shop (buy with points). id = the weapons.bytes entry name made by Tools/make_weapons.py. thumb = path on the CC0 mirror.",
+ "weapons": [
+  {
+   "id": "melee:fantasy-weapons-bits:axe_A",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 1,
+   "pack": "fantasy-weapons-bits",
+   "model": "axe_A",
+   "thumb": "index/thumbs/fantasy-weapons-bits_axe_A.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:axe_B",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 2,
+   "pack": "fantasy-weapons-bits",
+   "model": "axe_B",
+   "thumb": "index/thumbs/fantasy-weapons-bits_axe_B.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:dagger_A",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 4,
+   "pack": "fantasy-weapons-bits",
+   "model": "dagger_A",
+   "thumb": "index/thumbs/fantasy-weapons-bits_dagger_A.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:halberd",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 8,
+   "pack": "fantasy-weapons-bits",
+   "model": "halberd",
+   "thumb": "index/thumbs/fantasy-weapons-bits_halberd.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:hammer_A",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 9,
+   "pack": "fantasy-weapons-bits",
+   "model": "hammer_A",
+   "thumb": "index/thumbs/fantasy-weapons-bits_hammer_A.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:hammer_B",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 10,
+   "pack": "fantasy-weapons-bits",
+   "model": "hammer_B",
+   "thumb": "index/thumbs/fantasy-weapons-bits_hammer_B.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:hammer_C",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 11,
+   "pack": "fantasy-weapons-bits",
+   "model": "hammer_C",
+   "thumb": "index/thumbs/fantasy-weapons-bits_hammer_C.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:spear_A",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 12,
+   "pack": "fantasy-weapons-bits",
+   "model": "spear_A",
+   "thumb": "index/thumbs/fantasy-weapons-bits_spear_A.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:sword_A",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 15,
+   "pack": "fantasy-weapons-bits",
+   "model": "sword_A",
+   "thumb": "index/thumbs/fantasy-weapons-bits_sword_A.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:sword_B",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 16,
+   "pack": "fantasy-weapons-bits",
+   "model": "sword_B",
+   "thumb": "index/thumbs/fantasy-weapons-bits_sword_B.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:sword_C",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 17,
+   "pack": "fantasy-weapons-bits",
+   "model": "sword_C",
+   "thumb": "index/thumbs/fantasy-weapons-bits_sword_C.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:sword_E",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 19,
+   "pack": "fantasy-weapons-bits",
+   "model": "sword_E",
+   "thumb": "index/thumbs/fantasy-weapons-bits_sword_E.png"
+  },
+  {
+   "id": "melee:fantasy-weapons-bits:wand_A",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 20,
+   "pack": "fantasy-weapons-bits",
+   "model": "wand_A",
+   "thumb": "index/thumbs/fantasy-weapons-bits_wand_A.png"
+  },
+  {
+   "id": "melee:kaykit-adventurers:axe_1handed",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 21,
+   "pack": "kaykit-adventurers",
+   "model": "axe_1handed",
+   "thumb": "index/thumbs/kaykit-adventurers_axe_1handed.png"
+  },
+  {
+   "id": "melee:kaykit-adventurers:axe_2handed",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 22,
+   "pack": "kaykit-adventurers",
+   "model": "axe_2handed",
+   "thumb": "index/thumbs/kaykit-adventurers_axe_2handed.png"
+  },
+  {
+   "id": "melee:kaykit-adventurers:dagger",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 23,
+   "pack": "kaykit-adventurers",
+   "model": "dagger",
+   "thumb": "index/thumbs/kaykit-adventurers_dagger.png"
+  },
+  {
+   "id": "melee:kaykit-adventurers:sword_1handed",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 25,
+   "pack": "kaykit-adventurers",
+   "model": "sword_1handed",
+   "thumb": "index/thumbs/kaykit-adventurers_sword_1handed.png"
+  },
+  {
+   "id": "melee:kaykit-adventurers:sword_2handed",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 26,
+   "pack": "kaykit-adventurers",
+   "model": "sword_2handed",
+   "thumb": "index/thumbs/kaykit-adventurers_sword_2handed.png"
+  },
+  {
+   "id": "melee:kaykit-adventurers:sword_2handed_color",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 27,
+   "pack": "kaykit-adventurers",
+   "model": "sword_2handed_color",
+   "thumb": "index/thumbs/kaykit-adventurers_sword_2handed_color.png"
+  },
+  {
+   "id": "melee:kaykit-skeletons:Skeleton_Axe",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 29,
+   "pack": "kaykit-skeletons",
+   "model": "Skeleton_Axe",
+   "thumb": "index/thumbs/kaykit-skeletons_Skeleton_Axe.png"
+  },
+  {
+   "id": "melee:kaykit-skeletons:Skeleton_Blade",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 30,
+   "pack": "kaykit-skeletons",
+   "model": "Skeleton_Blade",
+   "thumb": "index/thumbs/kaykit-skeletons_Skeleton_Blade.png"
+  },
+  {
+   "id": "melee:kenney-survival-kit:tool-axe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 33,
+   "pack": "kenney-survival-kit",
+   "model": "tool-axe",
+   "thumb": "index/thumbs/kenney-survival-kit_tool-axe.png"
+  },
+  {
+   "id": "melee:kenney-survival-kit:tool-hammer",
+   "kind": "melee",
+   "category": "starter",
+   "sheet": 35,
+   "pack": "kenney-survival-kit",
+   "model": "tool-hammer",
+   "thumb": "index/thumbs/kenney-survival-kit_tool-hammer.png"
+  },
+  {
+   "id": "melee:kenney-survival-kit:tool-hammer-upgraded",
+   "kind": "melee",
+   "category": "starter",
+   "sheet": 36,
+   "pack": "kenney-survival-kit",
+   "model": "tool-hammer-upgraded",
+   "thumb": "index/thumbs/kenney-survival-kit_tool-hammer-upgraded.png"
+  },
+  {
+   "id": "melee:kenney-survival-kit:tool-pickaxe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 38,
+   "pack": "kenney-survival-kit",
+   "model": "tool-pickaxe",
+   "thumb": "index/thumbs/kenney-survival-kit_tool-pickaxe.png"
+  },
+  {
+   "id": "melee:kenney-survival-kit:tool-shovel",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 40,
+   "pack": "kenney-survival-kit",
+   "model": "tool-shovel",
+   "thumb": "index/thumbs/kenney-survival-kit_tool-shovel.png"
+  },
+  {
+   "id": "melee:kenney-minigolf-kit:club-red",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 44,
+   "pack": "kenney-minigolf-kit",
+   "model": "club-red",
+   "thumb": "index/thumbs/kenney-minigolf-kit_club-red.png"
+  },
+  {
+   "id": "melee:quaternius-cubeworldkit:Axe_Wood",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 45,
+   "pack": "quaternius-cubeworldkit",
+   "model": "Axe_Wood",
+   "thumb": "index/thumbs/quaternius-cubeworldkit_tools_Axe_Wood.png"
+  },
+  {
+   "id": "melee:quaternius-cubeworldkit:Axe_Gold",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 47,
+   "pack": "quaternius-cubeworldkit",
+   "model": "Axe_Gold",
+   "thumb": "index/thumbs/quaternius-cubeworldkit_tools_Axe_Gold.png"
+  },
+  {
+   "id": "melee:quaternius-cubeworldkit:Axe_Diamond",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 48,
+   "pack": "quaternius-cubeworldkit",
+   "model": "Axe_Diamond",
+   "thumb": "index/thumbs/quaternius-cubeworldkit_tools_Axe_Diamond.png"
+  },
+  {
+   "id": "melee:quaternius-cubeworldkit:Sword_Wood",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 51,
+   "pack": "quaternius-cubeworldkit",
+   "model": "Sword_Wood",
+   "thumb": "index/thumbs/quaternius-cubeworldkit_tools_Sword_Wood.png"
+  },
+  {
+   "id": "melee:quaternius-cubeworldkit:Sword_Gold",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 53,
+   "pack": "quaternius-cubeworldkit",
+   "model": "Sword_Gold",
+   "thumb": "index/thumbs/quaternius-cubeworldkit_tools_Sword_Gold.png"
+  },
+  {
+   "id": "melee:quaternius-cubeworldkit:Sword_Diamond",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 54,
+   "pack": "quaternius-cubeworldkit",
+   "model": "Sword_Diamond",
+   "thumb": "index/thumbs/quaternius-cubeworldkit_tools_Sword_Diamond.png"
+  },
+  {
+   "id": "melee:quaternius-fantasy-props-megakit:Axe_Bronze",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 55,
+   "pack": "quaternius-fantasy-props-megakit",
+   "model": "Axe_Bronze",
+   "thumb": "index/thumbs/quaternius-fantasy-props-megakit_Axe_Bronze.png"
+  },
+  {
+   "id": "melee:quaternius-fantasy-props-megakit:Sword_Bronze",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 57,
+   "pack": "quaternius-fantasy-props-megakit",
+   "model": "Sword_Bronze",
+   "thumb": "index/thumbs/quaternius-fantasy-props-megakit_Sword_Bronze.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-medieval-weapons:Club",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 59,
+   "pack": "quaternius-low-poly-medieval-weapons",
+   "model": "Club",
+   "thumb": "index/thumbs/quaternius-low-poly-medieval-weapons_Club.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-medieval-weapons:Katana",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 61,
+   "pack": "quaternius-low-poly-medieval-weapons",
+   "model": "Katana",
+   "thumb": "index/thumbs/quaternius-low-poly-medieval-weapons_Katana.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-medieval-weapons:SimpleAxe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 64,
+   "pack": "quaternius-low-poly-medieval-weapons",
+   "model": "SimpleAxe",
+   "thumb": "index/thumbs/quaternius-low-poly-medieval-weapons_SimpleAxe.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-medieval-weapons:Spear",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 65,
+   "pack": "quaternius-low-poly-medieval-weapons",
+   "model": "Spear",
+   "thumb": "index/thumbs/quaternius-low-poly-medieval-weapons_Spear.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Axe_Double",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 66,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Axe_Double",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Axe_Double.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Axe_Double_Golden",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 67,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Axe_Double_Golden",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Axe_Double_Golden.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Axe_small_Golden",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 68,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Axe_small_Golden",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Axe_small_Golden.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Dagger_Golden",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 69,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Dagger_Golden",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Dagger_Golden.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Hammer_Double",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 70,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Hammer_Double",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Hammer_Double.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Hammer_Double_Golden",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 71,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Hammer_Double_Golden",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Hammer_Double_Golden.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Sword_big",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 72,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Sword_big",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Sword_big.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Sword_big_Golden",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 73,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Sword_big_Golden",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Sword_big_Golden.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-rpg-pack:Sword_Golden",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 74,
+   "pack": "quaternius-low-poly-rpg-pack",
+   "model": "Sword_Golden",
+   "thumb": "index/thumbs/quaternius-low-poly-rpg-pack_Sword_Golden.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Axe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 76,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Axe",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Axe.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Hammer_Small",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 79,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Hammer_Small",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Hammer_Small.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Scythe",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 80,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Scythe",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Scythe.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Spear",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 81,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Spear",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Spear.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Sword",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 82,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Sword",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Sword.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Sword_2",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 83,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Sword_2",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Sword_2.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Sword_Big",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 84,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Sword_Big",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Sword_Big.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-medieval-weapons:Dagger_2",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 86,
+   "pack": "quaternius-lowpoly-medieval-weapons",
+   "model": "Dagger_2",
+   "thumb": "index/thumbs/quaternius-lowpoly-medieval-weapons_Dagger_2.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-survival-pack:Axe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 91,
+   "pack": "quaternius-lowpoly-survival-pack",
+   "model": "Axe",
+   "thumb": "index/thumbs/quaternius-lowpoly-survival-pack_Axe.png"
+  },
+  {
+   "id": "melee:quaternius-lowpoly-survival-pack:Knife",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 92,
+   "pack": "quaternius-lowpoly-survival-pack",
+   "model": "Knife",
+   "thumb": "index/thumbs/quaternius-lowpoly-survival-pack_Knife.png"
+  },
+  {
+   "id": "melee:quaternius-piratekit:Weapon_Axe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 94,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Axe",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Axe.png"
+  },
+  {
+   "id": "melee:quaternius-piratekit:Weapon_Cutlass",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 95,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Cutlass",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Cutlass.png"
+  },
+  {
+   "id": "melee:quaternius-piratekit:Weapon_Dagger",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 96,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Dagger",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Dagger.png"
+  },
+  {
+   "id": "melee:quaternius-piratekit:Weapon_DoubleAxe",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 97,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_DoubleAxe",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_DoubleAxe.png"
+  },
+  {
+   "id": "melee:quaternius-piratekit:Weapon_Lute",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 98,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Lute",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Lute.png"
+  },
+  {
+   "id": "melee:quaternius-piratekit:Weapon_Sword_1",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 99,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Sword_1",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Sword_1.png"
+  },
+  {
+   "id": "melee:quaternius-piratekit:Weapon_Sword_2",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 100,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Sword_2",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Sword_2.png"
+  },
+  {
+   "id": "melee:quaternius-toonshootergamekit:Knife_1",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 101,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "Knife_1",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_Knife_1.png"
+  },
+  {
+   "id": "melee:quaternius-toonshootergamekit:Knife_2",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 102,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "Knife_2",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_Knife_2.png"
+  },
+  {
+   "id": "melee:quaternius-zombieapocalypsekit:Axe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 104,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "Axe",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_Axe.png"
+  },
+  {
+   "id": "melee:quaternius-zombieapocalypsekit:Guitar",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 105,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "Guitar",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_Guitar.png"
+  },
+  {
+   "id": "melee:quaternius-zombieapocalypsekit:Spear",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 107,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "Spear",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_Spear.png"
+  },
+  {
+   "id": "melee:quaternius-zombieapocalypsekit:WoodenBat_Barbed",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 108,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "WoodenBat_Barbed",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_WoodenBat_Barbed.png"
+  },
+  {
+   "id": "melee:quaternius-zombieapocalypsekit:WoodenBat_Saw",
+   "kind": "melee",
+   "category": "cool",
+   "sheet": 109,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "WoodenBat_Saw",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_WoodenBat_Saw.png"
+  },
+  {
+   "id": "melee:rpg-tools-bits:axe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 110,
+   "pack": "rpg-tools-bits",
+   "model": "axe",
+   "thumb": "index/thumbs/rpg-tools-bits_axe.png"
+  },
+  {
+   "id": "melee:rpg-tools-bits:hammer",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 111,
+   "pack": "rpg-tools-bits",
+   "model": "hammer",
+   "thumb": "index/thumbs/rpg-tools-bits_hammer.png"
+  },
+  {
+   "id": "melee:rpg-tools-bits:mallet",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 112,
+   "pack": "rpg-tools-bits",
+   "model": "mallet",
+   "thumb": "index/thumbs/rpg-tools-bits_mallet.png"
+  },
+  {
+   "id": "melee:rpg-tools-bits:pickaxe",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 113,
+   "pack": "rpg-tools-bits",
+   "model": "pickaxe",
+   "thumb": "index/thumbs/rpg-tools-bits_pickaxe.png"
+  },
+  {
+   "id": "melee:rpg-tools-bits:wrench_A",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 117,
+   "pack": "rpg-tools-bits",
+   "model": "wrench_A",
+   "thumb": "index/thumbs/rpg-tools-bits_wrench_A.png"
+  },
+  {
+   "id": "melee:rpg-tools-bits:wrench_B",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 118,
+   "pack": "rpg-tools-bits",
+   "model": "wrench_B",
+   "thumb": "index/thumbs/rpg-tools-bits_wrench_B.png"
+  },
+  {
+   "id": "melee:kenney-food-kit:frying-pan",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 122,
+   "pack": "kenney-food-kit",
+   "model": "frying-pan",
+   "thumb": "index/thumbs/kenney-food-kit_frying-pan.png"
+  },
+  {
+   "id": "melee:kenney-food-kit:rollingPin",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 123,
+   "pack": "kenney-food-kit",
+   "model": "rollingPin",
+   "thumb": "index/thumbs/kenney-food-kit_rollingPin.png"
+  },
+  {
+   "id": "melee:kenney-food-kit:fish",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 127,
+   "pack": "kenney-food-kit",
+   "model": "fish",
+   "thumb": "index/thumbs/kenney-food-kit_fish.png"
+  },
+  {
+   "id": "melee:kenney-food-kit:loaf-baguette",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 128,
+   "pack": "kenney-food-kit",
+   "model": "loaf-baguette",
+   "thumb": "index/thumbs/kenney-food-kit_loaf-baguette.png"
+  },
+  {
+   "id": "melee:kenney-food-kit:banana",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 133,
+   "pack": "kenney-food-kit",
+   "model": "banana",
+   "thumb": "index/thumbs/kenney-food-kit_banana.png"
+  },
+  {
+   "id": "melee:kenney-holiday-kit:candy-cane-red",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 137,
+   "pack": "kenney-holiday-kit",
+   "model": "candy-cane-red",
+   "thumb": "index/thumbs/kenney-holiday-kit_candy-cane-red.png"
+  },
+  {
+   "id": "melee:kenney-survival-kit:fish-large",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 139,
+   "pack": "kenney-survival-kit",
+   "model": "fish-large",
+   "thumb": "index/thumbs/kenney-survival-kit_fish-large.png"
+  },
+  {
+   "id": "melee:mixed-bag-1:guitar_A",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 140,
+   "pack": "mixed-bag-1",
+   "model": "guitar_A",
+   "thumb": "index/thumbs/mixed-bag-1_guitar_A.png"
+  },
+  {
+   "id": "melee:mixed-bag-1:umbrella_pink",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 141,
+   "pack": "mixed-bag-1",
+   "model": "umbrella_pink",
+   "thumb": "index/thumbs/mixed-bag-1_umbrella_pink.png"
+  },
+  {
+   "id": "melee:mixed-bag-1:chicken_plushie_A",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 142,
+   "pack": "mixed-bag-1",
+   "model": "chicken_plushie_A",
+   "thumb": "index/thumbs/mixed-bag-1_chicken_plushie_A.png"
+  },
+  {
+   "id": "melee:quaternius-low-poly-food-pack:Tentacle",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 143,
+   "pack": "quaternius-low-poly-food-pack",
+   "model": "Tentacle",
+   "thumb": "index/thumbs/quaternius-low-poly-food-pack_Tentacle.png"
+  },
+  {
+   "id": "melee:quaternius-junkfood:Hotdog",
+   "kind": "melee",
+   "category": "goofy",
+   "sheet": 147,
+   "pack": "quaternius-junkfood",
+   "model": "Hotdog",
+   "thumb": "index/thumbs/quaternius-junkfood_Hotdog.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-a",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 1,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-a",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-a.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-b",
+   "kind": "gun",
+   "category": "starter",
+   "sheet": 2,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-b",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-b.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-c",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 3,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-c",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-c.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-d",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 4,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-d",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-d.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-e",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 5,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-e",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-e.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-f",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 6,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-f",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-f.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-g",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 7,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-g",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-g.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-h",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 8,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-h",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-h.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-i",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 9,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-i",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-i.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-j",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 10,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-j",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-j.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-k",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 11,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-k",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-k.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-l",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 12,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-l",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-l.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-m",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 13,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-m",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-m.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-n",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 14,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-n",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-n.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-o",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 15,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-o",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-o.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-p",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 16,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-p",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-p.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-q",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 17,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-q",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-q.png"
+  },
+  {
+   "id": "gun:kenney-blaster-kit:blaster-r",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 18,
+   "pack": "kenney-blaster-kit",
+   "model": "blaster-r",
+   "thumb": "index/thumbs/kenney-blaster-kit_blaster-r.png"
+  },
+  {
+   "id": "gun:kenney-space-kit:weapon_gun",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 19,
+   "pack": "kenney-space-kit",
+   "model": "weapon_gun",
+   "thumb": "index/thumbs/kenney-space-kit_weapon_gun.png"
+  },
+  {
+   "id": "gun:kenney-space-kit:weapon_rifle",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 20,
+   "pack": "kenney-space-kit",
+   "model": "weapon_rifle",
+   "thumb": "index/thumbs/kenney-space-kit_weapon_rifle.png"
+  },
+  {
+   "id": "gun:kenney-mini-characters:weapon-shooter",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 21,
+   "pack": "kenney-mini-characters",
+   "model": "weapon-shooter",
+   "thumb": "index/thumbs/kenney-mini-characters_weapon-shooter.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:AssaultRifle_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 22,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "AssaultRifle_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_AssaultRifle_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:AssaultRifle2_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 23,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "AssaultRifle2_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_AssaultRifle2_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Bullpup_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 24,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Bullpup_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Bullpup_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Pistol_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 25,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Pistol_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Pistol_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Pistol_3",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 26,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Pistol_3",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Pistol_3.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Pistol_5",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 27,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Pistol_5",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Pistol_5.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Revolver_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 28,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Revolver_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Revolver_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Revolver_3",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 29,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Revolver_3",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Revolver_3.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Shotgun_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 30,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Shotgun_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Shotgun_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:Shotgun_SawedOff",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 31,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "Shotgun_SawedOff",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_Shotgun_SawedOff.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:SniperRifle_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 32,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "SniperRifle_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_SniperRifle_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:SubmachineGun_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 33,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "SubmachineGun_1",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_SubmachineGun_1.png"
+  },
+  {
+   "id": "gun:quaternius-50-lowpoly-guns:SubmachineGun_3",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 34,
+   "pack": "quaternius-50-lowpoly-guns",
+   "model": "SubmachineGun_3",
+   "thumb": "index/thumbs/quaternius-50-lowpoly-guns_SubmachineGun_3.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-animated-guns:P90",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 35,
+   "pack": "quaternius-low-poly-animated-guns",
+   "model": "P90",
+   "thumb": "index/thumbs/quaternius-low-poly-animated-guns_P90.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-animated-guns:Pistol",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 36,
+   "pack": "quaternius-low-poly-animated-guns",
+   "model": "Pistol",
+   "thumb": "index/thumbs/quaternius-low-poly-animated-guns_Pistol.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-animated-guns:Revolver",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 37,
+   "pack": "quaternius-low-poly-animated-guns",
+   "model": "Revolver",
+   "thumb": "index/thumbs/quaternius-low-poly-animated-guns_Revolver.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-animated-guns:Rifle",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 38,
+   "pack": "quaternius-low-poly-animated-guns",
+   "model": "Rifle",
+   "thumb": "index/thumbs/quaternius-low-poly-animated-guns_Rifle.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-animated-guns:Shotgun",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 39,
+   "pack": "quaternius-low-poly-animated-guns",
+   "model": "Shotgun",
+   "thumb": "index/thumbs/quaternius-low-poly-animated-guns_Shotgun.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-animated-guns:SniperRifle",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 40,
+   "pack": "quaternius-low-poly-animated-guns",
+   "model": "SniperRifle",
+   "thumb": "index/thumbs/quaternius-low-poly-animated-guns_SniperRifle.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-guns:ak47",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 41,
+   "pack": "quaternius-low-poly-guns",
+   "model": "ak47",
+   "thumb": "index/thumbs/quaternius-low-poly-guns_blends_ak47.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-guns:RocketLauncher",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 42,
+   "pack": "quaternius-low-poly-guns",
+   "model": "RocketLauncher",
+   "thumb": "index/thumbs/quaternius-low-poly-guns_RocketLauncher.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-guns:Uzi",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 43,
+   "pack": "quaternius-low-poly-guns",
+   "model": "Uzi",
+   "thumb": "index/thumbs/quaternius-low-poly-guns_Uzi.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-pirate-pack:Gun",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 44,
+   "pack": "quaternius-low-poly-pirate-pack",
+   "model": "Gun",
+   "thumb": "index/thumbs/quaternius-low-poly-pirate-pack_Gun.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-pirate-pack:Pistol",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 45,
+   "pack": "quaternius-low-poly-pirate-pack",
+   "model": "Pistol",
+   "thumb": "index/thumbs/quaternius-low-poly-pirate-pack_Pistol.png"
+  },
+  {
+   "id": "gun:quaternius-low-poly-pirate-pack:Rifle",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 46,
+   "pack": "quaternius-low-poly-pirate-pack",
+   "model": "Rifle",
+   "thumb": "index/thumbs/quaternius-low-poly-pirate-pack_Rifle.png"
+  },
+  {
+   "id": "gun:quaternius-sci-fi-essentials-kit:Gun_Pistol",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 47,
+   "pack": "quaternius-sci-fi-essentials-kit",
+   "model": "Gun_Pistol",
+   "thumb": "index/thumbs/quaternius-sci-fi-essentials-kit_Gun_Pistol.png"
+  },
+  {
+   "id": "gun:quaternius-sci-fi-essentials-kit:Gun_Revolver",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 48,
+   "pack": "quaternius-sci-fi-essentials-kit",
+   "model": "Gun_Revolver",
+   "thumb": "index/thumbs/quaternius-sci-fi-essentials-kit_Gun_Revolver.png"
+  },
+  {
+   "id": "gun:quaternius-sci-fi-essentials-kit:Gun_Rifle",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 49,
+   "pack": "quaternius-sci-fi-essentials-kit",
+   "model": "Gun_Rifle",
+   "thumb": "index/thumbs/quaternius-sci-fi-essentials-kit_Gun_Rifle.png"
+  },
+  {
+   "id": "gun:quaternius-sci-fi-essentials-kit:Gun_Sniper",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 50,
+   "pack": "quaternius-sci-fi-essentials-kit",
+   "model": "Gun_Sniper",
+   "thumb": "index/thumbs/quaternius-sci-fi-essentials-kit_Gun_Sniper.png"
+  },
+  {
+   "id": "gun:quaternius-scifigun:Lightning Gun",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 51,
+   "pack": "quaternius-scifigun",
+   "model": "Lightning Gun",
+   "thumb": "index/thumbs/quaternius-scifigun_Lightning_Gun.png"
+  },
+  {
+   "id": "gun:quaternius-scifigun:LongPistol",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 52,
+   "pack": "quaternius-scifigun",
+   "model": "LongPistol",
+   "thumb": "index/thumbs/quaternius-scifigun_LongPistol.png"
+  },
+  {
+   "id": "gun:quaternius-scifigun:Pistol",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 53,
+   "pack": "quaternius-scifigun",
+   "model": "Pistol",
+   "thumb": "index/thumbs/quaternius-scifigun_Pistol.png"
+  },
+  {
+   "id": "gun:quaternius-scifigun:Ray Gun",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 54,
+   "pack": "quaternius-scifigun",
+   "model": "Ray Gun",
+   "thumb": "index/thumbs/quaternius-scifigun_Ray_Gun.png"
+  },
+  {
+   "id": "gun:quaternius-scifigun:Rifle",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 55,
+   "pack": "quaternius-scifigun",
+   "model": "Rifle",
+   "thumb": "index/thumbs/quaternius-scifigun_Rifle.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:AR_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 56,
+   "pack": "quaternius-scifimodularguns",
+   "model": "AR_1",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_AR_1.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:AR_3",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 57,
+   "pack": "quaternius-scifimodularguns",
+   "model": "AR_3",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_AR_3.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:AR_5",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 58,
+   "pack": "quaternius-scifimodularguns",
+   "model": "AR_5",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_AR_5.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Crossbow_1",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 59,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Crossbow_1",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Crossbow_1.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Crossbow_2",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 60,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Crossbow_2",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Crossbow_2.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Grenade_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 61,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Grenade_1",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Grenade_1.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Grenade_3",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 62,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Grenade_3",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Grenade_3.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Pistol_1",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 63,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Pistol_1",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Pistol_1.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Pistol_2",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 64,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Pistol_2",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Pistol_2.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Pistol_3",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 65,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Pistol_3",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Pistol_3.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:SMG_1",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 66,
+   "pack": "quaternius-scifimodularguns",
+   "model": "SMG_1",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_SMG_1.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:SMG_2",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 67,
+   "pack": "quaternius-scifimodularguns",
+   "model": "SMG_2",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_SMG_2.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Sniper_1",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 68,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Sniper_1",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Sniper_1.png"
+  },
+  {
+   "id": "gun:quaternius-scifimodularguns:Sniper_3",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 69,
+   "pack": "quaternius-scifimodularguns",
+   "model": "Sniper_3",
+   "thumb": "index/thumbs/quaternius-scifimodularguns_guns_Sniper_3.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:GrenadeLauncher",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 70,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "GrenadeLauncher",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_GrenadeLauncher.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:Pistol",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 71,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "Pistol",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_Pistol.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:Revolver",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 72,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "Revolver",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_Revolver.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:Revolver_Small",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 73,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "Revolver_Small",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_Revolver_Small.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:RocketLauncher",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 74,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "RocketLauncher",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_RocketLauncher.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:ShortCannon",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 75,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "ShortCannon",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_ShortCannon.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:Shotgun",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 76,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "Shotgun",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_Shotgun.png"
+  },
+  {
+   "id": "gun:quaternius-toonshootergamekit:Sniper",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 77,
+   "pack": "quaternius-toonshootergamekit",
+   "model": "Sniper",
+   "thumb": "index/thumbs/quaternius-toonshootergamekit_guns_Sniper.png"
+  },
+  {
+   "id": "gun:quaternius-zombieapocalypsekit:Pistol",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 78,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "Pistol",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_Pistol.png"
+  },
+  {
+   "id": "gun:quaternius-zombieapocalypsekit:Rifle",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 79,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "Rifle",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_Rifle.png"
+  },
+  {
+   "id": "gun:quaternius-zombieapocalypsekit:Shotgun",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 80,
+   "pack": "quaternius-zombieapocalypsekit",
+   "model": "Shotgun",
+   "thumb": "index/thumbs/quaternius-zombieapocalypsekit_weapons_Shotgun.png"
+  },
+  {
+   "id": "gun:quaternius-lowpoly-survival-pack:FlareGun",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 81,
+   "pack": "quaternius-lowpoly-survival-pack",
+   "model": "FlareGun",
+   "thumb": "index/thumbs/quaternius-lowpoly-survival-pack_FlareGun.png"
+  },
+  {
+   "id": "gun:quaternius-piratekit:Weapon_Pistol",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 82,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Pistol",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Pistol.png"
+  },
+  {
+   "id": "gun:quaternius-piratekit:Weapon_Rifle",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 83,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_Rifle",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_Rifle.png"
+  },
+  {
+   "id": "gun:quaternius-piratekit:Weapon_DoubleShotgun",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 84,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_DoubleShotgun",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_DoubleShotgun.png"
+  },
+  {
+   "id": "gun:quaternius-piratekit:Weapon_AxeRifle",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 85,
+   "pack": "quaternius-piratekit",
+   "model": "Weapon_AxeRifle",
+   "thumb": "index/thumbs/quaternius-piratekit_Weapon_AxeRifle.png"
+  },
+  {
+   "id": "gun:kaykit-adventurers:crossbow_1handed",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 86,
+   "pack": "kaykit-adventurers",
+   "model": "crossbow_1handed",
+   "thumb": "index/thumbs/kaykit-adventurers_crossbow_1handed.png"
+  },
+  {
+   "id": "gun:kaykit-adventurers:crossbow_2handed",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 87,
+   "pack": "kaykit-adventurers",
+   "model": "crossbow_2handed",
+   "thumb": "index/thumbs/kaykit-adventurers_crossbow_2handed.png"
+  },
+  {
+   "id": "gun:kaykit-skeletons:Skeleton_Crossbow",
+   "kind": "gun",
+   "category": "cool",
+   "sheet": 88,
+   "pack": "kaykit-skeletons",
+   "model": "Skeleton_Crossbow",
+   "thumb": "index/thumbs/kaykit-skeletons_Skeleton_Crossbow.png"
+  },
+  {
+   "id": "gun:holiday-bits:snowball_cannon",
+   "kind": "gun",
+   "category": "goofy",
+   "sheet": 89,
+   "pack": "holiday-bits",
+   "model": "snowball_cannon",
+   "thumb": "index/thumbs/holiday-bits_snowball_cannon.png"
+  }
+ ]
+}

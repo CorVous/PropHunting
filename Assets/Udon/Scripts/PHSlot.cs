@@ -24,6 +24,7 @@ public class PHSlot : UdonSharpBehaviour
     public Renderer beaconRenderer;
     public Vector3 parkAt = new Vector3(0f, -400f, 0f);
     public AudioSource voice;          // taunts play here, at the prop
+    public PHWeapons weapons;          // the held weapons and their bursts (Swung)
 
     // ---- synced, written by the owner
     [UdonSynced] public bool inZone;
@@ -43,8 +44,11 @@ public class PHSlot : UdonSharpBehaviour
     [UdonSynced] public int health, maxHealth;
     [UdonSynced] public bool caught;
     [UdonSynced] public int survivedMs;
-    [UdonSynced] public int hunterHealth = 100;
+    [UdonSynced] public int hunterHealth = 100;       // a hunter's weapon's condition (PHWeapons draws its wear; 0 = broken, out)
     [UdonSynced] public bool hunterOut;
+    // the weapons this player picked on the selection wall (PHWeapons model indices; -1 = the map's default)
+    [UdonSynced] public int meleeChoice = -1, gunChoice = -1;
+    [UdonSynced] public bool armed;                  // a hider has shot in the final stand: their gun is seen by all (PHWeapons)
     [UdonSynced] public int wrongProps, hits, catches;
     [UdonSynced] public int round = -1;               // the round these figures belong to
 
@@ -88,7 +92,7 @@ public class PHSlot : UdonSharpBehaviour
         round = r;
         def = -1; lastDef = -1; hiding = false; ghost = false; caught = false; survivedMs = 0;
         health = 0; maxHealth = 0;
-        hunterHealth = 100; hunterOut = false; wrongProps = 0; hits = 0; catches = 0;
+        hunterHealth = 100; hunterOut = false; armed = false; wrongProps = 0; hits = 0; catches = 0;
         Send();
     }
 
@@ -145,9 +149,32 @@ public class PHSlot : UdonSharpBehaviour
         def = -1; lastDef = -1; airborne = false; hiding = false; ghost = false;
         scrapVote = 0; undoVote = 0;
         health = 0; maxHealth = 0; caught = false; survivedMs = 0;
-        hunterHealth = 100; hunterOut = false; wrongProps = 0; hits = 0; catches = 0;
+        hunterHealth = 100; hunterOut = false; armed = false; wrongProps = 0; hits = 0; catches = 0;
         round = -1;
         Send();
+    }
+
+    // a hunter's swing landed (or, from a desktop player, was made): sent to everyone by the hunter, who owns this
+    // slot. kind: 0 a desktop slash that met nothing, 1 a wall or the like, 2 a prop, 3 a hider (PHWeapons.OnSwung)
+    [NetworkCallable]
+    public void Swung(Vector3 point, int kind)
+    {
+        if (weapons != null) weapons.OnSwung(index, point, kind);
+    }
+
+    // a hider's final-stand shot, sent to everyone by the hider: where it ended and the hunter slot it hit (-1 none)
+    [NetworkCallable]
+    public void Shot(Vector3 end, int hitSlot)
+    {
+        if (weapons != null) weapons.OnShot(index, end, hitSlot);
+    }
+
+    // ...and on the hunter it hit (sent to the owner): weapon wear
+    [NetworkCallable]
+    public void TakeShot(int wear, int shooterPlayerId)
+    {
+        if (!IsMine) return;
+        game.local.OnShot(wear, shooterPlayerId);
     }
 
     // a dart from a hunter (sent to the owner). Returns nothing: the owner's synced figures say what happened.

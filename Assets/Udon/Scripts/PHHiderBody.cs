@@ -36,6 +36,7 @@ public class PHHiderBody : UdonSharpBehaviour
 
     Vector3 half = new Vector3(0.2f, 0.85f, 0.2f);
     float velY, stepHeight = 0.3f, hop, ledge, speed = 3.6f;
+    [HideInInspector] public int hops;   // hops started this session (the trophies read it)
     int mask = 1 << 11;
     bool lifting, blocked;
     Vector3 liftFrom, liftTo;
@@ -772,7 +773,7 @@ public class PHHiderBody : UdonSharpBehaviour
         {
             velY = 0f;
             float up = hop > 0f ? Mathf.Sqrt(2f * GRAVITY * hop) : 0f;
-            if (jump && up > 0f) { velY = up; grounded = false; wasGrounded = false; }
+            if (jump && up > 0f) { velY = up; grounded = false; wasGrounded = false; hops++; }
         }
         else velY = Mathf.Max(velY - GRAVITY * dt, -MAX_FALL);
         blocked = false;
