@@ -583,8 +583,8 @@ public class PHView : UdonSharpBehaviour
     {
         if (fenceX == null || Mathf.Abs(n.y) > 0.5f) return false;
         float gz = Mathf.Round(p.z / FENCE_CELL), gx = Mathf.Round(p.x / FENCE_CELL);
-        if (Mathf.Abs(p.z - gz * FENCE_CELL) <= FENCE_NEAR && Mathf.Abs(n.z) > 0.9f && HasFence(fenceX, Mathf.FloorToInt(p.x / FENCE_CELL), (int)gz)) return true;
-        if (Mathf.Abs(p.x - gx * FENCE_CELL) <= FENCE_NEAR && Mathf.Abs(n.x) > 0.9f && HasFence(fenceZ, (int)gx, Mathf.FloorToInt(p.z / FENCE_CELL))) return true;
+        if (Mathf.Abs(p.z - gz * FENCE_CELL) <= FENCE_NEAR && Mathf.Abs(n.z) > 0.9f && HasFence(fenceX, Mathf.FloorToInt(p.x / FENCE_CELL), Mathf.RoundToInt(gz))) return true;
+        if (Mathf.Abs(p.x - gx * FENCE_CELL) <= FENCE_NEAR && Mathf.Abs(n.x) > 0.9f && HasFence(fenceZ, Mathf.RoundToInt(gx), Mathf.FloorToInt(p.z / FENCE_CELL))) return true;
         return false;
     }
 

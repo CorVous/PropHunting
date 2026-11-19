@@ -147,7 +147,7 @@ public class PHHiderBody : UdonSharpBehaviour
     {
         pos = at; home = at; yaw = facing; stationYaw = facing; lag = Vector3.zero;
         velY = 0f; grounded = false; lifting = false; stuckFor = 0f; loose = false;
-        settle = true;
+        settleDue = true;
         active = true; ghost = false;
         turnHeld = false; wasTurning = false; keyDir = 0;
     }
@@ -159,10 +159,10 @@ public class PHHiderBody : UdonSharpBehaviour
     // disguise is set by then, PHLocal.StartingDisguise) the prop alone is moved to the nearest place it fits, as
     // it faces (never turned: no input asked for it) and within the lag's reach (Shift: the seat and the view stay
     // where the player landed). Where nothing fits that near, it stays and Unstick frees it as it moves.
-    bool settle;
+    bool settleDue;
     void Settle()
     {
-        settle = false;
+        settleDue = false;
         if (mask == 0 || Fits(pos, yaw)) return;
         if (Nudge(yaw, Mathf.Min(Mathf.Max(fullHalf.x, fullHalf.z) + 1f, LAG_MAX - 0.1f))) home = pos;
     }
@@ -429,7 +429,7 @@ public class PHHiderBody : UdonSharpBehaviour
     void UpdateBody()
     {
         if (!active) return;
-        if (settle) Settle();
+        if (settleDue) Settle();
         VRCPlayerApi me = Networking.LocalPlayer;
         float dt = Mathf.Min(Time.deltaTime, 0.1f);
         bool vr = me.IsUserInVR();
@@ -681,7 +681,7 @@ public class PHHiderBody : UdonSharpBehaviour
                 Vector3 up = remaining - dir * slid;
                 Vector3 flat = new Vector3(up.x, 0f, up.z);
                 up -= hit.normal * Vector3.Dot(up, hit.normal);
-                float upFlat = new Vector2(up.x, up.z).magnitude;
+                float upFlat = Mathf.Sqrt(up.x * up.x + up.z * up.z);
                 if (upFlat < 1e-5f || Vector3.Dot(up, delta) <= 0f) break;
                 remaining = up * (flat.magnitude / upFlat);   // as far across as before: no slower up a ramp
                 continue;
@@ -861,7 +861,7 @@ public class PHHiderBody : UdonSharpBehaviour
             // less than a ramp falls under a step's walk, and it fell down the ramp in hops)
             // (the longer reach counts only on a slope: off a flat edge it falls as before)
             float keep = wasGrounded ? stepHeight : 0f;
-            float rampKeep = wasGrounded ? 1.2f * new Vector2(delta.x, delta.z).magnitude : 0f;
+            float rampKeep = wasGrounded ? 1.2f * Mathf.Sqrt(delta.x * delta.x + delta.z * delta.z) : 0f;
             if (GroundBelow(pos, fall + keep + 0.01f) && groundN.y > 0.64f) { pos.y = groundY; grounded = true; velY = 0f; }
             else if (rampKeep > keep && GroundBelow(pos, fall + rampKeep + 0.01f) && groundN.y > 0.64f && groundN.y < 0.98f) { pos.y = groundY; grounded = true; velY = 0f; }
             else { pos.y -= fall; grounded = false; }
