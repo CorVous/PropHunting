@@ -88,6 +88,16 @@ public class PHText : UdonSharpBehaviour
         return table[t.Int * nLang + lang];
     }
 
+    // a synced status as "key|arg|arg" (PHGame.seedStatus): each client shows it in its own language
+    public string Coded(string coded)
+    {
+        if (coded == null || coded == "") return "";
+        string[] p = coded.Split('|');
+        string s = Get(p[0]);
+        for (int i = 1; i < p.Length && i < 4; i++) s = s.Replace("{" + (i - 1) + "}", p[i]);
+        return s;
+    }
+
     public string Code() { return langCode != null && lang < langCode.Length ? langCode[lang] : "en"; }
 
     // ------------------------------------------------------------------ language

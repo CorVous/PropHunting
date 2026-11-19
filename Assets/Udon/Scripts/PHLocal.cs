@@ -83,7 +83,7 @@ public class PHLocal : UdonSharpBehaviour
             case PHGame.PH_LOADING:
                 sound.Play("confirmation_001", 0.6f);
                 if (s != null && role != PHGame.ROLE_NONE) s.ResetFor(game.round, role);
-                Say(role == PHGame.ROLE_NONE ? "A round is starting. You are watching." : "Building the map...", 5f);
+                Say(T(role == PHGame.ROLE_NONE ? "say.watching" : "say.building"), 5f);
                 break;
             case PHGame.PH_BRIEF:
                 sound.Play("ready", 0.8f);
@@ -92,7 +92,7 @@ public class PHLocal : UdonSharpBehaviour
                     // hunters wait in the lobby while the hiders hide (Cor); the hunt brings them to the release
                     SetPropLayer(LAYER_PROPS_WALKTHROUGH);
                     SetFrozen(false);
-                    Say("You hunt. Wait in the lobby while the hiders hide.", 6f);
+                    Say(T("say.youHunt"), 6f);
                 }
                 else if (role == PHGame.ROLE_HIDER)
                 {
@@ -110,7 +110,7 @@ public class PHLocal : UdonSharpBehaviour
                     changesLeft = HUNT_CHANGES;
                     StartingDisguise();
                     if (s != null) s.StartHiding();
-                    Say("You hide. Look at a prop and click (trigger) to become it.", 6f);
+                    Say(T("say.youHide"), 6f);
                 }
                 break;
             case PHGame.PH_HIDE:
@@ -122,11 +122,11 @@ public class PHLocal : UdonSharpBehaviour
                 {
                     me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
                     SetFrozen(false);
-                    Say("Hunt! Find the props that are hiders.", 3f);
+                    Say(T("say.hunt"), 3f);
                 }
                 else if (role == PHGame.ROLE_HIDER)
                 {
-                    Say("The hunters are released!", 3f);
+                    Say(T("say.released"), 3f);
                     nextForced = Time.time + ForcedInterval() * Random.Range(0.35f, 1f);
                     checkPos = me.GetPosition(); warned = false;
                 }
@@ -143,7 +143,7 @@ public class PHLocal : UdonSharpBehaviour
                 if (s != null) s.LeaveSeatForReveal();
                 RestoreEye();
                 SetFrozen(false);
-                Say((game.hidersWin ? "Hiders win. " : "Hunters win. ") + game.endReason, 10f);
+                Say(game.text.F1(game.hidersWin ? "say.hidersWin" : "say.huntersWin", game.text.En(game.endReason)), 10f);
                 break;
         }
     }
@@ -205,7 +205,7 @@ public class PHLocal : UdonSharpBehaviour
         s.Claim();   // (first: the slot's takeover clearing, PHSlot.Fresh, must not wipe the ghost state written next)
         Networking.LocalPlayer.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
         s.StartGhost();
-        Say("A round is on: you walk the map as a ghost until it ends.", 5f);
+        Say(T("say.ghostJoin"), 5f);
     }
 
     // Never trap a player: the stations cannot be left by hand, and only the player's own slot lets them out. Seated
@@ -321,32 +321,34 @@ public class PHLocal : UdonSharpBehaviour
     string Name(int playerId)
     {
         VRCPlayerApi p = VRCPlayerApi.GetPlayerById(playerId);
-        return Utilities.IsValid(p) ? p.displayName : "Player " + playerId;
+        return Utilities.IsValid(p) ? p.displayName : game.text.F1("res.player", playerId.ToString());
     }
+
+    string T(string key) { return game.text.Get(key); }
 
     string Clock(int ms) { int t = Mathf.Max(0, Mathf.RoundToInt(ms / 1000f)); return (t / 60) + ":" + (t % 60).ToString("00"); }
 
     string Results()
     {
-        string r = (game.hidersWin ? "Hiders win" : "Hunters win") + ": " + game.endReason;
+        string r = game.text.F1(game.hidersWin ? "res.hidersWin" : "res.huntersWin", game.text.En(game.endReason));
         float huntMs = game.HuntLength * 1000f, sum = 0f;
         int n = 0;
         for (int i = 0; i < game.slots.Length; i++)
         {
             if (game.slotPlayer[i] == 0 || game.slotRole[i] != PHGame.ROLE_HIDER) continue;
             PHSlot s = game.slots[i];
-            string what = s.lastDef >= 0 ? DefName(s.lastDef).ToLower() : "prop";
-            r += "\n" + Name(game.slotPlayer[i]) + ": " + what + (s.caught ? " - caught after " + Clock(s.survivedMs) : " - survived");
+            string what = s.lastDef >= 0 ? game.text.Prop(s.lastDef) : T("res.prop");
+            r += "\n" + (s.caught ? game.text.F3("res.hiderCaught", Name(game.slotPlayer[i]), what, Clock(s.survivedMs)) : game.text.F2("res.hiderSurvived", Name(game.slotPlayer[i]), what));
             sum += s.caught ? s.survivedMs : huntMs; n++;
         }
         for (int i = 0; i < game.slots.Length; i++)
         {
             if (game.slotPlayer[i] == 0 || game.slotRole[i] != PHGame.ROLE_HUNTER) continue;
             PHSlot s = game.slots[i];
-            r += "\n" + Name(game.slotPlayer[i]) + " (hunter): " + s.hits + " hits, " + s.catches + " catches, " + s.wrongProps + " wrong props, " + s.hunterHealth + " health" + (s.hunterOut ? " (out)" : "");
+            r += "\n" + game.text.F3(s.hunterOut ? "res.hunterOut" : "res.hunter", Name(game.slotPlayer[i]), s.hits.ToString(), s.catches.ToString()).Replace("{3}", s.wrongProps.ToString()).Replace("{4}", s.hunterHealth.ToString());
         }
         // survival share (05 section 8.1)
-        if (n > 0) r += "\nSurvival share: " + Mathf.RoundToInt(100f * sum / (n * huntMs)) + "%";
+        if (n > 0) r += "\n" + game.text.F1("res.share", Mathf.RoundToInt(100f * sum / (n * huntMs)).ToString());
         return r;
     }
 
@@ -413,7 +415,7 @@ public class PHLocal : UdonSharpBehaviour
             body.SetProp(d);
             // no room where the hider stands: the nearest place with room (PHHiderBody.FitHere), or not at all
             Vector3 was = body.pos; float wasYaw = body.yaw;
-            if (!body.FitHere()) { body.SetProp(old); body.pos = was; body.yaw = wasYaw; Say("No room for that here.", 2f); return false; }
+            if (!body.FitHere()) { body.SetProp(old); body.pos = was; body.yaw = wasYaw; Say(T("say.noRoom"), 2f); return false; }
         }
         // Every hider has 100 health whatever they are (Cor); size changes how much a dart takes (PHSlot.HitDamage), so
         // a new disguise keeps the health it had
@@ -542,7 +544,7 @@ public class PHLocal : UdonSharpBehaviour
         if (eg && !wasEndgame && role != PHGame.ROLE_NONE)
         {
             PlayThen("hurry_up", 0.8f, "jingles_HIT03", 0.6f);
-            Say("45 seconds! Taunts come twice as often; wrong props and hits count double.", 4f);
+            Say(T("say.final"), 4f);
             float iv = game.tauntInterval * 0.5f;
             if (nextForced > Time.time + iv) nextForced = Time.time + iv;
         }
@@ -613,13 +615,13 @@ public class PHLocal : UdonSharpBehaviour
         {
             warned = true;
             sound.Play("tick_001", 0.8f);
-            Say("Forced taunt in 3 s: move 4 m, or taunt now (T)", 3f);
+            Say(T("say.forced"), 3f);
         }
         if (t > 0f) return;
         checkPos = Networking.LocalPlayer.GetPosition();
         nextForced = Time.time + ForcedInterval();
         warned = false;
-        if (skip) { Say("You moved: no forced taunt", 2f); return; }
+        if (skip) { Say(T("say.moved"), 2f); return; }
         lastTaunt = -99f;
         Taunt();
     }
@@ -703,10 +705,10 @@ public class PHLocal : UdonSharpBehaviour
         if (e < 0) return;
         int d = game.gen.emitDef[e];
         // a prop that cannot be taken says so, and a change that took has its own cue; both heard only by the hider (Cor)
-        if (game.gen.defDisguise[d] <= 0) { sound.Play("error_004", 0.5f); Say("That can't be a disguise.", 2f); return; }
+        if (game.gen.defDisguise[d] <= 0) { sound.Play("error_004", 0.5f); Say(T("say.notDisguise"), 2f); return; }
         if (game.phase == PHGame.PH_HUNT)
         {
-            if (changesLeft <= 0) { sound.Play("error_004", 0.5f); Say("No disguise changes left.", 2f); return; }
+            if (changesLeft <= 0) { sound.Play("error_004", 0.5f); Say(T("say.noChanges"), 2f); return; }
             if (Time.time - lastChange < HUNT_CHANGE_COOLDOWN) { sound.Play("error_004", 0.5f); return; }
             changesLeft--;
         }
@@ -715,7 +717,7 @@ public class PHLocal : UdonSharpBehaviour
         statPropChanges++;
         // one soft pluck, at once (Cor: the three rising tones were not immediate)
         sound.Play("pluck_002", 0.5f);
-        Say("You are a " + DefName(d).ToLower(), 2f);
+        Say(game.text.F1("say.youAre", game.text.Prop(d)), 2f);
     }
 
     // ------------------------------------------------------------------ the final stand: hiders shoot back (Cor)
@@ -958,7 +960,7 @@ public class PHLocal : UdonSharpBehaviour
         if (s == null) return;   // (the slot table may not have this player yet)
         if (nowCaught)
         {
-            Say("You were caught! You walk as a ghost until the round ends.", 5f);
+            Say(T("say.caught"), 5f);
             sound.Play("you_lose", 0.8f);
             s.def = -1; s.Send();
             body.End();
@@ -966,7 +968,7 @@ public class PHLocal : UdonSharpBehaviour
             s.StartGhost();
             SetFrozen(false);
         }
-        else Say("Hit! " + s.health + " health left. Move!", 2.5f);
+        else Say(game.text.F1("say.hitLeft", s.health.ToString()), 2.5f);
     }
 
     // ------------------------------------------------------------------ HUD
@@ -977,16 +979,16 @@ public class PHLocal : UdonSharpBehaviour
         string t = "";
         int phase = game.phase;
         if (phase == PHGame.PH_LOBBY)
-            t = "Lobby: stand in the green zone to play. " + game.Participants() + " in the zone.";
+            t = game.text.F1("hud.lobby", game.Participants().ToString());
         else if (phase == PHGame.PH_LOADING)
-            t = "Loading the map... " + Mathf.RoundToInt(game.gen.progressPermille / 10f) + "%";
+            t = game.text.F1("hud.loading", Mathf.RoundToInt(game.gen.progressPermille / 10f).ToString());
         else
         {
-            string ph = phase == PHGame.PH_BRIEF ? "Get ready" : (phase == PHGame.PH_HIDE ? "Hide" : (phase == PHGame.PH_HUNT ? (game.Endgame ? "Hunt (endgame)" : "Hunt") : "Round over"));
+            string ph = T(phase == PHGame.PH_BRIEF ? "hud.phase.brief" : (phase == PHGame.PH_HIDE ? "hud.phase.hide" : (phase == PHGame.PH_HUNT ? (game.Endgame ? "hud.phase.endgame" : "hud.phase.hunt") : "hud.phase.over")));
             int left = Mathf.CeilToInt(game.Left);
             t = ph + "  " + (left / 60) + ":" + (left % 60).ToString("00");
-            if (s != null && role == PHGame.ROLE_HIDER) t += "\nHealth " + s.health + "/" + s.maxHealth + (s.caught ? " (caught)" : "") + "  changes " + changesLeft;
-            if (s != null && role == PHGame.ROLE_HUNTER) t += "\nHealth " + s.hunterHealth + "  hits " + s.hits + "  wrong " + s.wrongProps + (s.hunterOut ? " (out)" : "");
+            if (s != null && role == PHGame.ROLE_HIDER) t += "\n" + game.text.F3(s.caught ? "hud.hiderCaught" : "hud.hider", s.health.ToString(), s.maxHealth.ToString(), changesLeft.ToString());
+            if (s != null && role == PHGame.ROLE_HUNTER) t += "\n" + game.text.F3(s.hunterOut ? "hud.hunterOut" : "hud.hunter", s.hunterHealth.ToString(), s.hits.ToString(), s.wrongProps.ToString());
         }
         if (phase == PHGame.PH_END && resultsText != null) t += "\n" + resultsText.text;
         if (Time.time < noticeUntil) t += "\n" + notice;
