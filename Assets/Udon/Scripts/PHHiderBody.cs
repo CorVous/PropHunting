@@ -787,6 +787,7 @@ public class PHHiderBody : UdonSharpBehaviour
         if (delta.sqrMagnitude > 1e-10f)
         {
             Vector3 start = pos;
+            bool fitStart = mask != 0 && !narrow && Fits(start, BoxYaw());
             SlideMove(delta, wasGrounded);
             // (also when squeezing but out of the gap, as the narrow box: back into the doorway it came through, or on
             // into the next)
@@ -849,6 +850,18 @@ public class PHHiderBody : UdonSharpBehaviour
                     bool tried = caFailLeft > 0f && SameTry(start, dir, caFailPos, caFailYaw, caFailDir);
                     if (!tried && !CornerAssist(start, dir, len, wasGrounded)) { caFailPos = start; caFailYaw = yaw; caFailDir = dir; caFailLeft = FAIL_HOLD; }
                 }
+            }
+            // A move does not end inside what the prop was clear of before it: a sidestep at a stair's foot left a tall
+            // prop a few millimetres into the ramp (within the skin that casts and fits leave out), and from there no
+            // sweep saw the ramp, so it walked on into it and sank below the floor. Lifted by up to its step it is on
+            // the ramp and walks up it; where no lift fits it stays where it was, blocked. One already inside
+            // something is Unstick's (never trapped).
+            if (fitStart && !narrow && !Fits(pos, BoxYaw()))
+            {
+                bool onTop = false;
+                for (float r = 0.02f; r <= stepHeight + 0.001f && !onTop; r += 0.02f)
+                    if (Fits(pos + Vector3.up * r, BoxYaw())) { pos.y += r; onTop = true; }
+                if (!onTop) { pos = start; blocked = true; }
             }
             if (mask != 0) Unstick(start, delta, dt);
             // a corrected prop makes its way back under the player while they move: alone, flat, no further than
