@@ -212,9 +212,10 @@ public class PHView : UdonSharpBehaviour
         bool hider = s != null && game.RoleOf(s.index) == PHGame.ROLE_HIDER && s.hiding && !s.caught && s.def >= 0
             && (game.phase == PHGame.PH_BRIEF || game.phase == PHGame.PH_HIDE || game.phase == PHGame.PH_HUNT);
         float share = hider && s.maxHealth > 0 ? Mathf.Clamp01((float)s.health / s.maxHealth) : 0f;
+        // (Perf: switched only when they change, here and for the pip camera below)
         if (vr)
         {
-            vrHealthBar.SetActive(hider);
+            if (vrHealthBar.activeSelf != hider) vrHealthBar.SetActive(hider);
             if (hider) vrHealth.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
             if (vrPanel.gameObject.activeSelf != hider) vrPanel.gameObject.SetActive(hider);
             if (devicesOn != hider) ShowDevices(hider);
@@ -222,9 +223,9 @@ public class PHView : UdonSharpBehaviour
         }
         else
         {
-            desktopHealthBar.SetActive(hider);
+            if (desktopHealthBar.activeSelf != hider) desktopHealthBar.SetActive(hider);
             if (hider) desktopHealth.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
-            desktopPip.SetActive(hider);
+            if (desktopPip.activeSelf != hider) desktopPip.SetActive(hider);
             UpdateLegend(s, hider);
         }
         UpdateOutline(s, hider);
@@ -232,7 +233,8 @@ public class PHView : UdonSharpBehaviour
         // the third-person camera renders every second frame while there is a prop to show
         frame++;
         bool pip = hider;
-        pipCam.enabled = pip && (frame & 1) == 0;
+        bool pipOn = pip && (frame & 1) == 0;
+        if (pipCam.enabled != pipOn) pipCam.enabled = pipOn;
         if (pip) PlaceCamera(s);
         SetCut(s, pip);
     }
@@ -509,6 +511,10 @@ public class PHView : UdonSharpBehaviour
         profMs += profWatch.Elapsed.TotalMilliseconds - p0;
     }
 
+    Vector3 outlineShownPos;   // where the outline was last put (PostLateBody), and the heights its rays found
+    float outlineShownYaw;
+    float[] pieceY;
+
     void PostLateBody()
     {
         VRCPlayerApi me = Networking.LocalPlayer;
@@ -520,25 +526,38 @@ public class PHView : UdonSharpBehaviour
             // a knocked prop).
             Vector3 foot = local.body.pos;
             float yaw = local.body.yaw;
-            if ((foot - outlinePos).sqrMagnitude > 1e-6f || Mathf.Abs(Mathf.DeltaAngle(yaw, outlineYaw)) > 0.1f || Time.time >= outlineNext)
+            // (Perf: the rays down, about 41 of them, are cast again after 2 cm or a degree and a few times a second; in
+            // between the pieces follow the prop at the heights the last rays found)
+            bool cast = (foot - outlinePos).sqrMagnitude > 0.02f * 0.02f || Mathf.Abs(Mathf.DeltaAngle(yaw, outlineYaw)) > 1f || Time.time >= outlineNext;
+            if (cast || (foot - outlineShownPos).sqrMagnitude > 1e-6f || Mathf.Abs(Mathf.DeltaAngle(yaw, outlineShownYaw)) > 0.1f)
             {
-                outlinePos = foot; outlineYaw = yaw; outlineNext = Time.time + 0.25f;
+                outlineShownPos = foot; outlineShownYaw = yaw;
+                if (cast) { outlinePos = foot; outlineYaw = yaw; outlineNext = Time.time + 0.25f; }
+                if (pieceY == null || pieceY.Length != outlineParts.Length) { pieceY = new float[outlineParts.Length]; cast = true; }
                 Quaternion q = Quaternion.Euler(0f, yaw, 0f);
                 bool grounded = local.body.grounded;
-                float top = Mathf.Max(0.3f, me.GetAvatarEyeHeightAsMeters());
-                float reach = top + (grounded ? 0.35f : 4f);
+                float top = 0f, reach = 0f, baseY = foot.y;
                 RaycastHit g;
-                // in a hop: the ground it will come down on, where nothing else is under a piece
-                float baseY = foot.y;
-                if (!grounded && Physics.Raycast(foot + Vector3.up * 0.05f, Vector3.down, out g, 4f, 1 << 11, QueryTriggerInteraction.Ignore)) baseY = g.point.y;
+                if (cast)
+                {
+                    top = Mathf.Max(0.3f, me.GetAvatarEyeHeightAsMeters());
+                    reach = top + (grounded ? 0.35f : 4f);
+                    // in a hop: the ground it will come down on, where nothing else is under a piece
+                    if (!grounded && Physics.Raycast(foot + Vector3.up * 0.05f, Vector3.down, out g, 4f, 1 << 11, QueryTriggerInteraction.Ignore)) baseY = g.point.y;
+                }
                 int last = outlineParts.Length - 1;
                 for (int i = 0; i <= nPieces; i++)
                 {
                     bool isNub = i == nPieces;
                     Vector3 p = foot + q * (isNub ? new Vector3(0f, 0f, nubZ) : new Vector3(pieceX[i], 0f, pieceZ[i]));
-                    float y = baseY;
-                    if (Physics.Raycast(new Vector3(p.x, foot.y + top, p.z), Vector3.down, out g, reach, 1 << 11, QueryTriggerInteraction.Ignore)) y = g.point.y;
-                    outlineParts[isNub ? last : i].SetPositionAndRotation(new Vector3(p.x, y + 0.012f, p.z), q);
+                    int slot = isNub ? last : i;
+                    if (cast)
+                    {
+                        float y = baseY;
+                        if (Physics.Raycast(new Vector3(p.x, foot.y + top, p.z), Vector3.down, out g, reach, 1 << 11, QueryTriggerInteraction.Ignore)) y = g.point.y;
+                        pieceY[slot] = y;
+                    }
+                    outlineParts[slot].SetPositionAndRotation(new Vector3(p.x, pieceY[slot] + 0.012f, p.z), q);
                 }
             }
         }
@@ -581,9 +600,9 @@ public class PHView : UdonSharpBehaviour
             }
             return;
         }
+        if (!vrPanel.gameObject.activeSelf) return;   // (before the avatar and head queries: not hiding, nothing to place. Perf)
         float sc = AvatarScale();
         VRCPlayerApi.TrackingData headT = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
-        if (!vrPanel.gameObject.activeSelf) return;
         vrPanel.localScale = new Vector3(panelBaseScale.x * sc, panelBaseScale.y * sc, panelBaseScale.z);
         VRCPlayerApi.TrackingData origin = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Origin);
         Quaternion inv = Quaternion.Inverse(origin.rotation);
