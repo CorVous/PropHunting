@@ -265,6 +265,8 @@ public static class WorldSceneBuilder
         local.panelUiText = null; local.resultsText = null;
         // the credits (from CREDITS.md), on the north wall left of the host panel
         BuildCredits(lobby.transform);
+        // the language board: a lectern ahead and right of the spawn disc, turned towards it
+        LobbyBuilder.BuildLanguageBoard(lobby.transform, game, new Vector3(2.7f, 0f, -RoomD / 2 + 3.6f), 28f);
 
         // the profiler (its plaque right of the DEBUG plaque) and the scripts it watches: every one that runs each frame
         var prof = LobbyBuilder.BuildProfiler(lobby.transform, game, new Vector3(7.95f, 1.55f, RoomD / 2 - 0.12f));
@@ -288,6 +290,7 @@ public static class WorldSceneBuilder
 
         UdonSharpEditorUtility.CopyProxyToUdon(local);
         UdonSharpEditorUtility.CopyProxyToUdon(game);
+        TextBaker.Bake();   // the text in every language (PHText under World/Game), its labels and fallback fonts
         EditorSceneManager.MarkSceneDirty(world.scene);
         Debug.Log("[prophunt] built the world scene: lobby, " + SLOTS + " slots");
     }
