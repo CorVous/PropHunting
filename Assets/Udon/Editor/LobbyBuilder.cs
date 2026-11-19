@@ -594,8 +594,6 @@ public static class LobbyBuilder
             para.Append(ln);
         }
         flush();
-        // a hint where the fine print was: everything with a link can be clicked for it (CopyLink)
-        notes.Add("Click a name, a maker or the source banner: VRChat opens a text box with its link, ready to copy.");
 
         // the order on the board: maker by maker, then by name; one column per maker (Cor), each a short list that
         // scrolls (its own scroll bar) when it holds more than visRows
@@ -608,7 +606,7 @@ public static class LobbyBuilder
         int most = 0;
         foreach (int g in groups) most = Mathf.Max(most, rows.FindAll(r => r.maker == g).Count);
         float listH = Mathf.Min(most, visRows) * rowH;
-        float colsH = headH + listH + (most > visRows ? 26f : 0f);   // room for the "scroll for more" hint
+        float colsH = headH + listH;
 
         // measure the fine print, then size the canvas: title band, board (columns, a rule, the notes), margin
         const float side = 24f, pad = 26f, colGap = 34f;
@@ -744,8 +742,6 @@ public static class LobbyBuilder
             sr.verticalScrollbar = bar;
             sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
             bar.size = listH / contentH; bar.value = 1f;
-            // a hint under the bar that there is more
-            Txt(cv, "More " + makerName[m], Q(x0 + listW / 2, y + listH + 13), new Vector2(listW, 20), "SCROLL FOR " + (list.Count - visRows) + " MORE", future, 11, C("8a7b5a"), TextAlignmentOptions.Center);
         }
         // the fine print under a dashed rule
         if (notes.Count > 0)
