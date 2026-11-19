@@ -770,9 +770,20 @@ public class MapBuilderUdon : UdonSharpBehaviour
         doomed[nDoomed++] = go;
     }
 
-    // a few of the old map's objects destroyed this frame; true while some are left
-    bool DestroySome()
+    const int BACKLOG_MAP = 1500;   // about the objects of an XL map (1,050 props, ~110 fences, ~80 fixtures)
+
+    // the old objects still waiting: the set-aside roots' children and the queued ones
+    int Backlog()
     {
+        int n = nDoomed - doomedNext;
+        for (int i = 0; i < nDying; i++) if (dying[i] != null) n += dying[i].childCount;
+        return n;
+    }
+
+    // up to count of the old map's objects destroyed this frame; true while some are left
+    bool DestroySome(int count)
+    {
+        count = Mathf.Max(1, count);
         if (nDying > 0)
         {
             // the oldest set-aside root: its last few children this frame (they go at the frame's end), and once it
@@ -785,11 +796,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 for (int i = 1; i < nDying; i++) dying[i - 1] = dying[i];
                 dying[--nDying] = null;
             }
-            else for (int i = n - 1; i >= 0 && i >= n - Mathf.Max(1, destroyPerFrame); i--) Destroy(r.GetChild(i).gameObject);
+            else for (int i = n - 1; i >= 0 && i >= n - count; i--) Destroy(r.GetChild(i).gameObject);
             return true;
         }
         if (doomedNext >= nDoomed) { nDoomed = 0; doomedNext = 0; return false; }
-        int end = Mathf.Min(nDoomed, doomedNext + Mathf.Max(1, destroyPerFrame));
+        int end = Mathf.Min(nDoomed, doomedNext + count);
         for (; doomedNext < end; doomedNext++)
         {
             if (doomed[doomedNext] != null) Destroy(doomed[doomedNext]);
@@ -897,8 +908,16 @@ public class MapBuilderUdon : UdonSharpBehaviour
     void UpdateBody()
     {
         // (only once the new map stands: a build's frames are already near their budget, and the old objects wait
-        // switched off, unseen and without colliders)
-        if ((nDoomed > 0 || nDying > 0) && built) DestroySome();
+        // switched off, unseen and without colliders). Quick restarts (a map stands, the next round clears it within
+        // seconds) can retire maps faster than one object a frame destroys them: with more than a map waiting, four a
+        // frame once the map stands, and two a frame between builds too. (Not by time: a Destroy's cost comes at the
+        // frame's end, so a clock round the calls would not see it.)
+        if (nDoomed > 0 || nDying > 0)
+        {
+            int backlog = Backlog();
+            if (built) DestroySome(backlog > BACKLOG_MAP ? 4 * destroyPerFrame : destroyPerFrame);
+            else if (!busy && backlog > BACKLOG_MAP) DestroySome(2 * destroyPerFrame);
+        }
         if (built && nClouds > 0)
         {
             // the clouds drift round the map, one turn in about twenty minutes
