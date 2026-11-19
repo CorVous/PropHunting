@@ -10,9 +10,9 @@ using UnityEngine.UI;
 //   BuildPanel     the host panel: four coloured tracks with a meeple on the pick, a die for START, the bench
 //   BuildScorePad  the last round's results as a spiral notepad on the west wall
 //   DressRoom      board floor with a track of coloured spaces, the PLAY space, wall bands, the PROPHUNT name,
-//                  a prop shelf on the east wall and giant game pieces (KayKit models, CC0)
+//                  giant game pieces (the east wall is the weapon wall, LobbyBuilder.Store.cs) (KayKit models, CC0)
 // Assets live in Assets/Lobby (icons are 256 px renders from cc0.cor.home with the background keyed out).
-public static class LobbyBuilder
+public static partial class LobbyBuilder
 {
     const string Root = "Assets/Lobby/";
     static TMP_FontAsset future, rocket;
@@ -893,30 +893,17 @@ public static class LobbyBuilder
         var name = WorldText(root, "Name", L(roomW / 2, roomD - 0.03f, 4.3f), Quaternion.Euler(0f, 180f, 0f), "PROPHUNT", 26f, C("f6d773"), new Vector2(20f, 2.2f));
         name.characterSpacing = 6f;
 
-        // the prop shelf on the east wall
-        var wood = Mat("LobbyShelfWood", C("b07848"));
-        float[] shelfH = { 0.85f, 2.1f, 3.35f };
-        string[][] shelf = {
-            new[] { "kaykit-dungeon-pack/barrel_small", "furniture-bits/lamp_standing", "furniture-bits/armchair", "kaykit-dungeon-pack/chest", "furniture-bits/cactus_medium_A", "furniture-bits/book_set", "kaykit-dungeon-pack/box_small" },
-            new[] { "furniture-bits/chair_stool_wood", "furniture-bits/couch_pillows", "furniture-bits/lamp_table", "kaykit-dungeon-pack/barrel_small", "board-game-bits/D6_A_red", "kaykit-dungeon-pack/chest", "furniture-bits/book_set" },
-            new[] { "kaykit-dungeon-pack/box_small", "furniture-bits/cactus_medium_A", "furniture-bits/armchair", "furniture-bits/lamp_table", "furniture-bits/lamp_standing", "board-game-bits/coin_gold", "kaykit-dungeon-pack/barrel_small" } };
-        float[][] shelfSize = { new[] { 0.8f, 1.1f, 0.9f, 0.8f, 0.8f, 0.6f, 0.7f }, new[] { 0.7f, 1.0f, 0.7f, 0.7f, 0.6f, 0.7f, 0.6f }, new[] { 0.7f, 0.8f, 0.8f, 0.7f, 1.0f, 0.6f, 0.7f } };
-        for (int s = 0; s < 3; s++)
-        {
-            Box(root, "Shelf" + s, L(roomW - 0.3f, roomD / 2, shelfH[s] - 0.05f), new Vector3(0.6f, 0.1f, 12f), wood);
-            for (int k = 0; k < shelf[s].Length; k++)
-                Piece(root, shelf[s][k], L(roomW - 0.32f, roomD / 2 - 5.1f + k * 1.7f, shelfH[s]), shelfSize[s][k], -90f + (k % 2 == 0 ? 15f : -10f), false);
-        }
+        // (the east wall is the weapon wall: LobbyBuilder.Store.cs, built after the weapons)
 
         // giant pieces (feet on the floor; sizes are the largest dimension in metres)
         Piece(root, "board-game-bits/D6_A_red", L(20.8f, 2.2f), 2.3f, 20f, true);
-        Piece(root, "board-game-bits/D20_blue", L(22.2f, 5.4f), 1.8f, -15f, true);
+        Piece(root, "board-game-bits/D20_blue", L(4.8f, 18.6f), 1.8f, -15f, true);   // (clear of the weapon wall)
         Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(2.4f, 5.0f), 1, 1.4f);
         Piece(root, "furniture-bits/couch_pillows", L(2.3f, 15.0f), 2.6f, 90f, true);
         Piece(root, "furniture-bits/armchair", L(2.3f, 18.3f), 1.5f, 90f, true);
         Piece(root, "furniture-bits/lamp_standing", L(1.7f, 16.9f), 2.4f, 0f, false);
-        Piece(root, "board-game-bits/pawn_A_blue", L(9.2f, 20.3f), 2.4f, 0f, true);
-        Piece(root, "board-game-bits/flag_A_red", L(14.8f, 20.3f), 2.6f, 200f, true);
+        Piece(root, "board-game-bits/pawn_A_blue", L(18.3f, 17.0f), 2.4f, 0f, true);   // (clear of the Trophies board)
+        Piece(root, "board-game-bits/flag_A_red", L(5.2f, 20.0f), 2.6f, 200f, true);
         Piece(root, "board-game-bits/domino_tile_6-6", L(19.4f, 19.5f), 2.4f, 25f, true);
         Piece(root, "furniture-bits/cactus_medium_A", L(22.2f, 20.0f), 1.6f, 0f, true);
         Piece(root, "furniture-bits/lamp_standing", L(22.3f, 18.4f), 2.4f, 0f, false);
@@ -927,7 +914,7 @@ public static class LobbyBuilder
         Color warm = new Color(1f, 0.82f, 0.58f);
         LampBuilder.MakeLight(root, "LampLightCouch", L(1.7f, 16.9f, 2.05f), warm, 2.2f, 0.9f);
         LampBuilder.MakeLight(root, "LampLightCorner", L(22.3f, 18.4f, 2.05f), warm, 2.2f, 0.9f);
-        LampBuilder.MakeLight(root, "LampLightShelf", L(roomW - 0.6f, roomD / 2 - 0.0f, 2.6f), warm, 0.8f, 0.6f);
+        LampBuilder.MakeLight(root, "LampLightShelf", L(roomW - 0.6f, roomD / 2 - 0.0f, 2.6f), warm, 0.8f, 0.6f);   // between the weapon wall's halves
 
         // the sun lights the room through the open box; the walls and the lid cast no shadows into it
         foreach (Transform c in lobby)

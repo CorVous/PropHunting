@@ -272,6 +272,9 @@ public static class WorldSceneBuilder
             Debug.Log("[prophunt] the profiler watches " + list.Count + " scripts");
         }
 
+        // the weapon wall (east wall) and the Trophies board (spawn wall): after the weapons, whose lists number the picks
+        LobbyBuilder.BuildStore(lobby.transform, game, local.sound, RoomW, RoomD);
+
         UdonSharpEditorUtility.CopyProxyToUdon(local);
         UdonSharpEditorUtility.CopyProxyToUdon(game);
         EditorSceneManager.MarkSceneDirty(world.scene);
