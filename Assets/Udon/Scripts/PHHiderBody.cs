@@ -370,6 +370,8 @@ public class PHHiderBody : UdonSharpBehaviour
                 bool wall = SweepH(pos, (at - pos).normalized, d);
                 half = fullHalf;
                 if (wall) continue;
+                // nor out over a drop (an upper floor's stair hole on its open side), as PlaceAt
+                if (!GroundBelow(at, 0.5f) || groundN.y < 0.64f) continue;
                 Shift(at); narrow = false;
                 return;
             }
