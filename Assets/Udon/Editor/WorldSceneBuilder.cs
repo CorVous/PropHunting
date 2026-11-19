@@ -93,7 +93,18 @@ public static class WorldSceneBuilder
         Box(lobby.transform, "Floor", new Vector3(0, -0.25f, 0), new Vector3(RoomW, 0.5f, RoomD), floorMat, true);
         Box(lobby.transform, "WallN", new Vector3(0, WallH / 2, RoomD / 2 + 0.1f), new Vector3(RoomW, WallH, 0.2f), wallMat, true);
         Box(lobby.transform, "WallS", new Vector3(0, WallH / 2, -RoomD / 2 - 0.1f), new Vector3(RoomW, WallH, 0.2f), wallMat, true);
-        Box(lobby.transform, "WallE", new Vector3(RoomW / 2 + 0.1f, WallH / 2, 0), new Vector3(0.2f, WallH, RoomD), wallMat, true);
+        // the east wall (Cor, the weapon wall): pushed out 1 m into an alcove behind an opening; the old wall's line
+        // keeps panels above and below the opening and at its ends, so the room's band and trim run on
+        float al = LobbyBuilder.Alcove, lo = LobbyBuilder.OpeningLow, hi = LobbyBuilder.OpeningHigh, oh = LobbyBuilder.OpeningHalf;
+        Box(lobby.transform, "WallE", new Vector3(RoomW / 2 + 0.1f, (hi + WallH) / 2, 0), new Vector3(0.2f, WallH - hi, RoomD), wallMat, true);
+        Box(lobby.transform, "WallEBelow", new Vector3(RoomW / 2 + 0.1f, lo / 2, 0), new Vector3(0.2f, lo, 2 * oh), wallMat, true);
+        Box(lobby.transform, "WallENorth", new Vector3(RoomW / 2 + 0.1f, hi / 2, (oh + RoomD / 2) / 2), new Vector3(0.2f, hi, RoomD / 2 - oh), wallMat, true);
+        Box(lobby.transform, "WallESouth", new Vector3(RoomW / 2 + 0.1f, hi / 2, -(oh + RoomD / 2) / 2), new Vector3(0.2f, hi, RoomD / 2 - oh), wallMat, true);
+        Box(lobby.transform, "AlcoveBack", new Vector3(RoomW / 2 + al + 0.1f, WallH / 2, 0), new Vector3(0.2f, WallH, 2 * oh + 0.4f), wallMat, true);
+        Box(lobby.transform, "AlcoveFloor", new Vector3(RoomW / 2 + al / 2 + 0.1f, -0.25f, 0), new Vector3(al + 0.2f, 0.5f, 2 * oh + 0.4f), floorMat, true);
+        Box(lobby.transform, "AlcoveTop", new Vector3(RoomW / 2 + al / 2 + 0.1f, WallH + 0.2f, 0), new Vector3(al + 0.4f, 0.4f, 2 * oh + 0.4f), Mat("StoreVoid", new Color(0.012f, 0.012f, 0.012f)), false);
+        Box(lobby.transform, "AlcoveNorth", new Vector3(RoomW / 2 + al / 2 + 0.1f, WallH / 2, oh + 0.1f), new Vector3(al, WallH, 0.2f), wallMat, true);
+        Box(lobby.transform, "AlcoveSouth", new Vector3(RoomW / 2 + al / 2 + 0.1f, WallH / 2, -oh - 0.1f), new Vector3(al, WallH, 0.2f), wallMat, true);
         Box(lobby.transform, "WallW", new Vector3(-RoomW / 2 - 0.1f, WallH / 2, 0), new Vector3(0.2f, WallH, RoomD), wallMat, true);
         Vector3 zoneCentre = new Vector3(0f, 0f, RoomD / 2 - 0.15f - ZoneHalf);
         Box(lobby.transform, "ZoneFloor", zoneCentre + new Vector3(0, 0.005f, 0), new Vector3(ZoneHalf * 2, 0.01f, ZoneHalf * 2), zoneMat, false);
@@ -115,7 +126,7 @@ public static class WorldSceneBuilder
         var shell = new GameObject("LobbyShell");
         shell.transform.SetParent(world.transform, false);
         shell.transform.position = LobbyOrigin;
-        var shellBox = Box(shell.transform, "Box", new Vector3(0f, (WallH + 1.0f) / 2f - 0.6f, 0f), new Vector3(RoomW + 1.2f, WallH + 1.0f, RoomD + 1.2f), shellMat, false);
+        var shellBox = Box(shell.transform, "Box", new Vector3(0f, (WallH + 1.0f) / 2f - 0.6f, 0f), new Vector3(RoomW + 1.2f + 2f * (LobbyBuilder.Alcove + 0.2f), WallH + 1.0f, RoomD + 1.2f), shellMat, false);   // (wide enough for the alcove)
         var shellR = shellBox.GetComponent<MeshRenderer>();
         shellR.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; shellR.receiveShadows = false;
 

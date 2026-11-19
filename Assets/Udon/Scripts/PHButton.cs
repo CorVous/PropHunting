@@ -1,5 +1,6 @@
 using UdonSharp;
 using UnityEngine;
+using VRC.Dynamics;
 
 // A pressable thing in the world (Interact: click on desktop, trigger in VR) that calls one of PHGame's public
 // methods by name, with an optional number (PHGame.panelArg). The game itself checks who may use it (the host's
@@ -14,6 +15,16 @@ public class PHButton : UdonSharpBehaviour
 
     // from a UI button's OnClick (the host panel)
     public void Press() { Interact(); }
+
+    // a hand pressing it (a VRC Contact Receiver on this object, the player's own fingers only): once per touch,
+    // and not again for a moment (a hand resting on it, or brushing past twice, presses once)
+    float lastTouch = -9f;
+    public override void OnContactEnter(ContactEnterInfo contactInfo)
+    {
+        if (Time.time - lastTouch < 0.4f) { lastTouch = Time.time; return; }
+        lastTouch = Time.time;
+        Interact();
+    }
 
     public override void Interact()
     {

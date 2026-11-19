@@ -22,9 +22,12 @@ public static partial class LobbyBuilder
     [System.Serializable] class StoreCatalog { public string note; public StoreWeapon[] weapons; }
     [System.Serializable] class StoreWeapon { public string id, kind, category, pack, model, thumb; public int sheet; }
 
-    const float SlotW = 0.55f, RowH = 0.85f, BaseY = 0.15f, Depth = 0.5f, Ceiling = 7f;
-    const int Shown = 8;
-    const int Cols = 10;
+    // the east wall (Cor): an alcove 1 m deep behind an opening from 0.5 to 5.85 m up (WorldSceneBuilder); the
+    // shelves stand in it, flat against its back, five showing, sixteen weapons wide
+    public const float Alcove = 1.0f, OpeningLow = 0.5f, OpeningHigh = 5.85f, OpeningHalf = 9.4f;
+    const float SlotW = 0.55f, RowH = 1.17f, BaseY = 0.55f, Depth = 0.8f, Ceiling = 7f;
+    const int Shown = 5;
+    const int Cols = 16;
 
     public static PHStore BuildStore(Transform lobby, PHGame game, PHAudio sound, float roomW, float roomD)
     {
@@ -103,9 +106,11 @@ public static partial class LobbyBuilder
         }
 
         // the wall: two halves on the east wall (x = roomW / 2), facing west into the room
-        var melee = BuildShelf(root, store, 0, cat, meshByName, new Vector3(roomW / 2f, 0f, -3.15f));
-        var guns = BuildShelf(root, store, 1, cat, meshByName, new Vector3(roomW / 2f, 0f, 3.15f));
+        float hz = 0.3f + Cols * SlotW / 2f;
+        var melee = BuildShelf(root, store, 0, cat, meshByName, new Vector3(roomW / 2f + Alcove, 0f, -hz));
+        var guns = BuildShelf(root, store, 1, cat, meshByName, new Vector3(roomW / 2f + Alcove, 0f, hz));
         store.shelfMelee = melee; store.shelfGun = guns;
+        BuildOpeningTrim(root, roomW);
         store.dialog = BuildStoreDialog(root, store, text);
         store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 2.75f, -5.2f));   // west wall, left of the score pad (Cor)
         UdonSharpEditorUtility.CopyProxyToUdon(store);
@@ -145,7 +150,7 @@ public static partial class LobbyBuilder
         go.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);   // +z into the room (west), +x north
         var t = go.transform;
         var shelf = go.AddUdonSharpComponent<PHShelf>();
-        shelf.store = store; shelf.kind = kind; shelf.baseY = BaseY; shelf.rowH = RowH;
+        shelf.store = store; shelf.kind = kind; shelf.baseY = BaseY; shelf.rowH = RowH; shelf.cols = Cols;
 
         // the order: the free ones, the trophy weapons (quickest trophy first), then the shop from cheap to dear
         var order = new List<int>();
@@ -192,9 +197,8 @@ public static partial class LobbyBuilder
         float halfW = Cols * SlotW / 2f;
         var voidMat = Mat("StoreVoid", C("030303"));
         Slab(t, "FloorHole", new Vector3(0f, 0.006f, Depth / 2f + 0.02f), new Vector3(2 * halfW + 0.16f, 0.012f, Depth + 0.14f), voidMat);
-        Box(t, "CeilingHole", new Vector3(0f, Ceiling + 0.4f, Depth / 2f + 0.02f), new Vector3(2 * halfW + 0.16f, 0.8f, Depth + 0.14f), voidMat);
-        Slab(t, "RodL", new Vector3(halfW + 0.04f, Ceiling / 2f, Depth / 2f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
-        Slab(t, "RodR", new Vector3(-halfW - 0.04f, Ceiling / 2f, Depth / 2f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
+        Slab(t, "RodL", new Vector3(halfW + 0.04f, Ceiling / 2f, Depth - 0.05f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
+        Slab(t, "RodR", new Vector3(-halfW - 0.04f, Ceiling / 2f, Depth - 0.05f), new Vector3(0.035f, Ceiling, 0.035f), woodDark);
 
         // the shelf rows (one more than show, out of sight) with ten places each
         var mat = ShelfMat();
@@ -213,8 +217,8 @@ public static partial class LobbyBuilder
             shelf.rows[r] = row;
             var board = new GameObject("Board");   // rounded off (Cor)
             board.transform.SetParent(row, false);
-            board.transform.localPosition = new Vector3(0f, -0.045f, Depth / 2f);
-            board.AddComponent<MeshFilter>().sharedMesh = RoundedBoard(2 * halfW + 0.06f, Depth - 0.02f, 0.045f, 0.1f);
+            board.transform.localPosition = new Vector3(0f, -0.045f, (Depth - 0.12f) / 2f);   // its back 0.12 m into the wall: flat there (Cor)
+            board.AddComponent<MeshFilter>().sharedMesh = RoundedBoard(2 * halfW + 0.06f, Depth + 0.12f, 0.045f, 0.1f);
             var br = board.AddComponent<MeshRenderer>(); br.sharedMaterial = wood;
             br.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             for (int c = 0; c < Cols; c++)
@@ -260,18 +264,18 @@ public static partial class LobbyBuilder
 
         // the floating panel (Cor: round buttons, slanted towards the player, no rail), 1 m out at hip height: up /
         // down, and the coins. Its own +z faces the player; the plate tilts its top towards them.
-        float cz = 1.0f;
+        float cz = Alcove + 0.9f;
         var cart = new GameObject("Panel").transform;
         cart.SetParent(t, false); cart.localPosition = new Vector3(0f, 0f, cz);
-        shelf.cart = cart; shelf.cartMin = -halfW + 0.3f; shelf.cartMax = halfW - 0.3f; shelf.cartZ = cz;
+        shelf.cart = cart; shelf.cartMin = -halfW + 0.5f; shelf.cartMax = halfW - 0.5f; shelf.cartZ = cz;
         var tilt = new GameObject("Tilt").transform;
         tilt.SetParent(cart, false); tilt.localPosition = new Vector3(0f, 1.05f, 0f); tilt.localRotation = Quaternion.Euler(35f, 0f, 0f);
-        Oval(tilt, "Rim", new Vector3(0f, -0.012f, 0f), new Vector3(0.66f, 0.03f, 0.36f), woodDark);
-        Oval(tilt, "Plate", Vector3.zero, new Vector3(0.62f, 0.03f, 0.32f), felt);
-        RoundButton(tilt, shelf, "Up", new Vector3(0.13f, 0.02f, -0.04f), true);
-        RoundButton(tilt, shelf, "Down", new Vector3(-0.13f, 0.02f, -0.04f), false);
-        Disc(tilt, "Coin", new Vector3(0.09f, 0.018f, 0.1f), 0.06f, gold);
-        var coins = WorldText(tilt, "Coins", new Vector3(-0.03f, 0.02f, 0.1f), Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, 180f, 0f), "0", 0.75f, C("f6d773"), new Vector2(0.2f, 0.08f));
+        Oval(tilt, "Rim", new Vector3(0f, -0.015f, 0f), new Vector3(1.06f, 0.04f, 0.58f), woodDark);
+        Oval(tilt, "Plate", Vector3.zero, new Vector3(1.0f, 0.04f, 0.52f), felt);
+        RoundButton(tilt, shelf, "Up", new Vector3(0.21f, 0.025f, -0.06f), true);
+        RoundButton(tilt, shelf, "Down", new Vector3(-0.21f, 0.025f, -0.06f), false);
+        Disc(tilt, "Coin", new Vector3(0.15f, 0.023f, 0.16f), 0.09f, gold);
+        var coins = WorldText(tilt, "Coins", new Vector3(-0.09f, 0.025f, 0.16f), Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, 180f, 0f), "0", 1.1f, C("f6d773"), new Vector2(0.32f, 0.12f));
         coins.font = future; coins.alignment = TextAlignmentOptions.Left;
         shelf.cartCoins = coins;
 
@@ -342,6 +346,46 @@ public static partial class LobbyBuilder
         return m;
     }
 
+    // the detailing on the strips of wall across the weapon wall's opening (designed as flat art: Tools/make_panels.py,
+    // Assets/Lobby/Panels): a game-track row on the bottom strip, bunting hanging from the cream band over the top
+    static void BuildOpeningTrim(Transform root, float roomW)
+    {
+        float w = 2f * OpeningHalf;
+        Panel(root, "BottomStrip", "bottom_strip", new Vector3(roomW / 2f - 0.006f, OpeningLow / 2f, 0f), new Vector2(w, OpeningLow), w / 4f, false);
+        Panel(root, "TopTrim", "top_trim", new Vector3(roomW / 2f - 0.008f, 5.9f - 0.125f, 0f), new Vector2(w, 0.25f), w / 4f, true);
+    }
+
+    // a flat picture on the east wall's face, facing west into the room, its texture repeated `tiles` times across
+    static void Panel(Transform root, string name, string tex, Vector3 pos, Vector2 size, float tiles, bool cutout)
+    {
+        string tp = "Assets/Lobby/Panels/" + tex + ".png";
+        var ti = (TextureImporter)AssetImporter.GetAtPath(tp);
+        if (ti != null && (ti.wrapModeU != TextureWrapMode.Repeat || ti.alphaIsTransparency != cutout))
+        {
+            ti.wrapModeU = TextureWrapMode.Repeat; ti.wrapModeV = TextureWrapMode.Clamp; ti.alphaIsTransparency = cutout;
+            ti.mipmapEnabled = true; ti.SaveAndReimport();
+        }
+        var m = Mat("StorePanel_" + tex, Color.white);
+        m.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(tp);
+        m.mainTextureScale = new Vector2(tiles, 1f);
+        if (cutout)
+        {
+            m.SetFloat("_Mode", 1f); m.SetFloat("_Cutoff", 0.5f);
+            m.EnableKeyword("_ALPHATEST_ON"); m.renderQueue = 2450;
+            m.SetOverrideTag("RenderType", "TransparentCutout");
+        }
+        EditorUtility.SetDirty(m);
+        var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        go.name = name;
+        go.transform.SetParent(root, false);
+        go.transform.localPosition = pos;
+        go.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);   // facing -x, into the room
+        go.transform.localScale = new Vector3(size.x, size.y, 1f);
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+        var r = go.GetComponent<MeshRenderer>();
+        r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+    }
+
     // a flattened cylinder (an oval plate)
     static void Oval(Transform root, string name, Vector3 pos, Vector3 size, Material m)
     {
@@ -359,12 +403,12 @@ public static partial class LobbyBuilder
     {
         var key = new GameObject(action).transform;
         key.SetParent(panel, false); key.localPosition = at;
-        Oval(key, "Cap", new Vector3(0f, 0.02f, 0f), new Vector3(0.15f, 0.04f, 0.15f), Mat("StoreKey", C("e1cfa5")));
+        Oval(key, "Cap", new Vector3(0f, 0.03f, 0f), new Vector3(0.25f, 0.06f, 0.25f), Mat("StoreKey", C("e1cfa5")));
         var arrow = new GameObject("Arrow");
         arrow.transform.SetParent(key, false);
-        arrow.transform.localPosition = new Vector3(0f, 0.042f, 0f);
+        arrow.transform.localPosition = new Vector3(0f, 0.062f, 0f);
         arrow.transform.localRotation = Quaternion.Euler(0f, up ? 180f : 0f, 0f);   // (the panel's -z is away from the player: up)
-        arrow.transform.localScale = Vector3.one * 0.7f;
+        arrow.transform.localScale = Vector3.one * 1.15f;
         arrow.AddComponent<MeshFilter>().sharedMesh = ArrowMesh();
         arrow.AddComponent<MeshRenderer>().sharedMaterial = Mat("StoreInk", C("1e190f"));
         var btn = key.gameObject.AddUdonSharpComponent<PHButton>();
@@ -372,8 +416,15 @@ public static partial class LobbyBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(btn);
         var u = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
         u.proximity = 3f; u.interactText = up ? "Up" : "Down";
-        var col = key.gameObject.AddComponent<SphereCollider>(); col.radius = 0.09f; col.center = new Vector3(0f, 0.02f, 0f);
+        var col = key.gameObject.AddComponent<SphereCollider>(); col.radius = 0.14f; col.center = new Vector3(0f, 0.03f, 0f);
         col.isTrigger = true;   // the panel follows the player: nothing on it may push them
+        // pressed by hand in VR (Cor): the player's own fingertips touching the cap (PHButton.OnContactEnter)
+        var rc = key.gameObject.AddComponent<VRC.SDK3.Dynamics.Contact.Components.VRCContactReceiver>();
+        rc.shapeType = VRC.Dynamics.ContactBase.ShapeType.Sphere;
+        rc.radius = 0.11f; rc.position = new Vector3(0f, 0.05f, 0f);
+        rc.allowSelf = true; rc.allowOthers = false; rc.localOnly = true;
+        rc.collisionTags = new System.Collections.Generic.List<string> { "Finger", "FingerIndex" };
+        rc.receiverType = VRC.Dynamics.ContactReceiver.ReceiverType.OnEnter;
     }
 
     // an up / down button on the cart: a pale key with an arrow, pressed like any world button (PHButton)

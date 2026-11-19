@@ -24,7 +24,7 @@ public class PHShelf : UdonSharpBehaviour
     public Quaternion itemRot;       // melee stands up, guns lie along the shelf
 
     public Transform[] rows;         // 5 shelf rows (4 showing, 1 out of sight for the turn)
-    public Transform[] items;        // 50: row * 10 + column
+    public Transform[] items;        // row * cols + column
     public MeshFilter[] itemMf;
     public MeshRenderer[] itemMr;
     public GameObject[] tagShop, tagCool, tagGoofy, sel;
@@ -36,8 +36,8 @@ public class PHShelf : UdonSharpBehaviour
     public TextMeshPro cartCoins;
 
     public int shown = 8;            // shelves showing (one more row root goes round out of sight)
-    const int COLS = 10;
-    int SHOWN, ROOTS;
+    public int cols = 16;
+    int COLS, SHOWN, ROOTS;
     const float TURN = 0.4f;
     int[] content;                   // catalog index per slot (-1 empty)
     int[] ro;                        // the row root at each place: 0 bottom .. 3 top, 4 out of sight
@@ -50,7 +50,7 @@ public class PHShelf : UdonSharpBehaviour
 
     void Start()
     {
-        SHOWN = shown; ROOTS = shown + 1;
+        SHOWN = shown; ROOTS = shown + 1; COLS = cols;
         content = new int[ROOTS * COLS];
         ro = new int[ROOTS];
         for (int i = 0; i < ROOTS; i++) ro[i] = i;
