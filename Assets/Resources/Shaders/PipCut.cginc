@@ -78,10 +78,38 @@ float PipCutShape(float3 wp, float3 u, float L)
     return sd;
 }
 
+// Where the architecture's surface at wp (world normal n) reads the hole's shape. A wall is layers one behind the
+// other along the view: the facade's kit part in front (up to 0.3 m proud), the wall's own box face behind it (and a
+// door's trim 2 cm proud). Each layer cut by the shape at its own point showed the rim twice (Cor: a second outline
+// on the wall behind): where the hole is wider at the front layer the back layer's rim band showed through it. An
+// upright surface near a wall's line on the map's grid (walls stand on the cells' edges, PIPCUT_GRID apart, to
+// PIPCUT_LAYERS either side) reads the shape where its view ray crosses that line instead, so every layer of one wall
+// is cut by one outline and its front layer's rim covers the rest. Toward a grazing view (the ray along the wall)
+// it eases back to its own point, which keeps the shift short and the shape continuous.
+#define PIPCUT_GRID 4.0       // MapBuilderUdon.CELL
+#define PIPCUT_LAYERS 0.45    // a wall's half thickness (0.1) and the deepest facade (0.3), and a little
+float3 PipCutLayerPoint(float3 wp, float3 n)
+{
+    float3 vd = normalize(wp - _WorldSpaceCameraPos);
+    float3 an = abs(n);
+    if (an.x > 0.9)
+    {
+        float dx = round(wp.x / PIPCUT_GRID) * PIPCUT_GRID - wp.x;
+        if (abs(dx) < PIPCUT_LAYERS && abs(vd.x) > 0.05) return wp + vd * (dx / vd.x) * saturate((abs(vd.x) - 0.25) / 0.2);
+    }
+    else if (an.z > 0.9)
+    {
+        float dz = round(wp.z / PIPCUT_GRID) * PIPCUT_GRID - wp.z;
+        if (abs(dz) < PIPCUT_LAYERS && abs(vd.z) > 0.05) return wp + vd * (dz / vd.z) * saturate((abs(vd.z) - 0.25) / 0.2);
+    }
+    return wp;
+}
+
 // what lies in the hole: architecture (fade 0) is clipped and returns 1 in the rim band (draw it in PipCutRim());
 // a prop (fade 1) keeps three pixels in eight there, in a fixed 4x4 pattern, growing to all of them across the rim.
+// n: the surface's world normal (PipCutLayerPoint, architecture only); (0, 0, 0) where there is none.
 // (Call it inside an if, never ?: or &&: its clip() must not run for what skips it.)
-half PipCut(float3 wp, float2 px, float fade)
+half PipCutN(float3 wp, float3 n, float2 px, float fade)
 {
     if (_UdonPHCut.w <= 0.0 || abs(_ScreenParams.x - 384.0) > 0.5) return 0;
     if (wp.y < _UdonPHCutFloor.x + 0.05) return 0;
@@ -95,7 +123,7 @@ half PipCut(float3 wp, float2 px, float fade)
     float far = 1.1 * PipCutRadius(t, L) + PIPCUT_RMAX + PIPCUT_NOISE;
     float3 off = v - u * t;
     if (dot(off, off) >= far * far) return 0;
-    float s = PipCutShape(wp, u, L);
+    float s = PipCutShape(fade > 0.5 ? wp : PipCutLayerPoint(wp, n), u, L);
     if (s >= 0.0) return 0;
     if (fade > 0.5)
     {
@@ -108,6 +136,8 @@ half PipCut(float3 wp, float2 px, float fade)
     clip(s < -PIPCUT_RIM ? -1.0 : 1.0);
     return 1;
 }
+
+half PipCut(float3 wp, float2 px, float fade) { return PipCutN(wp, float3(0, 0, 0), px, fade); }
 
 // the rim's colour: the ground outline's teal (WorldSceneBuilder OutlineTeal), as the framebuffer wants it
 float3 PipCutRim()

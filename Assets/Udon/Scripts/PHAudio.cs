@@ -24,11 +24,20 @@ public class PHAudio : UdonSharpBehaviour
 
     public AudioClip Clip(string n)
     {
-        for (int i = 0; i < names.Length; i++) if (names[i] == n) return clips[i];
+        if (names == null || clips == null) return null;
+        // (names and clips filled apart: one longer than the other must not halt the sounds)
+        int n0 = Mathf.Min(names.Length, clips.Length);
+        for (int i = 0; i < n0; i++) if (names[i] == n) return clips[i];
         return null;
     }
 
-    public string Pick(string[] set, int r) { return set[(r < 0 ? -r : r) % set.Length]; }
+    // any int, even a negative one from the network (-int.MinValue is still negative); an empty set picks nothing
+    public string Pick(string[] set, int r)
+    {
+        if (set == null || set.Length == 0) return "";
+        int k = r % set.Length;
+        return set[k < 0 ? k + set.Length : k];
+    }
 
     // the local player's own cue, not placed in the world
     public void Play(string n, float volume)
@@ -41,8 +50,10 @@ public class PHAudio : UdonSharpBehaviour
     {
         AudioClip c = Clip(n);
         if (c == null || pool == null || pool.Length == 0) return;
+        if (next >= pool.Length) next = 0;
         AudioSource s = pool[next];
         next = (next + 1) % pool.Length;
+        if (s == null) return;
         s.transform.position = pos;
         s.maxDistance = range;
         s.pitch = pitch;

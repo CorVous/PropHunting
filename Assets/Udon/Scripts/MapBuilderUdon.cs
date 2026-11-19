@@ -857,6 +857,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             collisionCollider.sharedMesh = null;
             if (cm != null) Destroy(cm);
         }
+        // a build scrapped between stages 26 and 27 had made the collision mesh but not handed it over yet
+        if (collMesh != null) { Destroy(collMesh); collMesh = null; }
+        nLights = 0;   // the old points (and lamp props they follow) are gone
         built = false; busy = false; stage = 0;
     }
 
@@ -1458,6 +1461,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             int inC = IsBuilding(zoneA) ? cellA : cellB, outC = IsBuilding(zoneA) ? cellB : cellA;
             // the outside colour is what the generated wall shows on the outside face
             facade = Facade(horizontal, ex, ez, type, off, inC, outC, h, IsBuilding(zoneA) ? colB : colA);
+            if (facade) FacadeCollider(horizontal, ex, ez, type, off, h, IsBuilding(zoneA) ? 1f : -1f);
         }
         if (type == GenData.E_WALL)
         {
@@ -1517,6 +1521,32 @@ public class MapBuilderUdon : UdonSharpBehaviour
     }
 
     int capStyle;   // the scheme of the building whose wall Edge is drawing (CapColour's outside colour)
+
+    // The facade is solid out to its face (and the door frame's 3 cm past it), not only drawn. The generator already
+    // keeps outdoor things off that face (MapGenRooms.WallFace: 2 cm off it), but the collision stopped at the wall:
+    // a bench or a plant against a town house's outer wall left a 28 cm slot between its back and the wall, and a
+    // thin prop walking along the wall went into the facade and squeezed through behind it (bugfix 5). The doorway
+    // keeps its opening exactly as wide and as high as the wall's own (d0..d1, up to the door's head).
+    void FacadeCollider(bool horizontal, float ex, float ez, int type, int off, float h, float side)
+    {
+        float n0 = WALL_HALF, n1 = WALL_HALF + facadeDepth + 0.03f;
+        if (type == GenData.E_DOOR)
+        {
+            float d0 = off * INNER, d1 = (off + GenData.DOOR_CELLS) * INNER, dh = GenData.DOOR_HEIGHT_MM / 1000f;
+            FacadeBox(horizontal, ex, ez, 0f, d0, 0f, h, n0, n1, side);
+            FacadeBox(horizontal, ex, ez, d1, CELL, 0f, h, n0, n1, side);
+            FacadeBox(horizontal, ex, ez, d0, d1, dh, h, n0, n1, side);
+        }
+        else FacadeBox(horizontal, ex, ez, 0f, CELL, 0f, h, n0, n1, side);
+    }
+
+    void FacadeBox(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1, float n0, float n1, float side)
+    {
+        if (a1 - a0 < 0.001f || y1 - y0 < 0.001f) return;
+        float m0 = side > 0 ? n0 : -n1, m1 = side > 0 ? n1 : -n0;
+        if (horizontal) Collider(new Vector3(ex + a0, y0, ez + m0), new Vector3(ex + a1, y1, ez + m1));
+        else Collider(new Vector3(ex + m0, y0, ez + a0), new Vector3(ex + m1, y1, ez + a1));
+    }
 
     // more-places (revision 9): a garage bay's roller door on its wall to the forecourt, a barn's double doors on its
     // wall to the farmyard, drawn on the outside face 3 cm proud of it; the people's door is the plan's own beside it
@@ -2161,7 +2191,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             {
                 // review 10: the sphere read as a lumpy blob; a flat disc with bands suits the style
                 MeshFilter mf = moon.GetComponent<MeshFilter>();
-                if (mf != null) mf.sharedMesh = PlanetDisc();
+                // one disc for every space map (a new one each build was never freed with the moon)
+                if (planetMesh == null) planetMesh = PlanetDisc();
+                if (mf != null) mf.sharedMesh = planetMesh;
                 moon.transform.rotation = Quaternion.LookRotation(-dir, Vector3.up);
             }
             if (moon != null)
@@ -2246,6 +2278,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             PlaceSky(skyPrefabs[k % 2 == 0 ? SKY_HILL_A : SKY_HILL_B], p, Rand01(U32(k + 8401)) * 360f, 1.0f + Rand01(U32(k + 8501)) * 0.5f);
         }
     }
+
+    Mesh planetMesh;
 
     Mesh PlanetDisc()
     {
@@ -2856,7 +2890,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // ------------------------------------------------------------------ props
     void MakeProp(int e)
     {
-        GameObject prefab = propPrefabs[emitDef[e]];
+        // (baked prefabs older than the generator's defs: skip the prop rather than halt the build)
+        int pd = emitDef[e];
+        if (pd < 0 || pd >= propPrefabs.Length) return;
+        GameObject prefab = propPrefabs[pd];
         if (prefab == null) return;
         GameObject go = Instantiate(prefab);
         Transform t = go.transform;

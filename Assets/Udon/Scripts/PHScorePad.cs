@@ -24,6 +24,7 @@ public class PHScorePad : UdonSharpBehaviour
     public TextMeshProUGUI[] hunterName, hunterHits, hunterCatches, hunterWrong;
 
     int shownRound = -1;
+    float refillUntil, nextFill;
 
     void Start() { Empty(); }
 
@@ -42,7 +43,10 @@ public class PHScorePad : UdonSharpBehaviour
     void UpdateBody()
     {
         if (game == null) return;
-        if (game.phase == PHGame.PH_END && game.round != shownRound) { shownRound = game.round; Fill(); }
+        if (game.phase == PHGame.PH_END && game.round != shownRound) { shownRound = game.round; Fill(); refillUntil = Time.time + 3f; nextFill = Time.time + 1f; }
+        // the last catch or hit may reach us just after the round's end (other players send their own figures):
+        // filled again for a few seconds (not longer: a player leaving in the reveal would drop off the pad)
+        else if (game.phase == PHGame.PH_END && Time.time < refillUntil && Time.time >= nextFill) { nextFill = Time.time + 1f; Fill(); }
     }
 
     void Empty()

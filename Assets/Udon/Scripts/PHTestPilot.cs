@@ -24,6 +24,8 @@ public class PHTestPilot : UdonSharpBehaviour
 
     void Start()
     {
+        // unwired (left in a scene by hand): do nothing rather than halt every frame
+        if (game == null || local == null) { enabled = false; return; }
         zoneAt = Time.time + 6f;
         Log("start me=" + Networking.LocalPlayer.playerId + " master=" + Networking.IsMaster);
     }
@@ -68,7 +70,7 @@ public class PHTestPilot : UdonSharpBehaviour
     {
         VRCPlayerApi me = Networking.LocalPlayer;
         // one shot in four at a real prop near the release
-        if (Random.Range(0, 4) == 0 && game.builder.objects != null)
+        if (Random.Range(0, 4) == 0 && game.builder.objects != null && game.builder.objects.Length > 0)
         {
             GameObject[] objs = game.builder.objects;
             for (int k = 0; k < 20; k++)
@@ -86,7 +88,7 @@ public class PHTestPilot : UdonSharpBehaviour
             if (game.slotPlayer[i] == 0 || game.slotRole[i] != PHGame.ROLE_HIDER || s.caught || !s.hiding || s.def < 0) continue;
             // the middle of the prop as this client draws it
             Vector3 target = s.propPos + Vector3.up * 0.3f;
-            Transform proxy = s.proxyRoot.Find("Hider" + i);
+            Transform proxy = s.proxyRoot != null ? s.proxyRoot.Find("Hider" + i) : null;
             if (proxy != null)
             {
                 Renderer r = proxy.GetComponentInChildren<Renderer>();

@@ -145,10 +145,27 @@ public class PHHiderBody : UdonSharpBehaviour
     // ------------------------------------------------------------------ shape
     public void Begin(Vector3 at, float facing)
     {
-        pos = at; yaw = facing; stationYaw = facing; lag = Vector3.zero;
-        velY = 0f; grounded = false; lifting = false;
+        pos = at; home = at; yaw = facing; stationYaw = facing; lag = Vector3.zero;
+        velY = 0f; grounded = false; lifting = false; stuckFor = 0f; loose = false;
+        settleDue = true;
         active = true; ghost = false;
         turnHeld = false; wasTurning = false; keyDir = 0;
+    }
+
+    Vector3 home;   // where the round started (a fall out of the map comes back here)
+
+    // A spawn can hold the starting disguise partly inside something: an outdoor spawn cell against a building is
+    // 0.25 m from the wall line and the facade's collider reaches 0.28-0.43 m out. The first frame after Begin (the
+    // disguise is set by then, PHLocal.StartingDisguise) the prop alone is moved to the nearest place it fits, as
+    // it faces (never turned: no input asked for it) and within the lag's reach (Shift: the seat and the view stay
+    // where the player landed). Where nothing fits that near, it stays and Unstick frees it as it moves.
+    bool settleDue;
+    void Settle()
+    {
+        settleDue = false;
+        if (mask == 0 || Fits(pos, yaw)) return;
+        // (a short reach: a spawn overlaps a facade by a few tens of cm; a far move would part the prop from the view)
+        if (Nudge(yaw, Mathf.Min(Mathf.Max(fullHalf.x, fullHalf.z) + 0.3f, 0.8f))) home = pos;
     }
 
     public void End() { active = false; }
@@ -157,6 +174,7 @@ public class PHHiderBody : UdonSharpBehaviour
     public void SetProp(int def)
     {
         ghost = false;
+        lifting = false;   // (a lift planned for the old box could end the new one inside the ledge's edge)
         Vector3 size = new Vector3(game.gen.defSx[def], game.gen.defSy[def], game.gen.defSz[def]) / 1000f;
         SetBox(size);
         SetShape(def, size);
@@ -412,6 +430,7 @@ public class PHHiderBody : UdonSharpBehaviour
     void UpdateBody()
     {
         if (!active) return;
+        if (settleDue) Settle();
         VRCPlayerApi me = Networking.LocalPlayer;
         float dt = Mathf.Min(Time.deltaTime, 0.1f);
         bool vr = me.IsUserInVR();
@@ -628,6 +647,23 @@ public class PHHiderBody : UdonSharpBehaviour
     Vector3 firstNormal;   // of the first thing a Slide met
     bool firstArch;        // and whether that was the architecture (a wall, a jamb) and not a prop
 
+    // A walkable slope of the architecture (a stair's ramp) met on the ground is walked up, not stepped onto: the
+    // move goes on along the slope, as far across as it was going. Stepping could not do it for a long prop: its box
+    // stays level, so raised by a step and set down again it finds the ramp under its front edge only, and a low
+    // prop's step is smaller than what the ramp rises over the step's own slide (Cor: a long low prop facing up a
+    // stair could only back away). Only for the move on the ground (SlideMove with a step), not in the air.
+    bool slopeOK;
+
+    // a box meeting a step's edge can report a slanted normal: the surface just past the contact must itself slope
+    bool RampAt(Vector3 at, Vector3 dir)
+    {
+        Collider arch = game.builder.collisionCollider;
+        RaycastHit r;
+        Vector3 from = at + new Vector3(dir.x, 0f, dir.z).normalized * 0.05f + Vector3.up * 0.3f;
+        if (!arch.Raycast(new Ray(from, Vector3.down), out r, 0.6f)) return false;
+        return r.normal.y > 0.64f && r.normal.y < 0.98f;
+    }
+
     Vector3 Slide(Vector3 from, Vector3 delta)
     {
         Vector3 p = from, remaining = delta;
@@ -638,6 +674,19 @@ public class PHHiderBody : UdonSharpBehaviour
             if (dist < 1e-5f) break;
             Vector3 dir = remaining / dist;
             if (!SweepH(p, dir, dist)) { p += remaining; break; }
+            if (slopeOK && hit.normal.y > 0.64f && hit.normal.y < 0.98f && hit.collider == game.builder.collisionCollider && RampAt(hit.point, dir))
+            {
+                // up along the slope (not counted as meeting something: no step, no squeeze, no corner assist)
+                float slid = Mathf.Max(0f, hit.distance - GAP);
+                p += dir * slid;
+                Vector3 up = remaining - dir * slid;
+                Vector3 flat = new Vector3(up.x, 0f, up.z);
+                up -= hit.normal * Vector3.Dot(up, hit.normal);
+                float upFlat = Mathf.Sqrt(up.x * up.x + up.z * up.z);
+                if (upFlat < 1e-5f || Vector3.Dot(up, delta) <= 0f) break;
+                remaining = up * (flat.magnitude / upFlat);   // as far across as before: no slower up a ramp
+                continue;
+            }
             if (!hitSomething) { firstNormal = hit.normal; firstArch = hit.collider == game.builder.collisionCollider; }
             hitSomething = true;
             float travel = Mathf.Max(0f, hit.distance - GAP);
@@ -656,7 +705,9 @@ public class PHHiderBody : UdonSharpBehaviour
     void SlideMove(Vector3 delta, bool allowStep)
     {
         Vector3 start = pos;
+        slopeOK = allowStep;
         Vector3 a = Slide(start, delta);
+        slopeOK = false;
         bool hitA = hitSomething;
         blocked = hitA;
         if (hitA && allowStep && stepHeight > 0f)
@@ -692,8 +743,9 @@ public class PHHiderBody : UdonSharpBehaviour
         {
             liftT += dt / LEDGE_TIME;
             float t = Mathf.Clamp01(liftT);
-            Vector3 p = Vector3.Lerp(liftFrom, liftTo, t);
-            p.y = Mathf.Lerp(liftFrom.y, liftTo.y, Mathf.Clamp01(t * 1.6f));
+            // up first, then on over the lip (TryLedge checked both legs)
+            Vector3 p = Vector3.Lerp(liftFrom, liftTo, Mathf.Clamp01((t - 0.45f) / 0.55f));
+            p.y = t < 0.45f ? Mathf.Lerp(liftFrom.y, liftTo.y + 0.01f, t / 0.45f) : Mathf.Lerp(liftTo.y + 0.01f, liftTo.y, (t - 0.45f) / 0.55f);
             pos = p;
             if (t >= 1f) { lifting = false; grounded = true; velY = 0f; }
             return;
@@ -803,7 +855,10 @@ public class PHHiderBody : UdonSharpBehaviour
         if (velY > 0f)
         {
             float want = velY * dt;
-            float can = CeilingAbove(pos, want);
+            // The body's box is a SKIN shorter than the prop it shows (SetBox, SetShape: its top is size.y - SKIN), so
+            // a hop stopped by the body alone showed the prop's top SKIN - GAP (1.5 cm) into the ceiling. Up to a
+            // skin under it, then: the shown top stops GAP short.
+            float can = Mathf.Max(0f, CeilingAbove(pos, want + SKIN) - SKIN);
             pos.y += can;
             if (can < want - 1e-4f) velY = 0f;
             grounded = false;
@@ -811,22 +866,36 @@ public class PHHiderBody : UdonSharpBehaviour
         else
         {
             float fall = -velY * dt;
-            if (GroundBelow(pos, fall + (wasGrounded ? stepHeight : 0f) + 0.01f) && groundN.y > 0.64f) { pos.y = groundY; grounded = true; velY = 0f; }
+            // kept on the ground by a step, or walking down a ramp as steep as one can walk up (a low prop's step is
+            // less than a ramp falls under a step's walk, and it fell down the ramp in hops)
+            // (the longer reach counts only on a slope: off a flat edge it falls as before)
+            float keep = wasGrounded ? stepHeight : 0f;
+            float rampKeep = wasGrounded ? 1.2f * Mathf.Sqrt(delta.x * delta.x + delta.z * delta.z) : 0f;
+            if (GroundBelow(pos, fall + keep + 0.01f) && groundN.y > 0.64f) { pos.y = groundY; grounded = true; velY = 0f; }
+            else if (rampKeep > keep && GroundBelow(pos, fall + rampKeep + 0.01f) && groundN.y > 0.64f && groundN.y < 0.98f) { pos.y = groundY; grounded = true; velY = 0f; }
             else { pos.y -= fall; grounded = false; }
         }
         if (!grounded && blocked && ledge > 0f && delta.sqrMagnitude > 1e-10f) TryLedge(delta.normalized);
-        if (pos.y < -20f) { pos.y = 2f; velY = 0f; }
+        // fell out of the map: back where the round started (the same x and z could be off the map, and fall forever)
+        if (pos.y < -20f) { pos = home; velY = 0f; lag = Vector3.zero; narrow = false; half = fullHalf; }
     }
 
     void TryLedge(Vector3 forward)
     {
         float reach = Mathf.Clamp(Mathf.Max(half.x, half.z) * 1.3f + 0.06f, 0.12f, 0.6f);
         Vector3 top = pos + forward * reach + Vector3.up * ledge;
-        if (!Fits(top, yaw)) return;
+        if (!Fits(top, BoxYaw())) return;
         if (!GroundBelow(top, ledge) || groundN.y < 0.64f) return;
         float sy = groundY;
         if (sy <= pos.y + 0.02f) return;
-        if (!Fits(new Vector3(pos.x, sy + 0.01f, pos.z), yaw)) return;
+        // The lift goes straight up where it is, then on over the lip (Move): a straight line from here to there cut
+        // the prop's lower front through the ledge's edge for most of the lift. Both legs must be clear: up (nothing
+        // overhead) and on at the ledge's height (nothing between here and there, a post or the next wall's edge).
+        float rise = sy + 0.01f - pos.y;
+        if (CeilingAbove(pos, rise) < rise - 0.001f) return;
+        Vector3 over = new Vector3(pos.x, sy + 0.01f, pos.z);
+        Vector3 to = new Vector3(top.x, sy + 0.01f, top.z) - over;
+        if (to.sqrMagnitude > 1e-6f && SweepH(over, to.normalized, to.magnitude)) return;
         lifting = true; liftT = 0f;
         liftFrom = pos; liftTo = new Vector3(top.x, sy, top.z);
         velY = 0f;
@@ -835,8 +904,10 @@ public class PHHiderBody : UdonSharpBehaviour
     public bool TryYaw(float newYaw)
     {
         if (Mathf.Abs(Mathf.DeltaAngle(yaw, newYaw)) < 0.01f) return true;
-        if (Mathf.Abs(half.x - half.z) < 0.03f || Fits(pos, newYaw)) { yaw = newYaw; return true; }
-        for (float d = 3f; d <= 15f; d += 3f)
+        // (always asked, a square prop too: turned 15 or 45 degrees its corners reach further, into a wall it stood against)
+        if (Fits(pos, newYaw)) { yaw = newYaw; return true; }
+        // (short of a whole 15 degree step: at 15 one side is the facing it already has, and the nudge was never reached)
+        for (float d = 3f; d < 14.9f; d += 3f)
         {
             if (Fits(pos, newYaw + d)) { yaw = newYaw + d; return true; }
             if (Fits(pos, newYaw - d)) { yaw = newYaw - d; return true; }
@@ -975,6 +1046,7 @@ public class PHHiderBody : UdonSharpBehaviour
         if (Fits(pos, yaw) || Nudge(yaw, Mathf.Max(fullHalf.x, fullHalf.z) + 0.6f) || !canSqueeze) return;
         Vector3 dir = delta; dir.y = 0f;
         dir.Normalize();
+        if (dir.sqrMagnitude < 0.5f) return;   // (a push too slight to have a way: Normalize gives zero)
         SqueezeBox(dir);
         if (BlockedOn(pos, dir, 0.3f)) { half = fullHalf; return; }
         narrow = true; loose = true; narrowSince = Time.time;

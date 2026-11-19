@@ -41,6 +41,10 @@ Shader "PropHunt/Cage"
         float side : TEXCOORD1;
         UNITY_VERTEX_OUTPUT_STEREO
     };
+    // How small the prop is, 0 to 1, read off the fade MapBuilderUdon.Cage sets by its size: _FadeFar 0.8 m (a prop of
+    // 1.5 m and more; also the material's own value) gives 0, which leaves its cage exactly as it was; 0.65 m or less
+    // (a chair, or smaller) gives 1.
+    float Small() { return saturate((0.8 - _FadeFar) / 0.15); }
     float Bayer(float2 px)
     {
         static const float b[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
@@ -69,7 +73,8 @@ Shader "PropHunt/Cage"
         float2 d = sb - sa;
         d = dot(d, d) > 1e-6 ? normalize(d) : float2(1.0, 0.0);
         float2 n = float2(-d.y, d.x);
-        float hw = 0.5 * _WidthPx * _ScreenParams.y / 720.0;   // the eye's own height in pixels (per eye in VR)
+        // the eye's own height in pixels (per eye in VR); a small prop's lines a little wider (Small)
+        float hw = 0.5 * _WidthPx * (1.0 + 0.35 * Small()) * _ScreenParams.y / 720.0;
         float2 off = (n * i.other.w - d) * hw;                    // sideways, and half a width past the end (closed corners)
         ca.xy += off * 2.0 / _ScreenParams.xy * ca.w;          // pixels to clip space
         o.pos = ca;
@@ -77,10 +82,15 @@ Shader "PropHunt/Cage"
         o.side = i.other.w;
         return o;
     }
-    // the share of pixels kept here: fewer near the eye
+    // the share of pixels kept here: fewer near the eye. On a small prop the eye (at 0.9 of its height) is within a
+    // few tens of centimetres of every edge, so by distance alone most of a chair's cage was dithered down to a third
+    // (Cor: faint and thin). What lies well below the eye is looked down at, not across the view, so on a small prop
+    // a point's drop under the eye counts as distance too: the seat and legs stand at full strength, while what is
+    // level with the eye (the top of a chair's back) still fades away.
     float Keep(v2f i, float share)
     {
         float dist = distance(i.world, _WorldSpaceCameraPos);
+        dist += Small() * max(0.0, _WorldSpaceCameraPos.y - i.world.y);
         return share * saturate((dist - _FadeNear) / max(1e-3, _FadeFar - _FadeNear));
     }
     fixed4 Shade(v2f i) { return abs(i.side) > 1.0 - _RimShare ? _Rim : _Core; }

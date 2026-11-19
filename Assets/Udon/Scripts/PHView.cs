@@ -217,7 +217,12 @@ public class PHView : UdonSharpBehaviour
         {
             if (vrHealthBar.activeSelf != hider) vrHealthBar.SetActive(hider);
             if (hider) vrHealth.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
-            if (vrPanel.gameObject.activeSelf != hider) vrPanel.gameObject.SetActive(hider);
+            if (vrPanel.gameObject.activeSelf != hider)
+            {
+                // still in the hand when the hiding ends (caught, round over): let go first, so the hand is not left holding a hidden pickup
+                if (!hider && vrPanelPickup != null && vrPanelPickup.IsHeld) vrPanelPickup.Drop();
+                vrPanel.gameObject.SetActive(hider);
+            }
             if (devicesOn != hider) ShowDevices(hider);
             UpdateMini(s, hider);
         }
@@ -417,9 +422,11 @@ public class PHView : UdonSharpBehaviour
         if (!on)
         {
             cutAmt = 0f; cutWant = false; cutRay = CUT_RAYS; cutNext = 0f; cutHidden = 0f;
+            fenceDirty = true;   // the map may change before the next hiding
             if (cutOn) { VRCShader.SetGlobalVector(cutId, Vector4.zero); cutOn = false; }
             return;
         }
+        if (fenceDirty) LearnFences();
         UpdateHidden(s);
         cutAmt = Mathf.MoveTowards(cutAmt, cutWant ? 1f : 0f, Time.deltaTime / CUT_EASE);
         if (cutAmt <= 0f)
@@ -498,9 +505,94 @@ public class PHView : UdonSharpBehaviour
         float len = dist - CUT_SHORT;
         if (len <= 0.05f) return false;
         d = d / dist;
+        if (BlockedRay(cam, d, len)) return true;
+        return BlockedRay(cam + d * len, -d, len);
+    }
+
+    // one way of Blocked. A fence does not hide (Cor: a low prop behind a fence opened the hole): the fence is pickets
+    // (or a space base's rails) that the camera sees through, and its collider is a solid box (6 m high at the map's
+    // edge and round the release pen, over a fence drawn 1.1 m high), so a hit on a fence's stretch of the map's
+    // collision mesh goes on past it. A ray that starts inside the box leaves it without a hit (a mesh collider's
+    // faces stop only rays from outside), so a step of a few centimetres past the hit is enough.
+    bool BlockedRay(Vector3 from, Vector3 d, float len)
+    {
         RaycastHit hit;
-        if (Physics.Raycast(cam, d, out hit, len, cutMask, QueryTriggerInteraction.Ignore)) return true;
-        return Physics.Raycast(cam + d * len, -d, out hit, len, cutMask, QueryTriggerInteraction.Ignore);
+        for (int k = 0; k < 4; k++)
+        {
+            if (!Physics.Raycast(from, d, out hit, len, cutMask, QueryTriggerInteraction.Ignore)) return false;
+            if (fenceArch == null || hit.collider != fenceArch || !OnFence(hit.point, hit.normal)) return true;
+            float step = hit.distance + 0.02f;
+            from += d * step;
+            len -= step;
+            if (len <= 0.05f) return false;
+        }
+        return true;
+    }
+
+    // The fences' stretches of the map's grid, learnt from the builder's fence objects when a hiding begins. A fence
+    // along x stands at (ex + CELL/2, 0, ez) unturned, one along z at (ex, 0, ez + CELL/2) turned 90 degrees
+    // (MapBuilderUdon.Fence); a stretch is keyed by its edge: along x (floor(x / CELL), round(z / CELL)), along z
+    // (round(x / CELL), floor(z / CELL)).
+    const float FENCE_CELL = 4f;      // MapBuilderUdon.CELL
+    const float FENCE_NEAR = 0.14f;   // how far off its edge's line a hit on a fence's collider lies at most (it is 0.16 m thick)
+    bool fenceDirty = true;
+    bool[] fenceX, fenceZ;            // [i + j * fenceNx], i, j from fenceI0, fenceJ0
+    int fenceI0, fenceJ0, fenceNx, fenceNz;
+    Collider fenceArch;
+
+    void LearnFences()
+    {
+        fenceDirty = false;
+        fenceX = null; fenceZ = null; fenceArch = null;
+        MapBuilderUdon b = game.builder;
+        if (b == null || b.fenceRoot == null || b.collisionCollider == null) return;
+        Transform root = b.fenceRoot;
+        int n = root.childCount;
+        if (n == 0) return;
+        int i0 = 1 << 20, j0 = 1 << 20, i1 = -(1 << 20), j1 = -(1 << 20);
+        for (int k = 0; k < n; k++)
+        {
+            Vector3 p = root.GetChild(k).position;
+            int i = Mathf.FloorToInt(p.x / FENCE_CELL), j = Mathf.FloorToInt(p.z / FENCE_CELL);
+            i0 = Mathf.Min(i0, i); j0 = Mathf.Min(j0, j); i1 = Mathf.Max(i1, i + 1); j1 = Mathf.Max(j1, j + 1);
+        }
+        fenceI0 = i0; fenceJ0 = j0; fenceNx = i1 - i0 + 1; fenceNz = j1 - j0 + 1;
+        fenceX = new bool[fenceNx * fenceNz];
+        fenceZ = new bool[fenceNx * fenceNz];
+        for (int k = 0; k < n; k++)
+        {
+            Transform t = root.GetChild(k);
+            Vector3 p = t.position;
+            bool alongX = Mathf.Abs(Vector3.Dot(t.right, Vector3.right)) > 0.7f;
+            if (alongX) SetFence(fenceX, Mathf.FloorToInt(p.x / FENCE_CELL), Mathf.RoundToInt(p.z / FENCE_CELL));
+            else SetFence(fenceZ, Mathf.RoundToInt(p.x / FENCE_CELL), Mathf.FloorToInt(p.z / FENCE_CELL));
+        }
+        fenceArch = b.collisionCollider;
+    }
+
+    void SetFence(bool[] a, int i, int j)
+    {
+        i -= fenceI0; j -= fenceJ0;
+        if (i < 0 || j < 0 || i >= fenceNx || j >= fenceNz) return;
+        a[i + j * fenceNx] = true;
+    }
+
+    bool HasFence(bool[] a, int i, int j)
+    {
+        i -= fenceI0; j -= fenceJ0;
+        if (i < 0 || j < 0 || i >= fenceNx || j >= fenceNz) return false;
+        return a[i + j * fenceNx];
+    }
+
+    // whether a point of the collision mesh lies on a fence's stretch (not a building's wall, a hedge or a low wall)
+    // (only a fence's own face: a wall's end or the ground next to a fence line still hides)
+    bool OnFence(Vector3 p, Vector3 n)
+    {
+        if (fenceX == null || Mathf.Abs(n.y) > 0.5f) return false;
+        float gz = Mathf.Round(p.z / FENCE_CELL), gx = Mathf.Round(p.x / FENCE_CELL);
+        if (Mathf.Abs(p.z - gz * FENCE_CELL) <= FENCE_NEAR && Mathf.Abs(n.z) > 0.9f && HasFence(fenceX, Mathf.FloorToInt(p.x / FENCE_CELL), Mathf.RoundToInt(gz))) return true;
+        if (Mathf.Abs(p.x - gx * FENCE_CELL) <= FENCE_NEAR && Mathf.Abs(n.x) > 0.9f && HasFence(fenceZ, Mathf.RoundToInt(gx), Mathf.FloorToInt(p.z / FENCE_CELL))) return true;
+        return false;
     }
 
     public override void PostLateUpdate()
@@ -563,6 +655,7 @@ public class PHView : UdonSharpBehaviour
         }
         if (!vr)
         {
+            if (desktopRoot == null) return;
             // The canvas fills the screen, 900 units high whatever the field of view and as wide as the screen is,
             // so what is anchored to a corner sits in the screen's corner (Cor: the controls ran into VRChat's own).
             // Placed from the screen's own camera (the head's tracking data where there is none); its size and its

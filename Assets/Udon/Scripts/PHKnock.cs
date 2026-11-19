@@ -132,11 +132,36 @@ public class PHKnock : UdonSharpBehaviour
 
     GameObject restPut;   // the prop last put at its resting pose (UpdateBody); a new sync puts it again
 
+    // The hunter running a knock left while it flew: the new owner has no rigidbody for it, so 'moving' would stay
+    // set for good (the knock Busy all round, never reused; everyone easing the prop toward a pose that never comes).
+    // The new owner settles it where it shows it now and sends that. The old owner, if still here, stops its physics.
+    public override void OnOwnershipTransferred(VRCPlayerApi player)
+    {
+        // (a prop still in the air is taken over and lands here: settled where it shows, it would hang in mid-air)
+        restPut = null;
+        if (!Networking.IsOwner(gameObject)) { Release(); return; }
+        if (body != null || !moving) return;
+        GameObject go = (emit >= 0 && game != null && game.builder.objects != null && emit < game.builder.objects.Length) ? game.builder.objects[emit] : null;
+        if (go == null || round != game.round) { moving = false; RequestSerialization(); return; }
+        body = go.GetComponent<Rigidbody>();
+        if (body != null)
+        {
+            body.isKinematic = false;
+            knockedAt = Time.time;   // the normal settle path ends it and sends the pose it rests in
+            nextSend = Time.time;
+            return;
+        }
+        moving = false;
+        Capture();
+        RequestSerialization();
+    }
+
     public override void OnDeserialization()
     {
         restPut = null;
         // a knock that has just started: everyone hears it
-        if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0) KnockSound(pos);
+        // (only on a built map: a late joiner still generating has no prop table yet, and a bad index halts this script)
+        if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0 && game.MapReady && emit < game.gen.emitDef.Length) KnockSound(pos);
         wasMoving = moving; heardEmit = emit;
         // a knock of another prop took this one over: the old prop stays where it lay
         shownEmit = emit;
