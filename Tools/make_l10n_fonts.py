@@ -13,7 +13,7 @@ strings keep working without running this again (unless they use rare characters
 
 Usage: python -I Tools/make_l10n_fonts.py <folder with NotoSansJP.ttf, NotoSansKR.ttf, NotoSansSC.ttf,
 NotoSansTC.ttf, Rubik.ttf, NotoSans.ttf (the [wght] files from github.com/google/fonts/tree/main/ofl)>
-Writes Assets/Lobby/Fonts/L10n/<name>-Bold.ttf. "PropHunt/Bake text table" makes the SDF atlases from them.
+Writes Assets/Lobby/Fonts/L10n/<name>-Bold-<hash>.ttf (and its .chars.txt). "PropHunt/Bake text table" makes the SDF atlases from them.
 """
 import glob, os, sys
 from fontTools.ttLib import TTFont
@@ -80,11 +80,18 @@ def main(src):
         sub = subset.Subsetter(opt)
         sub.populate(unicodes=keep)
         sub.subset(f)
-        path = os.path.join(OUT, name + "-Bold.ttf")
+        # the file name carries a hash of the contents: Unity's font engine caches a face per font asset and can keep
+        # serving an old one after the file changes, so a changed font is a new asset
+        import hashlib, io
+        buf = io.BytesIO(); f.save(buf)
+        tag = hashlib.sha1(buf.getvalue()).hexdigest()[:8]
+        for old in glob.glob(os.path.join(OUT, name + "-Bold*")):
+            os.remove(old)
+        path = os.path.join(OUT, name + "-Bold-" + tag + ".ttf")
         f.save(path)
         print(name, len(keep), "chars", os.path.getsize(path) // 1024, "KB")
         # the characters it holds, for TextBaker (Unity's Font.HasCharacter cannot tell for a dynamic font)
-        open(os.path.join(OUT, name + "-Bold.chars.txt"), "w", encoding="utf-8").write("".join(chr(c) for c in keep if c < 0x10000))
+        open(os.path.join(OUT, name + "-Bold-" + tag + ".chars.txt"), "w", encoding="utf-8").write("".join(chr(c) for c in keep if c < 0x10000))
     for ttf, out in (("Assets/Resources/PropHunt/Fonts/KenneyFuture.ttf", "KenneyFuture.chars.txt"), ("Assets/Lobby/Fonts/KenneyRocket.ttf", "KenneyRocket.chars.txt")):
         cm = TTFont(os.path.join(ROOT, ttf)).getBestCmap()
         open(os.path.join(OUT, out), "w", encoding="utf-8").write("".join(chr(c) for c in sorted(cm) if 0x20 <= c < 0x10000))

@@ -222,8 +222,8 @@ public static class TextBaker
         foreach (var row in rows)
             for (int l = 0; l < row.Length; l++)
                 foreach (char c in row[l]) all.Add(c);
-        var fontFile = FontOrder.ToDictionary(f => f, f => AssetDatabase.LoadAssetAtPath<Font>(FontDir + f + "-Bold.ttf"));
-        var cover = FontOrder.ToDictionary(f => f, f => Cmap(FontDir + f + "-Bold.ttf"));
+        var fontFile = FontOrder.ToDictionary(f => f, f => AssetDatabase.LoadAssetAtPath<Font>(Ttf(f)));
+        var cover = FontOrder.ToDictionary(f => f, f => Cmap(Ttf(f)));
         var kenneyCover = Cmap(FutureTtf);
         var assigned = new HashSet<char>();
         foreach (char c in all)
@@ -256,8 +256,8 @@ public static class TextBaker
             for (int retry = 0; retry < 3 && fa != null && fa.characterTable.Count == 0; retry++)
             {
                 Debug.LogWarning("[prophunt] text: " + f + " gave an empty atlas, reimporting its TTF and trying again");
-                AssetDatabase.ImportAsset(FontDir + f + "-Bold.ttf", ImportAssetOptions.ForceUpdate);
-                var font = AssetDatabase.LoadAssetAtPath<Font>(FontDir + f + "-Bold.ttf");
+                AssetDatabase.ImportAsset(Ttf(f), ImportAssetOptions.ForceUpdate);
+                var font = AssetDatabase.LoadAssetAtPath<Font>(Ttf(f));
                 UnityEngine.TextCore.LowLevel.FontEngine.LoadFontFace(font, 56);
                 fa = Atlas(font, FontDir + f + " SDF.asset", new string(perFont[f].ToArray()));
             }
@@ -274,6 +274,13 @@ public static class TextBaker
         Debug.Log("[prophunt] text fonts: " + string.Join(", ", FontOrder.Select(f => f + " " + perFont[f].Count)) + ", Latin extras " + latin.Count);
     }
 
+    // Fonts/L10n/<name>-Bold-<hash>.ttf (Tools/make_l10n_fonts.py names each cut by its contents)
+    static string Ttf(string name)
+    {
+        var hit = Directory.Exists(FontDir) ? Directory.GetFiles(FontDir, name + "-Bold*.ttf") : new string[0];
+        return hit.Length > 0 ? hit[0].Replace(System.IO.Path.DirectorySeparatorChar, '/') : FontDir + name + "-Bold.ttf";
+    }
+
     static void SetFallbacks(TMP_FontAsset fa, TMP_FontAsset first, List<TMP_FontAsset> chain)
     {
         if (fa == null) return;
@@ -288,13 +295,12 @@ public static class TextBaker
     static TMP_FontAsset Atlas(Font font, string path, string chars)
     {
         TMP_FontAsset fa = null;
-        foreach (int size in new[] { 512, 1024, 2048, 4096 })
-        {
-            fa = TMP_FontAsset.CreateFontAsset(font, 56, 7, GlyphRenderMode.SDFAA, size, size, AtlasPopulationMode.Dynamic, false);
-            if (fa.TryAddCharacters(chars, out string missing)) break;
-            if (size == 4096) Debug.LogWarning("[prophunt] text: " + Path.GetFileName(path) + " could not fit: " + missing);
-            else Object.DestroyImmediate(fa);
-        }
+        // one atlas of the right size (cells of about 70 px), made once: building and destroying trial atlases left
+        // Unity's font engine handing later fonts an empty face
+        int n = chars.Length, size = n <= 45 ? 512 : (n <= 190 ? 1024 : (n <= 780 ? 2048 : 4096));
+        UnityEngine.TextCore.LowLevel.FontEngine.LoadFontFace(font, 56);
+        fa = TMP_FontAsset.CreateFontAsset(font, 56, 7, GlyphRenderMode.SDFAA, size, size, AtlasPopulationMode.Dynamic, false);
+        if (!fa.TryAddCharacters(chars, out string missing)) Debug.LogWarning("[prophunt] text: " + Path.GetFileName(path) + " is missing: " + missing);
         fa.atlasPopulationMode = AtlasPopulationMode.Static;
         string name = Path.GetFileNameWithoutExtension(path);
         // a fresh asset every bake (the fallback lists are set again right after)
