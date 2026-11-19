@@ -1896,7 +1896,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         Mesh m = cageMeshes != null && def >= 0 && def < cageMeshes.Length ? cageMeshes[def] : null;
         if (m == null) { Uncage(null); return; }
         cageFilter.sharedMesh = m;
-        if (cageBlock == null) cageBlock = new MaterialPropertyBlock();
+        if (cageBlock == null) { cageBlock = new MaterialPropertyBlock(); SetCageColours(); }
         float h = 2f * half.y;
         float t = Mathf.Clamp01((2f * Mathf.Max(half.x, Mathf.Max(half.y, half.z)) - 0.3f) / 1.2f);
         float eye = h > 2.5f ? 1.6f : Mathf.Clamp(Mathf.Round(0.9f * h / 0.05f) * 0.05f, 0.25f, 2.0f);   // as PHLocal.SetEye
@@ -1909,6 +1909,23 @@ public class MapBuilderUdon : UdonSharpBehaviour
         ct.SetParent(go.transform, false);
         ct.localPosition = Vector3.zero; ct.localRotation = Quaternion.identity; ct.localScale = Vector3.one;
         cage.SetActive(true);
+    }
+
+    // the cage in the grab's amber while the hider turns the prop (Cor: "outline and the wireframe change colour"),
+    // the outline's teal otherwise; kept in the cage's property block, so a cage lent later has it too
+    bool cageTurning;
+    public void CageTint(bool turning)
+    {
+        cageTurning = turning;
+        if (cageBlock == null || cageRenderer == null) return;
+        SetCageColours();
+        cageRenderer.SetPropertyBlock(cageBlock);
+    }
+
+    void SetCageColours()
+    {
+        cageBlock.SetColor("_Core", cageTurning ? new Color(1.00f, 0.72f, 0.20f) : new Color(0.30f, 0.95f, 0.85f));
+        cageBlock.SetColor("_Rim", cageTurning ? new Color(0.32f, 0.20f, 0.03f) : new Color(0.02f, 0.30f, 0.27f));
     }
 
     // takes the cage back from go (from anywhere when go is null)

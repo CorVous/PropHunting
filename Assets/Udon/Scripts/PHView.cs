@@ -135,8 +135,10 @@ public class PHView : UdonSharpBehaviour
     // the outline in the grab's colour while the prop is held for turning
     void TintOutline(bool turning)
     {
-        if (turning == outlineTurning || outlineRenderers == null || outlineTurnMat == null || outlineMat == null) return;
+        if (turning == outlineTurning) return;
         outlineTurning = turning;
+        game.builder.CageTint(turning);   // the first-person wireframe too (Cor)
+        if (outlineRenderers == null || outlineTurnMat == null || outlineMat == null) return;
         Material m = turning ? outlineTurnMat : outlineMat;
         for (int i = 0; i < outlineRenderers.Length; i++) if (outlineRenderers[i] != null) outlineRenderers[i].sharedMaterial = m;
     }
