@@ -55,6 +55,12 @@ public class PHSlot : UdonSharpBehaviour
     Vector3 shownPos;
     float shownYaw;
     bool dirty;
+    GameObject placedProxy;    // the prop, place and facing UpdateProxy put last (not put again while they hold)
+    Vector3 placedPos;
+    float placedYaw;
+    bool gapMeasured;          // the last look's place and facing (Squash: not measured again until it moves)
+    Vector3 gapPos;
+    float gapYaw;
 
     public bool IsMine { get { return Networking.IsOwner(gameObject) && game.SlotOf(Networking.LocalPlayer.playerId) == index; } }
 
@@ -196,6 +202,7 @@ public class PHSlot : UdonSharpBehaviour
 
     void UpdateOwner()
     {
+        remoteSet = false; parked = false;   // (UpdateRemote sets them up again if this slot goes back to someone else)
         VRCPlayerApi me = Networking.LocalPlayer;
         bool z = game.InLobbyZone(me.GetPosition());
         if (z != inZone) { inZone = z; Send(); }
@@ -224,12 +231,15 @@ public class PHSlot : UdonSharpBehaviour
         }
     }
 
+    // Perf: the mobility and the parking were set every frame for every slot; nothing else moves a remote slot's
+    // station on this client, so each is set once until the owner's path (UpdateOwner) or a ghost's walk moves it
+    bool remoteSet, parked;
+
     void UpdateRemote()
     {
         // everyone else's copy of a hiding player's station is parked out of sight
-        station.PlayerMobility = VRCStation.Mobility.Immobilize;
-        Vector3 park = parkAt + new Vector3(index * 3f, 0f, 0f);
-        if (hiding) station.transform.SetPositionAndRotation(park, Quaternion.identity);
+        if (!remoteSet) { station.PlayerMobility = VRCStation.Mobility.Immobilize; remoteSet = true; }
+        if (hiding) Park();
         else if (ghost)
         {
             // ghosts see ghosts; nobody else does (Cor: the dead see only the dead and the hunters)
@@ -239,9 +249,17 @@ public class PHSlot : UdonSharpBehaviour
                 if ((at - walkPos).sqrMagnitude > 25f) at = walkPos;
                 float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
                 station.transform.SetPositionAndRotation(Vector3.Lerp(at, walkPos, k), Quaternion.Euler(0f, walkYaw, 0f));
+                parked = false;
             }
-            else station.transform.SetPositionAndRotation(park, Quaternion.identity);
+            else Park();
         }
+    }
+
+    void Park()
+    {
+        if (parked) return;
+        parked = true;
+        station.transform.SetPositionAndRotation(parkAt + new Vector3(index * 3f, 0f, 0f), Quaternion.identity);
     }
 
     // ------------------------------------------------------------------ the prop
@@ -304,14 +322,20 @@ public class PHSlot : UdonSharpBehaviour
         if ((propPos - shownPos).sqrMagnitude > 25f) k = 1f;
         shownPos = Vector3.Lerp(shownPos, propPos, k);
         shownYaw = Mathf.LerpAngle(shownYaw, propYaw, k);
-        if (squashRig != null)
+        // Perf: the ease never quite arrives, so a still prop was moved every frame (its colliders with it). Within a
+        // millimetre and a tenth of a degree it arrives, and a prop where it was put last frame is not put again.
+        if ((propPos - shownPos).sqrMagnitude < 1e-6f) shownPos = propPos;
+        if (Mathf.Abs(Mathf.DeltaAngle(shownYaw, propYaw)) < 0.1f) shownYaw = propYaw;
+        bool still = placedProxy == proxy && shownPos == placedPos && shownYaw == placedYaw;
+        placedProxy = proxy; placedPos = shownPos; placedYaw = shownYaw;
+        if (!still && squashRig != null)
         {
             // the rig at the prop's place, the prop turned inside it (local: the rig may be squashed)
             squashRig.position = shownPos;
             proxy.transform.localPosition = Vector3.zero;
             proxy.transform.localRotation = Quaternion.Euler(0f, shownYaw, 0f);
         }
-        else proxy.transform.SetPositionAndRotation(shownPos, Quaternion.Euler(0f, shownYaw, 0f));
+        else if (!still) proxy.transform.SetPositionAndRotation(shownPos, Quaternion.Euler(0f, shownYaw, 0f));
         if (proxyShade != null && Time.time >= shadeNext) { shadeNext = Time.time + 0.15f; ShadeCheck(); }
         Squash();
     }
@@ -330,9 +354,6 @@ public class PHSlot : UdonSharpBehaviour
     Vector3 proxyScale = Vector3.one, proxyHalf;
     float squashX = 1f, squashZ = 1f, squashVX, squashVZ, wantX = 1f, wantZ = 1f, squashNext;
     float squashY = 1f, squashVY, wantY = 1f;
-    bool gapMeasured;          // the last look's place and facing (Squash: not measured again until it moves)
-    Vector3 gapPos;
-    float gapYaw;
 
     // A hop's stretch and squash (Cor: "a bouncy stretch and squash for jumping"), the cartoon way: a quick dip as it
     // leaves the ground (the hop itself is not held back, the dip is only seen), tall and thin while it rises fast, near its own shape at
