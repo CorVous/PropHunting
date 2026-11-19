@@ -15,13 +15,17 @@ using VRC.Udon.Common;
 //           draws). Desktop: a picture in the lower right corner. VR: a floating device (a screen in a casing)
 //           beside the player that can be grabbed and put where it suits; it keeps that place in the room.
 //   a VR hider's devices (Cor), seen by nobody else and sized with the avatar:
-//           right hand: the selector, with a beam to what the trigger would pick
-//           left hand:  the turner (its trigger hands the right stick to the prop), and above it a small copy of
-//                       the prop, standing as the prop stands in the world
+//           right hand: the selector, with a beam to what a tap of the trigger would pick; a held trigger grabs
+//                       the prop and turns it (PHLocal, PHHiderBody). Shown from the landing, before the first prop.
+//           the screen device appears on the left of the view (Cor; the selector is in the right hand)
 //           on the screen device's casing: the taunt button, pushed with a hand; never by grabbing
+//           (no left-hand device any more, Cor)
+//           the grab ring (Cor's experiment): a thin ring round the seat at hip height, a little out from the avatar;
+//                       a grip on it holds the prop, and moving that hand round the ring turns the prop
 //   desktop: the controls, in the lower left corner; after a while only the two that are easy to forget
 //   the own prop's outline (Cor), desktop and VR: the hider does not see their own prop in first person, so its
-//           footprint lies on the ground under it as a thin rectangle, with a nub on the front; seen only by the hider
+//           footprint lies on the ground under it as a thin rectangle, with a nub on the front; seen only by the hider.
+//           It changes colour while the prop is grabbed for turning (Cor)
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHView : UdonSharpBehaviour
 {
@@ -43,10 +47,6 @@ public class PHView : UdonSharpBehaviour
     public Transform beam;
     public MeshRenderer beamRenderer;
     public Material beamIdle, beamHit;
-    public Transform dial;             // left hand
-    public Transform pad;              // floats above it, level; the small prop stands on it
-    public MeshRenderer padRenderer;
-    public Material padIdle, padLit;
     public Transform casing;           // the screen device's body, drawn around the panel
     public Transform tauntButton, tauntCap;
     public MeshRenderer tauntCapRenderer;
@@ -59,6 +59,15 @@ public class PHView : UdonSharpBehaviour
     const float LEGEND_H = 120f / 1342f;   // a VRChat panel's height against the screen's
     public Transform outline;          // the own prop's footprint on the ground
     public Transform[] outlineParts;   // short pieces of the edges, and the nub on the front (the last)
+    public Material outlineTurnMat;    // the outline while the prop is grabbed for turning (Cor)
+    Material outlineMat;               // ...and otherwise (the pieces' own, as built)
+    public Transform grabRing;         // unit radius, flat; scaled to RING_R and put round the seat while hiding (VR)
+    public Material ringIdle, ringHeld;
+    MeshRenderer[] ringRenderers;
+    bool ringIsHeld;
+    const float RING_R = 0.42f, RING_REACH = 0.13f, RING_Y = 0.55f;   // radius, how near the ring a grip takes it (both x avatar size), height x eye height
+    MeshRenderer[] outlineRenderers;
+    bool outlineTurning;
 
     // the taunt button, in the casing's own metres (z towards the back of the device): where it sits, and its press
     readonly Vector3 BUTTON_AT = new Vector3(-0.12f, -0.175f, -0.010f);
@@ -69,11 +78,7 @@ public class PHView : UdonSharpBehaviour
     float[] armedUntil = new float[2];
     bool[] latched = new bool[2];
     float panelDropAt = -99f;
-    bool hiderNow, devicesOn, padIsLit, capIsReady = true, beamIsHit;
-    GameObject mini;
-    int miniDef = -2;
-    float miniFit = 1f;
-    Vector3 miniBase = Vector3.one;
+    bool hiderNow, devicesOn, gunOn, capIsReady = true, beamIsHit;
     int legendMode = -1;
     const float HUD_DIST = 0.5f;   // metres from the screen's camera to the desktop canvas
     bool hudLogged;
@@ -114,17 +119,42 @@ public class PHView : UdonSharpBehaviour
         devicesOn = false;
         if (legend != null) legend.gameObject.SetActive(false);
         if (outline != null) outline.gameObject.SetActive(false);
+        if (grabRing != null)
+        {
+            ringRenderers = grabRing.GetComponentsInChildren<MeshRenderer>(true);
+            grabRing.gameObject.SetActive(false);
+        }
+        if (outlineParts != null)
+        {
+            outlineRenderers = new MeshRenderer[outlineParts.Length];
+            for (int i = 0; i < outlineParts.Length; i++) if (outlineParts[i] != null) outlineRenderers[i] = outlineParts[i].GetComponent<MeshRenderer>();
+            if (outlineRenderers.Length > 0 && outlineRenderers[0] != null) outlineMat = outlineRenderers[0].sharedMaterial;
+        }
+    }
+
+    // the outline in the grab's colour while the prop is held for turning
+    void TintOutline(bool turning)
+    {
+        if (turning == outlineTurning || outlineRenderers == null || outlineTurnMat == null || outlineMat == null) return;
+        outlineTurning = turning;
+        Material m = turning ? outlineTurnMat : outlineMat;
+        for (int i = 0; i < outlineRenderers.Length; i++) if (outlineRenderers[i] != null) outlineRenderers[i].sharedMaterial = m;
     }
 
     void ShowDevices(bool on)
     {
         devicesOn = on;
         if (gun == null) return;
-        gun.gameObject.SetActive(on);
-        dial.gameObject.SetActive(on);
-        pad.gameObject.SetActive(on);
         casing.gameObject.SetActive(on);
         tauntButton.gameObject.SetActive(on);
+    }
+
+    // the selector: while hiding, and before the first prop while there is one to pick (Cor: hiders land as themselves)
+    void ShowGun(bool on)
+    {
+        gunOn = on;
+        if (gun == null) return;
+        gun.gameObject.SetActive(on);
         if (!on) beam.gameObject.SetActive(false);
     }
 
@@ -134,32 +164,22 @@ public class PHView : UdonSharpBehaviour
         int h = args.handType == HandType.LEFT ? 0 : 1;
         gripHeld[h] = value;
         if (!value) gripUpAt[h] = Time.time;
-    }
-
-    // the small copy of the hider's prop that stands on the pad over the left hand
-    void UpdateMini(PHSlot s, bool hider)
-    {
-        int want = hider ? s.def : -1;
-        if (want == miniDef) return;
-        miniDef = want;
-        if (mini != null) Destroy(mini);
-        mini = null;
-        GameObject[] prefabs = game.builder.propPrefabs;
-        if (want < 0 || prefabs == null || want >= prefabs.Length || prefabs[want] == null) return;
-        mini = Instantiate(prefabs[want]);
-        game.builder.TintProp(mini, want);
-        mini.name = "MiniProp";
-        Collider[] cols = mini.GetComponentsInChildren<Collider>(true);
-        for (int i = 0; i < cols.Length; i++) cols[i].enabled = false;
-        Transform[] parts = mini.GetComponentsInChildren<Transform>(true);
-        for (int i = 0; i < parts.Length; i++)
+        // the grab ring: a grip near it holds the prop, let go lets go
+        PHHiderBody b = local.body;
+        if (!value) { if (b.ringHand == h) b.ringHand = -1; return; }
+        if (vr && hiderNow && grabRing != null && grabRing.gameObject.activeSelf && b.ringHand < 0 && b.active && !b.frozen)
         {
-            parts[i].gameObject.layer = 5;   // not in the third-person view
-            if (parts[i].name == "Shade") parts[i].gameObject.SetActive(false);
+            VRCPlayerApi me = Networking.LocalPlayer;
+            Vector3 hand = me.GetTrackingData(h == 0 ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand).position;
+            Vector3 d = hand - grabRing.position;
+            float sc = AvatarScale();
+            float across = new Vector2(d.x, d.z).magnitude - RING_R * sc;
+            if (Mathf.Abs(across) < RING_REACH * sc && Mathf.Abs(d.y) < RING_REACH * sc)
+            {
+                b.ringHand = h;
+                me.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.06f, 0.7f, 120f);
+            }
         }
-        float big = Mathf.Max(game.gen.defSx[want], Mathf.Max(game.gen.defSy[want], game.gen.defSz[want])) / 1000f;
-        miniFit = 0.09f / Mathf.Max(0.05f, big);
-        miniBase = mini.transform.localScale;
     }
 
     // desktop: the controls. In full for the first while of a round, then only the two easy to forget
@@ -241,7 +261,8 @@ public class PHView : UdonSharpBehaviour
                 vrPanel.gameObject.SetActive(hider);
             }
             if (devicesOn != hider) ShowDevices(hider);
-            UpdateMini(s, hider);
+            bool gunWant = hider || local.canPick || local.CanShoot();
+            if (gunOn != gunWant) ShowGun(gunWant);
         }
         else
         {
@@ -269,6 +290,7 @@ public class PHView : UdonSharpBehaviour
     {
         if (outline == null) return;
         if (outline.gameObject.activeSelf != hider) outline.gameObject.SetActive(hider);
+        TintOutline(hider && local.body.Turning());
         if (!hider) return;
         PHHiderBody b = local.body;
         if (s.def == outlineDef && b.shapeSerial == outlineSerial) return;
@@ -751,18 +773,24 @@ public class PHView : UdonSharpBehaviour
             }
             return;
         }
+        if (gunOn && !vrPanel.gameObject.activeSelf) { PlaceGun(me, AvatarScale()); return; }   // (picking the first prop)
+        bool ringOn = hiderNow && grabRing != null;
+        if (grabRing != null && grabRing.gameObject.activeSelf != ringOn) grabRing.gameObject.SetActive(ringOn);
+        if (!ringOn && local.body.ringHand >= 0) local.body.ringHand = -1;
         if (!vrPanel.gameObject.activeSelf) return;   // (before the avatar and head queries: not hiding, nothing to place. Perf)
         float sc = AvatarScale();
+        if (ringOn) PlaceRing(me, sc);
         VRCPlayerApi.TrackingData headT = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
         vrPanel.localScale = new Vector3(panelBaseScale.x * sc, panelBaseScale.y * sc, panelBaseScale.z);
         VRCPlayerApi.TrackingData origin = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Origin);
         Quaternion inv = Quaternion.Inverse(origin.rotation);
         if (!panelPlaced)
         {
-            // where it first appears: to the right of the view, a little below the eyes, turned to the player
+            // where it first appears: to the left of the view (Cor: away from the selector's hand), a little below the
+            // eyes, turned to the player
             panelPlaced = true;
             Quaternion yawOnly = Quaternion.Euler(0f, headT.rotation.eulerAngles.y, 0f);
-            Vector3 p = headT.position + yawOnly * (new Vector3(0.38f, -0.22f, 0.55f) * sc);
+            Vector3 p = headT.position + yawOnly * (new Vector3(-0.38f, -0.22f, 0.55f) * sc);
             Quaternion r = Quaternion.LookRotation(p - headT.position + Vector3.up * (0.1f * sc), Vector3.up);
             panelLocal = inv * (p - origin.position) / sc;
             panelLocalRot = inv * r;
@@ -782,10 +810,32 @@ public class PHView : UdonSharpBehaviour
         Quaternion panelRot = vrPanel.rotation;
         casing.SetPositionAndRotation(panelPos, panelRot);
         casing.localScale = one;
-
-        // ---- right hand: the selector and its beam, along the very ray that picks (PHLocal.Aim)
-        VRCPlayerApi.TrackingData rh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);
+        VRCPlayerApi.TrackingData rh = PlaceGun(me, sc);
         VRCPlayerApi.TrackingData lh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand);
+        TauntButton(me, held, panelPos, panelRot, one, sc, lh, rh);
+    }
+
+    // the grab ring round the seat (the station: the prop's place and the seat's lag), level, at hip height
+    void PlaceRing(VRCPlayerApi me, float sc)
+    {
+        PHHiderBody b = local.body;
+        float eye = me.GetAvatarEyeHeightAsMeters();
+        grabRing.SetPositionAndRotation(b.pos + b.lag + Vector3.up * (eye * RING_Y), Quaternion.identity);
+        grabRing.localScale = Vector3.one * (RING_R * sc);
+        bool held = b.ringHand >= 0;
+        if (held != ringIsHeld && ringRenderers != null && ringIdle != null && ringHeld != null)
+        {
+            ringIsHeld = held;
+            for (int i = 0; i < ringRenderers.Length; i++) if (ringRenderers[i] != null) ringRenderers[i].sharedMaterial = held ? ringHeld : ringIdle;
+        }
+    }
+
+    // ---- right hand: the selector and its beam, along the very ray that picks (PHLocal.Aim)
+    VRCPlayerApi.TrackingData PlaceGun(VRCPlayerApi me, float sc)
+    {
+        VRCPlayerApi.TrackingData rh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);
+        if (!gunOn) return rh;
+        Vector3 one = Vector3.one * sc;
         Quaternion aim = local.AimRotation(rh.rotation);
         gun.SetPositionAndRotation(rh.position, aim);
         gun.localScale = one;
@@ -801,21 +851,11 @@ public class PHView : UdonSharpBehaviour
             bool valid = local.AimValid();
             if (valid != beamIsHit) { beamIsHit = valid; beamRenderer.sharedMaterial = valid ? beamHit : beamIdle; }
         }
+        return rh;
+    }
 
-        // ---- left hand: the turner; above it the pad, level, with the small prop standing as the prop stands
-        dial.SetPositionAndRotation(lh.position, lh.rotation);
-        dial.localScale = one;
-        Vector3 padAt = lh.position + Vector3.up * (0.085f * sc);
-        pad.SetPositionAndRotation(padAt, Quaternion.identity);
-        pad.localScale = new Vector3(0.11f * sc, 0.003f * sc, 0.11f * sc);
-        bool lit = local.body.turnHeld;
-        if (lit != padIsLit) { padIsLit = lit; padRenderer.sharedMaterial = lit ? padLit : padIdle; }
-        if (mini != null)
-        {
-            mini.transform.SetPositionAndRotation(padAt + Vector3.up * (0.004f * sc), Quaternion.Euler(0f, local.body.yaw, 0f));
-            mini.transform.localScale = miniBase * (miniFit * sc);
-        }
-
+    void TauntButton(VRCPlayerApi me, bool held, Vector3 panelPos, Quaternion panelRot, Vector3 one, float sc, VRCPlayerApi.TrackingData lh, VRCPlayerApi.TrackingData rh)
+    {
         // ---- the taunt button on the casing. A press is a hand that came from in front of the button and pushed
         // its cap in. A hand that is gripping, or let go a moment ago, does not count, and nothing counts while the
         // device is carried or was just put down: grabbing the device can never taunt (Cor).

@@ -12,7 +12,8 @@ using VRC.Udon.Common;
 //          desktop (55% without it, as the prototype); jump hops (tiny and medium props), with a ledge assist;
 //          the view and the prop turn apart (Cor): the VR right stick (the desktop mouse) turns only the view,
 //          and the prop keeps its facing in the world, so looking about never gives a hider away. The prop
-//          turns only when asked: VR, the right stick while the left trigger is held; desktop, Q and E.
+//          turns only when asked: VR, by holding the gun hand's trigger, as a grab (Cor): the prop turns as the
+//          hand turns and as the player turns while holding it (PHLocal decides a hold from a tap); desktop, Q and E.
 //          The head and the playspace never move or turn it
 //   the prop turns in 15 degree steps, each with a click, and only where its box fits (TryYaw)
 // A caught hider (a ghost) moves as a person-sized box through everything but the architecture.
@@ -43,11 +44,17 @@ public class PHHiderBody : UdonSharpBehaviour
     float liftT;
 
     float moveV, moveH, look;
-    // turning the prop: VR, the left trigger held makes the right stick turn the prop instead of the view
+    // turning the prop: VR, the gun hand's trigger held is a grab of the prop (PHLocal sets turnHeld): the prop turns
+    // by as much as the hand has turned about the vertical since the grab, the player's own turning included (the
+    // stick turns the seat, and the hand with it), so a turn while holding drags the prop round
     [HideInInspector] public bool turnHeld;
+    // ...or a grip on the grab ring round the seat (PHView, Cor's experiment): the prop turns by as much as that hand
+    // has gone round the seat since the grip (and with the player's own turning, as above). -1 none, 0 left, 1 right
+    [HideInInspector] public int ringHand = -1;
     bool wasTurning;
-    float propAim, propDetent;            // where the stick has turned the prop to, and the step it stands on
-    const float PROP_TURN = 100f;         // degrees a second at full stick
+    int grabSrc;                          // what the grab is: 1 the trigger, 2 + hand the ring
+    float grabHand, grabProp, propDetent; // the hand's and the prop's facing when the grab began; the step it stands on
+    public bool Turning() { return turnHeld || ringHand >= 0; }
     int keyDir;                           // desktop: Q (-1) or E (+1) held
     float keyNext;
     const float KEY_FIRST = 0.35f, KEY_REPEAT = 0.09f;
@@ -150,7 +157,7 @@ public class PHHiderBody : UdonSharpBehaviour
         velY = 0f; grounded = false; lifting = false; stuckFor = 0f; loose = false;
         settleDue = true;
         active = true; ghost = false;
-        turnHeld = false; wasTurning = false; keyDir = 0;
+        turnHeld = false; ringHand = -1; wasTurning = false; keyDir = 0;
     }
 
     Vector3 home;   // where the round started (a fall out of the map comes back here)
@@ -390,23 +397,32 @@ public class PHHiderBody : UdonSharpBehaviour
     public override void InputLookVertical(float value, UdonInputEventArgs args)
     {
         if (!Networking.LocalPlayer.IsUserInVR()) return;
-        // not while the stick turns the prop: a slanted push would hop
-        if (turnHeld) { lookUpHeld = value > 0.4f; return; }
         if (value > 0.75f && !lookUpHeld) { lookUpHeld = true; jumpPressed = true; }
         else if (value < 0.4f) lookUpHeld = false;
-    }
-
-    // VR: the left trigger, held, hands the right stick to the prop
-    public override void InputUse(bool value, UdonInputEventArgs args)
-    {
-        if (args.handType == HandType.LEFT) turnHeld = value;
     }
 
     // one step of the prop's turning took: a click, and in VR a tap in the hand that holds the trigger
     void TurnClick(bool vr)
     {
         if (local != null && local.sound != null) local.sound.Play("click_001", 0.35f);
-        if (vr) Networking.LocalPlayer.PlayHapticEventInHand(VRC_Pickup.PickupHand.Left, 0.04f, 0.6f, 160f);
+        if (vr) Networking.LocalPlayer.PlayHapticEventInHand(ringHand == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.04f, 0.6f, 160f);
+    }
+
+    // the gun hand's facing about the vertical (its pointing way; where it points nearly straight up or down, the
+    // way its back faces)
+    float HandYaw(VRCPlayerApi me)
+    {
+        Quaternion r = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation;
+        Vector3 f = r * Vector3.forward;
+        if (f.x * f.x + f.z * f.z < 0.04f) f = r * Vector3.up * (f.y > 0f ? -1f : 1f);
+        return Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+    }
+
+    // where a hand is round the seat (the grab ring's middle), as a facing about the vertical
+    float RingAngle(VRCPlayerApi me, int h)
+    {
+        Vector3 d = me.GetTrackingData(h == 0 ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand).position - (pos + lag);
+        return Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
     }
 
     // the prop to this facing, if its box fits there; false where it does not
@@ -454,30 +470,28 @@ public class PHHiderBody : UdonSharpBehaviour
         if (frozen) { v = 0f; h = 0f; jump = false; }
 
         // Moving always goes where the player looks. The view and the prop turn apart (Cor): in VR the right stick
-        // turns the station (and the seated player's view with it), and the prop only while the left trigger is
-        // held; on desktop the mouse turns the view (VRChat turns a seated player's head with it) and Q and E turn
+        // turns the station (and the seated player's view with it), and the prop only while it is grabbed (the gun
+        // hand's trigger held); on desktop the mouse turns the view (VRChat turns a seated player's head with it) and Q and E turn
         // the prop. Head turning and playspace movement never turn the prop.
         Vector3 hf = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation * Vector3.forward;
         hf.y = 0f;
         float headYaw = hf.sqrMagnitude > 1e-4f ? Mathf.Atan2(hf.x, hf.z) * Mathf.Rad2Deg : stationYaw;
-        bool turning = vr && turnHeld && !frozen && !ghost;
-        if (turning && !wasTurning) { propAim = yaw; propDetent = Mathf.Round(yaw / 15f) * 15f; }
-        wasTurning = turning;
-        if (vr && !frozen && Mathf.Abs(look) > 0.1f)
-        {
-            if (turning) propAim += look * PROP_TURN * dt;
-            else stationYaw += look * 120f * dt;
-        }
+        bool turning = vr && Turning() && !frozen && !ghost;
+        if (vr && !frozen && Mathf.Abs(look) > 0.1f) stationYaw += look * 120f * dt;
         if (turning)
         {
-            float detent = Mathf.Round(propAim / 15f) * 15f;
-            if (Mathf.Abs(detent - propDetent) > 0.5f)
+            int src = ringHand >= 0 ? 2 + ringHand : 1;
+            float hand = src == 1 ? HandYaw(me) : RingAngle(me, ringHand);
+            if (!wasTurning || src != grabSrc) { grabSrc = src; grabHand = hand; grabProp = yaw; propDetent = Mathf.Round(yaw / 15f) * 15f; }
+            float detent = Mathf.Round((grabProp + Mathf.DeltaAngle(grabHand, hand)) / 15f) * 15f;
+            if (Mathf.Abs(Mathf.DeltaAngle(detent, propDetent)) > 0.5f)
             {
+                // (no room to turn to that step: the prop stays, and is tried again at the hand's next step)
                 propDetent = detent;
-                // no room to turn that way: the stick starts again from where the prop stands
-                if (!TurnPropTo(detent, true)) { propAim = yaw; propDetent = Mathf.Round(yaw / 15f) * 15f; }
+                TurnPropTo(detent, true);
             }
         }
+        wasTurning = turning;
         // desktop: a tap of Q or E is one step; held, the steps repeat
         if (!vr && !frozen && !ghost)
         {

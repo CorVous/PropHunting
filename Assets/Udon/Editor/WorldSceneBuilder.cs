@@ -406,16 +406,6 @@ public static class WorldSceneBuilder
         view.beam = beam.transform; view.beamRenderer = beam.GetComponent<MeshRenderer>();
         view.beamIdle = beamIdle; view.beamHit = beamHit;
 
-        // left hand: the turner, a grip with a trigger; the pad floats above it
-        var dial = Empty(viewGo.transform, "Turner");
-        Part(dial, PrimitiveType.Cube, "Handle", Vector3.zero, Vector3.zero, new Vector3(0.03f, 0.03f, 0.09f), dark);
-        Part(dial, PrimitiveType.Cube, "Band", new Vector3(0f, 0f, 0.03f), Vector3.zero, new Vector3(0.034f, 0.034f, 0.012f), amber);
-        Part(dial, PrimitiveType.Cube, "Trigger", new Vector3(0f, -0.022f, 0.022f), Vector3.zero, new Vector3(0.012f, 0.02f, 0.012f), amber);
-        view.dial = dial;
-        var pad = Part(viewGo.transform, PrimitiveType.Cylinder, "TurnerPad", Vector3.zero, Vector3.zero, new Vector3(0.11f, 0.003f, 0.11f), mid);
-        view.pad = pad.transform; view.padRenderer = pad.GetComponent<MeshRenderer>();
-        view.padIdle = mid; view.padLit = amber;
-
         // the screen device: a casing around the panel (the panel is its screen and its grab), with a chin that
         // carries the taunt button. The casing's front is -z, as the screen's.
         var casing = Empty(viewGo.transform, "ScreenCasing");
@@ -453,6 +443,20 @@ public static class WorldSceneBuilder
         for (int i = 0; i < view.outlineParts.Length; i++)
             view.outlineParts[i] = Part(outline, PrimitiveType.Cube, i < 40 ? "Piece" + i : "Nub", Vector3.zero, Vector3.zero, new Vector3(0.02f, 0.004f, 0.02f), outlineMat).transform;
         view.outline = outline;
+        view.outlineTurnMat = amber;   // while the prop is grabbed for turning (Cor)
+
+        // the grab ring (Cor's experiment): 24 short flat pieces round a circle of radius 1, scaled by PHView to the
+        // avatar's size round the seat; teal, amber while gripped. On the UI layer, no colliders.
+        var ring = Empty(viewGo.transform, "GrabRing");
+        const int ringN = 24;
+        float seg = 2f * Mathf.PI / ringN * 1.04f;
+        for (int i = 0; i < ringN; i++)
+        {
+            float a = i * 360f / ringN;
+            Vector3 at = Quaternion.Euler(0f, a, 0f) * Vector3.forward;
+            Part(ring, PrimitiveType.Cube, "Seg" + i, at, new Vector3(0f, a, 0f), new Vector3(seg, 0.03f, 0.05f), teal);
+        }
+        view.grabRing = ring; view.ringIdle = teal; view.ringHeld = amber;
 
         // and the own prop's shape in first person: the cage of its edges (MapBuilderUdon.Cage lends this one object
         // to the local hider's prop; the meshes are PropPrefabBaker's). Off until lent; no collider, no shadows.
