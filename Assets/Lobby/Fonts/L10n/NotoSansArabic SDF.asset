@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!28 &-5817416457628948416
+--- !u!28 &-5467223589864259245
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -61,11 +61,11 @@ MonoBehaviour:
   m_Name: NotoSansArabic SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 376923879072806}
+  material: {fileID: 8400921673872455862}
   materialHashCode: -2006316128
   m_Version: 1.1.0
-  m_SourceFontFileGUID: 47299f51ff19f3c45a9084fe6191f33c
-  m_SourceFontFile_EditorRef: {fileID: 12800000, guid: 47299f51ff19f3c45a9084fe6191f33c,
+  m_SourceFontFileGUID: 9c06f2019e2c5d14794f454351d5742d
+  m_SourceFontFile_EditorRef: {fileID: 12800000, guid: 9c06f2019e2c5d14794f454351d5742d,
     type: 3}
   m_SourceFontFile: {fileID: 0}
   m_AtlasPopulationMode: 0
@@ -2260,7 +2260,7 @@ MonoBehaviour:
     m_GlyphIndex: 482
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: -5817416457628948416}
+  - {fileID: -5467223589864259245}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -3229,7 +3229,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!21 &376923879072806
+--- !u!21 &8400921673872455862
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -3253,7 +3253,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: -5817416457628948416}
+        m_Texture: {fileID: -5467223589864259245}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
