@@ -930,7 +930,7 @@ public class PHHiderBody : UdonSharpBehaviour
 
     // Perf: pushing into a plain wall, the look for a way through (up to 21 tries of several hundred casts) and the
     // step aside found nothing, and every frame they looked again from the same place: about 4-10 ms a frame. A look
-    // that found nothing is not made again for FAIL_HOLD seconds of moving while the prop is within 2 cm of where it
+    // that found nothing is not made again for FAIL_HOLD seconds of moving while the prop is within 3 mm of where it
     // stood, faces within half a degree, pushes the same way and meets the same wall. The world does not change
     // under a still prop but for doors and knocked props, and those wait at most FAIL_HOLD. The hold runs down with
     // the move's own time (dt), not the clock, so it ends inside a test that drives Move many times at once too.
@@ -942,7 +942,7 @@ public class PHHiderBody : UdonSharpBehaviour
 
     bool SameTry(Vector3 at, Vector3 dir, Vector3 wasAt, float wasYaw, Vector3 wasDir)
     {
-        return (at - wasAt).sqrMagnitude < 0.02f * 0.02f && Mathf.Abs(Mathf.DeltaAngle(yaw, wasYaw)) < 0.5f && Vector3.Dot(dir, wasDir) > 0.97f;
+        return (at - wasAt).sqrMagnitude < 0.003f * 0.003f && Mathf.Abs(Mathf.DeltaAngle(yaw, wasYaw)) < 0.5f && Vector3.Dot(dir, wasDir) > 0.97f;
     }
 
     // whether the look for a way through found nothing a moment ago in this same spot (and the wall it met, square to
