@@ -238,7 +238,9 @@ public class PHPanel : UdonSharpBehaviour
         if (rl != seenRound) { seenRound = rl; OptionSound(2, rl); Refresh(); }
         if (ta != seenTaunt) { seenTaunt = ta; OptionSound(3, ta); Refresh(); }
 
-        if (now >= nextRefresh) { nextRefresh = now + 0.25f; Refresh(); }
+        // (Perf: four times a second in the lobby; behind the veil during a round only every two seconds, and at
+        // once when the phase changes)
+        if (now >= nextRefresh) { nextRefresh = now + (game.phase == PHGame.PH_LOBBY ? 0.25f : 2f); Refresh(); }
 
         // little animations: a refused press wobbles, START spins the die, the veil's hourglass turns
         if (wobble != -99)
@@ -260,6 +262,7 @@ public class PHPanel : UdonSharpBehaviour
         {
             if (seenPhase == PHGame.PH_LOBBY && game.phase != PHGame.PH_LOBBY && spinner != null) { spinStart = now; spinFrom = spinner.localEulerAngles.y; }
             seenPhase = game.phase;
+            nextRefresh = 0f;
         }
         float st = (now - spinStart) / 2.6f;
         if (spinner != null && st >= 0f && st <= 1f)
