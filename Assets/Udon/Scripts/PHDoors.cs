@@ -97,7 +97,7 @@ public class PHDoors : UdonSharpBehaviour
         if (round != game.round) { for (int k = 0; k < MAX; k++) open[k] = false; round = game.round; }
         open[i] = !open[i];
         RequestSerialization();
-        if (game.local != null && game.local.sound != null)
+        if (game.local != null && game.local.sound != null && game.builder.objects != null)
         {
             GameObject o = game.builder.objects[emitOf[i]];
             if (o != null) game.local.sound.PlayAt(open[i] ? "doorOpen_1" : "doorClose_1", o.transform.position, 10f, 0.8f, 1f);
@@ -110,6 +110,8 @@ public class PHDoors : UdonSharpBehaviour
     public override void OnDeserialization()
     {
         // others hear a door that changed (a hider shutting themselves in is a clue)
+        // (not while the map is being rebuilt: the old list's props are gone, objects is null)
+        if (game.builder.objects == null || listedFor != game.round) return;
         for (int i = 0; i < count; i++)
         {
             bool want = open[i] && round == game.round;
@@ -137,6 +139,8 @@ public class PHDoors : UdonSharpBehaviour
     {
         if (game == null || game.builder == null) return;
         if (game.builder.built && listedFor != game.round && game.MapReady) ListDoors();
+        // a new round's map is coming: the old list points at destroyed props (and objects goes null in between)
+        else if (count > 0 && listedFor != game.round && !game.MapReady) count = 0;
         Apply();
     }
 

@@ -151,10 +151,10 @@ fixed4 frag (v2f i) : SV_Target
     // the prop viewer's cutout (PipCut.cginc): a prop in it is see-through (_Fade), the rest cut; never on the hider's own prop.
     // An if, never ?: or &&: HLSL works out both sides of those, so PipCut's clip() ran on the own prop too and cut away
     // the half of it nearer the camera (Cor: half the prop was clipped out)
-    half cutRim = 0;
-    [branch] if (_PipOnly < 0.5) cutRim = PipCut(i.worldPos, i.pos.xy, _Fade);
-    float3 c;
     float3 n = normalize(i.normal);
+    half cutRim = 0;
+    [branch] if (_PipOnly < 0.5) cutRim = PipCutN(i.worldPos, n, i.pos.xy, _Fade);
+    float3 c;
     bool lvOn = LightVolumesEnabled() > 0;
     // the spot sun (once PHSun has baked it) and the lamps (MapBuilderUdon's light points)
     float3 spot = 0, lamps = 0;

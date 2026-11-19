@@ -128,6 +128,29 @@ public class PHKnock : UdonSharpBehaviour
         a.PlayAt(a.Pick(soft ? a.softKnock : a.woodKnock, Random.Range(0, 100)), at, 16f, 0.9f, Random.Range(0.9f, 1.1f));
     }
 
+    // The hunter running a knock left while it flew: the new owner has no rigidbody for it, so 'moving' would stay
+    // set for good (the knock Busy all round, never reused; everyone easing the prop toward a pose that never comes).
+    // The new owner settles it where it shows it now and sends that. The old owner, if still here, stops its physics.
+    public override void OnOwnershipTransferred(VRCPlayerApi player)
+    {
+        // (a prop still in the air is taken over and lands here: settled where it shows, it would hang in mid-air)
+        if (!Networking.IsOwner(gameObject)) { Release(); return; }
+        if (body != null || !moving) return;
+        GameObject go = (emit >= 0 && game != null && game.builder.objects != null && emit < game.builder.objects.Length) ? game.builder.objects[emit] : null;
+        if (go == null || round != game.round) { moving = false; RequestSerialization(); return; }
+        body = go.GetComponent<Rigidbody>();
+        if (body != null)
+        {
+            body.isKinematic = false;
+            knockedAt = Time.time;   // the normal settle path ends it and sends the pose it rests in
+            nextSend = Time.time;
+            return;
+        }
+        moving = false;
+        Capture();
+        RequestSerialization();
+    }
+
     public override void OnDeserialization()
     {
         // a knock that has just started: everyone hears it

@@ -62,6 +62,9 @@ public class PHSlot : UdonSharpBehaviour
     public void Claim()
     {
         if (!Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);
+        // (before the caller writes its own state: the takeover's clearing must not wipe it next frame)
+        int myId = Networking.LocalPlayer.playerId;
+        if (game.slotPlayer[index] == myId && myId != 0 && freshFor != myId) { freshFor = myId; Fresh(); }
     }
 
     public void Send() { dirty = true; }
@@ -125,11 +128,28 @@ public class PHSlot : UdonSharpBehaviour
         nextSit = Time.time + 0.3f;
     }
 
+    // A slot is reused when its player leaves and someone else joins: everything the last player left in it
+    // (a disguise and hiding, so a stray prop stood where they left; caught; a scrap vote that counted for the
+    // newcomer; inZone, so they counted as in the zone) is cleared the first time this player owns it.
+    int freshFor;
+
+    void Fresh()
+    {
+        inZone = false; readyRound = -1;
+        def = -1; lastDef = -1; airborne = false; hiding = false; ghost = false;
+        scrapVote = 0; undoVote = 0;
+        health = 0; maxHealth = 0; caught = false; survivedMs = 0;
+        hunterHealth = 100; hunterOut = false; wrongProps = 0; hits = 0; catches = 0;
+        round = -1;
+        Send();
+    }
+
     // a dart from a hunter (sent to the owner). Returns nothing: the owner's synced figures say what happened.
+    // (only during the hunt: a dart still on its way when the round ended does not catch anyone in the reveal)
     [NetworkCallable]
     public void TakeHit(int damage, int shooterPlayerId)
     {
-        if (!IsMine || caught || def < 0) return;
+        if (!IsMine || caught || def < 0 || game.phase != PHGame.PH_HUNT) return;
         health -= damage;
         if (health <= 0)
         {
@@ -184,6 +204,7 @@ public class PHSlot : UdonSharpBehaviour
         // the player the host gave this slot takes it over (the host owns every slot until then)
         if (game.slotPlayer[index] == myId && myId != 0 && !Networking.IsOwner(gameObject)) Networking.SetOwner(Networking.LocalPlayer, gameObject);
         bool mine = Networking.IsOwner(gameObject) && game.slotPlayer[index] == myId && myId != 0;
+        if (mine && freshFor != myId) { freshFor = myId; Fresh(); }
         if (mine) UpdateOwner(); else UpdateRemote();
         UpdateProxy(mine);
         if (mine && dirty && Time.time >= nextSend)
@@ -343,6 +364,7 @@ public class PHSlot : UdonSharpBehaviour
     const float HOP_LAND_FULL = 4.5f;    // the fall speed (m/s) of a full landing; slower ones squash less (squared)
     const float HOP_K = 1000f, HOP_DAMP = 26f;   // the spring: overshoots once a little, settled in about 0.3 s
     float hopS = 1f, hopV, hopVY, hopFall, lastY;
+    float hopCap = 2f;   // the most the hop may stretch it this frame (the room over it, Hop)
     bool wasAirborne, hopDipped;
 
     // the hop's stretch (up) at this frame, on its spring; exactly 1 at rest
@@ -385,6 +407,7 @@ public class PHSlot : UdonSharpBehaviour
             if (tall > 0.01f) cap = Mathf.Min(cap, Mathf.Max(1f, (WallAt(shownPos + Vector3.up * 0.05f, Vector3.up, tall * cap + 0.1f) + 0.03f) / tall));
             want = Mathf.Min(want, cap);
         }
+        hopCap = cap;
         if (!air && Mathf.Abs(hopS - 1f) < 0.003f && Mathf.Abs(hopV) < 0.03f) { hopS = 1f; hopV = 0f; return; }
         hopV += ((want - hopS) * HOP_K - hopV * HOP_DAMP) * dt;
         hopS = Mathf.Clamp(hopS + hopV * dt, 0.7f, cap);
@@ -481,7 +504,11 @@ public class PHSlot : UdonSharpBehaviour
             float across = 1f / Mathf.Sqrt(hopS);
             s = new Vector3(across, hopS, across);
         }
-        s = new Vector3(s.x * squashX, s.y * squashY, s.z * squashZ);
+        // (the hop's stretch held to the room over it with the doorway's spring on top too: that spring's overshoot,
+        // times the stretch, took the top 2 cm into a corridor's ceiling; never lower than the doorway's alone)
+        float sy = s.y * squashY;
+        if (hopS > 1f) sy = Mathf.Min(sy, Mathf.Max(squashY, hopCap));
+        s = new Vector3(s.x * squashX, sy, s.z * squashZ);
         if (squashRig.localScale != s) squashRig.localScale = s;
     }
 
