@@ -39,11 +39,10 @@ public static class WorldSceneBuilder
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(lobby.scene);
     }
 
-    // on the north wall between the west wall and the DEBUG plaque (Cor): 4.65 m wide, centred on the plaque's height;
-    // facing south (into the room), like the host panel
+    // on the north wall left of the host panel (Cor), level with its centre: 5.4 m wide; facing south, like the panel
     static void BuildCredits(Transform lobby)
     {
-        LobbyBuilder.BuildCredits(lobby, new Vector3(-9.35f, 1.8f, RoomD / 2 - 0.12f), Quaternion.identity, 0.0031f);
+        LobbyBuilder.BuildCredits(lobby, new Vector3(-7.9f, 2.58f, RoomD / 2 - 0.12f), Quaternion.identity, 0.0036f);
     }
 
     [MenuItem("PropHunt/Build world scene")]
@@ -246,15 +245,15 @@ public static class WorldSceneBuilder
         // design (LobbyBuilder). Everyone can read it; only the host's presses count (PHPanel and PHGame check).
         // A world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR.
         LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 0.9f + 1.68f, RoomD / 2 - 0.12f));   // 7.2 x 3.36 m, bottom 0.9 m up
-        LobbyBuilder.BuildExplore(lobby.transform, game, new Vector3(-5.9f, 1.7f, RoomD / 2 - 0.12f));   // the DEBUG plaque: explore a map, spawn as hunter / hider, end round
+        LobbyBuilder.BuildExplore(lobby.transform, game, new Vector3(5.9f, 1.7f, RoomD / 2 - 0.12f));   // right of the panel (Cor: the credits take the left); the DEBUG plaque: explore a map, spawn as hunter / hider, end round
         // the last round's results, a score pad on the west wall
         LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
         local.panelUiText = null; local.resultsText = null;
-        // the credits (from CREDITS.md), on the north wall left of the DEBUG plaque
+        // the credits (from CREDITS.md), on the north wall left of the host panel
         BuildCredits(lobby.transform);
 
-        // the profiler (its plaque right of the panel) and the scripts it watches: every one that runs each frame
-        var prof = LobbyBuilder.BuildProfiler(lobby.transform, game, new Vector3(5.9f, 1.55f, RoomD / 2 - 0.12f));
+        // the profiler (its plaque right of the DEBUG plaque) and the scripts it watches: every one that runs each frame
+        var prof = LobbyBuilder.BuildProfiler(lobby.transform, game, new Vector3(7.95f, 1.55f, RoomD / 2 - 0.12f));
         {
             string[] names = { "PHGame", "PHLocal", "PHSlot", "PHHiderBody", "PHKnock", "PHLamps", "PHLobbyCull", "PHPanel", "PHScorePad", "PHSun", "PHView", "PHDoors", "MapBuilderUdon" };
             var list = new System.Collections.Generic.List<UdonSharp.UdonSharpBehaviour>();
