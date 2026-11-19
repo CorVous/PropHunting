@@ -485,8 +485,8 @@ public static class LobbyBuilder
 
     // ------------------------------------------------------------------ the credits board (south wall)
     // Made from CREDITS.md at the project's root each time the world is built (and by PropHunt > Rebuild credits board),
-    // so it follows the file: the packs table, grouped by maker into three columns, and every paragraph that names a
-    // licence (other software, fonts) as fine print. 1500 canvas units wide; the height follows the text.
+    // so it follows the file: the packs table grouped by maker, then the "Asset" table (other assets, other licences),
+    // in three columns; the "Other software:" paragraph as fine print. 1500 canvas units wide; the height follows the text.
     const float CW = 1500f;
     // the board's heading and Cor's note above the list (Cor's words, 2026-11-19)
     const string CreditsTitle = "Disclosures!!!";
@@ -494,7 +494,7 @@ public static class LobbyBuilder
     const string CreditsSource = "SOURCE CODE:  github.com/CorVous/PropHunting   ·   AGPL v3.0";
     const string CreditsIntro = "Heya! This map is super vibe coded! I normally like to put in a lot more effort and authorship into my work, but this was (as of writing) made in a week to show to my friends because I wasn't happy with current prop hunt maps! Plus I think even if you're using AI, practice makes perfect! None of the assets were diffusion generated (what most people would call \"Generative AI\") though, and below is a list of the awesome creators of the CC0 public domain asset packs that you should check out! Either if you need free assets or are looking to find awesome assets!";
 
-    class CreditRow { public string name, right; public int maker; }
+    class CreditRow { public string name, right; public int maker; public bool tall; }   // tall: the details on a line of their own
 
     public static Transform BuildCredits(Transform lobby, Vector3 localPos, Quaternion rot, float scale)
     {
@@ -507,14 +507,14 @@ public static class LobbyBuilder
         var makerSub = new System.Collections.Generic.List<string>();
         var rows = new System.Collections.Generic.List<CreditRow>();
         var notes = new System.Collections.Generic.List<string>();
-        int col = -1, colMaker = -1, colUse = -1, colCount = -1, colLic = -1;
-        bool allCc0 = true;
+        int col = -1, colMaker = -1, colUse = -1, colCount = -1, colLic = -1, otherGroup = -1;
+        bool otherTable = false;
         var para = new System.Text.StringBuilder();
+        // the fine print: the "Other software:" paragraph (Unity, the VRChat SDK); every asset is a row of the list
         System.Action flush = () =>
         {
             string p = para.ToString().Trim(); para.Length = 0;
-            if (p.Length > 0 && (p.IndexOf("licence", System.StringComparison.OrdinalIgnoreCase) >= 0 || p.IndexOf("license", System.StringComparison.OrdinalIgnoreCase) >= 0))
-                notes.Add(MdPlain(p));
+            if (p.StartsWith("Other software")) notes.Add(MdPlain(p));
         };
         foreach (var raw in lines)
         {
@@ -525,9 +525,12 @@ public static class LobbyBuilder
                 var cells = ln.Trim('|').Split('|');
                 for (int i = 0; i < cells.Length; i++) cells[i] = cells[i].Trim();
                 if (cells[0].StartsWith("---")) continue;
-                if (cells[0] == "Pack")
+                if (cells[0] == "Pack" || cells[0] == "Asset")
                 {
                     col = 0;
+                    // the "Asset" table (assets that are not packs, other licences): one group of its own, after the makers
+                    otherTable = cells[0] == "Asset";
+                    if (otherTable && otherGroup < 0) { makerName.Add("Other assets"); makerSub.Add(""); otherGroup = makerName.Count - 1; }
                     colMaker = System.Array.IndexOf(cells, "Maker"); colUse = System.Array.IndexOf(cells, "Used for");
                     colCount = System.Array.FindIndex(cells, c => c.StartsWith("Items")); colLic = System.Array.IndexOf(cells, "Licence");
                     continue;
@@ -536,11 +539,18 @@ public static class LobbyBuilder
                 var r = new CreditRow();
                 r.name = PackName(cells[0]);
                 string maker = colMaker >= 0 ? cells[colMaker] : "";
-                r.maker = makerName.FindIndex(m => maker.StartsWith(m, System.StringComparison.OrdinalIgnoreCase));
-                if (r.maker < 0) { makerName.Add(maker); makerSub.Add(""); r.maker = makerName.Count - 1; }
                 string use = colUse >= 0 ? System.Text.RegularExpressions.Regex.Replace(cells[colUse], @"\s*\([^)]*\)", "") : "";
                 string lic = colLic >= 0 ? cells[colLic] : "";
-                if (!lic.StartsWith("CC0")) allCc0 = false;
+                if (otherTable)
+                {
+                    // "VRC Light Volumes" ... "RED_SIM  ·  sun light and shadows  ·  MIT"
+                    r.maker = otherGroup; r.tall = true;
+                    r.right = maker + "  ·  " + use + "  ·  " + lic;
+                    rows.Add(r);
+                    continue;
+                }
+                r.maker = makerName.FindIndex(m => maker.StartsWith(m, System.StringComparison.OrdinalIgnoreCase));
+                if (r.maker < 0) { makerName.Add(maker); makerSub.Add(""); r.maker = makerName.Count - 1; }
                 r.right = use + (colCount >= 0 ? "  ·  " + cells[colCount] : "") + (lic.StartsWith("CC0") ? "" : "  ·  " + lic);
                 rows.Add(r);
                 continue;
@@ -563,40 +573,23 @@ public static class LobbyBuilder
         }
         flush();
 
-        // the order on the board: maker by maker, then by name; laid out in three columns of about the same length
+        // the order on the board: maker by maker, then by name; one column per maker (Cor), each a short list that
+        // scrolls (its own scroll bar) when it holds more than visRows
         rows.Sort((a, b) => a.maker != b.maker ? a.maker.CompareTo(b.maker) : string.CompareOrdinal(a.name, b.name));
-        const float rowH = 30f, headH = 62f;
-        var items = new System.Collections.Generic.List<object>();   // int = a maker's header, CreditRow = a pack
-        for (int i = 0; i < rows.Count; i++)
-        {
-            if (i == 0 || rows[i].maker != rows[i - 1].maker) items.Add(rows[i].maker);
-            items.Add(rows[i]);
-        }
-        float total = 0f;
-        foreach (var it in items) total += it is int ? headH : rowH;
-        const int nCols = 3;
-        float colTarget = total / nCols;
-        var colStart = new int[nCols + 1];
-        { float acc = 0f; int c = 1;
-          for (int i = 0; i < items.Count && c < nCols; i++)
-          {
-              float h = items[i] is int ? headH : rowH;
-              if (acc + h / 2 > colTarget * c) { colStart[c++] = (items[i] is CreditRow && i > 0 && items[i - 1] is int) ? i - 1 : i; }
-              acc += h;
-          }
-          for (; c <= nCols; c++) colStart[c] = items.Count; colStart[nCols] = items.Count; }
-        float colsH = 0f;
-        for (int c = 0; c < nCols; c++)
-        {
-            float h = 0f;
-            for (int i = colStart[c]; i < colStart[c + 1]; i++) h += items[i] is int ? headH : rowH;
-            colsH = Mathf.Max(colsH, h);
-        }
+        const float rowH = 32f, headH = 62f, barW = 16f;
+        const int visRows = 9;
+        var groups = new System.Collections.Generic.List<int>();
+        foreach (var r in rows) if (!groups.Contains(r.maker)) groups.Add(r.maker);
+        int nCols = Mathf.Max(1, groups.Count);
+        int most = 0;
+        foreach (int g in groups) most = Mathf.Max(most, rows.FindAll(r => r.maker == g).Count);
+        float listH = Mathf.Min(most, visRows) * rowH;
+        float colsH = headH + listH + (most > visRows ? 26f : 0f);   // room for the "scroll for more" hint
 
         // measure the fine print, then size the canvas: title band, board (columns, a rule, the notes), margin
         const float side = 24f, pad = 26f, colGap = 34f;
         float boardW = CW - 2 * side, innerW = boardW - 2 * pad;
-        var cv = Canvas(lobby, "Credits", localPos, rot, new Vector2(CW, 100f), scale, false);
+        var cv = Canvas(lobby, "Credits", localPos, rot, new Vector2(CW, 100f), scale, true);   // pointable: the lists scroll
         var noteTexts = new System.Collections.Generic.List<TextMeshProUGUI>();
         float notesH = 0f;
         foreach (var n in notes)
@@ -618,6 +611,7 @@ public static class LobbyBuilder
         float boardH = pad + colsH + (notes.Count > 0 ? 22f + notesH : 0f) + pad - 8f;
         float CH = titleH + boardH + side;
         ((RectTransform)cv).sizeDelta = new Vector2(CW, CH);
+        cv.GetComponent<BoxCollider>().size = new Vector3(CW, CH, 1f);
         System.Func<float, float, Vector2> Q = (x, y) => new Vector2(x - CW / 2, CH / 2 - y);   // top-left based
 
         var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
@@ -642,39 +636,80 @@ public static class LobbyBuilder
         float colW = (innerW - (nCols - 1) * colGap) / nCols;
         Color[] makerColour = { RowColour[0], RowColour[3], RowColour[2], RowColour[1] };
         var ink = C("2b2416");
-        for (int c = 0; c < nCols; c++)
+        for (int c = 0; c < groups.Count; c++)
         {
+            int m = groups[c];
+            var list = rows.FindAll(r => r.maker == m);
             float x0 = side + pad + c * (colW + colGap), y = titleH + pad;
             if (c > 0)
             {
                 var div = Img(cv, "Divider" + c, Q(x0 - colGap / 2, titleH + pad + colsH / 2), new Vector2(colsH, 4), sDash, C("d9c49a"), 5f);
                 div.rectTransform.localRotation = Quaternion.Euler(0, 0, 90);
             }
-            for (int i = colStart[c]; i < colStart[c + 1]; i++)
+            // the maker's header tile
+            var tile = Img(cv, "Maker " + makerName[m], Q(x0 + colW / 2, y + headH / 2 - 4), new Vector2(colW, headH - 14), sTile, makerColour[m % 4], 2f);
+            var mn = Txt(tile.transform, "Name", new Vector2(-colW / 2 + 16, 2), new Vector2(colW - 32, 30), Clean(makerName[m].ToUpperInvariant(), rocket), rocket, 24, ink, TextAlignmentOptions.Left);
+            mn.rectTransform.pivot = new Vector2(0f, 0.5f);
+            float nameW = mn.GetPreferredValues(mn.text).x;
+            // the rest of the bullet ("by Kay Lousberg · kaylousberg.com"), shrunk to fit beside the name
+            float subW = colW - 32 - nameW - 18;
+            var st = Txt(tile.transform, "Site", new Vector2(colW / 2 - 16, 2), new Vector2(subW, 24), Clean(makerSub[m], future), future, 13, C("1e190f", 0.75f), TextAlignmentOptions.Right);
+            st.rectTransform.pivot = new Vector2(1f, 0.5f);
+            st.enableAutoSizing = true; st.fontSizeMin = 8f; st.fontSizeMax = 13f;
+            y += headH;
+
+            // the list: a masked viewport (it takes the drag), the rows on a content rect, a scroll bar on the right
+            float fullH = 0f;
+            foreach (var r in list) fullH += r.tall ? rowH * 1.6f : rowH;
+            bool scrolls = fullH > listH + 0.5f;
+            float listW = scrolls ? colW - barW - 10f : colW;
+            var vp = Img(cv, "List " + makerName[m], Q(x0 + listW / 2, y + listH / 2), new Vector2(listW, listH), null, new Color(1f, 1f, 1f, 0f));
+            vp.raycastTarget = true;
+            vp.gameObject.AddComponent<RectMask2D>();
+            float contentH = 0f;
+            foreach (var r in list) contentH += r.tall ? rowH * 1.6f : rowH;
+            var content = Rect(vp.transform, "Content", Vector2.zero, new Vector2(listW, contentH));
+            content.anchorMin = content.anchorMax = new Vector2(0.5f, 1f); content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            float ry = 0f;
+            for (int k = 0; k < list.Count; k++)
             {
-                if (items[i] is int m)
-                {
-                    var tile = Img(cv, "Maker " + makerName[m], Q(x0 + colW / 2, y + headH / 2 - 4), new Vector2(colW, headH - 14), sTile, makerColour[m % 4], 2f);
-                    var mn = Txt(tile.transform, "Name", new Vector2(-colW / 2 + 16, 2), new Vector2(colW - 32, 30), Clean(makerName[m].ToUpperInvariant(), rocket), rocket, 24, ink, TextAlignmentOptions.Left);
-                    mn.rectTransform.pivot = new Vector2(0f, 0.5f);
-                    float nameW = mn.GetPreferredValues(mn.text).x;
-                    // the rest of the bullet ("by Kay Lousberg · kaylousberg.com"), shrunk to fit beside the name
-                    float subW = colW - 32 - nameW - 18;
-                    var st = Txt(tile.transform, "Site", new Vector2(colW / 2 - 16, 2), new Vector2(subW, 24), Clean(makerSub[m], future), future, 13, C("1e190f", 0.75f), TextAlignmentOptions.Right);
-                    st.rectTransform.pivot = new Vector2(1f, 0.5f);
-                    st.enableAutoSizing = true; st.fontSizeMin = 8f; st.fontSizeMax = 13f;
-                    y += headH;
-                    continue;
-                }
-                var r = (CreditRow)items[i];
-                float cy = y + rowH / 2;
-                Img(cv, "Pip", Q(x0 + 8, cy), new Vector2(12, 12), sRound, makerColour[r.maker % 4], 6f);
-                var nt = Txt(cv, "Pack " + r.name, Q(x0 + 24, cy), new Vector2(colW - 24, rowH), Clean(r.name, future), future, 17, ink, TextAlignmentOptions.Left);
+                var r = list[k];
+                float h = r.tall ? rowH * 1.6f : rowH;
+                var row = Rect(content, "Row " + r.name, new Vector2(0f, contentH / 2 - ry - h / 2), new Vector2(listW, h));
+                ry += h;
+                float top = r.tall ? h / 2 - rowH / 2 : 0f;   // the name line
+                Img(row, "Pip", new Vector2(-listW / 2 + 8, top), new Vector2(12, 12), sRound, makerColour[r.maker % 4], 6f);
+                var nt = Txt(row, "Name", new Vector2(-listW / 2 + 24, top), new Vector2(listW - 24, rowH), Clean(r.name, future), future, 17, ink, TextAlignmentOptions.Left);
                 nt.rectTransform.pivot = new Vector2(0f, 0.5f);
-                var rt2 = Txt(cv, "Use", Q(x0 + colW, cy + 1), new Vector2(colW * 0.5f, rowH), Clean(r.right, future), future, 12, C("8a7b5a"), TextAlignmentOptions.Right);
-                rt2.rectTransform.pivot = new Vector2(1f, 0.5f);
-                y += rowH;
+                var ut = r.tall
+                    ? Txt(row, "Use", new Vector2(-listW / 2 + 24, top - rowH * 0.62f), new Vector2(listW - 24, rowH * 0.7f), Clean(r.right, future), future, 12, C("8a7b5a"), TextAlignmentOptions.Left)
+                    : Txt(row, "Use", new Vector2(listW / 2, 1), new Vector2(listW * 0.5f, rowH), Clean(r.right, future), future, 12, C("8a7b5a"), TextAlignmentOptions.Right);
+                ut.rectTransform.pivot = new Vector2(r.tall ? 0f : 1f, 0.5f);
+                ut.enableAutoSizing = true; ut.fontSizeMin = 8f; ut.fontSizeMax = 12f;
             }
+            if (!scrolls) continue;
+            var sr = vp.gameObject.AddComponent<ScrollRect>();
+            sr.content = content; sr.viewport = vp.rectTransform;
+            sr.horizontal = false; sr.vertical = true; sr.movementType = ScrollRect.MovementType.Clamped;
+            sr.inertia = true; sr.decelerationRate = 0.12f; sr.scrollSensitivity = rowH;
+            // the bar: a cream track, a handle in the maker's colour
+            var track = Img(cv, "Bar " + makerName[m], Q(x0 + colW - barW / 2, y + listH / 2), new Vector2(barW, listH), sRound, C("e6d9b4"), 8f);
+            track.raycastTarget = true;
+            var area = Rect(track.transform, "Sliding Area", Vector2.zero, new Vector2(barW, listH));
+            area.anchorMin = Vector2.zero; area.anchorMax = Vector2.one; area.sizeDelta = Vector2.zero;
+            var handle = Img(area, "Handle", Vector2.zero, Vector2.zero, sRound, makerColour[m % 4] * new Color(0.85f, 0.85f, 0.85f, 1f), 8f);
+            handle.raycastTarget = true;
+            handle.rectTransform.anchorMin = Vector2.zero; handle.rectTransform.anchorMax = Vector2.one; handle.rectTransform.sizeDelta = Vector2.zero;
+            var bar = track.gameObject.AddComponent<Scrollbar>();
+            bar.handleRect = handle.rectTransform; bar.targetGraphic = handle;
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            var bn = bar.navigation; bn.mode = Navigation.Mode.None; bar.navigation = bn;
+            sr.verticalScrollbar = bar;
+            sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            bar.size = listH / contentH; bar.value = 1f;
+            // a hint under the bar that there is more
+            Txt(cv, "More " + makerName[m], Q(x0 + listW / 2, y + listH + 13), new Vector2(listW, 20), "SCROLL FOR " + (list.Count - visRows) + " MORE", future, 11, C("8a7b5a"), TextAlignmentOptions.Center);
         }
         // the fine print under a dashed rule
         if (notes.Count > 0)
@@ -699,7 +734,7 @@ public static class LobbyBuilder
     {
         s = System.Text.RegularExpressions.Regex.Replace(s, @"\s*\(`[^`]*`\)", "");
         s = System.Text.RegularExpressions.Regex.Replace(s, @"^(KayKit\s*[:\-]\s*|Kenney\s*:\s*)", "");
-        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+\d+(\.\d+)+$", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+\d+(\.\d+)+(-[\w.]+)?$", "");
         return s.Trim();
     }
 
