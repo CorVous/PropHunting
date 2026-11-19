@@ -2276,11 +2276,24 @@ public class MapBuilderUdon : UdonSharpBehaviour
         return true;
     }
 
+    // Perf: a scan of every def (about 850 string compares, 1-2 ms in Udon), and Outskirts asked 25-60 times in one
+    // build step. The few ids the builder asks for by name are remembered (they never change while the def table
+    // is the same array).
+    const int DEF_MEMO = 48;
+    string[] defMemoId;
+    int[] defMemoIndex;
+    int defMemoN;
+    string[] defMemoOf;
+
     int DefIndex(string id)
     {
         string[] ids = gen.defId;
-        for (int i = 0; i < ids.Length; i++) if (ids[i] == id) return i;
-        return -1;
+        if (defMemoId == null || defMemoOf != ids) { defMemoId = new string[DEF_MEMO]; defMemoIndex = new int[DEF_MEMO]; defMemoN = 0; defMemoOf = ids; }
+        for (int m = 0; m < defMemoN; m++) if (defMemoId[m] == id) return defMemoIndex[m];
+        int found = -1;
+        for (int i = 0; i < ids.Length; i++) if (ids[i] == id) { found = i; break; }
+        if (defMemoN < DEF_MEMO) { defMemoId[defMemoN] = id; defMemoIndex[defMemoN] = found; defMemoN++; }
+        return found;
     }
 
     // a small roof over an outside door (review 3: long walls with nothing on them): 0.7 m deep, brackets under it
