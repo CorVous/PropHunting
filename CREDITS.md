@@ -102,6 +102,8 @@ Other assets, under other licences:
 |---|---|---|---|---|
 | VRC Light Volumes 3.0.0-dev.20 | RED_SIM | sun light and shadows (VRChat world) | MIT | https://github.com/REDSIM/VRCLightVolumes |
 | DejaVu Sans Bold | DejaVu fonts | control legend key letters | DejaVu fonts licence | https://dejavu-fonts.github.io/License.html |
+| Noto Sans, Noto Sans JP, KR, SC and TC | Google (Noto) | translated text: Japanese, Korean, Chinese, Vietnamese letters | SIL OFL 1.1 | https://github.com/notofonts |
+| Rubik | The Rubik Project Authors | translated text: Cyrillic and Central European letters | SIL OFL 1.1 | https://github.com/googlefonts/rubik |
 
 Other software: Unity 2022.3.22f1; the VRChat world template and SDK (not part of the browser build).
 
@@ -133,6 +135,12 @@ Station Kit (`wall`, `wall-window`, `wall-door`: space base) and Kenney Fantasy 
 - Sounds: Kenney Interface Sounds (`bong_001`, `drop_002`, `error_004`, `pluck_001`, `select_003`, `tick_002`) and Kenney
   Music Jingles (`jingles_NES03`), counted in the table above.
 - Fonts: Kenney Future and Kenney Rocket (Kenney Fonts), with TextMesh Pro SDF assets made from them.
+- The language board's globe (`Icons/globe.png`) is drawn for this project by `Tools/make_globe.py`. The letters the
+  Kenney fonts lack come from Noto Sans and Rubik (SIL OFL 1.1, table above), cut down by `Tools/make_l10n_fonts.py`
+  (`Fonts/L10n`, with the licence texts) and baked into TextMesh Pro SDF atlases by "PropHunt/Bake text table".
+
+The translations (`Assets/Udon/Text/*.tsv`, 23 languages besides English) were drafted by AI (Claude) and have not yet
+been checked by native speakers; corrections are welcome.
 
 The on-screen control legend (`Assets/Udon/Textures/Legend*.png`) is drawn for this project by `Tools/make_legend.py`;
 its key letters are set in DejaVu Sans Bold (DejaVu fonts licence, https://dejavu-fonts.github.io/License.html).

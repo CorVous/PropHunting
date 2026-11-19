@@ -26,7 +26,8 @@ public class PHScorePad : UdonSharpBehaviour
     int shownRound = -1;
     float refillUntil, nextFill;
 
-    void Start() { Empty(); }
+    void Start() { Empty(); if (game != null && game.text != null) game.text.Register(this); }
+    public void _OnTextLanguage() { if (game == null) return; if (columns.activeSelf) Fill(); else Empty(); }
 
     // profiling (PHProfiler): while it runs, the time this script's updates take adds up in profMs
     [System.NonSerialized] public System.Diagnostics.Stopwatch profWatch;
@@ -51,7 +52,7 @@ public class PHScorePad : UdonSharpBehaviour
 
     void Empty()
     {
-        title.text = "NO ROUNDS YET"; title.color = idleColour;
+        title.text = game != null && game.text != null ? game.text.Get("pad.noRounds") : "NO ROUNDS YET"; title.color = idleColour;
         reason.text = "";
         shareRoot.SetActive(false); winHiders.SetActive(false); winHunters.SetActive(false); columns.SetActive(false);
     }
@@ -61,15 +62,15 @@ public class PHScorePad : UdonSharpBehaviour
     string Name(int playerId)
     {
         VRCPlayerApi p = VRCPlayerApi.GetPlayerById(playerId);
-        return Utilities.IsValid(p) ? p.displayName : "Player " + playerId;
+        return Utilities.IsValid(p) ? p.displayName : game.text.F1("res.player", playerId.ToString());
     }
 
     void Fill()
     {
         bool hw = game.hidersWin;
-        title.text = hw ? "HIDERS WIN" : "HUNTERS WIN";
+        title.text = game.text.Get(hw ? "pad.hidersWin" : "pad.huntersWin");
         title.color = hw ? hidersColour : huntersColour;
-        reason.text = game.endReason;
+        reason.text = game.text.En(game.endReason);
         winHiders.SetActive(hw); winHunters.SetActive(!hw);
         columns.SetActive(true);
 
@@ -82,8 +83,8 @@ public class PHScorePad : UdonSharpBehaviour
             if (game.slotRole[i] == PHGame.ROLE_HIDER && n < hiderRow.Length)
             {
                 hiderName[n].text = Name(game.slotPlayer[i]);
-                hiderProp[n].text = s.lastDef >= 0 && local != null && s.lastDef < local.defNames.Length ? local.defNames[s.lastDef] : "";
-                hiderResult[n].text = s.caught ? "caught " + Clock(s.survivedMs) : "survived";
+                hiderProp[n].text = s.lastDef >= 0 ? game.text.Prop(s.lastDef) : "";
+                hiderResult[n].text = s.caught ? game.text.F1("pad.caught", Clock(s.survivedMs)) : game.text.Get("pad.survived");
                 hiderResult[n].color = s.caught ? new Color(0.54f, 0.23f, 0.17f) : new Color(0.18f, 0.48f, 0.23f);
                 sum += s.caught ? s.survivedMs : huntMs;
                 n++;

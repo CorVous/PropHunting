@@ -285,6 +285,9 @@ public class PHPanel : UdonSharpBehaviour
     [HideInInspector] public float diceY;
 
     // ------------------------------------------------------------------ the picture
+    void Start() { if (game != null && game.text != null) game.text.Register(this); }
+    public void _OnTextLanguage() { Refresh(); }
+
     public void Refresh()
     {
         if (game == null) return;
@@ -298,7 +301,7 @@ public class PHPanel : UdonSharpBehaviour
             bool ap = kind == 0 && game.sizeAuto && tileArg[i] == auto;
             if (tileAuto[i].activeSelf != ap) tileAuto[i].SetActive(ap);
         }
-        autoCaption.text = "Auto · " + sizeCap[auto];
+        autoCaption.text = game.text.F1("panel.auto", sizeCap[auto]);
         int sizeNow = game.sizeAuto ? auto : game.sizeChoice;
         for (int r = 0; r < roundCaption.Length; r++)
         {
@@ -309,7 +312,7 @@ public class PHPanel : UdonSharpBehaviour
         int n = game.Participants();
         int h = n > 0 ? PHGame.Hunters(n) : 0;
         int props = n - h;
-        benchText.text = props + (props == 1 ? " Prop" : " Props") + " · " + h + (h == 1 ? " Hunter" : " Hunters");
+        benchText.text = game.text.F2(props == 1 ? (h == 1 ? "panel.bench.11" : "panel.bench.1n") : (h == 1 ? "panel.bench.n1" : "panel.bench.nn"), props.ToString(), h.ToString());
         // meeples in rows of up to 11, each row centred
         int perRow = 11;
         for (int i = 0; i < benchMeeples.Length; i++)
@@ -332,7 +335,7 @@ public class PHPanel : UdonSharpBehaviour
             VRCPlayerApi owner = Networking.GetOwner(game.gameObject);
             hostName.text = Utilities.IsValid(owner) ? owner.displayName : "";
             bool locked = HostLocked, host = Host;
-            hostButtonText[0].text = locked ? "UNLOCK HOST" : "LOCK HOST";
+            hostButtonText[0].text = game.text.Get(locked ? "panel.unlockHost" : "panel.lockHost");
             Color c0 = hostButtonImage[0].color; c0.a = host ? 1f : 0.35f; hostButtonImage[0].color = c0;
             bool claimable = !host && game.CanClaim();
             Color c1 = hostButtonImage[1].color; c1.a = claimable ? 1f : 0.35f; hostButtonImage[1].color = c1;
@@ -345,15 +348,15 @@ public class PHPanel : UdonSharpBehaviour
             seedCodeText.text = game.seedCode == "" ? "-" : game.seedCode;
             bool confirm = game.seedNeedsConfirm && hostNow;
             if (confirmRoot.activeSelf != confirm) confirmRoot.SetActive(confirm);
-            seedStatusText.text = confirm ? "" : game.seedStatus;
+            seedStatusText.text = confirm ? "" : game.text.Coded(game.seedStatus);
             bool entry = hostNow && lobby;
             if (seedInputRoot.activeSelf != entry) seedInputRoot.SetActive(entry);
             int runs = game.lastRot >= 0 && game.lastRot < game.rotRuns.Length ? game.rotRuns[game.lastRot] : 0;
-            runsText.text = "RUN " + runs + "/" + game.runCap;
+            runsText.text = game.text.F2("panel.run", runs.ToString(), game.runCap.ToString());
             Fade(5, hostNow && lobby); Fade(6, hostNow && lobby);
             int need = game.VotesNeeded();
-            scrapText.text = "SCRAP " + game.ScrapVotes() + "/" + need;
-            undoText.text = "UNDO " + game.UndoVotes() + "/" + need;
+            scrapText.text = game.text.F2("panel.scrapVotes", game.ScrapVotes().ToString(), need.ToString());
+            undoText.text = game.text.F2("panel.undoVotes", game.UndoVotes().ToString(), need.ToString());
             Fade(7, game.CanScrap()); Fade(8, game.CanUndo());
         }
         bool lockOn = game.phase != PHGame.PH_LOBBY;

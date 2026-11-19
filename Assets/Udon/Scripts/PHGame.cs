@@ -284,15 +284,17 @@ public class PHGame : UdonSharpBehaviour
     public readonly string[] sizeName = { "S", "M", "L", "XL" };
     public readonly string[] densityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense" };
     public readonly string[] roundLengthName = { "Short", "Normal", "Long" };
+    readonly string[] densityKey = { "dens.normal", "dens.sparse", "dens.dense", "dens.vsparse", "dens.vdense" };   // PHText rows
+    readonly string[] roundLengthKey = { "len.short", "len.normal", "len.long" };
 
     public string SettingsText()
     {
-        return "Size: " + (sizeAuto ? "Auto (" + sizeName[RoundSize()] + ")" : sizeName[sizeChoice])
-            + "\nProps: " + densityName[densityChoice]
-            + "\nRound: " + roundLengthName[roundLength]
-            + "\nForced taunt every " + tauntInterval + " s"
-            + "\nIn the zone: " + Participants() + " (" + Hunters(Mathf.Max(1, Participants())) + " hunt)"
-            + (phase != PH_LOBBY ? "\nA round is on." : "");
+        return (sizeAuto ? text.F1("opt.sizeAuto", sizeName[RoundSize()]) : text.F1("opt.size", sizeName[sizeChoice]))
+            + "\n" + text.F1("opt.props", text.Get(densityKey[densityChoice]))
+            + "\n" + text.F1("opt.round", text.Get(roundLengthKey[roundLength]))
+            + "\n" + text.F1("opt.taunt", tauntInterval.ToString())
+            + "\n" + text.F2("opt.zone", Participants().ToString(), Hunters(Mathf.Max(1, Participants())).ToString())
+            + (phase != PH_LOBBY ? "\n" + text.Get("opt.roundOn") : "");
     }
 
     public void SetSizeAuto(bool v) { if (!IsHost || phase != PH_LOBBY) return; sizeAuto = v; RequestSerialization(); }
@@ -308,15 +310,15 @@ public class PHGame : UdonSharpBehaviour
         if (!IsHost || phase != PH_LOBBY || seedTool == null) return;
         seedNeedsConfirm = false; confirmCode = "";
         int st = seedTool.Decode(text, GenData.GEN_VERSION);
-        if (st == PHSeed.TYPO) { seedStatus = "Typo in the code. A code looks like v" + GenData.GEN_VERSION + "-XXXX-XXXX-XXXX."; }
-        else if (st == PHSeed.NEWER) { seedStatus = "This code needs a newer world (generator v" + seedTool.genVersion + ")."; }
+        if (st == PHSeed.TYPO) { seedStatus = "seed.typo|" + GenData.GEN_VERSION; }
+        else if (st == PHSeed.NEWER) { seedStatus = "seed.newer|" + seedTool.genVersion; }
         else
         {
             string code = seedTool.Encode(seedTool.genVersion, seedTool.size, seedTool.seed, seedTool.flags);
             int fits = RoundSize();
-            if (st == PHSeed.OLDER) { seedStatus = "Made with generator v" + seedTool.genVersion + ": the map will differ."; seedNeedsConfirm = true; confirmCode = code; }
-            else if (seedTool.size != fits) { seedStatus = "This map is size " + sizeName[seedTool.size] + "; the players here fit " + sizeName[fits] + "."; seedNeedsConfirm = true; confirmCode = code; }
-            else { pendingCode = code; seedStatus = "Next map: " + code; }
+            if (st == PHSeed.OLDER) { seedStatus = "seed.older|" + seedTool.genVersion; seedNeedsConfirm = true; confirmCode = code; }
+            else if (seedTool.size != fits) { seedStatus = "seed.size|" + sizeName[seedTool.size] + "|" + sizeName[fits]; seedNeedsConfirm = true; confirmCode = code; }
+            else { pendingCode = code; seedStatus = "seed.next|" + code; }
         }
         RequestSerialization();
     }
@@ -325,7 +327,7 @@ public class PHGame : UdonSharpBehaviour
     {
         if (!IsHost || !seedNeedsConfirm) return;
         pendingCode = confirmCode; seedNeedsConfirm = false;
-        seedStatus = "Next map: " + pendingCode;
+        seedStatus = "seed.next|" + pendingCode;
         RequestSerialization();
     }
 
