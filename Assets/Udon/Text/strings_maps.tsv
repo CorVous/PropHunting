@@ -1,6 +1,6 @@
-key	en	ja	ko	zh-CN	zh-HK	es	fr	de	pt-BR	ru
-maps.title	MAPS PLAYED									
-maps.newmap	NEW MAP									
-maps.replay	REPLAY									
-maps.played	PLAYED {0}									
-maps.count	x{0}									
+key	en	ja	ko	zh-CN	zh-HK	es	fr	de	pt-BR	ru	it	pl	id	nl	sv	uk	da	no	fi	hu	cs	tr	ro	vi	ar	he	th	tok
+maps.title	MAPS PLAYED	プレイしたマップ	플레이한 맵	玩过的地图	玩過的地圖	MAPAS JUGADOS	CARTES JOUÉES	GESPIELTE KARTEN	MAPAS JOGADOS	СЫГРАННЫЕ КАРТЫ	MAPPE GIOCATE	ROZEGRANE MAPY	PETA DIMAINKAN	GESPEELDE KAARTEN	SPELADE KARTOR	ЗІГРАНІ КАРТИ	SPILLEDE BANER	SPILTE KART	PELATUT KARTAT	JÁTSZOTT PÁLYÁK	HRANÉ MAPY	OYNANAN HARİTALAR	HĂRȚI JUCATE	BẢN ĐỒ ĐÃ CHƠI	الخرائط الملعوبة	מפות ששוחקו	แผนที่ที่เล่นแล้ว	MA MUSI PINI
+maps.newmap	NEW MAP	新しいマップ	새 맵	新地图	新地圖	MAPA NUEVO	NOUVELLE CARTE	NEUE KARTE	MAPA NOVO	НОВАЯ КАРТА	NUOVA MAPPA	NOWA MAPA	PETA BARU	NIEUWE KAART	NY KARTA	НОВА КАРТА	NY BANE	NYTT KART	UUSI KARTTA	ÚJ PÁLYA	NOVÁ MAPA	YENİ HARİTA	HARTĂ NOUĂ	BẢN ĐỒ MỚI	خريطة جديدة	מפה חדשה	แผนที่ใหม่	MA SIN
+maps.replay	REPLAY	もう一度	다시 하기	再玩一次	再玩一次	REPETIR	REJOUER	NOCHMAL	REPETIR	ЕЩЁ РАЗ	RIGIOCA	JESZCZE RAZ	MAIN LAGI	OPNIEUW	SPELA IGEN	ЩЕ РАЗ	IGEN	IGJEN	UUDESTAAN	ÚJRA	ZNOVU	TEKRAR	DIN NOU	CHƠI LẠI	إعادة	שוב	เล่นอีกครั้ง	MUSI SIN
+maps.played	PLAYED {0}	プレイ {0}	플레이 {0}	已玩 {0}	已玩 {0}	JUGADO {0}	JOUÉE {0}	GESPIELT {0}	JOGADO {0}	СЫГРАНО {0}	GIOCATA {0}	ROZEGRANO {0}	DIMAINKAN {0}	GESPEELD {0}	SPELAD {0}	ЗІГРАНО {0}	SPILLET {0}	SPILT {0}	PELATTU {0}	JÁTSZVA {0}	HRÁNO {0}	OYNANDI {0}	JUCATĂ {0}	ĐÃ CHƠI {0}	لُعبت {0}	שוחקה {0}	เล่นแล้ว {0}	MUSI {0}
+maps.count	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}	x{0}
