@@ -21,8 +21,8 @@ public static partial class LobbyBuilder
         root.SetParent(lobby, false);
         root.localPosition = localPos; root.localRotation = Quaternion.Euler(0f, yaw, 0f);
         var wood = Mat("LangStandWood", C("b07c3e"));
-        Box(root, "Foot", new Vector3(0f, 0.03f, 0f), new Vector3(0.9f, 0.06f, 0.5f), wood);
-        Slab(root, "Post", new Vector3(0f, 0.5f, 0.06f), new Vector3(0.12f, 0.94f, 0.12f), wood);
+        Box(root, "Foot", new Vector3(0f, 0.03f, 0f), new Vector3(0.9f, 0.06f, 0.6f), wood);
+        Slab(root, "Post", new Vector3(0f, 0.45f, 0.24f), new Vector3(0.12f, 0.84f, 0.12f), wood);   // behind the leaning board
         Slab(root, "Back", new Vector3(0f, 1.05f, 0.13f), new Vector3(3.6f, 1.06f, 0.05f), wood);
         root.Find("Back").localRotation = Quaternion.Euler(22f, 0f, 0f);
 
