@@ -769,6 +769,25 @@ public class MapBuilderUdon : UdonSharpBehaviour
         profMs += profWatch.Elapsed.TotalMilliseconds - p0;
     }
 
+    double[] stepEst;   // per build stage: what a step has been costing lately (ms), for the frame budget
+
+    // Perf log (off unless perfLog is set, e.g. from PHGame.perfLog): one "[prophunt] perf build" line per build
+    // step slower than perfStepMs, with the frame number, and a summary per stage when the build ends.
+    [System.NonSerialized] public bool perfLog;
+    public float perfStepMs = 4f;
+
+    void PerfStep(int st, int cu, double one)
+    {
+        if (one >= perfStepMs) Debug.Log("[prophunt] perf build step frame=" + Time.frameCount + " stage=" + st + " cursor=" + cu + " ms=" + one.ToString("0.0"));
+    }
+
+    void PerfSummary()
+    {
+        string s = "[prophunt] perf build done frame=" + Time.frameCount + " workMs=" + buildMs.ToString("0") + " worstMs=" + worstStepMs.ToString("0.0") + " worstStage=" + worstStage + " stages:";
+        for (int i = 0; i < stageMs.Length; i++) if (stageMs[i] > 0.0) s += " " + i + "=" + stageMs[i].ToString("0");
+        Debug.Log(s);
+    }
+
     void UpdateBody()
     {
         if (built && nClouds > 0)
@@ -784,12 +803,21 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (!busy) return;
         watch.Reset(); watch.Start();
         bool finished = false;
-        while (watch.Elapsed.TotalMilliseconds < budgetMs)
+        // Perf: the budget was checked only before a step, so a frame ran 6 ms and then one whole step more. Now a
+        // step is begun only if what that stage's steps have been costing (a running average) still fits; the
+        // first step of a frame always runs, so the build never stalls.
+        if (stepEst == null) stepEst = new double[32];
+        bool first = true;
+        while (true)
         {
             double s0 = watch.Elapsed.TotalMilliseconds;
             int st = stage, cu = cursor;
+            if (!first && s0 + stepEst[st & 31] > budgetMs) break;
+            first = false;
             if (StepOne()) { finished = true; break; }
             double one = watch.Elapsed.TotalMilliseconds - s0;
+            stepEst[st & 31] = stepEst[st & 31] * 0.75 + one * 0.25;
+            if (perfLog) PerfStep(st, cu, one);
             if (one > worstStepMs) { worstStepMs = one; worstStage = st; worstCursor = cu; }
             stageMs[st & 31] += one;
             if (one > slowStepMs) Debug.Log("[MapBuilder] slow step: stage " + st + " cursor " + cu + " " + one.ToString("0") + " ms");
@@ -799,6 +827,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (finished)
         {
             busy = false; built = true;
+            if (perfLog) PerfSummary();
             Debug.Log("[MapBuilder] built in " + buildMs.ToString("0") + " ms of work: " + objects.Length + " props, ground " + nv[B_GROUND] + " verts, walls " + nv[B_WALLS] + ", roofs " + nv[B_ROOFS] + ", collision " + nv[B_COLL]);
         }
     }

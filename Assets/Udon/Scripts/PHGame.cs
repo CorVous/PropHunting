@@ -529,10 +529,15 @@ public class PHGame : UdonSharpBehaviour
     [System.NonSerialized] public string genWorstAt = "";
     System.Diagnostics.Stopwatch genWatch;
 
+    const double GEN_BUDGET_MS = 6.0;   // the generator's time a frame
+    bool beginPending;                  // the generator is done: the builder starts next frame (UpdateBody)
+    double[] genStepEst;                // per generator stage: what a step has been costing lately (ms)
+
     void BeginMap()
     {
         genRound = round;
         building = true;
+        beginPending = false;
         if (genWatch == null) genWatch = new System.Diagnostics.Stopwatch();
         genWatch.Reset(); genWatch.Start();
         builder.Clear();
@@ -557,26 +562,83 @@ public class PHGame : UdonSharpBehaviour
         profMs += profWatch.Elapsed.TotalMilliseconds - p0;
     }
 
+    // Perf log (off by default; tick it on PHGame in the inspector, or set it from editor code): "[prophunt] perf"
+    // lines in the log. Generator steps of 4 ms or more and the builder's start (here), the builder's slow steps and
+    // a per-stage summary (MapBuilderUdon.perfLog, set from this), and every 5 s a frame sample: the mean and worst
+    // frame time, and this script's own Update cost, so a before/after can be read from the log alone.
+    public bool perfLog = false;
+    float perfWindowEnd, perfFrameSum, perfFrameMax, perfSelfMs;
+    int perfFrames;
+    System.Diagnostics.Stopwatch perfWatch;
+
+    void PerfSample(double selfMs)
+    {
+        float dt = Time.unscaledDeltaTime * 1000f;
+        perfFrames++; perfFrameSum += dt; perfSelfMs += (float)selfMs;
+        if (dt > perfFrameMax) perfFrameMax = dt;
+        if (Time.time < perfWindowEnd) return;
+        if (perfFrames > 0 && perfWindowEnd > 0f)
+            Debug.Log("[prophunt] perf frames frame=" + Time.frameCount + " n=" + perfFrames + " meanMs=" + (perfFrameSum / perfFrames).ToString("0.00")
+                + " worstMs=" + perfFrameMax.ToString("0.0") + " gameUpdateMs=" + (perfSelfMs / perfFrames).ToString("0.000") + " phase=" + phase + " building=" + building);
+        perfWindowEnd = Time.time + 5f;
+        perfFrames = 0; perfFrameSum = 0f; perfFrameMax = 0f; perfSelfMs = 0f;
+    }
+
     void UpdateBody()
+    {
+        if (perfLog)
+        {
+            if (perfWatch == null) perfWatch = new System.Diagnostics.Stopwatch();
+            perfWatch.Reset(); perfWatch.Start();
+            builder.perfLog = true;
+            UpdateBodyInner();
+            PerfSample(perfWatch.Elapsed.TotalMilliseconds);
+            return;
+        }
+        if (builder.perfLog) builder.perfLog = false;
+        UpdateBodyInner();
+    }
+
+    void UpdateBodyInner()
     {
         if (building)
         {
-            if (!builder.busy && !builder.built)
+            if (!builder.busy && !builder.built && beginPending)
+            {
+                // Perf: the builder starts in a frame of its own (BeginBuild alone is about 23 ms; it ran in the
+                // generator's last frame, after up to 6 ms of steps and the last step, 30-45 ms in all)
+                beginPending = false;
+                if (genWatch == null) genWatch = new System.Diagnostics.Stopwatch();
+                genWatch.Reset(); genWatch.Start();
+                builder.BeginBuild();
+                if (logSlowSteps) Debug.Log("[PHProf] build begin: " + genWatch.Elapsed.TotalMilliseconds.ToString("0.0") + "ms");
+                if (perfLog) Debug.Log("[prophunt] perf build begin frame=" + Time.frameCount + " ms=" + genWatch.Elapsed.TotalMilliseconds.ToString("0.0"));
+            }
+            else if (!builder.busy && !builder.built)
             {
                 // generation, a few steps per frame within a budget
                 if (genWatch == null) genWatch = new System.Diagnostics.Stopwatch();
                 genWatch.Reset(); genWatch.Start();
                 bool finished = false;
                 double s0 = 0.0;
-                while (!finished && s0 < 6.0)
+                // Perf: a step is begun only if what that stage's steps have been costing still fits the budget (it
+                // was checked only before a step, so a frame ran 6 ms and then one whole step more); the first step
+                // of a frame always runs
+                if (genStepEst == null) genStepEst = new double[16];
+                bool firstStep = true;
+                while (!finished)
                 {
-                    int st = 0, cu = 0, ph = 0;
+                    int st = gen.CurrentStage(), cu = 0, ph = 0;
+                    if (!firstStep && s0 + genStepEst[st & 15] >= GEN_BUDGET_MS) break;
+                    firstStep = false;
                     string sub = "";
-                    if (logSlowSteps) { st = gen.CurrentStage(); cu = gen.CurrentCursor(); ph = gen.CurrentPhase(); sub = gen.CurrentSub(); }
+                    if (logSlowSteps) { cu = gen.CurrentCursor(); ph = gen.CurrentPhase(); sub = gen.CurrentSub(); }
                     finished = gen.Step();
                     double s1 = genWatch.Elapsed.TotalMilliseconds;
                     float one = (float)(s1 - s0);
                     s0 = s1;
+                    genStepEst[st & 15] = genStepEst[st & 15] * 0.75 + one * 0.25;
+                    if (perfLog && one >= 4f) Debug.Log("[prophunt] perf gen step frame=" + Time.frameCount + " stage=" + st + " ms=" + one.ToString("0.0"));
                     genMs += one;
                     if (one > genWorstMs) { genWorstMs = one; if (logSlowSteps) genWorstAt = "st" + st + "/cu" + cu + "/ph" + ph + "/sub" + sub; }
                     if (logSlowSteps)
@@ -590,11 +652,7 @@ public class PHGame : UdonSharpBehaviour
                 if (finished)
                 {
                     if (gen.failed) { building = false; Debug.LogError("[PHGame] map generation failed: " + gen.failReason); }
-                    else
-                    {
-                        builder.BeginBuild();
-                        if (logSlowSteps) Debug.Log("[PHProf] build begin: " + (genWatch.Elapsed.TotalMilliseconds - s0).ToString("0.0") + "ms");
-                    }
+                    else beginPending = true;   // BeginBuild next frame (above)
                 }
             }
             else if (builder.built)

@@ -15,6 +15,7 @@ public class PHExplore : UdonSharpBehaviour
     public AudioClip select, error, done;
 
     bool generating;
+    bool beginNext;   // the generator is done: the builder starts next frame, in a frame of its own (as PHGame)
 
     public void Press()
     {
@@ -26,6 +27,7 @@ public class PHExplore : UdonSharpBehaviour
         }
         if (sfx != null && select != null) sfx.PlayOneShot(select);
         generating = true;
+        beginNext = false;
         builder.Clear();
         uint seed = game.ThemedSeed();   // of the debug THEME button's theme, if one is chosen
         game.gen.Begin(seed, game.RoundSize(), game.densityChoice, 0);
@@ -38,7 +40,13 @@ public class PHExplore : UdonSharpBehaviour
         if (game.phase != PHGame.PH_LOBBY) { generating = false; label.text = "EXPLORE A NEW MAP"; return; }   // a round took over
         MapBuilderUdon builder = game.builder;
         MapGenUdon gen = game.gen;
-        if (!builder.busy && !builder.built)
+        if (!builder.busy && !builder.built && beginNext)
+        {
+            beginNext = false;
+            builder.BeginBuild();
+            label.text = "BUILDING...";
+        }
+        else if (!builder.busy && !builder.built)
         {
             float t0 = Time.realtimeSinceStartup;
             bool finished = false;
@@ -46,8 +54,7 @@ public class PHExplore : UdonSharpBehaviour
             if (finished)
             {
                 if (gen.failed) { generating = false; label.text = "FAILED, TRY AGAIN"; return; }
-                builder.BeginBuild();
-                label.text = "BUILDING...";
+                beginNext = true;
             }
         }
         else if (builder.built)
