@@ -1,7 +1,7 @@
 [
  {
   "key": "first_catch",
-  "weapon": "melee:fantasy-weapons-bits:halberd",
+  "weapon": "melee:rpg-tools-bits:hammer",
   "lo": 1,
   "hi": 8
  },
@@ -55,7 +55,7 @@
  },
  {
   "key": "weathered",
-  "weapon": "melee:quaternius-low-poly-rpg-pack:Axe_Double",
+  "weapon": "melee:quaternius-piratekit:Weapon_Sword_2",
   "lo": 2,
   "hi": 10
  },
@@ -97,13 +97,13 @@
  },
  {
   "key": "swing_and_a_miss",
-  "weapon": "melee:rpg-tools-bits:hammer",
+  "weapon": "melee:rpg-tools-bits:mallet",
   "lo": 1,
   "hi": 8
  },
  {
   "key": "splinters",
-  "weapon": "melee:rpg-tools-bits:mallet",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Hammer_Double",
   "lo": 1,
   "hi": 8
  },
@@ -127,19 +127,19 @@
  },
  {
   "key": "scrapper",
-  "weapon": "melee:quaternius-low-poly-rpg-pack:Axe_small_Golden",
+  "weapon": "melee:quaternius-cubeworldkit:Axe_Gold",
   "lo": 1,
   "hi": 2
  },
  {
   "key": "first_hunt",
-  "weapon": "melee:quaternius-low-poly-rpg-pack:Hammer_Double",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Axe_small_Golden",
   "lo": 1,
   "hi": 6
  },
  {
   "key": "double",
-  "weapon": "melee:quaternius-piratekit:Weapon_Sword_2",
+  "weapon": "melee:fantasy-weapons-bits:hammer_C",
   "lo": 2,
   "hi": 10
  },
@@ -175,7 +175,7 @@
  },
  {
   "key": "first_win_hunt",
-  "weapon": "melee:fantasy-weapons-bits:hammer_C",
+  "weapon": "melee:fantasy-weapons-bits:halberd",
   "lo": 2,
   "hi": 10
  },
@@ -193,7 +193,7 @@
  },
  {
   "key": "town_watch",
-  "weapon": "melee:kaykit-skeletons:Skeleton_Blade",
+  "weapon": "melee:quaternius-low-poly-rpg-pack:Axe_Double",
   "lo": 2,
   "hi": 12
  },
@@ -234,14 +234,20 @@
   "hi": 80
  },
  {
+  "key": "three_catches",
+  "weapon": "melee:kaykit-skeletons:Skeleton_Blade",
+  "lo": 3,
+  "hi": 12
+ },
+ {
   "key": "survivor",
-  "weapon": "gun:quaternius-low-poly-guns:ak47",
+  "weapon": "gun:kenney-blaster-kit:blaster-e",
   "lo": 1,
   "hi": 4
  },
  {
   "key": "untouched",
-  "weapon": "gun:kenney-blaster-kit:blaster-p",
+  "weapon": "gun:kenney-blaster-kit:blaster-k",
   "lo": 2,
   "hi": 8
  },
@@ -271,7 +277,7 @@
  },
  {
   "key": "first_shot",
-  "weapon": "gun:kaykit-adventurers:crossbow_1handed",
+  "weapon": "gun:kenney-blaster-kit:blaster-m",
   "lo": 3,
   "hi": 10
  },
@@ -331,7 +337,7 @@
  },
  {
   "key": "bouncy",
-  "weapon": "gun:quaternius-toonshootergamekit:ShortCannon",
+  "weapon": "gun:quaternius-low-poly-guns:ak47",
   "lo": 1,
   "hi": 5
  },
@@ -343,7 +349,7 @@
  },
  {
   "key": "spray_and_pray",
-  "weapon": "gun:kenney-blaster-kit:blaster-m",
+  "weapon": "gun:kenney-blaster-kit:blaster-c",
   "lo": 3,
   "hi": 10
  },
@@ -367,13 +373,13 @@
  },
  {
   "key": "first_hide",
-  "weapon": "gun:kenney-space-kit:weapon_rifle",
+  "weapon": "gun:kenney-blaster-kit:blaster-a",
   "lo": 1,
   "hi": 2
  },
  {
   "key": "three_survivals",
-  "weapon": "gun:quaternius-piratekit:Weapon_DoubleShotgun",
+  "weapon": "gun:kaykit-adventurers:crossbow_1handed",
   "lo": 4,
   "hi": 10
  },
@@ -397,13 +403,13 @@
  },
  {
   "key": "first_win_hide",
-  "weapon": "gun:kenney-blaster-kit:blaster-e",
+  "weapon": "gun:quaternius-scifimodularguns:Grenade_1",
   "lo": 1,
   "hi": 4
  },
  {
   "key": "three_wins_hide",
-  "weapon": "gun:quaternius-scifimodularguns:Crossbow_2",
+  "weapon": "gun:kaykit-adventurers:crossbow_2handed",
   "lo": 4,
   "hi": 12
  },
@@ -415,56 +421,62 @@
  },
  {
   "key": "hidden_minute",
-  "weapon": "gun:quaternius-scifimodularguns:Grenade_1",
+  "weapon": "gun:quaternius-scifimodularguns:Grenade_3",
   "lo": 1,
   "hi": 4
  },
  {
   "key": "two_minutes",
-  "weapon": "gun:kenney-blaster-kit:blaster-k",
-  "lo": 2,
-  "hi": 8
- },
- {
-  "key": "town_hider",
   "weapon": "gun:quaternius-sci-fi-essentials-kit:Gun_Revolver",
   "lo": 2,
   "hi": 8
  },
  {
-  "key": "village_hider",
-  "weapon": "gun:holiday-bits:snowball_cannon",
-  "lo": 3,
-  "hi": 15
+  "key": "town_hider",
+  "weapon": "gun:quaternius-toonshootergamekit:ShortCannon",
+  "lo": 2,
+  "hi": 8
  },
  {
-  "key": "station_hider",
+  "key": "village_hider",
   "weapon": "gun:quaternius-low-poly-guns:RocketLauncher",
   "lo": 3,
   "hi": 15
  },
  {
+  "key": "station_hider",
+  "weapon": "gun:quaternius-scifimodularguns:Crossbow_2",
+  "lo": 3,
+  "hi": 15
+ },
+ {
   "key": "ten_props",
-  "weapon": "gun:kaykit-adventurers:crossbow_2handed",
+  "weapon": "gun:quaternius-piratekit:Weapon_DoubleShotgun",
   "lo": 5,
   "hi": 10
  },
  {
   "key": "hoppy",
-  "weapon": "gun:quaternius-scifimodularguns:Grenade_3",
+  "weapon": "gun:kenney-space-kit:weapon_rifle",
   "lo": 1,
   "hi": 3
  },
  {
   "key": "back_to_back",
-  "weapon": "gun:kenney-blaster-kit:blaster-c",
+  "weapon": "gun:kenney-blaster-kit:blaster-q",
   "lo": 3,
   "hi": 10
  },
  {
   "key": "stand_your_ground",
-  "weapon": "gun:kenney-blaster-kit:blaster-q",
+  "weapon": "gun:kenney-blaster-kit:blaster-p",
   "lo": 3,
   "hi": 10
+ },
+ {
+  "key": "five_survivals",
+  "weapon": "gun:holiday-bits:snowball_cannon",
+  "lo": 6,
+  "hi": 15
  }
 ]

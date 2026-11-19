@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // The Trophies board on the spawn wall (Cor, 2026-11-19): hunter trophies on the left, hider trophies on the
-// right, 39 each, every card with its name, its goal written out, a rough range of rounds to earn it and, for the
+// right, 40 each, every card with its name, its goal written out, a rough range of rounds to earn it and, for the
 // ones that count up, a bar. Each player sees their own: each half is sorted closest-to-done first, the earned ones
 // at the end. The cards are built by the scene builder; this only moves and colours them.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]

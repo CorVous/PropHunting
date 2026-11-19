@@ -24,8 +24,8 @@ public static partial class LobbyBuilder
 
     // the east wall (Cor): an alcove 1 m deep behind an opening from 0.5 to 5.85 m up (WorldSceneBuilder); the
     // shelves stand in it, flat against its back, five showing, sixteen weapons wide
-    public const float Alcove = 1.0f, OpeningLow = 0.5f, OpeningHigh = 5.85f, OpeningHalf = 9.4f;
-    const float SlotW = 0.55f, RowH = 1.17f, BaseY = 0.55f, Depth = 0.8f, Ceiling = 7f;
+    public const float Alcove = 1.0f, OpeningLow = 0.5f, OpeningHigh = 5.85f, OpeningHalf = 10.65f;
+    const float SlotW = 0.64f, RowH = 1.17f, BaseY = 0.55f, Depth = 0.8f, Ceiling = 7f;
     const int Shown = 5;
     const int Cols = 16;
 
@@ -348,7 +348,7 @@ public static partial class LobbyBuilder
 
     // the dressing across the weapon wall's opening, from the same KayKit Board Game Bits (CC0) as the room's giant
     // pieces (Cor: the flat art did not fit): a cream ledge on the bottom strip with a parade of small game pieces
-    // in the board's four colours, and pennant flags leaning out from the band over the top
+    // in the board's four colours (the room's trim band is the top's panel, Cor)
     static void BuildOpeningTrim(Transform root, float roomW)
     {
         float face = roomW / 2f, w = 2f * OpeningHalf;
@@ -371,14 +371,6 @@ public static partial class LobbyBuilder
             }
             var go = Piece(root, "board-game-bits/" + model, new Vector3(face - 0.11f, OpeningLow, z), size, 270f + (i % 3 - 1) * 12f, false);
             if (model.StartsWith("coin")) go.transform.RotateAround(root.TransformPoint(new Vector3(face - 0.11f, OpeningLow, z)), root.TransformDirection(Vector3.forward), 80f);
-        }
-        // the pennants: one every 3.1 m, poles out of the band's lower edge, leaning into the room
-        for (int i = 0; i < 6; i++)
-        {
-            float z = -w / 2f + 1.55f + i * (w - 3.1f) / 5f;
-            var at = new Vector3(face - 0.02f, 5.86f, z);
-            var go = Piece(root, "board-game-bits/flag_A_" + colours[i % 4], at, 0.7f, 90f, false);
-            go.transform.RotateAround(root.TransformPoint(at), root.TransformDirection(Vector3.forward), 55f);   // the top out over the room
         }
         // no shadows from the dressing (the flags' fell across the shelves)
         foreach (Transform c in root)
@@ -525,7 +517,7 @@ public static partial class LobbyBuilder
     }
 
     // ------------------------------------------------------------------ the Trophies board (south wall)
-    // 2900 x 1190 canvas units at 3.7 mm: 10.7 x 4.4 m, on the west wall. Two halves of 4 x 10 cards (39 used), a
+    // 2900 x 1190 canvas units at 3.7 mm: 10.7 x 4.4 m, on the west wall. Two halves of 4 x 10 cards (all 40 used), a
     // count over each.
     const int BoardCols = 4;
     const float CardW = 330f, CardH = 100f, Gap = 10f, HalfW = BoardCols * CardW + (BoardCols - 1) * Gap;
@@ -552,7 +544,7 @@ public static partial class LobbyBuilder
             float cx = (h == 0 ? -1 : 1) * halfShift / 2f;
             Img(cv, h == 0 ? "HunterDot" : "HiderDot", new Vector2(cx - HalfW / 2f + 18, Hh / 2f - 32), new Vector2(30, 30), sRound, h == 0 ? C("d8473a") : C("7fb3e6"), 6f);
             Img(cv, "Rule", new Vector2(cx, Hh / 2f - 54), new Vector2(HalfW, 4), sDash, C("c9a46a"), 2f);
-            var count = Txt(cv, h == 0 ? "HunterCount" : "HiderCount", new Vector2(cx + HalfW / 2f - 60, Hh / 2f - 32), new Vector2(120, 30), "0 / 39", future, 20, C("6b5d40"), TextAlignmentOptions.Right);
+            var count = Txt(cv, h == 0 ? "HunterCount" : "HiderCount", new Vector2(cx + HalfW / 2f - 60, Hh / 2f - 32), new Vector2(120, 30), "0 / 40", future, 20, C("6b5d40"), TextAlignmentOptions.Right);
             if (h == 0) board.countHunter = count; else board.countHider = count;
         }
 

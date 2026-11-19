@@ -86,6 +86,8 @@ trophy.last_stand.name	Last Stand
 trophy.last_stand.goal	Catch a hider in the final stand.									
 trophy.quick_pair.name	Quick Pair									
 trophy.quick_pair.goal	Catch 2 hiders in the first minute of the hunt.									
+trophy.three_catches.name	Three Catches									
+trophy.three_catches.goal	Catch 3 hiders in total.									
 trophy.survivor.name	Survivor									
 trophy.survivor.goal	Survive a round as a hider.									
 trophy.untouched.name	Untouched									
@@ -164,3 +166,5 @@ trophy.back_to_back.name	Back to Back
 trophy.back_to_back.goal	Survive 2 rounds in a row as a hider.									
 trophy.stand_your_ground.name	Stand Your Ground									
 trophy.stand_your_ground.goal	Still be hiding when the final stand begins.									
+trophy.five_survivals.name	Five Survivals									
+trophy.five_survivals.goal	Survive 5 rounds in total.									

@@ -9,7 +9,7 @@ using VRC.SDK3.Persistence;
 //   weapons     the catalog of Tools/weapon_catalog.json, baked by the scene builder (StoreBuilder): starters and
 //               the 10 free weapons a side (Tools/store_free.json) are free; a new player carries a random free one; cool and goofy ones come from trophies, shop ones are bought. What the player carries is
 //               written to their PHSlot (meleeChoice / gunChoice, the melee work's synced picks)
-//   trophies    78: 39 hunter ones unlock melee weapons, 39 hider ones guns (Cor: half the weapons; the hardest
+//   trophies    80: 40 hunter ones unlock melee weapons, 40 hider ones guns (Cor: half the weapons; the hardest
 //               give the most interesting). Watched from the player's own PHSlot
 //               (a light 0.25 s check during the round, 1 s otherwise) and settled when the round ends
 // Everything is kept in VRChat's player data (PlayerData: per player, per world), read when it is restored.
@@ -36,7 +36,7 @@ public class PHStore : UdonSharpBehaviour
     public string[] tKey, tName, tGoal;
     public int[] tLo, tHi;       // a rough range of rounds to earn it
     public int[] tWeapon;        // the catalog weapon it unlocks
-    public const int TROPHIES = 78, HUNTER_TROPHIES = 39;
+    public const int TROPHIES = 80, HUNTER_TROPHIES = 40;
 
     // ---- the player's own (saved)
     [System.NonSerialized] public int coins;
@@ -58,14 +58,14 @@ public class PHStore : UdonSharpBehaviour
         T_EMPTY = 20, T_SCRAPPER = 21,
         T_FIRST_HUNT = 22, T_DOUBLE = 23, T_FIVE = 24, T_TWENTY_FIVE = 25, T_FIFTY = 26, T_TEN_HUNTS = 27,
         T_REG_HUNTER = 28, T_WIN1_H = 29, T_WIN3_H = 30, T_TOP_DOG = 31, T_TOWN_H = 32, T_VILLAGE_H = 33, T_STATION_H = 34,
-        T_FIFTY_BONKS = 35, T_STEADY = 36, T_LAST_STAND = 37, T_QUICK_PAIR = 38,
-        T_SURVIVOR = 39, T_UNTOUCHED = 40, T_LAST_PROP = 41, T_TEN_SURV = 42, T_FIFTY_SURV = 43, T_ON_A_ROLL = 44,
-        T_FIRST_SHOT = 45, T_SHARPSHOOTER = 46, T_GIANT_SLAYER = 47, T_PROPS_WIN = 48, T_GLOBE_P = 49, T_OLD_P = 50,
-        T_LONG_HAUL = 51, T_FOUND = 52, T_CLOSE_CALL = 53, T_QUICK_CHANGE = 54, T_BOUNCY = 55, T_CHAMELEON = 56,
-        T_SPRAY = 57, T_FULL_HOUSE = 58, T_USUAL = 59, T_WALLFLOWER = 60,
-        T_FIRST_HIDE = 61, T_THREE_SURV = 62, T_TWENTY_FIVE_SURV = 63, T_TEN_HIDES = 64, T_REG_HIDER = 65, T_WIN1_P = 66,
-        T_WIN3_P = 67, T_ROYALTY = 68, T_MINUTE = 69, T_TWO_MINUTES = 70, T_TOWN_P = 71, T_VILLAGE_P = 72, T_STATION_P = 73,
-        T_TEN_PROPS = 74, T_HOPPY = 75, T_BACK_TO_BACK = 76, T_STAND = 77;
+        T_FIFTY_BONKS = 35, T_STEADY = 36, T_LAST_STAND = 37, T_QUICK_PAIR = 38, T_THREE_CATCHES = 39,
+        T_SURVIVOR = 40, T_UNTOUCHED = 41, T_LAST_PROP = 42, T_TEN_SURV = 43, T_FIFTY_SURV = 44, T_ON_A_ROLL = 45,
+        T_FIRST_SHOT = 46, T_SHARPSHOOTER = 47, T_GIANT_SLAYER = 48, T_PROPS_WIN = 49, T_GLOBE_P = 50, T_OLD_P = 51,
+        T_LONG_HAUL = 52, T_FOUND = 53, T_CLOSE_CALL = 54, T_QUICK_CHANGE = 55, T_BOUNCY = 56, T_CHAMELEON = 57,
+        T_SPRAY = 58, T_FULL_HOUSE = 59, T_USUAL = 60, T_WALLFLOWER = 61,
+        T_FIRST_HIDE = 62, T_THREE_SURV = 63, T_TWENTY_FIVE_SURV = 64, T_TEN_HIDES = 65, T_REG_HIDER = 66, T_WIN1_P = 67,
+        T_WIN3_P = 68, T_ROYALTY = 69, T_MINUTE = 70, T_TWO_MINUTES = 71, T_TOWN_P = 72, T_VILLAGE_P = 73, T_STATION_P = 74,
+        T_TEN_PROPS = 75, T_HOPPY = 76, T_BACK_TO_BACK = 77, T_STAND = 78, T_FIVE_SURV = 79;
 
     // coins (Cor approved): a round, a catch, surviving, every 20 s hidden before being caught, winning
     public const int COIN_ROUND = 10, COIN_CATCH = 15, COIN_SURVIVE = 25, COIN_WIN = 10, COIN_HIDDEN_MS = 20000;
@@ -470,6 +470,8 @@ public class PHStore : UdonSharpBehaviour
         if (st[S_PROPS] >= 10) Earn(T_TEN_PROPS);
         if (st[S_STREAK] >= 2) Earn(T_BACK_TO_BACK);
         if (st[S_HOPS] >= 50) Earn(T_HOPPY);
+        if (st[S_CATCH] >= 3) Earn(T_THREE_CATCHES);
+        if (st[S_SURV] >= 5) Earn(T_FIVE_SURV);
     }
 
     // how far along a counted trophy is: x of n (n 0 for one done in one go)
@@ -477,12 +479,12 @@ public class PHStore : UdonSharpBehaviour
     {
         switch (t)
         {
-            case T_TEN: case T_HUNDRED: case T_FIVE: case T_TWENTY_FIVE: case T_FIFTY: return st[S_CATCH];
+            case T_TEN: case T_HUNDRED: case T_FIVE: case T_TWENTY_FIVE: case T_FIFTY: case T_THREE_CATCHES: return st[S_CATCH];
             case T_PACK_LEADER: case T_WIN3_H: case T_TOP_DOG: return st[S_HWINS];
             case T_TEN_HUNTS: case T_REG_HUNTER: return st[S_HROUNDS];
             case T_FIFTY_BONKS: return st[S_WRONG];
             case T_STEADY: return st[S_CLEAN];
-            case T_THREE_SURV: case T_TWENTY_FIVE_SURV: return st[S_SURV];
+            case T_THREE_SURV: case T_TWENTY_FIVE_SURV: case T_FIVE_SURV: return st[S_SURV];
             case T_TEN_HIDES: case T_REG_HIDER: return st[S_PROUNDS];
             case T_WIN3_P: case T_ROYALTY: return st[S_PWINS];
             case T_TEN_PROPS: return st[S_PROPS];
@@ -516,7 +518,7 @@ public class PHStore : UdonSharpBehaviour
             case T_REG_HUNTER: return 25; case T_WIN3_H: return 3; case T_TOP_DOG: return 25; case T_FIFTY_BONKS: return 50;
             case T_STEADY: return 5; case T_THREE_SURV: return 3; case T_TWENTY_FIVE_SURV: return 25; case T_TEN_HIDES: return 10;
             case T_REG_HIDER: return 25; case T_WIN3_P: return 3; case T_ROYALTY: return 25; case T_TEN_PROPS: return 10;
-            case T_BACK_TO_BACK: return 2; case T_HOPPY: return 50;
+            case T_BACK_TO_BACK: return 2; case T_HOPPY: return 50; case T_THREE_CATCHES: return 3; case T_FIVE_SURV: return 5;
         }
         return 0;
     }

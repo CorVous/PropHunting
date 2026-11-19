@@ -61,6 +61,7 @@ HUNT = [
     ('steady_hand', 'Steady Hand', 'Finish 5 rounds as a hunter without hitting a wrong prop.', 25, 100),
     ('last_stand', 'Last Stand', 'Catch a hider in the final stand.', 8, 30),
     ('quick_pair', 'Quick Pair', 'Catch 2 hiders in the first minute of the hunt.', 20, 80),
+    ('three_catches', 'Three Catches', 'Catch 3 hiders in total.', 3, 12),
 ]
 HIDE = [
     ('survivor', 'Survivor', 'Survive a round as a hider.', 1, 4),
@@ -102,6 +103,7 @@ HIDE = [
     ('hoppy', 'Hoppy', 'Hop 50 times as a prop.', 1, 3),
     ('back_to_back', 'Back to Back', 'Survive 2 rounds in a row as a hider.', 3, 10),
     ('stand_your_ground', 'Stand Your Ground', 'Still be hiding when the final stand begins.', 3, 10),
+    ('five_survivals', 'Five Survivals', 'Survive 5 rounds in total.', 6, 15),
 ]
 
 # Cor: plain weapons are quick to earn and cheap, the coolest take the longest and cost the most. The shop weapons
@@ -127,7 +129,7 @@ APPEAL = {
             'Pistol_5', 'Shotgun_1', 'Shotgun_SawedOff', 'SniperRifle_1', 'P90', 'Pistol#23', 'Revolver#24', 'Rifle#25',
             'Shotgun#26', 'SniperRifle', 'Uzi', 'Gun', 'Rifle#32'],
 }
-NEW_TROPHY_WEAPONS = 17
+NEW_TROPHY_WEAPONS = 18
 
 UI = [
     ('store.buy', '{0}'),                        # the buy button: the price beside a coin
@@ -260,6 +262,6 @@ def plan():
 
 if __name__ == '__main__':
     folder = sys.argv[sys.argv.index('--thumbs') + 1] if '--thumbs' in sys.argv else None
-    assert len(HUNT) == 39 and len(HIDE) == 39
+    assert len(HUNT) == 40 and len(HIDE) == 40
     tsv(); prices(); free(); plan()
     if '--no-icons' not in sys.argv: icons(folder)
