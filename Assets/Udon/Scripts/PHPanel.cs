@@ -267,8 +267,15 @@ public class PHPanel : UdonSharpBehaviour
             float e = 1f - (1f - st) * (1f - st) * (1f - st);
             spinner.localRotation = Quaternion.Euler(0f, spinFrom + e * (1080f + 137f), 0f);
         }
-        if (veil.activeSelf) veilHourglass.localRotation = Quaternion.Euler(0f, 0f, Mathf.Floor(now / 1.2f) * 180f + Mathf.SmoothStep(0f, 180f, Mathf.Clamp01((now - Mathf.Floor(now / 1.2f) * 1.2f - 0.7f) / 0.5f)));
+        // the hourglass rests, then turns over now and again (Cor: not constantly)
+        if (veil.activeSelf)
+        {
+            float k = Mathf.Floor(now / HOURGLASS_EVERY), into = now - k * HOURGLASS_EVERY;
+            veilHourglass.localRotation = Quaternion.Euler(0f, 0f, k * 180f + Mathf.SmoothStep(0f, 180f, Mathf.Clamp01((into - (HOURGLASS_EVERY - 0.6f)) / 0.6f)));
+        }
     }
+
+    const float HOURGLASS_EVERY = 6f;   // seconds between the veil's hourglass turning over
 
     [HideInInspector] public float diceY;
 

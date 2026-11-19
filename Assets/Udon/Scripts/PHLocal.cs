@@ -11,7 +11,8 @@ using TMPro;
 //          trigger turns the prop (PHHiderBody). Taunt: T on desktop, the button on the screen device in VR (PHView).
 //   Hunter: Use fires the tagger (05 section 5.3): a hider's prop takes a hit (sent to its owner), a real prop
 //          costs health (G17) and gets knocked, anything else is a miss. Hunters walk through props (G45).
-//   Everyone: frozen during the reveal; hunters are held at the release during BRIEF and HIDE.
+//   Everyone: frozen during the reveal; hunters wait in the lobby during BRIEF and HIDE. Hiders are free from the
+//   moment they land on the map (BRIEF), so the hiding time is BRIEF + HIDE.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHLocal : UdonSharpBehaviour
 {
@@ -103,7 +104,7 @@ public class PHLocal : UdonSharpBehaviour
                     float facing = Random.Range(0, 24) * 15f;
                     me.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
                     body.Begin(at, facing);
-                    body.frozen = true;
+                    body.frozen = false;   // a hider moves, picks and opens doors the moment they land (Cor)
                     changesLeft = HUNT_CHANGES;
                     StartingDisguise();
                     if (s != null) s.StartHiding();
@@ -389,7 +390,7 @@ public class PHLocal : UdonSharpBehaviour
         if (!vr && TryDoor()) return;
         // VR: a hider's left trigger turns the prop (PHHiderBody); the selector in the right hand picks
         if (vr && role == PHGame.ROLE_HIDER && args.handType == VRC.Udon.Common.HandType.LEFT) return;
-        if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) TryTakeDisguise();
+        if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) TryTakeDisguise();
         else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT) Fire();
     }
 
@@ -431,7 +432,7 @@ public class PHLocal : UdonSharpBehaviour
     // desktop: the door (or the openable prop) under the cross-hair, within the role's reach of the prop
     bool TryDoor()
     {
-        if (doors == null || !InRound() || game.phase == PHGame.PH_BRIEF) return false;
+        if (doors == null || !InRound()) return false;
         float reach = role == PHGame.ROLE_HUNTER ? HUNTER_HANDLE_RANGE : HANDLE_RANGE;
         if (!Aim(reach + 1f)) return false;
         if (!hit.collider.gameObject.name.StartsWith("door")) return false;
@@ -493,7 +494,7 @@ public class PHLocal : UdonSharpBehaviour
     void UpdateHover()
     {
         int phase = game.phase;
-        bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT) && !aimOverride;
+        bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT) && !aimOverride;
         Collider c = null;
         canPick = can;
         aimDist = TAKE_RANGE;

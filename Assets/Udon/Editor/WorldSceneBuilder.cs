@@ -19,7 +19,10 @@ using Mobility = VRC.SDKBase.VRCStation.Mobility;
 //   Game              PHGame, PHLocal (with a head-locked HUD), and 32 player slots (station + voice each)
 public static class WorldSceneBuilder
 {
-    static readonly Vector3 LobbyOrigin = new Vector3(-120f, 0f, -120f);
+    // in the distance on the map's own level, just past the hills and mountains round the largest map (SkyDressing: up
+    // to about 190 m from its centre; it leaves a gap facing the lobby). Cor: late joiners spawn here, so not close.
+    // 5 cm up so its floor does not fight the map's ground plane, which reaches out under it
+    static readonly Vector3 LobbyOrigin = new Vector3(-170f, 0.05f, -170f);
     const float RoomW = 24f, RoomD = 22f, WallH = 7f, ZoneHalf = 5.5f;
     const int SLOTS = 32;
 
@@ -85,6 +88,17 @@ public static class WorldSceneBuilder
         spawn.transform.SetParent(lobby.transform, false);
         spawn.transform.localPosition = new Vector3(0f, 0.05f, -RoomD / 2 + 2.3f);   // on the spawn disc
         LobbyBuilder.DressRoom(lobby.transform, RoomW, RoomD, WallH, ZoneHalf);
+        // the lobby as seen from the map (Cor): one plain box round it, outside the lobby object so PHLobbyCull leaves
+        // it drawn; unlit and unfogged so it shows that far off; invisible from inside (its faces point outwards)
+        var shellMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/LobbyShell.mat");
+        if (shellMat == null) { shellMat = new Material(Shader.Find("PropHunt/LobbyShell")); AssetDatabase.CreateAsset(shellMat, "Assets/Udon/Generated/LobbyShell.mat"); }
+        else shellMat.shader = Shader.Find("PropHunt/LobbyShell");
+        var shell = new GameObject("LobbyShell");
+        shell.transform.SetParent(world.transform, false);
+        shell.transform.position = LobbyOrigin;
+        var shellBox = Box(shell.transform, "Box", new Vector3(0f, (WallH + 1.0f) / 2f - 0.6f, 0f), new Vector3(RoomW + 1.2f, WallH + 1.0f, RoomD + 1.2f), shellMat, false);
+        var shellR = shellBox.GetComponent<MeshRenderer>();
+        shellR.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; shellR.receiveShadows = false;
 
         // ---- the scene descriptor
         var vrcWorld = new GameObject("VRCWorld");
@@ -120,6 +134,7 @@ public static class WorldSceneBuilder
         local.hud = null; local.hudRoot = null;   // no head-locked text (Cor): PHView shows the little there is
         game.local = local;
         builder.sun = sun;   // the map's mood turns and tints it (MapBuilderUdon.ApplyMood)
+        builder.lobby = lobby.transform;   // the hills and mountains leave a gap facing it (SkyDressing)
         // the hider's own prop and the prop pointed at are drawn with materials of their own (MapBuilderUdon.SelfOnly, Hover)
         builder.propLitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
         builder.selfMat = Variant("PropLitSelf", builder.propLitMat, "_PipOnly");

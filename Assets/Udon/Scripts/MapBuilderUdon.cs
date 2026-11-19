@@ -30,6 +30,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // stars and the moon at night, a planet over a space base (PropPrefabBaker.SkyNames, same order)
     public GameObject[] skyPrefabs;
     public GameObject starDomePrefab, moonPrefab;
+    public Transform lobby;   // the lobby out past the ring: the ring leaves a gap facing it so the map can see it (Cor)
     const int SKY_HILL_A = 0, SKY_HILL_B = 1, SKY_MOUNT_A = 2, SKY_MOUNT_B = 3, SKY_MOUNT_C = 4, SKY_CLOUD_BIG = 5, SKY_CLOUD_SMALL = 6, SKY_ROCK_A = 7, SKY_ROCK_B = 8;
     Transform[] clouds;
     int nClouds;
@@ -1909,6 +1910,17 @@ public class MapBuilderUdon : UdonSharpBehaviour
         return go;
     }
 
+    // an angle round the map (radians) moved out of the gap facing the lobby, half that many radians each side
+    float LobbyGap(float a, float half)
+    {
+        if (lobby == null) return a;
+        Vector3 d = lobby.position - skyCentre;
+        float la = Mathf.Atan2(d.z, d.x);
+        float diff = Mathf.DeltaAngle(la * Mathf.Rad2Deg, a * Mathf.Rad2Deg) * Mathf.Deg2Rad;
+        if (Mathf.Abs(diff) >= half) return a;
+        return la + (diff >= 0f ? half : -half);
+    }
+
     void SkyDressing()
     {
         nClouds = 0;
@@ -1921,14 +1933,14 @@ public class MapBuilderUdon : UdonSharpBehaviour
         int ring = 16;
         for (int k = 0; k < ring; k++)
         {
-            float a = (k + Rand01(U32(k + 5001)) * 0.6f) / ring * Mathf.PI * 2f;
+            float a = LobbyGap((k + Rand01(U32(k + 5001)) * 0.6f) / ring * Mathf.PI * 2f, 0.42f);
             float rr = r0 + Rand01(U32(k + 5101)) * 18f;
             Vector3 p = skyCentre + new Vector3(Mathf.Cos(a) * rr, -0.5f, Mathf.Sin(a) * rr);
             int kind = space ? (k % 2 == 0 ? SKY_ROCK_A : SKY_ROCK_B) : (k % 2 == 0 ? SKY_HILL_A : SKY_HILL_B);
             PlaceSky(skyPrefabs[kind], p, Rand01(U32(k + 5201)) * 360f, space ? 1.3f + Rand01(U32(k + 5301)) * 0.6f : 2.2f + Rand01(U32(k + 5301)) * 1.2f);
             if (k % 2 == 0)
             {
-                float a2 = a + Mathf.PI / ring;
+                float a2 = LobbyGap(a + Mathf.PI / ring, 0.32f);
                 float r2 = rr + 40f + Rand01(U32(k + 5401)) * 25f;
                 Vector3 p2 = skyCentre + new Vector3(Mathf.Cos(a2) * r2, -1f, Mathf.Sin(a2) * r2);
                 int m = space ? SKY_ROCK_A : SKY_MOUNT_A + (k / 2) % 3;
@@ -2020,6 +2032,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Vector3 rel = c - new Vector3(tx, 0f, tz);
             float alongT = rel.x * DX[rd] + rel.z * DZ[rd], acrossT = Mathf.Abs(rel.x * DZ[rd] - rel.z * DX[rd]);
             if (alongT > 0f && acrossT < 7f) continue;
+            // and the view of the lobby (Cor: the map can see it)
+            float ca = Mathf.Atan2(c.z - skyCentre.z, c.x - skyCentre.x);
+            if (LobbyGap(ca, 0.3f) != ca) continue;
             int kind = (int)(Rand01(U32(k * 7 + 8105)) * 10f);
             if (medieval && kind >= 8)
             {
@@ -2042,7 +2057,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         float r1 = Mathf.Max(w, h) * 0.5f + 42f;
         for (int k = 0; k < 10; k++)
         {
-            float a = (k + Rand01(U32(k + 8301)) * 0.5f) / 10f * Mathf.PI * 2f;
+            float a = LobbyGap((k + Rand01(U32(k + 8301)) * 0.5f) / 10f * Mathf.PI * 2f, 0.3f);   // these hid the lobby too
             Vector3 p = skyCentre + new Vector3(Mathf.Cos(a) * r1, -3.2f, Mathf.Sin(a) * r1);   // sunk: their cliffs read as floating plateaus this close
             Vector3 rel = p - new Vector3(tx, 0f, tz);
             if (rel.x * DX[rd] + rel.z * DZ[rd] > 0f && Mathf.Abs(rel.x * DZ[rd] - rel.z * DX[rd]) < 14f) continue;   // the track runs out between them
