@@ -702,6 +702,58 @@ public class MapBuilderUdon : UdonSharpBehaviour
     int nDoomed, doomedNext;
     public int destroyPerFrame = 8;
 
+    // empty copies of the three roots, made at the start while they are still empty (Clear: a new root is a copy)
+    Transform propTemplate, fenceTemplate, fixtureTemplate;
+    // old roots, switched off, waiting to be emptied and destroyed
+    Transform[] dying;
+    int nDying;
+
+    void Start()
+    {
+        propTemplate = Template(propRoot);
+        fenceTemplate = Template(fenceRoot);
+        fixtureTemplate = Template(fixtureRoot);
+    }
+
+    Transform Template(Transform root)
+    {
+        if (root == null || root.childCount > 0) return null;
+        GameObject g = Instantiate(root.gameObject);
+        g.name = root.name + "Template";
+        g.transform.SetParent(root.parent, false);
+        g.SetActive(false);
+        return g.transform;
+    }
+
+    // the root switched off and set aside for DestroySome, an empty copy in its place; without a copy (or when it is
+    // empty) the root stays, its children switched off one by one and queued
+    Transform Retire(Transform root, Transform template)
+    {
+        if (root == null) return root;
+        if (root.childCount == 0) return root;
+        if (template == null)
+        {
+            for (int i = root.childCount - 1; i >= 0; i--) Doom(root.GetChild(i).gameObject);
+            return root;
+        }
+        root.gameObject.SetActive(false);
+        if (dying == null) dying = new Transform[16];
+        if (nDying >= dying.Length)
+        {
+            Transform[] more = new Transform[dying.Length * 2];
+            System.Array.Copy(dying, more, nDying);
+            dying = more;
+        }
+        dying[nDying++] = root;
+        GameObject g = Instantiate(template.gameObject);
+        g.name = root.name;
+        Transform t = g.transform;
+        t.SetParent(root.parent, false);
+        t.localPosition = root.localPosition; t.localRotation = root.localRotation; t.localScale = root.localScale;
+        g.SetActive(true);
+        return t;
+    }
+
     void Doom(GameObject go)
     {
         if (go == null) return;
@@ -721,6 +773,21 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // a few of the old map's objects destroyed this frame; true while some are left
     bool DestroySome()
     {
+        if (nDying > 0)
+        {
+            // the oldest set-aside root: its last few children this frame (they go at the frame's end), and once it
+            // has none, the root itself
+            Transform r = dying[0];
+            int n = r != null ? r.childCount : 0;
+            if (n == 0)
+            {
+                if (r != null) Destroy(r.gameObject);
+                for (int i = 1; i < nDying; i++) dying[i - 1] = dying[i];
+                dying[--nDying] = null;
+            }
+            else for (int i = n - 1; i >= 0 && i >= n - Mathf.Max(1, destroyPerFrame); i--) Destroy(r.GetChild(i).gameObject);
+            return true;
+        }
         if (doomedNext >= nDoomed) { nDoomed = 0; doomedNext = 0; return false; }
         int end = Mathf.Min(nDoomed, doomedNext + Mathf.Max(1, destroyPerFrame));
         for (; doomedNext < end; doomedNext++)
@@ -772,17 +839,15 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         if (indoorAreaId != 0) VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, Vector4.zero);
         // Perf: destroying the old map's objects all at once (an XL map: about 1,240 objects, 6,800 colliders) cost one
-        // frame of about 850 ms in the editor, nearly all of it the engine's own destroying at the frame's end. They
-        // are switched off at once instead (gone from sight and from the physics in this frame, a fraction of a
-        // millisecond) and destroyed a few a frame from then on (DestroySome), while the next map is generated.
-        if (objects != null)
-            for (int i = 0; i < objects.Length; i++) if (objects[i] != null) Doom(objects[i]);
+        // frame of about 850 ms in the editor, nearly all of it the engine's own destroying at the frame's end; and
+        // switching them off one by one from Udon cost 265 ms. Instead each of the three roots is switched off whole
+        // (gone from sight and from the physics in this frame), set aside, and replaced by an empty copy of it; the
+        // old ones lose a few children a frame from then on (DestroySome), while the next map is generated.
         objects = null;
-        if (fenceRoot != null)
-            for (int i = fenceRoot.childCount - 1; i >= 0; i--) Doom(fenceRoot.GetChild(i).gameObject);
+        propRoot = Retire(propRoot, propTemplate);
+        fenceRoot = Retire(fenceRoot, fenceTemplate);
         nClouds = 0;
-        if (fixtureRoot != null)
-            for (int i = fixtureRoot.childCount - 1; i >= 0; i--) Doom(fixtureRoot.GetChild(i).gameObject);
+        fixtureRoot = Retire(fixtureRoot, fixtureTemplate);
         DropMesh(groundFilter); DropMesh(wallsFilter); DropMesh(roofsFilter); DropMesh(sceneryFilter);
         if (tiles != null) for (int i = 1; i < tiles.Length; i++) if (tiles[i] != null) { DropMesh(tiles[i].GetComponent<MeshFilter>()); Doom(tiles[i]); tiles[i] = null; }
         nTiles = 0;
@@ -828,7 +893,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void UpdateBody()
     {
-        if (nDoomed > 0) DestroySome();
+        if (nDoomed > 0 || nDying > 0) DestroySome();
         if (built && nClouds > 0)
         {
             // the clouds drift round the map, one turn in about twenty minutes
