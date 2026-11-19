@@ -10,7 +10,7 @@ using UnityEngine.UI;
 // language VRChat chose. Local to each player (PHText, PHLangBoard, PHLangTile).
 public static partial class LobbyBuilder
 {
-    const float LW = 980f, LH = 330f;   // canvas units at 3.4 mm: 3.33 x 1.12 m
+    const float LW = 1170f, LH = 330f;   // canvas units at 3 mm: 3.51 x 0.99 m
     static Vector2 LP(float x, float y) { return new Vector2(x - LW / 2, LH / 2 - y); }
 
     // the lectern stands at localPos (its foot), turned by yaw; the board leans back by 22 degrees
@@ -23,11 +23,11 @@ public static partial class LobbyBuilder
         var wood = Mat("LangStandWood", C("b07c3e"));
         Box(root, "Foot", new Vector3(0f, 0.03f, 0f), new Vector3(0.9f, 0.06f, 0.5f), wood);
         Slab(root, "Post", new Vector3(0f, 0.5f, 0.06f), new Vector3(0.12f, 0.94f, 0.12f), wood);
-        Slab(root, "Back", new Vector3(0f, 1.05f, 0.13f), new Vector3(3.42f, 1.2f, 0.05f), wood);
+        Slab(root, "Back", new Vector3(0f, 1.05f, 0.13f), new Vector3(3.6f, 1.06f, 0.05f), wood);
         root.Find("Back").localRotation = Quaternion.Euler(22f, 0f, 0f);
 
         var cv = Canvas(root, "Board", new Vector3(0f, 1.05f, 0.13f) + Quaternion.Euler(22f, 0f, 0f) * new Vector3(0f, 0f, -0.03f),
-            Quaternion.Euler(22f, 0f, 0f), new Vector2(LW, LH), 0.0034f, true);
+            Quaternion.Euler(22f, 0f, 0f), new Vector2(LW, LH), 0.003f, true);
         Img(cv, "BoardShadow", LP(LW / 2, LH / 2 + 5), new Vector2(LW - 8, LH - 8), sRound, C("173d2c"), 1.6f);
         Img(cv, "BoardEdge", LP(LW / 2, LH / 2), new Vector2(LW - 8, LH - 8), sRound, BoardEdge, 1.6f);
         Img(cv, "Board", LP(LW / 2, LH / 2), new Vector2(LW - 18, LH - 18), sRound, Cream, 1.6f);
@@ -40,11 +40,11 @@ public static partial class LobbyBuilder
         board.tiles = new RectTransform[n];
         var tiles = new PHLangTile[n + 1];
         const float TW = 86f, TH = 72f, GAP = 10f, X0 = 186f;
-        // three rows of eight: Auto, then the languages in TextBaker's order
+        // three rows of ten: Auto, then the languages in TextBaker's order
         for (int i = -1; i < n; i++)
         {
             int slot = i + 1;
-            int row = slot / 8, col = slot % 8;
+            int row = slot / 10, col = slot % 10;
             float cx = X0 + col * (TW + GAP) + TW / 2;
             float cy = 30 + row * (TH + 26) + TH / 2;
             Image tile;
@@ -58,7 +58,7 @@ public static partial class LobbyBuilder
             else
             {
                 tile = Img(cv, "Tile " + TextBaker.Codes[i], LP(cx, cy), new Vector2(TW, TH), sTile, RowColour[i % 4], 2f);
-                var name = Txt(tile.transform, "Name", new Vector2(0, 2), new Vector2(TW - 8, 30), TextBaker.Names[i], future, 15, C("1e190f"), TextAlignmentOptions.Center);
+                var name = Txt(tile.transform, "Name", new Vector2(0, 2), new Vector2(TW - 8, 30), TextBaker.DisplayName(i), future, 15, C("1e190f"), TextAlignmentOptions.Center);
                 name.enableAutoSizing = true; name.fontSizeMin = 9; name.fontSizeMax = 17;
                 board.tiles[i] = tile.rectTransform;
             }

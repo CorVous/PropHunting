@@ -8,7 +8,8 @@ using VRC.SDK3.Persistence;
 // The world's text in the local player's language (Cor: "full localization options", 2026-11-19).
 //
 // The strings live in Assets/Udon/Text/*.tsv (one file per area; columns key, en, then VRChat's language codes: ja, ko,
-// zh-CN, zh-HK, es, fr, de, pt-BR, ru, it, pl, id, nl, sv, uk, da, no, fi, hu, cs, tr, ro, vi). "PropHunt/Bake text table" (TextBaker.cs) reads them into the arrays below, fills every empty cell
+// zh-CN, zh-HK, es, fr, de, pt-BR, ru, it, pl, id, nl, sv, uk, da, no, fi, hu, cs, tr, ro, vi, ar, he, th, tok;
+// Arabic and Hebrew are stored shaped and in visual order: TextBaker / RtlText). "PropHunt/Bake text table" (TextBaker.cs) reads them into the arrays below, fills every empty cell
 // with the English, finds the static labels in the scene (a TMP text whose whole text equals some row's English)
 // and gives the Kenney fonts a fallback that holds the CJK and Cyrillic glyphs used by the table.
 //

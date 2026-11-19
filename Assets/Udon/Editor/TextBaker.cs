@@ -26,15 +26,20 @@ public static class TextBaker
 
     // the languages, in the board's order: VRChat's codes and each one's name in itself
     public static readonly string[] Codes = { "en", "ja", "ko", "zh-CN", "zh-HK", "es", "fr", "de", "pt-BR", "ru", "it", "pl",
-        "id", "nl", "sv", "uk", "da", "no", "fi", "hu", "cs", "tr", "ro", "vi" };
+        "id", "nl", "sv", "uk", "da", "no", "fi", "hu", "cs", "tr", "ro", "vi", "ar", "he", "th", "tok" };
     public static readonly string[] Names = { "English", "日本語", "한국어", "简体中文", "繁體中文", "Español", "Français", "Deutsch", "Português", "Русский", "Italiano", "Polski",
-        "Indonesia", "Nederlands", "Svenska", "Українська", "Dansk", "Norsk", "Suomi", "Magyar", "Čeština", "Türkçe", "Română", "Tiếng Việt" };
+        "Indonesia", "Nederlands", "Svenska", "Українська", "Dansk", "Norsk", "Suomi", "Magyar", "Čeština", "Türkçe", "Română", "Tiếng Việt", "العربية", "עברית", "ไทย", "toki pona" };
     // which column's characters go to which fallback font first (a Han character used by Japanese and Chinese takes the
     // Japanese shape: one fallback chain serves every language)
     // (Latin letters the Kenney fonts hold come from them; Cyrillic and Latin Extended-A from Rubik; Vietnamese from Noto Sans)
     static readonly string[] FontFor = { null, "NotoSansJP", "NotoSansKR", "NotoSansSC", "NotoSansTC", null, null, null, null, "Rubik", null, "Rubik",
-        null, null, null, "Rubik", null, null, null, "Rubik", "Rubik", "Rubik", "Rubik", "NotoSans" };
-    static readonly string[] FontOrder = { "NotoSansJP", "NotoSansKR", "NotoSansSC", "NotoSansTC", "Rubik", "NotoSans" };
+        null, null, null, "Rubik", null, null, null, "Rubik", "Rubik", "Rubik", "Rubik", "NotoSans", "NotoSansArabic", "Rubik", "NotoSansThai", null };
+    static readonly string[] FontOrder = { "NotoSansJP", "NotoSansKR", "NotoSansSC", "NotoSansTC", "Rubik", "NotoSans", "NotoSansArabic", "NotoSansThai" };
+    // right to left: shaped (Arabic) and put in visual order at bake time (RtlText)
+    static readonly string[] Rtl = { "ar", "he" };
+
+    // a language's own name as the board draws it (right-to-left ones shaped and in visual order)
+    public static string DisplayName(int i) { string c = Codes[i]; return c == "ar" || c == "he" ? RtlText.Visual(Names[i], c == "ar") : Names[i]; }
 
     public class Table
     {
@@ -42,6 +47,7 @@ public static class TextBaker
         public List<string[]> rows = new List<string[]>();             // one cell per language, English filled in
         public Dictionary<string, string[]> props = new Dictionary<string, string[]>();
         public List<string> warnings = new List<string>();
+        public List<string> missing = new List<string>();               // "key (codes)" rows with untranslated cells
     }
 
     public static Table Read()
@@ -68,7 +74,14 @@ public static class TextBaker
                     if (l >= 0) row[l] = cells[c].Trim().Replace("\\n", "\n");
                 }
                 if (string.IsNullOrEmpty(row[0])) { t.warnings.Add(Path.GetFileName(path) + ":" + n + " " + key + " has no English"); row[0] = key; }
-                for (int l = 1; l < row.Length; l++) if (string.IsNullOrEmpty(row[l])) row[l] = row[0];
+                foreach (var code in Rtl)
+                {
+                    int l = System.Array.IndexOf(Codes, code);
+                    if (!string.IsNullOrEmpty(row[l])) row[l] = RtlText.Visual(row[l], code == "ar");
+                }
+                var gaps = new List<string>();
+                for (int l = 1; l < row.Length; l++) if (string.IsNullOrEmpty(row[l])) { row[l] = row[0]; gaps.Add(Codes[l]); }
+                if (gaps.Count > 0) t.missing.Add(key + " (" + (gaps.Count == Codes.Length - 1 ? "all" : string.Join(" ", gaps)) + ")");
                 if (key.StartsWith("prop:")) { t.props[key.Substring(5)] = row; continue; }
                 if (at.TryGetValue(key, out int was)) { t.warnings.Add(Path.GetFileName(path) + ":" + n + " " + key + " repeats an earlier key (this one wins)"); t.rows[was] = row; continue; }
                 at[key] = t.keys.Count; t.keys.Add(key); t.rows.Add(row);
@@ -93,7 +106,7 @@ public static class TextBaker
         }
         int L = Codes.Length;
         text.langCode = (string[])Codes.Clone();
-        text.langName = (string[])Names.Clone();
+        text.langName = Enumerable.Range(0, Names.Length).Select(DisplayName).ToArray();
         text.keys = t.keys.ToArray();
         text.table = new string[t.keys.Count * L];
         for (int k = 0; k < t.keys.Count; k++) for (int l = 0; l < L; l++) text.table[k * L + l] = t.rows[k][l];
@@ -147,7 +160,7 @@ public static class TextBaker
         var latin = new SortedSet<char>();
         var all = new SortedSet<char>();
         var rows = t.rows.Concat(t.props.Values).ToList();
-        rows.Add(Names);
+        rows.Add(Enumerable.Range(0, Names.Length).Select(DisplayName).ToArray());
         foreach (var row in rows)
             for (int l = 0; l < row.Length; l++)
                 foreach (char c in row[l]) all.Add(c);
@@ -269,5 +282,34 @@ public static class TextBaker
             sb.Append(i == 0 ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c));
         }
         return sb.ToString();
+    }
+}
+
+// Before a build or upload (Cor: "make sure localizations stay up to date as we add more text"): the scene's text
+// table is baked again from the TSVs if it is stale, and rows still missing translations are listed, with the choice
+// to stop and translate them first.
+public class TextPublishCheck : VRC.SDKBase.Editor.BuildPipeline.IVRCSDKBuildRequestedCallback
+{
+    public int callbackOrder => 1;
+
+    public bool OnBuildRequested(VRC.SDKBase.Editor.BuildPipeline.VRCSDKRequestedBuildType type)
+    {
+        if (type != VRC.SDKBase.Editor.BuildPipeline.VRCSDKRequestedBuildType.Scene || PrePublishCheck.Exporting) return true;
+        var text = Object.FindObjectOfType<PHText>(true);
+        if (text == null) return true;
+        var t = TextBaker.Read();
+        bool stale = text.keys == null || text.keys.Length != t.keys.Count;
+        int L = TextBaker.Codes.Length;
+        for (int k = 0; !stale && k < t.keys.Count; k++)
+            for (int l = 0; l < L; l++)
+                if (text.keys[k] != t.keys[k] || text.table[k * L + l] != t.rows[k][l]) { stale = true; break; }
+        if (stale) { Debug.Log("[prophunt] text table was stale: baking it again before the build"); TextBaker.Bake(); }
+        if (t.missing.Count == 0) return true;
+        string nl = "\n";
+        string list = string.Join(nl, t.missing.Take(15)) + (t.missing.Count > 15 ? nl + "... and " + (t.missing.Count - 15) + " more" : "");
+        Debug.LogWarning("[prophunt] text rows missing translations (English shows instead):" + nl + string.Join(nl, t.missing));
+        if (Application.isBatchMode || PrePublishCheck.Quiet) return true;
+        return EditorUtility.DisplayDialog("PropHunt: untranslated text", t.missing.Count + " text rows are missing translations; those languages show English for them:" + nl + nl + list,
+            "Build anyway", "Cancel");
     }
 }
