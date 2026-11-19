@@ -1,7 +1,8 @@
 # Credits
 
 Every model, sound and font in this prototype comes from the owner's CC0 mirror (http://cc0.cor.home/),
-which holds the free packs of two makers. All packs below are **CC0 1.0** (public domain dedication):
+and is from the free packs of two makers (the mirror also holds Quaternius packs; none of them is used here). All
+packs below are **CC0 1.0** (public domain dedication):
 no credit is required; it is given here with thanks.
 
 - **Kenney** (www.kenney.nl)
@@ -16,7 +17,7 @@ no credit is required; it is given here with thanks.
 | KayKit - Dungeon Pack 1.1 (`kaykit-dungeon-pack`) | KayKit (Kay Lousberg) | models | 65 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-dungeon-pack |
 | KayKit - Medieval Hexagon Pack 1.0 (`kaykit-medieval-hexagon`) | KayKit (Kay Lousberg) | models | 20 | CC0-1.0 | https://kaylousberg.itch.io/kaykit-medieval-hexagon |
 | Kenney: Blaster Kit (`kenney-blaster-kit`) | Kenney | models | 2 | CC0-1.0 | https://kenney.nl/assets/blaster-kit |
-| Kenney: Board Game Icons (`kenney-board-game-icons`) | Kenney | lobby icons | 1 | CC0-1.0 | https://kenney.nl/assets/board-game-icons |
+| Kenney: Board Game Icons (`kenney-board-game-icons`) | Kenney | lobby tile shapes | 1 | CC0-1.0 | https://kenney.nl/assets/board-game-icons |
 | Kenney: Building Kit (`kenney-building-kit`) | Kenney | town facades (Udon world) | 3 | CC0-1.0 | https://kenney.nl/assets/building-kit |
 | Kenney: Car Kit (`kenney-car-kit`) | Kenney | models | 32 | CC0-1.0 | https://kenney.nl/assets/car-kit |
 | Kenney: City Kit (Roads) (`kenney-city-kit-roads`) | Kenney | light fixture (Udon world) | 1 | CC0-1.0 | https://kenney.nl/assets/city-kit-roads |
@@ -25,7 +26,7 @@ no credit is required; it is given here with thanks.
 | Kenney: Digital Audio (`kenney-digital-audio`) | Kenney | sounds | 12 | CC0-1.0 | https://kenney.nl/assets/digital-audio |
 | Kenney: Fantasy Town Kit (`kenney-fantasy-town-kit`) | Kenney | models | 21 | CC0-1.0 | https://kenney.nl/assets/fantasy-town-kit |
 | Kenney: Food Kit (`kenney-food-kit`) | Kenney | models | 50 | CC0-1.0 | https://kenney.nl/assets/food-kit |
-| Kenney: Game Icons (`kenney-game-icons`) | Kenney | lobby icons | 1 | CC0-1.0 | https://kenney.nl/assets/game-icons |
+| Kenney: Game Icons (`kenney-game-icons`) | Kenney | lobby lock icon | 1 | CC0-1.0 | https://kenney.nl/assets/game-icons |
 | Kenney: Furniture Kit (`kenney-furniture-kit`) | Kenney | models | 63 | CC0-1.0 | https://kenney.nl/assets/furniture-kit |
 | Kenney: Graveyard Kit (`kenney-graveyard-kit`) | Kenney | models | 40 | CC0-1.0 | https://kenney.nl/assets/graveyard-kit |
 | Kenney: Holiday Kit (`kenney-holiday-kit`) | Kenney | models | 11 | CC0-1.0 | https://kenney.nl/assets/holiday-kit |
@@ -79,10 +80,12 @@ Station Kit (`wall`, `wall-window`, `wall-door`: space base) and Kenney Fantasy 
 `Assets/Lobby`, all CC0 1.0 from the same mirror:
 - Models: KayKit Board Game Bits (8), KayKit Furniture Bits (7) and KayKit Dungeon Pack (3), as FBX with their pack
   textures.
-- Icons: 256 px renders of pack models with the background keyed out: castle, church and tavern (KayKit Medieval
-  Hexagon), bell (KayKit Holiday Bits), meeples, dice and hourglass (KayKit Board Game Bits), crate (KayKit Dungeon
-  Pack); lock (Kenney Board Game Icons) and home (Kenney Game Icons). The four `ui_*` tile shapes are drawn for this
-  project.
+- Icons (each matched pixel for pixel against the mirror's previews): 256 px renders of pack models with the
+  background keyed out: castle, church, tavern and home (KayKit Medieval Hexagon `building_castle_blue`,
+  `building_church_blue`, `building_tavern_blue`, `building_home_A_blue`), bell (KayKit Holiday Bits `bell`), meeples,
+  dice and hourglass (KayKit Board Game Bits `meeple_yellow`, `meeple_red`, `D6_A_yellow`, `hourglass`), crate
+  (KayKit Dungeon Pack `box_large`); the lock is Kenney Game Icons `locked`, unchanged; the tile shapes `ui_tile` and
+  `ui_round` are Kenney Board Game Icons `dice_empty`, recoloured. `ui_dashed` and `ui_dash` are drawn for this project.
 - Sounds: Kenney Interface Sounds (`bong_001`, `drop_002`, `error_004`, `pluck_001`, `select_003`, `tick_002`) and Kenney
   Music Jingles (`jingles_NES03`), counted in the table above.
 - Fonts: Kenney Future and Kenney Rocket (Kenney Fonts), with TextMesh Pro SDF assets made from them.
