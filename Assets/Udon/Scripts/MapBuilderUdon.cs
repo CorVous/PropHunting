@@ -1648,7 +1648,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // a hedge in the map's greens
     void TintHedge(GameObject h)
     {
-        Color avg = AverageGreen(h);
+        // (Perf: the hedge model's foliage average, from the bake or measured once a session, not on every hedge)
+        if (hedgeGreenShare < 0f && !hedgeMeasured) { hedgeMeasured = true; hedgeGreenAvg = AverageGreen(h); }
+        Color avg = hedgeGreenAvg;
         if (avg.a <= 0f) return;
         Color32 want = Blend(palGrass, C(54, 112, 58), 50);
         Tint(h, new Color(Mathf.Clamp(want.r / 255f / Mathf.Max(0.05f, avg.r), 0.3f, 1.6f), Mathf.Clamp(want.g / 255f / Mathf.Max(0.05f, avg.g), 0.3f, 1.6f), Mathf.Clamp(want.b / 255f / Mathf.Max(0.05f, avg.b), 0.3f, 1.6f), 1f));
@@ -1795,6 +1797,44 @@ public class MapBuilderUdon : UdonSharpBehaviour
     }
     float greenShare;   // AverageGreen: the share of the model's vertices that passed
 
+    // Perf: AverageGreen walks every vertex of a model (a copy of its colours, then an Udon loop): 2-20+ ms for the
+    // first prop of each def, on every map (defTint is per map), and on every hedge. The averages do not depend on
+    // the map, only the tint made from them does. MapBuilderBaker.BakeTints writes them per def (defGreenAvg,
+    // defGreenShare; a share below 0, or arrays shorter than the defs, means not baked), with the hedge's and the
+    // fence's; whatever is not baked is measured at runtime once a session and kept.
+    public Color[] defGreenAvg;
+    public float[] defGreenShare;
+    public Color hedgeGreenAvg;
+    public float hedgeGreenShare = -1f;
+    public Color fenceColourAvg = new Color(0, 0, 0, 0);
+    bool hedgeMeasured, fenceMeasured;
+    Color[] greenMeasured;
+    float[] shareMeasured;
+    bool[] greenMeasuredDone;
+
+    // the foliage average of def's model (and greenShare), from the bake or measured once
+    Color DefGreen(int def)
+    {
+        if (defGreenAvg != null && defGreenShare != null && def < defGreenAvg.Length && def < defGreenShare.Length && defGreenShare[def] >= 0f)
+        {
+            greenShare = defGreenShare[def];
+            return defGreenAvg[def];
+        }
+        if (greenMeasured == null || greenMeasured.Length != propPrefabs.Length)
+        {
+            greenMeasured = new Color[propPrefabs.Length]; shareMeasured = new float[propPrefabs.Length]; greenMeasuredDone = new bool[propPrefabs.Length];
+        }
+        if (!greenMeasuredDone[def])
+        {
+            greenMeasuredDone[def] = true;
+            greenShare = 0f;
+            greenMeasured[def] = propPrefabs[def] != null ? AverageGreen(propPrefabs[def]) : new Color(0, 0, 0, 0);
+            shareMeasured[def] = greenShare;
+        }
+        greenShare = shareMeasured[def];
+        return greenMeasured[def];
+    }
+
     public void TintProp(GameObject go, int def)
     {
         if (go == null || def < 0) return;
@@ -1803,7 +1843,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
         if (!defTintDone[def])
         {
             defTintDone[def] = true;
-            Color avg = propPrefabs[def] != null ? AverageGreen(propPrefabs[def]) : new Color(0, 0, 0, 0);
+            Color avg = DefGreen(def);
             Color t = new Color(0, 0, 0, 0);
             // only the cyan greens: blue close to green; and only a thing that is mostly foliage (the tint is on the
             // whole prop: a tan basket with a blue towel in it turned olive)
@@ -1823,15 +1863,22 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         if (fenceTint.a > 0f) return fenceTint;
         if (fencePrefab == null) return Color.white;
-        MeshFilter[] fs = fencePrefab.GetComponentsInChildren<MeshFilter>(true);
-        float r = 0, g = 0, b = 0; int n = 0;
-        for (int f = 0; f < fs.Length; f++)
+        // the fence model's average colour (0-255; alpha 0: none), from the bake or measured once a session (Perf)
+        if (fenceColourAvg.a <= 0f && !fenceMeasured)
         {
-            if (fs[f].sharedMesh == null) continue;
-            Color32[] cs = fs[f].sharedMesh.colors32;
-            for (int i = 0; i < cs.Length; i++) { r += cs[i].r; g += cs[i].g; b += cs[i].b; n++; }
+            fenceMeasured = true;
+            MeshFilter[] fs = fencePrefab.GetComponentsInChildren<MeshFilter>(true);
+            float sr = 0, sg = 0, sb = 0; int sn = 0;
+            for (int f = 0; f < fs.Length; f++)
+            {
+                if (fs[f].sharedMesh == null) continue;
+                Color32[] cs = fs[f].sharedMesh.colors32;
+                for (int i = 0; i < cs.Length; i++) { sr += cs[i].r; sg += cs[i].g; sb += cs[i].b; sn++; }
+            }
+            fenceColourAvg = sn > 0 ? new Color(sr / sn, sg / sn, sb / sn, 1f) : new Color(0, 0, 0, 0);
         }
-        if (n == 0) { fenceTint = Color.white; return fenceTint; }
+        if (fenceColourAvg.a <= 0f) { fenceTint = Color.white; return fenceTint; }
+        float r = fenceColourAvg.r, g = fenceColourAvg.g, b = fenceColourAvg.b, n = 1f;
         Color32 want = theme == GenData.THEME_MEDIEVAL ? C(112, 86, 62) : palWoodB;
         fenceTint = new Color(Mathf.Clamp(want.r / Mathf.Max(1f, r / n), 0.2f, 1.6f), Mathf.Clamp(want.g / Mathf.Max(1f, g / n), 0.2f, 1.6f), Mathf.Clamp(want.b / Mathf.Max(1f, b / n), 0.2f, 1.6f), 1f);
         return fenceTint;

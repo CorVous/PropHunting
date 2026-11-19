@@ -57,12 +57,84 @@ public static class MapBuilderBaker
         builder.fencePrefab = fence;
         builder.fenceModelSize = fenceBounds.size;
         builder.railPrefab = rail;
+        BakeTints(builder);
         UdonSharpEditorUtility.CopyProxyToUdon(builder);
         EditorUtility.SetDirty(builder);
 
         var bench = Object.FindObjectOfType<MapGenBench>(true);
         if (bench != null) { bench.builder = builder; UdonSharpEditorUtility.CopyProxyToUdon(bench); EditorUtility.SetDirty(bench); }
         EditorSceneManager.MarkSceneDirty(root.scene);
+    }
+
+    // The colour averages MapBuilderUdon's tints start from (its AverageGreen and FenceTint, the same sums), so the
+    // build does not walk every vertex of a model at runtime (Perf). Run by Assign (Bake prop prefabs) and on its own
+    // from the menu, on the open scene's builder, without baking the prefabs again.
+    [MenuItem("PropHunt/Bake tint stats (open scene)")]
+    static void BakeTintsMenu()
+    {
+        var builder = Object.FindObjectOfType<MapBuilderUdon>(true);
+        if (builder == null) { Debug.LogError("[MapBuilderBaker] no MapBuilderUdon in the open scene"); return; }
+        BakeTints(builder);
+        UdonSharpEditorUtility.CopyProxyToUdon(builder);
+        EditorUtility.SetDirty(builder);
+        EditorSceneManager.MarkSceneDirty(builder.gameObject.scene);
+    }
+
+    const int HEDGE = 12;   // MapBuilderUdon.DECOR_HEDGE
+
+    public static void BakeTints(MapBuilderUdon builder)
+    {
+        GameObject[] prefabs = builder.propPrefabs;
+        int n = prefabs != null ? prefabs.Length : 0;
+        var avg = new Color[n];
+        var share = new float[n];
+        int baked = 0;
+        for (int d = 0; d < n; d++)
+        {
+            if (prefabs[d] == null) { share[d] = -1f; continue; }
+            float sh;
+            avg[d] = AverageGreen(prefabs[d], out sh);
+            share[d] = sh;
+            baked++;
+        }
+        builder.defGreenAvg = avg;
+        builder.defGreenShare = share;
+        GameObject hedge = builder.decorPrefabs != null && HEDGE < builder.decorPrefabs.Length ? builder.decorPrefabs[HEDGE] : null;
+        if (hedge != null) { float sh; builder.hedgeGreenAvg = AverageGreen(hedge, out sh); builder.hedgeGreenShare = sh; }
+        else { builder.hedgeGreenAvg = new Color(0, 0, 0, 0); builder.hedgeGreenShare = -1f; }
+        builder.fenceColourAvg = new Color(0, 0, 0, 0);
+        if (builder.fencePrefab != null)
+        {
+            float r = 0, g = 0, b = 0; int k = 0;
+            foreach (var f in builder.fencePrefab.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (f.sharedMesh == null) continue;
+                foreach (var c in f.sharedMesh.colors32) { r += c.r; g += c.g; b += c.b; k++; }
+            }
+            if (k > 0) builder.fenceColourAvg = new Color(r / k, g / k, b / k, 1f);
+        }
+        Debug.Log("[MapBuilderBaker] tint stats baked: " + baked + " of " + n + " defs, hedge " + (hedge != null) + ", fence " + (builder.fenceColourAvg.a > 0f));
+    }
+
+    // as MapBuilderUdon.AverageGreen: the average colour of the vertices greener than red by 20, and their share
+    static Color AverageGreen(GameObject go, out float share)
+    {
+        float r = 0, g = 0, b = 0; int n = 0, total = 0;
+        foreach (var f in go.GetComponentsInChildren<MeshFilter>(true))
+        {
+            Mesh m = f.sharedMesh;
+            if (m == null) continue;
+            Color32[] cs = m.colors32;
+            total += cs.Length;
+            for (int i = 0; i < cs.Length; i++)
+            {
+                if (cs[i].g < cs[i].r + 20) continue;
+                r += cs[i].r; g += cs[i].g; b += cs[i].b; n++;
+            }
+        }
+        share = total > 0 ? (float)n / total : 0f;
+        if (n == 0) return new Color(0, 0, 0, 0);
+        return new Color(r / n / 255f, g / n / 255f, b / n / 255f, 1f);
     }
 
     static T Get<T>(GameObject go) where T : Component
