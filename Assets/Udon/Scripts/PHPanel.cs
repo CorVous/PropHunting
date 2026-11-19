@@ -238,9 +238,11 @@ public class PHPanel : UdonSharpBehaviour
         if (rl != seenRound) { seenRound = rl; OptionSound(2, rl); Refresh(); }
         if (ta != seenTaunt) { seenTaunt = ta; OptionSound(3, ta); Refresh(); }
 
-        // (Perf: four times a second in the lobby; behind the veil during a round only every two seconds, and at
-        // once when the phase changes)
-        if (now >= nextRefresh) { nextRefresh = now + (game.phase == PHGame.PH_LOBBY ? 0.25f : 2f); Refresh(); }
+        // (Perf: four times a second in the lobby and at a round's end, where the votes are counted; while a map
+        // loads and the round is played, behind the veil, every two seconds; at once when the phase changes. The
+        // panel shows no clock)
+        bool busyPhase = game.phase == PHGame.PH_LOADING || game.phase == PHGame.PH_BRIEF || game.phase == PHGame.PH_HIDE || game.phase == PHGame.PH_HUNT;
+        if (now >= nextRefresh) { nextRefresh = now + (busyPhase ? 2f : 0.25f); Refresh(); }
 
         // little animations: a refused press wobbles, START spins the die, the veil's hourglass turns
         if (wobble != -99)
