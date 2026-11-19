@@ -697,6 +697,40 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     // a mesh this builder made is destroyed with what showed it (a runtime mesh is not freed by itself: every round's
     // ground, walls, roofs and scenery stayed in memory)
+    // the old map's objects waiting to be destroyed (Clear): switched off, destroyed destroyPerFrame a frame
+    GameObject[] doomed;
+    int nDoomed, doomedNext;
+    public int destroyPerFrame = 8;
+
+    void Doom(GameObject go)
+    {
+        if (go == null || !go.activeSelf && go.name == DOOMED) return;   // (already waiting)
+        go.SetActive(false);
+        go.name = DOOMED;   // (so a second Clear before it goes does not queue it twice)
+        if (doomed == null) doomed = new GameObject[2048];
+        if (nDoomed >= doomed.Length)
+        {
+            GameObject[] more = new GameObject[doomed.Length * 2];
+            System.Array.Copy(doomed, more, nDoomed);
+            doomed = more;
+        }
+        doomed[nDoomed++] = go;
+    }
+    const string DOOMED = "#doomed";
+
+    // a few of the old map's objects destroyed this frame; true while some are left
+    bool DestroySome()
+    {
+        if (doomedNext >= nDoomed) { nDoomed = 0; doomedNext = 0; return false; }
+        int end = Mathf.Min(nDoomed, doomedNext + Mathf.Max(1, destroyPerFrame));
+        for (; doomedNext < end; doomedNext++)
+        {
+            if (doomed[doomedNext] != null) Destroy(doomed[doomedNext]);
+            doomed[doomedNext] = null;
+        }
+        return true;
+    }
+
     void DropMesh(MeshFilter f)
     {
         if (f == null) return;
@@ -737,16 +771,20 @@ public class MapBuilderUdon : UdonSharpBehaviour
     public void Clear()
     {
         if (indoorAreaId != 0) VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, Vector4.zero);
+        // Perf: destroying the old map's objects all at once (an XL map: about 1,240 objects, 6,800 colliders) cost one
+        // frame of about 850 ms in the editor, nearly all of it the engine's own destroying at the frame's end. They
+        // are switched off at once instead (gone from sight and from the physics in this frame, a fraction of a
+        // millisecond) and destroyed a few a frame from then on (DestroySome), while the next map is generated.
         if (objects != null)
-            for (int i = 0; i < objects.Length; i++) if (objects[i] != null) Destroy(objects[i]);
+            for (int i = 0; i < objects.Length; i++) if (objects[i] != null) Doom(objects[i]);
         objects = null;
         if (fenceRoot != null)
-            for (int i = fenceRoot.childCount - 1; i >= 0; i--) Destroy(fenceRoot.GetChild(i).gameObject);
+            for (int i = fenceRoot.childCount - 1; i >= 0; i--) Doom(fenceRoot.GetChild(i).gameObject);
         nClouds = 0;
         if (fixtureRoot != null)
-            for (int i = fixtureRoot.childCount - 1; i >= 0; i--) Destroy(fixtureRoot.GetChild(i).gameObject);
+            for (int i = fixtureRoot.childCount - 1; i >= 0; i--) Doom(fixtureRoot.GetChild(i).gameObject);
         DropMesh(groundFilter); DropMesh(wallsFilter); DropMesh(roofsFilter); DropMesh(sceneryFilter);
-        if (tiles != null) for (int i = 1; i < tiles.Length; i++) if (tiles[i] != null) { DropMesh(tiles[i].GetComponent<MeshFilter>()); Destroy(tiles[i]); tiles[i] = null; }
+        if (tiles != null) for (int i = 1; i < tiles.Length; i++) if (tiles[i] != null) { DropMesh(tiles[i].GetComponent<MeshFilter>()); Doom(tiles[i]); tiles[i] = null; }
         nTiles = 0;
         if (collisionCollider != null)
         {
@@ -790,6 +828,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void UpdateBody()
     {
+        if (nDoomed > 0) DestroySome();
         if (built && nClouds > 0)
         {
             // the clouds drift round the map, one turn in about twenty minutes
