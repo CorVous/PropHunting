@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 24;   // 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 25;   // 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -1409,6 +1409,20 @@ public static partial class GenData
             bool chest = (m.Contains("chest") || m.Contains("trunk")) && !m.Contains("tree");
             bool laid = m.Contains("decorated") && !m.Contains("bed");
             if (chest || laid) defSlotCount[d] = 0;
+            // a display table (the space base's hologram and planet tables) keeps its top clear; the seats round it
+            // stay (Cor: things stood on the planet table)
+            else if (m.StartsWith("table-display"))
+            {
+                int s0 = defSlotStart[d], n = 0;
+                for (int i = s0; i < s0 + defSlotCount[d]; i++)
+                {
+                    if (slotType[i] == S_ON_TOP) continue;
+                    int j = s0 + n++;
+                    slotType[j] = slotType[i]; slotX[j] = slotX[i]; slotY[j] = slotY[i]; slotZ[j] = slotZ[i]; slotYaw[j] = slotYaw[i];
+                    slotSize[j] = slotSize[i]; slotAccept[j] = slotAccept[i]; slotFill[j] = slotFill[i]; slotGroup[j] = slotGroup[i]; slotHiding[j] = slotHiding[i];
+                }
+                defSlotCount[d] = n;
+            }
         }
     }
 

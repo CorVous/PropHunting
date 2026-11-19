@@ -31,7 +31,7 @@ Material:
     - _Keep: 0.85
     - _KeepBehind: 0.2
     - _RimShare: 0.4
-    - _WidthPx: 6
+    - _WidthPx: 4
     m_Colors:
     - _Core: {r: 0.3, g: 0.95, b: 0.85, a: 1}
     - _Rim: {r: 0.02, g: 0.3, b: 0.27, a: 1}

@@ -1195,11 +1195,16 @@ public static partial class LobbyBuilder
         go.transform.position += root.TransformPoint(at) - new Vector3(b.center.x, b.min.y, b.center.z);
         if (collider)
         {
+            // the box in the piece's own axes: measured unturned (the world box of a turned piece is the wrong shape:
+            // the couch at 270 degrees had its length across, Cor: a weird hitbox), then turned back
+            Quaternion turned = go.transform.rotation;
+            go.transform.rotation = Quaternion.identity;
             b = Bounds(go);
             var col = go.AddComponent<BoxCollider>();
             col.center = go.transform.InverseTransformPoint(b.center);
             var ls = go.transform.lossyScale;
             col.size = new Vector3(b.size.x / ls.x, b.size.y / ls.y, b.size.z / ls.z);
+            go.transform.rotation = turned;
             go.layer = 11;
         }
         return go;

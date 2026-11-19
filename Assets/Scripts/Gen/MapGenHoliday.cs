@@ -70,7 +70,7 @@ public partial class MapGen
     // revision 13, the map themes: a themed map shows its age everywhere, not only where a modern piece had a twin.
     // After a room's plan, up to two of the theme's own pieces are added on top of its budget, of kinds the room
     // does not hold yet: inside a space base its machines, tanks and cargo cans, outside its solar panels, dishes,
-    // fuel tanks and craters; in a medieval village torches, kegs, chests and a sword on the wall inside, banners,
+    // fuel tanks and craters; in a medieval village kegs, chests and a sword on the wall inside, banners,
     // barriers, the well and crates outside.
     static readonly string[] SpaceIn = { "sp_speaker", "sp_relay", "sp_frame", "sp_canB", "sp_canC", "sp_fuelB", "sp_barrelsRail", "sp_lamp", "sp_tank", "sp_cargoStackB" };
     static readonly string[] SpaceOut = { "sp_solar", "sp_dishSmall", "sp_supportsLow", "sp_fuelA", "sp_turretDouble", "sp_crater", "sp_meteor", "sp_lightPost", "sp_skipRocks", "sp_canD",
@@ -78,7 +78,7 @@ public partial class MapGen
         "sp_cargoCraft", "sp_racer", "sp_generator", "sp_tank", "sp_relay", "sp_monoBox", "sp_monoCargo", "sp_monoFlat", "sp_monoPass", "sp_monoFront", "sp_monoEnd",
         "sp_vent", "sp_ventB", "sp_gate", "sp_gateB", "sp_podB", "sp_podC", "sp_frameLow" };
     static readonly string[] MedievalIn = { "md_barrelSmall", "md_kegDeco", "md_boxStacked", "md_trunkSmallB", "md_swordWall", "md_coinsM", "md_trunkLargeC", "md_drum",
-        "md_torchWall", "md_weaponRack", "md_crateA", "md_crateLongA", "md_oakBarrel", "md_trunkMedA", "md_arrows" };
+        "md_weaponRack", "md_crateA", "md_crateLongA", "md_oakBarrel", "md_trunkMedA", "md_arrows" };
     static readonly string[] MedievalOut = { "md_barrierHalf", "md_crates", "md_well", "md_barrelLarge", "md_rockSmall", "md_drum",
         "md_target", "md_flag", "md_tent", "md_lumber", "md_stone", "md_crateOpen", "md_crateLongC", "md_ladder" };
 
