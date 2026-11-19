@@ -893,7 +893,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void UpdateBody()
     {
-        if (nDoomed > 0 || nDying > 0) DestroySome();
+        // (only once the new map stands: a build's frames are already near their budget, and the old objects wait
+        // switched off, unseen and without colliders)
+        if ((nDoomed > 0 || nDying > 0) && built) DestroySome();
         if (built && nClouds > 0)
         {
             // the clouds drift round the map, one turn in about twenty minutes
