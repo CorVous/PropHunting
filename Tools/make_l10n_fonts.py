@@ -8,6 +8,8 @@ strings keep working without running this again (unless they use rare characters
   Noto Sans SC: GB 2312 level-1 hanzi         Noto Sans TC: Big5 common hanzi
   Rubik: Cyrillic and Latin Extended-A (Polish, Czech, Hungarian, Turkish, Romanian...)
   Noto Sans: Vietnamese
+  Noto Sans Arabic: Arabic with its presentation forms (the bake shapes Arabic into them); Rubik also Hebrew
+  Noto Sans Thai: Thai
 
 Usage: python -I Tools/make_l10n_fonts.py <folder with NotoSansJP.ttf, NotoSansKR.ttf, NotoSansSC.ttf,
 NotoSansTC.ttf, Rubik.ttf, NotoSans.ttf (the [wght] files from github.com/google/fonts/tree/main/ofl)>
@@ -53,7 +55,11 @@ def common(name):
     if name == "NotoSansTC":
         return punct | dbcs("big5", range(0xA4, 0xC7), list(range(0x40, 0x7F)) + list(range(0xA1, 0xFF)))
     if name == "Rubik":
-        return set(chr(c) for c in list(range(0x0400, 0x0460)) + list(range(0x0490, 0x04A0)) + list(range(0x0100, 0x0180)) + list(range(0x0218, 0x021C))) | set("№«»—–…„“”")
+        return set(chr(c) for c in list(range(0x0400, 0x0460)) + list(range(0x0490, 0x04A0)) + list(range(0x0100, 0x0180)) + list(range(0x0218, 0x021C)) + list(range(0x05D0, 0x05F5))) | set("№«»—–…„“”")
+    if name == "NotoSansArabic":
+        return set(chr(c) for c in list(range(0x0600, 0x0700)) + list(range(0xFE70, 0xFF00)))
+    if name == "NotoSansThai":
+        return set(chr(c) for c in range(0x0E00, 0x0E80))
     if name == "NotoSans":
         return set(chr(c) for c in list(range(0x1EA0, 0x1EFA)) + list(range(0x0100, 0x0180)) + [0x01A0, 0x01A1, 0x01AF, 0x01B0, 0x0300, 0x0301, 0x0303, 0x0309, 0x0323])
     return set()
@@ -62,7 +68,7 @@ def common(name):
 def main(src):
     os.makedirs(OUT, exist_ok=True)
     extra = table_chars()
-    for name in ("NotoSansJP", "NotoSansKR", "NotoSansSC", "NotoSansTC", "Rubik", "NotoSans"):
+    for name in ("NotoSansJP", "NotoSansKR", "NotoSansSC", "NotoSansTC", "Rubik", "NotoSans", "NotoSansArabic", "NotoSansThai"):
         f = TTFont(os.path.join(src, name + ".ttf"))
         if "fvar" in f:
             f = instancer.instantiateVariableFont(f, {a.axisTag: (700 if a.axisTag == "wght" else a.defaultValue) for a in f["fvar"].axes})
