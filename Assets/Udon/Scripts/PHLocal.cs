@@ -217,19 +217,45 @@ public class PHLocal : UdonSharpBehaviour
         int myRole = me != null ? game.RoleOf(me.index) : PHGame.ROLE_NONE;
         int n = VRCPlayerApi.GetPlayerCount();
         voicePlayers = VRCPlayerApi.GetPlayers(voicePlayers);
+        // Perf: a player's slot was a 32-slot search per player (about 1,000 rounds with 32 players), and all five
+        // voice settings were set every half second whether they had changed or not (about 155 calls): a 1.5-3 ms
+        // hitch every 0.5 s. Now the slots go into a small table keyed by player id once a pass, and a player's
+        // settings are set only when what they should be differs from what was set last. Every few seconds they are
+        // all set again regardless (VRChat may reset a player's voice, e.g. on an avatar change).
+        if (Time.time >= voiceResetAt || voiceSet == null) { voiceResetAt = Time.time + VOICE_RESET; voiceSetId = new int[VOICE_HASH]; voiceSet = new int[VOICE_HASH]; }
+        int[] slotOfKey = new int[VOICE_HASH], slotOfSlot = new int[VOICE_HASH];
+        for (int s = 0; s < game.slotPlayer.Length; s++)
+        {
+            int id = game.slotPlayer[s];
+            if (id == 0) continue;
+            int h = id & (VOICE_HASH - 1);
+            while (slotOfKey[h] != 0) h = (h + 1) & (VOICE_HASH - 1);
+            slotOfKey[h] = id; slotOfSlot[h] = s;
+        }
+        bool iHide = round && myRole == PHGame.ROLE_HIDER && me != null && me.hiding && !meGhost;
+        bool iHunt = round && myRole == PHGame.ROLE_HUNTER && !meGhost;
         for (int i = 0; i < n; i++)
         {
             VRCPlayerApi p = voicePlayers[i];
             if (!Utilities.IsValid(p) || p.isLocal) continue;
-            int slot = game.SlotOf(p.playerId);
+            int pid = p.playerId;
+            int slot = -1;
+            for (int h = pid & (VOICE_HASH - 1); slotOfKey[h] != 0; h = (h + 1) & (VOICE_HASH - 1))
+                if (slotOfKey[h] == pid) { slot = slotOfSlot[h]; break; }
             PHSlot ps = slot >= 0 ? game.slots[slot] : null;
             bool theyHide = round && ps != null && game.RoleOf(slot) == PHGame.ROLE_HIDER && ps.hiding && !ps.ghost;
-            bool iHide = round && myRole == PHGame.ROLE_HIDER && me != null && me.hiding && !meGhost;
-            bool iHunt = round && myRole == PHGame.ROLE_HUNTER && !meGhost;
+            // 1: VRChat's default, 2: a hunter does not hear a hider, 3: hiders hear each other like a radio
+            int want = (iHunt && theyHide) ? 2 : ((iHide && theyHide) ? 3 : 1);
+            // what was set for this player last (an open-addressed table keyed by player id; a full one starts over)
+            int at = pid & (VOICE_HASH - 1), probes = 0;
+            while (voiceSetId[at] != 0 && voiceSetId[at] != pid && probes < VOICE_HASH) { at = (at + 1) & (VOICE_HASH - 1); probes++; }
+            if (probes >= VOICE_HASH) { voiceSetId = new int[VOICE_HASH]; voiceSet = new int[VOICE_HASH]; at = pid & (VOICE_HASH - 1); }
+            if (voiceSetId[at] == pid && voiceSet[at] == want) continue;
+            voiceSetId[at] = pid; voiceSet[at] = want;
             float gain = 15f, near = 0f, far = 25f, radius = 0f;
             bool lowpass = true;
-            if (iHunt && theyHide) gain = 0f;
-            else if (iHide && theyHide) { near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }
+            if (want == 2) gain = 0f;
+            else if (want == 3) { near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }
             p.SetVoiceGain(gain);
             p.SetVoiceDistanceNear(near);
             p.SetVoiceDistanceFar(far);
@@ -237,6 +263,11 @@ public class PHLocal : UdonSharpBehaviour
             p.SetVoiceLowpass(lowpass);
         }
     }
+
+    const int VOICE_HASH = 128;     // a power of two, more than the 90 players an instance can hold
+    const float VOICE_RESET = 5f;   // seconds between setting everyone's voice again regardless
+    int[] voiceSetId, voiceSet;
+    float voiceResetAt;
 
     // ------------------------------------------------------------------ the reveal (prototype Round.EndRound)
     // The roofs come off and a beam marks every hider: green survived, red caught. The results go on the HUD for
