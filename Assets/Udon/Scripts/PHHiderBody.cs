@@ -901,13 +901,23 @@ public class PHHiderBody : UdonSharpBehaviour
             // (the longer reach counts only on a slope: off a flat edge it falls as before)
             float keep = wasGrounded ? stepHeight : 0f;
             float rampKeep = wasGrounded ? 1.2f * Mathf.Sqrt(delta.x * delta.x + delta.z * delta.z) : 0f;
-            if (GroundBelow(pos, fall + keep + 0.01f) && groundN.y > 0.64f) { pos.y = groundY; grounded = true; velY = 0f; }
-            else if (rampKeep > keep && GroundBelow(pos, fall + rampKeep + 0.01f) && groundN.y > 0.64f && groundN.y < 0.98f) { pos.y = groundY; grounded = true; velY = 0f; }
+            if (GroundBelow(pos, fall + keep + 0.01f) && groundN.y > 0.64f) { pos.y = SnapY(groundY); grounded = true; velY = 0f; }
+            else if (rampKeep > keep && GroundBelow(pos, fall + rampKeep + 0.01f) && groundN.y > 0.64f && groundN.y < 0.98f) { pos.y = SnapY(groundY); grounded = true; velY = 0f; }
             else { pos.y -= fall; grounded = false; }
         }
         if (!grounded && blocked && ledge > 0f && delta.sqrMagnitude > 1e-10f) TryLedge(delta.normalized);
         // fell out of the map: back where the round started (the same x and z could be off the map, and fall forever)
         if (pos.y < -20f) { pos = home; velY = 0f; lag = Vector3.zero; narrow = false; half = fullHalf; }
+    }
+
+    // Set down on the ground found below, but not into something: lifted onto a ramp's foot (Move), the cast down
+    // starts inside the ramp's first centimetres, misses it and finds the floor, and set down there the prop went
+    // back into the ramp. Where it fits as it stands and would not lower down, it stays.
+    float SnapY(float gy)
+    {
+        if (gy >= pos.y - 0.001f || mask == 0) return gy;
+        if (Fits(new Vector3(pos.x, gy, pos.z), BoxYaw()) || !Fits(pos, BoxYaw())) return gy;
+        return pos.y;
     }
 
     void TryLedge(Vector3 forward)
