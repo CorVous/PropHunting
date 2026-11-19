@@ -125,14 +125,24 @@ public static class LobbyBuilder
     // round whose map failed (PHGame.failedRound); off again when the next round starts
     public static void BuildFailNotice(Transform lobby, PHGame game, Vector3 localPos)
     {
-        var cv = Canvas(lobby, "FailNotice", localPos, Quaternion.identity, new Vector2(1440, 130), 0.005f, false);
+        // (interactive: the whole plate is its close button, desktop click or VR pointer; PHGame.DismissFail, local only)
+        var cv = Canvas(lobby, "FailNotice", localPos, Quaternion.identity, new Vector2(1440, 130), 0.005f, true);
         var plate = new GameObject("Plate");
         plate.transform.SetParent(cv, false);
-        var img = plate.AddComponent<Image>(); img.color = C("1e190f", 0.92f); img.raycastTarget = false;
+        var img = plate.AddComponent<Image>(); img.color = C("1e190f", 0.92f); img.raycastTarget = true;
         var prt = plate.GetComponent<RectTransform>(); prt.anchorMin = Vector2.zero; prt.anchorMax = Vector2.one; prt.offsetMin = Vector2.zero; prt.offsetMax = Vector2.zero;
-        var t = Txt(cv, "Text", Vector2.zero, new Vector2(1400, 120), "MAP FAILED TO BUILD - BACK TO THE LOBBY", rocket != null ? rocket : future, 58, C("ffd34d"), TextAlignmentOptions.Center);
+        var bt = plate.AddComponent<Button>();
+        var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = img;
+        var btn = plate.AddUdonSharpComponent<PHButton>();
+        btn.game = game; btn.action = nameof(PHGame.DismissFail);
+        UdonSharpEditorUtility.CopyProxyToUdon(btn);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, UdonSharpEditorUtility.GetBackingUdonBehaviour(btn).SendCustomEvent, nameof(PHButton.Press));
+        var t = Txt(cv, "Text", new Vector2(-40, 0), new Vector2(1300, 120), "MAP FAILED TO BUILD - BACK TO THE LOBBY", rocket != null ? rocket : future, 58, C("ffd34d"), TextAlignmentOptions.Center);
         t.fontStyle = FontStyles.Bold;
         t.enableAutoSizing = true; t.fontSizeMin = 20; t.fontSizeMax = 58;   // (the wide display face: fit the plate)
+        t.raycastTarget = false;
+        var x = Txt(cv, "Close", new Vector2(670, 0), new Vector2(80, 110), "X", future, 56, C("ffd34d"), TextAlignmentOptions.Center);
+        x.raycastTarget = false;
         game.failNotice = cv.gameObject;
         cv.gameObject.SetActive(false);
     }
