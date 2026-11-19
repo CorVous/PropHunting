@@ -700,7 +700,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // the old map's objects waiting to be destroyed (Clear): switched off, destroyed destroyPerFrame a frame
     GameObject[] doomed;
     int nDoomed, doomedNext;
-    public int destroyPerFrame = 8;
+    public int destroyPerFrame = 1;   // each costs about 0.6 ms in the editor (measured: 1 a frame +0.6 ms, 3 +2.3, 8 +6)
 
     // empty copies of the three roots, made at the start while they are still empty (Clear: a new root is a copy)
     Transform propTemplate, fenceTemplate, fixtureTemplate;
