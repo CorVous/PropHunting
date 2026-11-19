@@ -115,10 +115,15 @@ public class PHGame : UdonSharpBehaviour
         return -1;
     }
 
+    // Perf: PHView and PHLocal ask for the local slot several times a frame, each a 32-slot search. The last answer
+    // is kept and checked against the table (one read), searched again only when it no longer holds.
+    int localSlotIdx = -1, localId;
+
     public PHSlot LocalSlot()
     {
-        int s = SlotOf(Networking.LocalPlayer.playerId);
-        return s >= 0 ? slots[s] : null;
+        if (localId == 0) localId = Networking.LocalPlayer.playerId;
+        if (localSlotIdx < 0 || slotPlayer[localSlotIdx] != localId) localSlotIdx = SlotOf(localId);
+        return localSlotIdx >= 0 ? slots[localSlotIdx] : null;
     }
 
     void AssignSlots()
