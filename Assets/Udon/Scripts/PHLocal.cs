@@ -6,9 +6,12 @@ using TMPro;
 
 // The local player's side of the game (the prototype's Player and PlayerActions, without its own movement:
 // VRChat moves the player). One per world; it acts for whoever is running this client.
-//   Hider: Use (desktop click, VR right trigger) on a prop within 4 m becomes it (G5, G25); the avatar shrinks
-//          to the prop's eye height, sits in its parked station and the synced prop follows them. The VR left
-//          trigger turns the prop (PHHiderBody). Taunt: T on desktop, the button on the screen device in VR (PHView).
+//   Hider: lands on the map as themselves (Cor) and walks as usual until they pick a prop. Use (desktop click, a tap
+//          of the VR right trigger) on a prop within 4 m becomes it (G5, G25); the avatar shrinks to the prop's eye
+//          height, sits in its parked station and the synced prop follows them. Holding the VR right trigger grabs the
+//          prop and turns it with the hand (PHHiderBody), at once when nothing is aimed at (Cor). A hider still
+//          without a prop when the hunt starts gets a random one where they stand. Taunt: T on desktop, the button on
+//          the screen device in VR (PHView); no cooldown (Cor).
 //   Hunter: strikes with a melee weapon (PHWeapons; desktop click, VR swing): a hider's prop takes a hit (sent to
 //          its owner), a real prop wears the weapon (G17) and gets knocked, anything else costs nothing. Hunters walk
 //          through props (G45).
@@ -32,7 +35,7 @@ public class PHLocal : UdonSharpBehaviour
     float nextPanel;
 
     // ---- balance (Balance.cs)
-    public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 8f;
+    public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 0.5f;   // (Cor: no cooldown; this only keeps a held key from flooding the network)
     public const int HIT_DAMAGE = 25, HUNTER_HEALTH = 100, HUNT_CHANGES = 3;   // HUNTER_HEALTH: a new weapon's condition
     public const float HUNT_CHANGE_COOLDOWN = 5f;
     public const int LAYER_PROPS_SOLID = 11, LAYER_PROPS_WALKTHROUGH = 17;
@@ -105,11 +108,12 @@ public class PHLocal : UdonSharpBehaviour
                     }
                     float facing = Random.Range(0, 24) * 15f;
                     me.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
-                    body.Begin(at, facing);
-                    body.frozen = false;   // a hider moves, picks and opens doors the moment they land (Cor)
+                    // they land as themselves (Cor), on their own feet, and move, pick and open doors at once; the
+                    // first prop they pick seats them in it (SetDisguise). The hunters wait in the lobby until the
+                    // hunt, so nobody who must not sees them meanwhile.
+                    body.End();
+                    SetFrozen(false);
                     changesLeft = HUNT_CHANGES;
-                    StartingDisguise();
-                    if (s != null) s.StartHiding();
                     Say(T("say.youHide"), 6f);
                 }
                 break;
@@ -126,6 +130,8 @@ public class PHLocal : UdonSharpBehaviour
                 }
                 else if (role == PHGame.ROLE_HIDER)
                 {
+                    // still themselves when the hunters come: a random prop, where they stand
+                    if (s != null && s.def < 0 && !s.caught && !s.ghost) StartingDisguise();
                     Say(T("say.released"), 3f);
                     nextForced = Time.time + ForcedInterval() * Random.Range(0.35f, 1f);
                     checkPos = me.GetPosition(); warned = false;
@@ -409,7 +415,17 @@ public class PHLocal : UdonSharpBehaviour
     {
         PHSlot s = Me();
         if (s == null) return false;
-        if (s.def >= 0 && body.active)
+        if (!body.active)
+        {
+            // the first prop: the body starts where the player stands, facing their way, and they sit in it
+            // (PHHiderBody settles a prop that starts partly inside something on its first frame)
+            VRCPlayerApi me = Networking.LocalPlayer;
+            body.Begin(me.GetPosition(), Mathf.Round(me.GetRotation().eulerAngles.y / 15f) * 15f);
+            body.frozen = false;
+            body.SetProp(d);
+            s.StartHiding();
+        }
+        else if (s.def >= 0)
         {
             int old = s.def;
             body.SetProp(d);
@@ -447,13 +463,19 @@ public class PHLocal : UdonSharpBehaviour
     // ------------------------------------------------------------------ input
     public override void InputUse(bool value, VRC.Udon.Common.UdonInputEventArgs args)
     {
-        if (!value) return;
+        if (!value)
+        {
+            if (args.handType == VRC.Udon.Common.HandType.RIGHT && Networking.LocalPlayer.IsUserInVR()) TriggerUp();
+            return;
+        }
         int phase = game.phase;
         bool vr = Networking.LocalPlayer.IsUserInVR();
         // desktop: a click on a door within reach works it (C7), before anything else
         if (!vr && TryDoor()) return;
-        // VR: a hider's left trigger turns the prop (PHHiderBody); the selector in the right hand picks
+        // VR: the left trigger does nothing (Cor: no left-hand device); a hider's right trigger is a tap or a hold,
+        // told apart while it is held and as it is let go (TriggerDown, UpdateTrigger, TriggerUp)
         if (vr && args.handType == VRC.Udon.Common.HandType.LEFT) return;
+        if (vr && role == PHGame.ROLE_HIDER) { TriggerDown(); return; }
         if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT))
         {
             // the final stand (Cor): no new disguises; the selector shoots hunters instead
@@ -467,6 +489,57 @@ public class PHLocal : UdonSharpBehaviour
         // a hunter: desktop clicks to slash (PHWeapons strikes as the weapon comes across); VR swings the hand instead
         else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT && !vr && weapons != null) weapons.DesktopSwing();
     }
+
+    // ---- a VR hider's right trigger (Cor): a tap picks the prop aimed at (in the final stand, fires); held past
+    // HOLD_TIME it grabs the prop, which then turns with the hand and with the player until it is let go
+    // (PHHiderBody.turnHeld). With nothing aimed at (before the final stand), the press grabs at once.
+    public const float HOLD_TIME = 0.25f;
+    bool triggerDown, grabbing;
+    float triggerAt;
+
+    void TriggerDown()
+    {
+        triggerDown = true; triggerAt = Time.time; grabbing = false;
+        if (!game.Endgame && hoverObj == null) StartGrab();
+    }
+
+    void TriggerUp()
+    {
+        if (!triggerDown) return;
+        triggerDown = false;
+        if (grabbing) { grabbing = false; body.turnHeld = false; return; }
+        int phase = game.phase;
+        if (role != PHGame.ROLE_HIDER || !(phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) return;
+        if (game.Endgame) { HiderShoot(); return; }
+        if (canPick && weapons != null) weapons.FireSelector();   // the selector kicks with every pick
+        TryTakeDisguise();
+    }
+
+    void StartGrab()
+    {
+        grabbing = true;
+        body.turnHeld = body.active;
+    }
+
+    void UpdateTrigger()
+    {
+        if (!triggerDown) { if (body.turnHeld) body.turnHeld = false; return; }
+        if (!grabbing && Time.time - triggerAt >= HOLD_TIME) StartGrab();
+        if (grabbing) body.turnHeld = body.active;   // (a grab that began before there was a prop takes hold once there is one)
+    }
+
+    // a hider still without a prop in the hunt (the phase change came before their slot, or the pick there failed)
+    // gets the random one where they stand; looked at twice a second
+    float nextPropless;
+    void UpdatePropless()
+    {
+        if (role != PHGame.ROLE_HIDER || game.phase != PHGame.PH_HUNT || Time.time < nextPropless) return;
+        nextPropless = Time.time + 0.5f;
+        PHSlot s = Me();
+        if (s != null && s.def < 0 && !s.caught && !s.ghost) StartingDisguise();
+    }
+
+    public bool Grabbing() { return grabbing && body.turnHeld; }
 
     // VR: the grips work doors (a hider taunts with the button on the screen device, PHView; desktop: T)
     public override void InputGrab(bool value, VRC.Udon.Common.UdonInputEventArgs args)
@@ -487,7 +560,7 @@ public class PHLocal : UdonSharpBehaviour
     public bool TauntReady()
     {
         PHSlot s = Me();
-        return s != null && role == PHGame.ROLE_HIDER && !s.caught && game.phase == PHGame.PH_HUNT && Time.time - lastTaunt >= TAUNT_COOLDOWN;
+        return s != null && role == PHGame.ROLE_HIDER && !s.caught && game.phase == PHGame.PH_HUNT;
     }
 
     public bool ButtonTaunt()
@@ -549,6 +622,8 @@ public class PHLocal : UdonSharpBehaviour
             if (nextForced > Time.time + iv) nextForced = Time.time + iv;
         }
         wasEndgame = eg;
+        UpdateTrigger();
+        UpdatePropless();
         UpdateForcedTaunt();
         UpdateVoices();
         UpdateStrayStation();
@@ -575,6 +650,9 @@ public class PHLocal : UdonSharpBehaviour
     {
         int phase = game.phase;
         bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || (phase == PHGame.PH_HUNT && !game.Endgame)) && !aimOverride && !IsGhost();
+        // in the hunt only while a change can be made now (Cor saw props light up that a pull then refused: the hunt's
+        // three changes were used up, or the last one was under HUNT_CHANGE_COOLDOWN ago)
+        if (can && phase == PHGame.PH_HUNT && (changesLeft <= 0 || Time.time - lastChange < HUNT_CHANGE_COOLDOWN)) can = false;
         Collider c = null;
         canPick = can;
         aimDist = TAKE_RANGE;
