@@ -681,8 +681,8 @@ public static class PropPrefabBaker
     {
         for (int m = 0; m < mesh.Length; m++)
         {
-            string n = GenModels.Name[m].ToLower();
             if (mesh[m] == null) continue;
+            string n = mesh[m].name.ToLower();
             if (n == "crop_carrot" || n == "crop_turnip")
             {
                 Vector3[] v = mesh[m].vertices;
@@ -752,6 +752,59 @@ public static class PropPrefabBaker
             mesh[m] = MakeModel(GenModels.Name[m]);
             bounds[m] = mesh[m].bounds;
             pivot[m] = Vector3.zero; parent[m] = -1;
+        }
+        LoadReplacements();
+    }
+
+    // Quaternius models that take the place of props once made in code (Tools/make_quaternius.py writes the file in
+    // the format of models.bytes). Each has the name of the model it replaces and lies inside that model's bounds.
+    // A model with a new name and a parent is one more door of that parent (the wardrobe's left leaf): it is added
+    // after GenModels' models, so it has no index in the generator's tables.
+    static void LoadReplacements()
+    {
+        var asset = Resources.Load<TextAsset>("PropHunt/models_quaternius");
+        if (asset == null) return;
+        byte[] b = asset.bytes;
+        if (b[0] != 'P' || b[1] != 'H' || b[2] != 'M' || b[3] != '1') throw new Exception("models_quaternius.bytes: bad header");
+        int p = 4;
+        int n = BitConverter.ToInt32(b, p); p += 4;
+        for (int k = 0; k < n; k++)
+        {
+            int nameLen = b[p++];
+            string name = System.Text.Encoding.UTF8.GetString(b, p, nameLen); p += nameLen;
+            int parLen = b[p++];
+            string par = System.Text.Encoding.UTF8.GetString(b, p, parLen); p += parLen;
+            Vector3 piv = V(b, p); p += 12;
+            Vector3 mn = V(b, p); p += 12;
+            Vector3 mx = V(b, p); p += 12;
+            int nv = BitConverter.ToInt32(b, p); p += 4;
+            int ni = BitConverter.ToInt32(b, p); p += 4;
+            var verts = new Vector3[nv]; var norms = new Vector3[nv]; var cols = new Color32[nv];
+            for (int i = 0; i < nv; i++)
+            {
+                verts[i] = V(b, p);
+                norms[i] = new Vector3((sbyte)b[p + 12] / 127f, (sbyte)b[p + 13] / 127f, (sbyte)b[p + 14] / 127f);
+                cols[i] = new Color32(b[p + 15], b[p + 16], b[p + 17], 255);
+                p += 19;
+            }
+            var tris = new int[ni];
+            if (nv < 65536) { for (int i = 0; i < ni; i++) { tris[i] = BitConverter.ToUInt16(b, p); p += 2; } }
+            else { for (int i = 0; i < ni; i++) { tris[i] = BitConverter.ToInt32(b, p); p += 4; } }
+            int m = Array.IndexOf(GenModels.Name, name);
+            if (m < 0)
+            {
+                int pi = par.Length == 0 ? -1 : Array.IndexOf(GenModels.Name, par);
+                if (pi < 0) throw new Exception("models_quaternius.bytes: no model named " + name);
+                m = mesh.Length;
+                Array.Resize(ref mesh, m + 1); Array.Resize(ref bounds, m + 1); Array.Resize(ref pivot, m + 1); Array.Resize(ref parent, m + 1);
+                parent[m] = pi;
+            }
+            var me = new Mesh { name = name };
+            if (nv >= 65536) me.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            me.vertices = verts; me.normals = norms; me.colors32 = cols; me.triangles = tris;
+            var bd = new Bounds(); bd.SetMinMax(mn, mx);
+            me.bounds = bd;
+            mesh[m] = me; bounds[m] = bd; pivot[m] = piv;
         }
     }
 
