@@ -134,6 +134,21 @@ public static class TextBaker
             if (byEnglish.TryGetValue(tmp.text.Trim(), out int k)) { labels.Add(tmp); labelKey.Add(k); }
         }
         text.labels = labels.ToArray(); text.labelKey = labelKey.ToArray();
+        // longer languages shrink to fit their label instead of spilling out (Cor: "make sure all the text stays
+        // formatted well"): auto size from the baked size down to 55% of it
+        foreach (var lab in labels) FitToBox(lab);
+        // and the texts the lobby boards set at runtime (not player names or map codes)
+        foreach (var u in Object.FindObjectsOfType<UdonSharp.UdonSharpBehaviour>(true))
+        {
+            if (!(u is PHPanel) && !(u is PHScorePad)) continue;
+            foreach (var f in u.GetType().GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                if (f.Name.ToLowerInvariant().Contains("name") || f.Name.Contains("seedCode")) continue;
+                if (typeof(TMP_Text).IsAssignableFrom(f.FieldType)) FitToBox(f.GetValue(u) as TMP_Text);
+                else if (f.FieldType.IsArray && typeof(TMP_Text).IsAssignableFrom(f.FieldType.GetElementType()) && f.GetValue(u) is System.Array arr)
+                    foreach (var o in arr) FitToBox(o as TMP_Text);
+            }
+        }
         UdonSharpEditorUtility.CopyProxyToUdon(text);
 
         var game2 = Object.FindObjectOfType<PHGame>(true);
@@ -145,6 +160,45 @@ public static class TextBaker
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(text.gameObject.scene);
         Debug.Log("[prophunt] text: " + t.keys.Count + " strings x " + L + " languages, " + t.props.Count + " prop names, " + labels.Count + " static labels");
     }
+
+    public static void FitToBox(TMP_Text t)
+    {
+        if (t == null) return;
+        if (!t.enableAutoSizing) { t.fontSizeMax = t.fontSize; t.enableAutoSizing = true; }
+        t.fontSizeMin = Mathf.Max(5f, t.fontSizeMax * 0.55f);
+        EditorUtility.SetDirty(t);
+    }
+
+    // "PropHunt/Check text fit": every static label in every language, laid out by TMP; lists the ones that still
+    // spill out of their box at the smallest auto size, and the runtime texts of the panels (PHPanel, PHScorePad)
+    // with the longest translation of their rows. Restores the English afterwards.
+    [MenuItem("PropHunt/Check text fit")]
+    public static void CheckFit()
+    {
+        var text = Object.FindObjectOfType<PHText>(true);
+        if (text == null || text.labels == null) { Debug.LogWarning("[prophunt] text fit: bake the text table first"); return; }
+        int L = text.langCode.Length, bad = 0;
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < text.labels.Length; i++)
+        {
+            var t = text.labels[i];
+            if (t == null) continue;
+            string was = t.text;
+            var box = t.rectTransform.rect;
+            for (int l = 0; l < L; l++)
+            {
+                t.text = text.table[text.labelKey[i] * L + l];
+                t.ForceMeshUpdate(true, true);
+                var b = t.textBounds.size;
+                bool over = t.isTextOverflowing || b.x > box.width * 1.02f + 1f || (!t.enableWordWrapping && b.y > box.height * 1.3f + 2f);
+                if (over) { bad++; sb.AppendLine(text.keys[text.labelKey[i]] + " [" + text.langCode[l] + "] " + TPath(t.transform) + "  " + b.x.ToString("0") + " > " + box.width.ToString("0") + "  \"" + t.text + "\""); }
+            }
+            t.text = was; t.ForceMeshUpdate(true, true);
+        }
+        Debug.Log("[prophunt] text fit: " + bad + " label/language pairs overflow" + (bad > 0 ? ":" + System.Environment.NewLine + sb : ""));
+    }
+
+    static string TPath(Transform t) { string p = t.name; while (t.parent != null && p.Length < 80) { t = t.parent; p = t.name + "/" + p; } return p; }
 
     // ------------------------------------------------------------------ fonts
     static void BakeFonts(Table t)
