@@ -704,9 +704,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     void Doom(GameObject go)
     {
-        if (go == null || !go.activeSelf && go.name == DOOMED) return;   // (already waiting)
+        if (go == null) return;
+        // (not renamed or otherwise marked: a rename is slow in the editor. A second Clear before it is gone queues it
+        // again, which is harmless: a destroyed object is null by the time its second turn comes)
         go.SetActive(false);
-        go.name = DOOMED;   // (so a second Clear before it goes does not queue it twice)
         if (doomed == null) doomed = new GameObject[2048];
         if (nDoomed >= doomed.Length)
         {
@@ -716,7 +717,6 @@ public class MapBuilderUdon : UdonSharpBehaviour
         }
         doomed[nDoomed++] = go;
     }
-    const string DOOMED = "#doomed";
 
     // a few of the old map's objects destroyed this frame; true while some are left
     bool DestroySome()
