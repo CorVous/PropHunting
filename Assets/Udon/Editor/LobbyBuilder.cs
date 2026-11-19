@@ -12,7 +12,7 @@ using UnityEngine.UI;
 //   DressRoom      board floor with a track of coloured spaces, the PLAY space, wall bands, the PROPHUNT name,
 //                  a prop shelf on the east wall and giant game pieces (KayKit models, CC0)
 // Assets live in Assets/Lobby (icons are 256 px renders from cc0.cor.home with the background keyed out).
-public static class LobbyBuilder
+public static partial class LobbyBuilder
 {
     const string Root = "Assets/Lobby/";
     static TMP_FontAsset future, rocket;
