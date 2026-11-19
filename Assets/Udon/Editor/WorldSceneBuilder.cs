@@ -26,6 +26,28 @@ public static class WorldSceneBuilder
     const float RoomW = 24f, RoomD = 22f, WallH = 7f, ZoneHalf = 5.5f;
     const int SLOTS = 32;
 
+    // the credits board alone, after CREDITS.md changes (the open scene's lobby keeps everything else)
+    [MenuItem("PropHunt/Rebuild credits board")]
+    public static void RebuildCredits()
+    {
+        var lobby = GameObject.Find("World/Lobby");
+        if (lobby == null) { Debug.LogWarning("[prophunt] no World/Lobby in the open scene"); return; }
+        LobbyBuilder.EnsureAssets();
+        var old = lobby.transform.Find("Credits");
+        if (old != null) Object.DestroyImmediate(old.gameObject);
+        BuildCredits(lobby.transform);
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(lobby.scene);
+    }
+
+    // 5.4 m wide, its foot 0.6 m up and its top under the name; facing north (into the room)
+    static void BuildCredits(Transform lobby)
+    {
+        var cv = LobbyBuilder.BuildCredits(lobby, Vector3.zero, Quaternion.Euler(0f, 180f, 0f));
+        if (cv == null) return;
+        float h = ((RectTransform)cv).sizeDelta.y * cv.localScale.y;
+        cv.localPosition = new Vector3(-6.3f, 0.6f + h / 2f, -RoomD / 2 + 0.06f);
+    }
+
     [MenuItem("PropHunt/Build world scene")]
     public static void Build()
     {
@@ -230,6 +252,8 @@ public static class WorldSceneBuilder
         // the last round's results, a score pad on the west wall
         LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
         local.panelUiText = null; local.resultsText = null;
+        // the credits (from CREDITS.md), on the south wall left of the spawn, under the PROPHUNT name
+        BuildCredits(lobby.transform);
 
         // the profiler (its plaque right of the panel) and the scripts it watches: every one that runs each frame
         var prof = LobbyBuilder.BuildProfiler(lobby.transform, game, new Vector3(5.9f, 1.55f, RoomD / 2 - 0.12f));

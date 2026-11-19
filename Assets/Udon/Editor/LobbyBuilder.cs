@@ -483,6 +483,232 @@ public static class LobbyBuilder
         return pad;
     }
 
+    // ------------------------------------------------------------------ the credits board (south wall)
+    // Made from CREDITS.md at the project's root each time the world is built (and by PropHunt > Rebuild credits board),
+    // so it follows the file: the packs table, grouped by maker into three columns, and every paragraph that names a
+    // licence (other software, fonts) as fine print. 1500 canvas units wide at 3.6 mm: 5.4 m; the height follows the text.
+    const float CW = 1500f;
+
+    class CreditRow { public string name, right; public int maker; }
+
+    public static Transform BuildCredits(Transform lobby, Vector3 localPos, Quaternion rot)
+    {
+        string path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.dataPath), "CREDITS.md");
+        if (!System.IO.File.Exists(path)) { Debug.LogWarning("[lobby] no CREDITS.md at " + path); return null; }
+        var lines = System.IO.File.ReadAllLines(path);
+
+        // the makers (the bullet list: "- **Kenney** (www.kenney.nl)"), the table rows, the licence paragraphs
+        var makerName = new System.Collections.Generic.List<string>();
+        var makerSub = new System.Collections.Generic.List<string>();
+        var rows = new System.Collections.Generic.List<CreditRow>();
+        var notes = new System.Collections.Generic.List<string>();
+        int col = -1, colMaker = -1, colUse = -1, colCount = -1, colLic = -1;
+        bool allCc0 = true;
+        var para = new System.Text.StringBuilder();
+        System.Action flush = () =>
+        {
+            string p = para.ToString().Trim(); para.Length = 0;
+            if (p.Length > 0 && (p.IndexOf("licence", System.StringComparison.OrdinalIgnoreCase) >= 0 || p.IndexOf("license", System.StringComparison.OrdinalIgnoreCase) >= 0))
+                notes.Add(MdPlain(p));
+        };
+        foreach (var raw in lines)
+        {
+            string ln = raw.Trim();
+            if (ln.StartsWith("|"))
+            {
+                flush();
+                var cells = ln.Trim('|').Split('|');
+                for (int i = 0; i < cells.Length; i++) cells[i] = cells[i].Trim();
+                if (cells[0].StartsWith("---")) continue;
+                if (cells[0] == "Pack")
+                {
+                    col = 0;
+                    colMaker = System.Array.IndexOf(cells, "Maker"); colUse = System.Array.IndexOf(cells, "Used for");
+                    colCount = System.Array.FindIndex(cells, c => c.StartsWith("Items")); colLic = System.Array.IndexOf(cells, "Licence");
+                    continue;
+                }
+                if (col < 0) continue;
+                var r = new CreditRow();
+                r.name = PackName(cells[0]);
+                string maker = colMaker >= 0 ? cells[colMaker] : "";
+                r.maker = makerName.FindIndex(m => maker.StartsWith(m, System.StringComparison.OrdinalIgnoreCase));
+                if (r.maker < 0) { makerName.Add(maker); makerSub.Add(""); r.maker = makerName.Count - 1; }
+                string use = colUse >= 0 ? System.Text.RegularExpressions.Regex.Replace(cells[colUse], @"\s*\([^)]*\)", "") : "";
+                string lic = colLic >= 0 ? cells[colLic] : "";
+                if (!lic.StartsWith("CC0")) allCc0 = false;
+                r.right = use + (colCount >= 0 ? "  ·  " + cells[colCount] : "") + (lic.StartsWith("CC0") ? "" : "  ·  " + lic);
+                rows.Add(r);
+                continue;
+            }
+            var bullet = System.Text.RegularExpressions.Regex.Match(ln, @"^- \*\*(.+?)\*\*\s*(.*)$");
+            if (bullet.Success && col < 0)
+            {
+                flush();
+                makerName.Add(bullet.Groups[1].Value);
+                // "by Kay Lousberg (www.kaylousberg.com)" -> "by Kay Lousberg · kaylousberg.com"
+                string rest = MdPlain(bullet.Groups[2].Value).Replace("www.", "");
+                rest = System.Text.RegularExpressions.Regex.Replace(rest, @"\s*\(([^)]*)\)", "  ·  $1").Trim();
+                if (rest.StartsWith("·")) rest = rest.Substring(1).Trim();
+                makerSub.Add(rest);
+                continue;
+            }
+            if (ln.Length == 0 || ln.StartsWith("#") || ln.StartsWith("- ")) { flush(); continue; }
+            if (para.Length > 0) para.Append(' ');
+            para.Append(ln);
+        }
+        flush();
+
+        // the order on the board: maker by maker, then by name; laid out in three columns of about the same length
+        rows.Sort((a, b) => a.maker != b.maker ? a.maker.CompareTo(b.maker) : string.CompareOrdinal(a.name, b.name));
+        const float rowH = 30f, headH = 62f;
+        var items = new System.Collections.Generic.List<object>();   // int = a maker's header, CreditRow = a pack
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (i == 0 || rows[i].maker != rows[i - 1].maker) items.Add(rows[i].maker);
+            items.Add(rows[i]);
+        }
+        float total = 0f;
+        foreach (var it in items) total += it is int ? headH : rowH;
+        const int nCols = 3;
+        float colTarget = total / nCols;
+        var colStart = new int[nCols + 1];
+        { float acc = 0f; int c = 1;
+          for (int i = 0; i < items.Count && c < nCols; i++)
+          {
+              float h = items[i] is int ? headH : rowH;
+              if (acc + h / 2 > colTarget * c) { colStart[c++] = (items[i] is CreditRow && i > 0 && items[i - 1] is int) ? i - 1 : i; }
+              acc += h;
+          }
+          for (; c <= nCols; c++) colStart[c] = items.Count; colStart[nCols] = items.Count; }
+        float colsH = 0f;
+        for (int c = 0; c < nCols; c++)
+        {
+            float h = 0f;
+            for (int i = colStart[c]; i < colStart[c + 1]; i++) h += items[i] is int ? headH : rowH;
+            colsH = Mathf.Max(colsH, h);
+        }
+
+        // measure the fine print, then size the canvas: title band, board (columns, a rule, the notes), margin
+        const float side = 24f, titleH = 112f, pad = 26f, colGap = 34f;
+        float boardW = CW - 2 * side, innerW = boardW - 2 * pad;
+        var cv = Canvas(lobby, "Credits", localPos, rot, new Vector2(CW, 100f), 0.0036f, false);
+        var noteTexts = new System.Collections.Generic.List<TextMeshProUGUI>();
+        float notesH = 0f;
+        foreach (var n in notes)
+        {
+            var t = Txt(cv, "Note", Vector2.zero, new Vector2(innerW, 20), Clean(n, future), future, 13, C("6b5d40"), TextAlignmentOptions.TopLeft);
+            t.enableWordWrapping = true;
+            float h = t.GetPreferredValues(t.text, innerW, 0f).y;
+            t.rectTransform.sizeDelta = new Vector2(innerW, h);
+            noteTexts.Add(t); notesH += h + 8f;
+        }
+        float boardH = pad + colsH + (notes.Count > 0 ? 22f + notesH : 0f) + pad - 8f;
+        float CH = titleH + boardH + side;
+        ((RectTransform)cv).sizeDelta = new Vector2(CW, CH);
+        System.Func<float, float, Vector2> Q = (x, y) => new Vector2(x - CW / 2, CH / 2 - y);   // top-left based
+
+        var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
+        // the title band on the felt
+        var crest = Icon("meeple_hide");
+        Img(cv, "MeepleL", Q(side + 46, 56), new Vector2(64, 64), crest, Color.white);
+        Img(cv, "MeepleR", Q(CW - side - 46, 56), new Vector2(64, 64), Icon("meeple_hunt"), Color.white);
+        var title = Txt(cv, "Title", Q(CW / 2, 44), new Vector2(800, 64), "CREDITS", rocket, 50, C("f6d773"), TextAlignmentOptions.Center);
+        title.characterSpacing = 6f;
+        string sub = allCc0 ? "Every model, sound and font here is from free CC0 1.0 packs (public domain). No credit is required: it is given with thanks."
+                            : "Thanks to the makers of the packs and tools used in this world.";
+        Txt(cv, "Subtitle", Q(CW / 2, 92), new Vector2(boardW - 200, 26), Clean(sub, future), future, 15, C("e1cfa5"), TextAlignmentOptions.Center);
+
+        // the board
+        float by = titleH + boardH / 2;
+        Img(cv, "BoardShadow", Q(CW / 2, by + 6), new Vector2(boardW, boardH), sRound, C("173d2c"), 1.6f);
+        Img(cv, "BoardEdge", Q(CW / 2, by), new Vector2(boardW, boardH), sRound, BoardEdge, 1.6f);
+        Img(cv, "Board", Q(CW / 2, by), new Vector2(boardW - 10, boardH - 10), sRound, Cream, 1.6f);
+
+        float colW = (innerW - (nCols - 1) * colGap) / nCols;
+        Color[] makerColour = { RowColour[0], RowColour[3], RowColour[2], RowColour[1] };
+        var ink = C("2b2416");
+        for (int c = 0; c < nCols; c++)
+        {
+            float x0 = side + pad + c * (colW + colGap), y = titleH + pad;
+            if (c > 0)
+            {
+                var div = Img(cv, "Divider" + c, Q(x0 - colGap / 2, titleH + pad + colsH / 2), new Vector2(colsH, 4), sDash, C("d9c49a"), 5f);
+                div.rectTransform.localRotation = Quaternion.Euler(0, 0, 90);
+            }
+            for (int i = colStart[c]; i < colStart[c + 1]; i++)
+            {
+                if (items[i] is int m)
+                {
+                    var tile = Img(cv, "Maker " + makerName[m], Q(x0 + colW / 2, y + headH / 2 - 4), new Vector2(colW, headH - 14), sTile, makerColour[m % 4], 2f);
+                    var mn = Txt(tile.transform, "Name", new Vector2(-colW / 2 + 16, 2), new Vector2(colW - 32, 30), Clean(makerName[m].ToUpperInvariant(), rocket), rocket, 24, ink, TextAlignmentOptions.Left);
+                    mn.rectTransform.pivot = new Vector2(0f, 0.5f);
+                    float nameW = mn.GetPreferredValues(mn.text).x;
+                    // the rest of the bullet ("by Kay Lousberg · kaylousberg.com"), shrunk to fit beside the name
+                    float subW = colW - 32 - nameW - 18;
+                    var st = Txt(tile.transform, "Site", new Vector2(colW / 2 - 16, 2), new Vector2(subW, 24), Clean(makerSub[m], future), future, 13, C("1e190f", 0.75f), TextAlignmentOptions.Right);
+                    st.rectTransform.pivot = new Vector2(1f, 0.5f);
+                    st.enableAutoSizing = true; st.fontSizeMin = 8f; st.fontSizeMax = 13f;
+                    y += headH;
+                    continue;
+                }
+                var r = (CreditRow)items[i];
+                float cy = y + rowH / 2;
+                Img(cv, "Pip", Q(x0 + 8, cy), new Vector2(12, 12), sRound, makerColour[r.maker % 4], 6f);
+                var nt = Txt(cv, "Pack " + r.name, Q(x0 + 24, cy), new Vector2(colW - 24, rowH), Clean(r.name, future), future, 17, ink, TextAlignmentOptions.Left);
+                nt.rectTransform.pivot = new Vector2(0f, 0.5f);
+                var rt2 = Txt(cv, "Use", Q(x0 + colW, cy + 1), new Vector2(colW * 0.5f, rowH), Clean(r.right, future), future, 12, C("8a7b5a"), TextAlignmentOptions.Right);
+                rt2.rectTransform.pivot = new Vector2(1f, 0.5f);
+                y += rowH;
+            }
+        }
+        // the fine print under a dashed rule
+        if (notes.Count > 0)
+        {
+            float ry = titleH + pad + colsH + 8f;
+            Img(cv, "Rule", Q(CW / 2, ry), new Vector2(innerW, 4), sDash, C("d9c49a"), 5f);
+            float ny = ry + 14f;
+            foreach (var t in noteTexts)
+            {
+                float h = t.rectTransform.sizeDelta.y;
+                t.rectTransform.anchoredPosition = Q(CW / 2, ny + h / 2);
+                t.transform.SetAsLastSibling();
+                ny += h + 8f;
+            }
+        }
+        Debug.Log("[lobby] credits board: " + rows.Count + " packs, " + notes.Count + " notes, " + (CW * 0.0036f).ToString("0.00") + " x " + (CH * 0.0036f).ToString("0.00") + " m");
+        return cv;
+    }
+
+    // "KayKit : Board Game Bits 1.0 (`board-game-bits`)" -> "Board Game Bits"
+    static string PackName(string s)
+    {
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s*\(`[^`]*`\)", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"^(KayKit\s*[:\-]\s*|Kenney\s*:\s*)", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+\d+(\.\d+)+$", "");
+        return s.Trim();
+    }
+
+    // markdown to plain text: no code-only brackets, no backticks, bold or link syntax, no "https://"
+    static string MdPlain(string s)
+    {
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s*\(`[^`]*`\)", "");
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\[([^\]]*)\]\([^)]*\)", "$1");
+        s = s.Replace("`", "").Replace("**", "").Replace("https://", "").Replace("http://", "");
+        return s.Trim();
+    }
+
+    // only characters the static font atlas has (TMP would draw a box otherwise)
+    static string Clean(string s, TMP_FontAsset f)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (char ch in s)
+        {
+            char c = ch == '—' || ch == '–' ? '-' : ch == '’' || ch == '‘' ? '\'' : ch == '“' || ch == '”' ? '"' : ch;
+            if (f == null || c == ' ' || f.HasCharacter(c)) sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
     // ------------------------------------------------------------------ the room
     // Plan coordinates: x 0..W from the west wall, y 0..D from the north wall (as in the mock-up); L() converts to the
     // lobby's local space (x east, z north, centred).
