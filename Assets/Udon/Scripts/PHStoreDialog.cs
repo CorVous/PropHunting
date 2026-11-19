@@ -42,9 +42,10 @@ public class PHStoreDialog : UdonSharpBehaviour
         if (t < 0) return;
         Place(at, facing);
         buyGroup.SetActive(false); trophyGroup.SetActive(true);
-        nameText.text = store.tName[t];
-        goalText.text = store.tGoal[t];
-        roundsText.text = roundsFormat.Replace("{0}", store.tLo[t].ToString()).Replace("{1}", store.tHi[t].ToString());
+        PHText tx = store.game != null ? store.game.text : null;   // the player's language (the English is a table row)
+        nameText.text = tx != null ? tx.En(store.tName[t]) : store.tName[t];
+        goalText.text = tx != null ? tx.En(store.tGoal[t]) : store.tGoal[t];
+        roundsText.text = (tx != null ? tx.Get("store.rounds") : roundsFormat).Replace("{0}", store.tLo[t].ToString()).Replace("{1}", store.tHi[t].ToString());
     }
 
     void Place(Vector3 at, Quaternion facing)
