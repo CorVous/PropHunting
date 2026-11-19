@@ -274,7 +274,10 @@ public static partial class LobbyBuilder
                 var abt = ab.gameObject.AddComponent<Button>();
                 var an = abt.navigation; an.mode = Navigation.Mode.None; abt.navigation = an; abt.targetGraphic = ab;
                 var face = Img(ab.transform, "Face", Vector2.zero, new Vector2(22, 40), sRound, BoardEdge, 4f);
-                panel.hostButtonText[9 + a] = Txt(ab.transform, "Text", new Vector2(0, 1), new Vector2(22, 30), a == 0 ? "<" : ">", future, 18, C("1e190f"), TextAlignmentOptions.Center);
+                // (the Kenney faces have no < or >: TextMesh Pro's own font, with rich text off so "<" is not read as a tag)
+                var at = Txt(ab.transform, "Text", new Vector2(0, 1), new Vector2(22, 30), a == 0 ? "<" : ">", null, 22, C("1e190f"), TextAlignmentOptions.Center);
+                at.richText = false; at.fontStyle = FontStyles.Bold;
+                panel.hostButtonText[9 + a] = at;
                 panel.hostButton[9 + a] = ab.rectTransform; panel.hostButtonImage[9 + a] = face;
                 hostTiles[9 + a] = AddTile(ab.gameObject, abt, -11 - a);
             }
