@@ -46,6 +46,8 @@ public class PHLocal : UdonSharpBehaviour
     string notice = "";
     float noticeUntil;
     int propLayer = -1;
+    GameObject[] layerObjs;   // the map's objects the layer was last set on
+    bool layerDone;           // ...and whether that map was finished then
     bool wasEndgame;
     // forced taunts (6.4, G47): every hider's own clock from the release of the hunters; a hider that has moved
     // 4 m (straight line) since the last check skips it
@@ -360,9 +362,13 @@ public class PHLocal : UdonSharpBehaviour
     // hunters pass through props (G45); hiders and everyone else collide with them
     void SetPropLayer(int layer)
     {
-        if (propLayer == layer || game.builder.objects == null) return;
-        propLayer = layer;
+        // (done again for a new map, and once the map is finished: props built after the switch kept their layer, so a
+        // hunter whose BRIEF came before their map was done bumped into them, and the next map was never switched)
         GameObject[] objs = game.builder.objects;
+        if (propLayer == layer && layerObjs == objs && layerDone) return;
+        propLayer = layer;
+        layerObjs = objs; layerDone = game.builder.built;
+        if (objs == null) return;
         int[] emitDef = game.gen.emitDef, defFlags = game.gen.defFlags;
         for (int i = 0; i < objs.Length; i++)
         {
@@ -518,6 +524,7 @@ public class PHLocal : UdonSharpBehaviour
     void UpdateBody()
     {
         if (Input.GetKeyDown(KeyCode.T)) Taunt();
+        if (propLayer >= 0 && game.builder.built && (!layerDone || layerObjs != game.builder.objects)) SetPropLayer(propLayer);
         bool eg = game.Endgame;
         if (eg && !wasEndgame && role != PHGame.ROLE_NONE)
         {
