@@ -275,7 +275,7 @@ public static partial class LobbyBuilder
         RoundButton(tilt, shelf, "Up", new Vector3(0.21f, 0.025f, -0.06f), true);
         RoundButton(tilt, shelf, "Down", new Vector3(-0.21f, 0.025f, -0.06f), false);
         Disc(tilt, "Coin", new Vector3(0.15f, 0.023f, 0.16f), 0.09f, gold);
-        var coins = WorldText(tilt, "Coins", new Vector3(-0.09f, 0.025f, 0.16f), Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, 180f, 0f), "0", 1.1f, C("f6d773"), new Vector2(0.32f, 0.12f));
+        var coins = WorldText(tilt, "Coins", new Vector3(-0.15f, 0.025f, 0.16f), Quaternion.Euler(-90f, 0f, 0f) * Quaternion.Euler(0f, 180f, 0f), "0", 1.1f, C("f6d773"), new Vector2(0.32f, 0.12f));
         coins.font = future; coins.alignment = TextAlignmentOptions.Left;
         shelf.cartCoins = coins;
 
@@ -346,44 +346,44 @@ public static partial class LobbyBuilder
         return m;
     }
 
-    // the detailing on the strips of wall across the weapon wall's opening (designed as flat art: Tools/make_panels.py,
-    // Assets/Lobby/Panels): a game-track row on the bottom strip, bunting hanging from the cream band over the top
+    // the dressing across the weapon wall's opening, from the same KayKit Board Game Bits (CC0) as the room's giant
+    // pieces (Cor: the flat art did not fit): a cream ledge on the bottom strip with a parade of small game pieces
+    // in the board's four colours, and pennant flags leaning out from the band over the top
     static void BuildOpeningTrim(Transform root, float roomW)
     {
-        float w = 2f * OpeningHalf;
-        Panel(root, "BottomStrip", "bottom_strip", new Vector3(roomW / 2f - 0.006f, OpeningLow / 2f, 0f), new Vector2(w, OpeningLow), w / 4f, false);
-        Panel(root, "TopTrim", "top_trim", new Vector3(roomW / 2f - 0.008f, 5.9f - 0.125f, 0f), new Vector2(w, 0.25f), w / 4f, true);
-    }
-
-    // a flat picture on the east wall's face, facing west into the room, its texture repeated `tiles` times across
-    static void Panel(Transform root, string name, string tex, Vector3 pos, Vector2 size, float tiles, bool cutout)
-    {
-        string tp = "Assets/Lobby/Panels/" + tex + ".png";
-        var ti = (TextureImporter)AssetImporter.GetAtPath(tp);
-        if (ti != null && (ti.wrapModeU != TextureWrapMode.Repeat || ti.alphaIsTransparency != cutout))
+        float face = roomW / 2f, w = 2f * OpeningHalf;
+        var cream = Mat("LobbyCream", C("f3e7c9"));
+        Box(root, "Ledge", new Vector3(face - 0.11f, OpeningLow - 0.03f, 0f), new Vector3(0.22f, 0.06f, w), cream);
+        Slab(root, "LedgeTrim", new Vector3(face - 0.222f, OpeningLow - 0.05f, 0f), new Vector3(0.008f, 0.03f, w), Mat("LobbyWallRule", C("c9a46a")));
+        string[] colours = { "blue", "yellow", "green", "red" };
+        int n = Mathf.FloorToInt(w / 0.62f);
+        for (int i = 0; i < n; i++)
         {
-            ti.wrapModeU = TextureWrapMode.Repeat; ti.wrapModeV = TextureWrapMode.Clamp; ti.alphaIsTransparency = cutout;
-            ti.mipmapEnabled = true; ti.SaveAndReimport();
+            float z = -w / 2f + 0.31f + i * (w - 0.62f) / (n - 1);
+            string c = colours[i % 4];
+            string model; float size;
+            switch ((i / 4) % 4)
+            {
+                case 0: model = "pawn_A_" + c; size = 0.3f; break;
+                case 1: model = "meeple_" + c; size = 0.26f; break;
+                case 2: model = "D6_A_" + c; size = 0.16f; break;
+                default: model = c == "yellow" ? "coin_5_gold" : "pawn_A_" + c; size = c == "yellow" ? 0.14f : 0.3f; break;
+            }
+            var go = Piece(root, "board-game-bits/" + model, new Vector3(face - 0.11f, OpeningLow, z), size, 270f + (i % 3 - 1) * 12f, false);
+            if (model.StartsWith("coin")) go.transform.RotateAround(root.TransformPoint(new Vector3(face - 0.11f, OpeningLow, z)), root.TransformDirection(Vector3.forward), 80f);
         }
-        var m = Mat("StorePanel_" + tex, Color.white);
-        m.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(tp);
-        m.mainTextureScale = new Vector2(tiles, 1f);
-        if (cutout)
+        // the pennants: one every 3.1 m, poles out of the band's lower edge, leaning into the room
+        for (int i = 0; i < 6; i++)
         {
-            m.SetFloat("_Mode", 1f); m.SetFloat("_Cutoff", 0.5f);
-            m.EnableKeyword("_ALPHATEST_ON"); m.renderQueue = 2450;
-            m.SetOverrideTag("RenderType", "TransparentCutout");
+            float z = -w / 2f + 1.55f + i * (w - 3.1f) / 5f;
+            var at = new Vector3(face - 0.02f, 5.86f, z);
+            var go = Piece(root, "board-game-bits/flag_A_" + colours[i % 4], at, 0.7f, 90f, false);
+            go.transform.RotateAround(root.TransformPoint(at), root.TransformDirection(Vector3.forward), 55f);   // the top out over the room
         }
-        EditorUtility.SetDirty(m);
-        var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        go.name = name;
-        go.transform.SetParent(root, false);
-        go.transform.localPosition = pos;
-        go.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);   // facing -x, into the room
-        go.transform.localScale = new Vector3(size.x, size.y, 1f);
-        Object.DestroyImmediate(go.GetComponent<Collider>());
-        var r = go.GetComponent<MeshRenderer>();
-        r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        // no shadows from the dressing (the flags' fell across the shelves)
+        foreach (Transform c in root)
+            if (c.name.StartsWith("pawn") || c.name.StartsWith("meeple") || c.name.StartsWith("D6") || c.name.StartsWith("coin") || c.name.StartsWith("flag"))
+                foreach (var r in c.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
     }
 
     // a flattened cylinder (an oval plate)
