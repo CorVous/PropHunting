@@ -44,7 +44,7 @@ MonoBehaviour:
       Data: 
     - Name: 
       Entry: 12
-      Data: 74
+      Data: 75
     - Name: 
       Entry: 7
       Data: 
@@ -2758,19 +2758,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashRig
+      Data: revealCopy
     - Name: $v
       Entry: 7
       Data: 144|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashRig
+      Data: revealCopy
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 14
+      Data: 17
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 14
+      Data: 17
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -2782,7 +2782,7 @@ MonoBehaviour:
       Data: 
     - Name: <IsSerialized>k__BackingField
       Entry: 5
-      Data: true
+      Data: false
     - Name: _fieldAttributes
       Entry: 7
       Data: 145|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
@@ -2807,19 +2807,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: proxyScale
+      Data: squashRig
     - Name: $v
       Entry: 7
       Data: 146|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: proxyScale
+      Data: squashRig
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 23
+      Data: 14
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 23
+      Data: 14
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -2831,7 +2831,7 @@ MonoBehaviour:
       Data: 
     - Name: <IsSerialized>k__BackingField
       Entry: 5
-      Data: false
+      Data: true
     - Name: _fieldAttributes
       Entry: 7
       Data: 147|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
@@ -2856,13 +2856,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: proxyHalf
+      Data: proxyScale
     - Name: $v
       Entry: 7
       Data: 148|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: proxyHalf
+      Data: proxyScale
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 23
@@ -2905,19 +2905,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashX
+      Data: proxyHalf
     - Name: $v
       Entry: 7
       Data: 150|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashX
+      Data: proxyHalf
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 45
+      Data: 23
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 45
+      Data: 23
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -2954,13 +2954,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashZ
+      Data: squashX
     - Name: $v
       Entry: 7
       Data: 152|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashZ
+      Data: squashX
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3003,13 +3003,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashVX
+      Data: squashZ
     - Name: $v
       Entry: 7
       Data: 154|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashVX
+      Data: squashZ
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3052,13 +3052,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashVZ
+      Data: squashVX
     - Name: $v
       Entry: 7
       Data: 156|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashVZ
+      Data: squashVX
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3101,13 +3101,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: wantX
+      Data: squashVZ
     - Name: $v
       Entry: 7
       Data: 158|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: wantX
+      Data: squashVZ
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3150,13 +3150,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: wantZ
+      Data: wantX
     - Name: $v
       Entry: 7
       Data: 160|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: wantZ
+      Data: wantX
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3199,13 +3199,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashNext
+      Data: wantZ
     - Name: $v
       Entry: 7
       Data: 162|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashNext
+      Data: wantZ
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3248,13 +3248,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashY
+      Data: squashNext
     - Name: $v
       Entry: 7
       Data: 164|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashY
+      Data: squashNext
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3297,13 +3297,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: squashVY
+      Data: squashY
     - Name: $v
       Entry: 7
       Data: 166|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: squashVY
+      Data: squashY
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3346,13 +3346,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: wantY
+      Data: squashVY
     - Name: $v
       Entry: 7
       Data: 168|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: wantY
+      Data: squashVY
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3395,13 +3395,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: hopS
+      Data: wantY
     - Name: $v
       Entry: 7
       Data: 170|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: hopS
+      Data: wantY
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3444,13 +3444,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: hopV
+      Data: hopS
     - Name: $v
       Entry: 7
       Data: 172|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: hopV
+      Data: hopS
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3493,13 +3493,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: hopVY
+      Data: hopV
     - Name: $v
       Entry: 7
       Data: 174|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: hopVY
+      Data: hopV
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3542,13 +3542,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: hopFall
+      Data: hopVY
     - Name: $v
       Entry: 7
       Data: 176|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: hopFall
+      Data: hopVY
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3591,13 +3591,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: lastY
+      Data: hopFall
     - Name: $v
       Entry: 7
       Data: 178|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: lastY
+      Data: hopFall
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3640,13 +3640,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: hopCap
+      Data: lastY
     - Name: $v
       Entry: 7
       Data: 180|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: hopCap
+      Data: lastY
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 45
@@ -3689,19 +3689,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: wasAirborne
+      Data: hopCap
     - Name: $v
       Entry: 7
       Data: 182|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: wasAirborne
+      Data: hopCap
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 29
+      Data: 45
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 29
+      Data: 45
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -3738,13 +3738,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: hopDipped
+      Data: wasAirborne
     - Name: $v
       Entry: 7
       Data: 184|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: hopDipped
+      Data: wasAirborne
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 29
@@ -3787,19 +3787,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: proxyShade
+      Data: hopDipped
     - Name: $v
       Entry: 7
       Data: 186|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: proxyShade
+      Data: hopDipped
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 17
+      Data: 29
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 17
+      Data: 29
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -3836,10 +3836,59 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: shadeNext
+      Data: proxyShade
     - Name: $v
       Entry: 7
       Data: 188|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
+    - Name: <Name>k__BackingField
+      Entry: 1
+      Data: proxyShade
+    - Name: <UserType>k__BackingField
+      Entry: 9
+      Data: 17
+    - Name: <SystemType>k__BackingField
+      Entry: 9
+      Data: 17
+    - Name: <SyncMode>k__BackingField
+      Entry: 7
+      Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
+    - Name: 
+      Entry: 6
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: <IsSerialized>k__BackingField
+      Entry: 5
+      Data: false
+    - Name: _fieldAttributes
+      Entry: 7
+      Data: 189|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
+        mscorlib
+    - Name: 
+      Entry: 12
+      Data: 0
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: shadeNext
+    - Name: $v
+      Entry: 7
+      Data: 190|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
       Data: shadeNext
@@ -3863,7 +3912,7 @@ MonoBehaviour:
       Data: false
     - Name: _fieldAttributes
       Entry: 7
-      Data: 189|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
+      Data: 191|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
         mscorlib
     - Name: 
       Entry: 12

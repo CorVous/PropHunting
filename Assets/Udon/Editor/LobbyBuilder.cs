@@ -132,6 +132,7 @@ public static class LobbyBuilder
         var prt = plate.GetComponent<RectTransform>(); prt.anchorMin = Vector2.zero; prt.anchorMax = Vector2.one; prt.offsetMin = Vector2.zero; prt.offsetMax = Vector2.zero;
         var t = Txt(cv, "Text", Vector2.zero, new Vector2(1400, 120), "MAP FAILED TO BUILD - BACK TO THE LOBBY", rocket != null ? rocket : future, 58, C("ffd34d"), TextAlignmentOptions.Center);
         t.fontStyle = FontStyles.Bold;
+        t.enableAutoSizing = true; t.fontSizeMin = 20; t.fontSizeMax = 58;   // (the wide display face: fit the plate)
         game.failNotice = cv.gameObject;
         cv.gameObject.SetActive(false);
     }
