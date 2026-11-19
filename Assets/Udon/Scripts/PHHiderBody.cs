@@ -687,6 +687,7 @@ public class PHHiderBody : UdonSharpBehaviour
 
     void Move(Vector3 wish, bool jump, float dt)
     {
+        sqFailLeft -= dt; caFailLeft -= dt;
         if (lifting)
         {
             liftT += dt / LEDGE_TIME;
@@ -720,7 +721,8 @@ public class PHHiderBody : UdonSharpBehaviour
             SlideMove(delta, wasGrounded);
             // (also when squeezing but out of the gap, as the narrow box: back into the doorway it came through, or on
             // into the next)
-            if (blocked && canSqueeze && !Held() && mask != 0)
+            // (not again where it just found none: same place, facing, wall and way, for a moment; see SqueezeFailedHere)
+            if (blocked && canSqueeze && !Held() && mask != 0 && !SqueezeFailedHere(start, delta))
             {
                 // straight through what stopped it (not along the way it was going: one seldom walks square at a
                 // door), from where it stands or from up to half a metre to either side along the wall
@@ -765,13 +767,19 @@ public class PHHiderBody : UdonSharpBehaviour
                 {
                     squeezeHalf = keepHalf; squeezeAxis = keepAxis; gapAt = keepAt; squeezeYaw = keepYaw; gapDepth = keepDepth;
                     half = was ? squeezeHalf : fullHalf;
+                    if (!was) { sqFailPos = start; sqFailYaw = yaw; sqFailDir = delta.normalized; sqFailN = failN; sqFailLeft = FAIL_HOLD; }
                 }
             }
             if (blocked && !narrow && mask != 0)
             {
                 Vector3 got = pos - start; got.y = 0f;
                 float len = delta.magnitude;
-                if (got.magnitude < 0.35f * len) CornerAssist(start, delta / len, len, wasGrounded);
+                if (got.magnitude < 0.35f * len)
+                {
+                    Vector3 dir = delta / len;
+                    bool tried = caFailLeft > 0f && SameTry(start, dir, caFailPos, caFailYaw, caFailDir);
+                    if (!tried && !CornerAssist(start, dir, len, wasGrounded)) { caFailPos = start; caFailYaw = yaw; caFailDir = dir; caFailLeft = FAIL_HOLD; }
+                }
             }
             if (mask != 0) Unstick(start, delta, dt);
             // a corrected prop makes its way back under the player while they move: alone, flat, no further than
@@ -904,7 +912,7 @@ public class PHHiderBody : UdonSharpBehaviour
     // Stopped almost dead by the corner of a thing (a table's leg, a door's jamb, the end of a wall): it steps
     // aside, up to a hand's width or three, to where the way on is clear, at its own pace. Walking square into a
     // wall finds no such place and stays.
-    void CornerAssist(Vector3 start, Vector3 dir, float len, bool step)
+    bool CornerAssist(Vector3 start, Vector3 dir, float len, bool step)
     {
         Vector3 side = new Vector3(-dir.z, 0f, dir.x);
         for (int k = 1; k <= 6; k++)
@@ -915,8 +923,36 @@ public class PHHiderBody : UdonSharpBehaviour
             if (BlockedOn(start + s * off, dir, 0.3f)) continue; // nor a clear way on from there
             pos = start;
             SlideMove(s * Mathf.Min(len, off), step);
-            return;
+            return true;
         }
+        return false;
+    }
+
+    // Perf: pushing into a plain wall, the look for a way through (up to 21 tries of several hundred casts) and the
+    // step aside found nothing, and every frame they looked again from the same place: about 4-10 ms a frame. A look
+    // that found nothing is not made again for FAIL_HOLD seconds of moving while the prop is within 2 cm of where it
+    // stood, faces within half a degree, pushes the same way and meets the same wall. The world does not change
+    // under a still prop but for doors and knocked props, and those wait at most FAIL_HOLD. The hold runs down with
+    // the move's own time (dt), not the clock, so it ends inside a test that drives Move many times at once too.
+    const float FAIL_HOLD = 0.25f;
+    Vector3 sqFailPos, sqFailDir, sqFailN, failN;
+    float sqFailYaw, sqFailLeft;
+    Vector3 caFailPos, caFailDir;
+    float caFailYaw, caFailLeft;
+
+    bool SameTry(Vector3 at, Vector3 dir, Vector3 wasAt, float wasYaw, Vector3 wasDir)
+    {
+        return (at - wasAt).sqrMagnitude < 0.02f * 0.02f && Mathf.Abs(Mathf.DeltaAngle(yaw, wasYaw)) < 0.5f && Vector3.Dot(dir, wasDir) > 0.97f;
+    }
+
+    // whether the look for a way through found nothing a moment ago in this same spot (and the wall it met, square to
+    // the map's grid, kept in failN for the record)
+    bool SqueezeFailedHere(Vector3 start, Vector3 delta)
+    {
+        Vector3 n = firstNormal; n.y = 0f;
+        failN = Mathf.Abs(n.x) > Mathf.Abs(n.z) ? new Vector3(n.x > 0f ? 1f : -1f, 0f, 0f) : new Vector3(0f, 0f, n.z > 0f ? 1f : -1f);
+        if (narrow || sqFailLeft <= 0f) return false;
+        return failN == sqFailN && SameTry(start, delta.normalized, sqFailPos, sqFailYaw, sqFailDir);
     }
 
     // Standing inside something (a door swung onto it, a knocked prop came to rest in it) and getting nowhere for
