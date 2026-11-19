@@ -222,7 +222,7 @@ public class PHHiderBody : UdonSharpBehaviour
     // it looks for the gap again when stopped)
     bool Held()
     {
-        if (!narrow) return false;
+        if (!narrow || loose) return false;
         Vector3 off = pos - gapAt; off.y = 0f;
         float along = Vector3.Dot(off, squeezeAxis);
         return along - squeezeHalf.z < gapDepth + 0.02f && (off - squeezeAxis * along).sqrMagnitude < 0.08f * 0.08f;
@@ -245,14 +245,48 @@ public class PHHiderBody : UdonSharpBehaviour
         float across = Mathf.Abs(Vector3.Dot(side, r)) * fullHalf.x + Mathf.Abs(Vector3.Dot(side, f)) * fullHalf.z + 0.15f;
         float front = Mathf.Abs(Vector3.Dot(dir, r)) * fullHalf.x + Mathf.Abs(Vector3.Dot(dir, f)) * fullHalf.z;
         Vector3 mid = from + Vector3.up * Mathf.Min(fullHalf.y, 0.9f);
+        // (or a lintel lower than the prop's top: a tall thin prop meets a door's head and not its jambs)
+        float top = from.y + 2f * fullHalf.y + RAISE;
         for (float s = -squeezeHalf.z; s < front + 0.55f; s += 0.1f)
         {
-            if (!SidesAt(mid + dir * s, side, across)) continue;
+            if (!SidesAt(mid + dir * s, side, across) && !OverAt(from + dir * s, top)) continue;
             gapFound = s; gapDepth = 0f;
-            for (float d = 0.05f; d < 1f && SidesAt(mid + dir * (s + d), side, across); d += 0.05f) gapDepth = d;
+            for (float d = 0.05f; d < 1f && (SidesAt(mid + dir * (s + d), side, across) || OverAt(from + dir * (s + d), top)); d += 0.05f) gapDepth = d;
             return true;
         }
         return false;
+    }
+
+    // the architecture overhead (a door's head, the ceiling over a stair) lower than 'top'; not a prop: a tall prop
+    // is not to crawl under a table, a shelf or a stall's roof
+    bool OverAt(Vector3 at, float top)
+    {
+        RaycastHit h;
+        return Physics.Raycast(at + Vector3.up * 0.3f, Vector3.up, out h, top - at.y - 0.3f, 1 << 11, QueryTriggerInteraction.Ignore)
+            && h.collider == game.builder.collisionCollider;
+    }
+
+    // Squeezing vertically too (Cor: "can we squeeze vertically as well if needed?"): under a lintel lower than the
+    // narrow box, the box is lowered to the opening's clear height, less a mat's step and a margin. Never below
+    // SQUEEZE_LOW of the prop's own height, nor below SQUEEZE_MIN_Y (a 1.2 m box: no opening lower than that lets a
+    // prop through), and only under the architecture (a prop overhead is not looked at: BlockedOn stops the box).
+    // False where the opening is too low. The doors are 2.1 m high, so this is mostly for props taller than about
+    // 2 m (a lamp post, a tall cabinet) and the ways down to basements.
+    const float SQUEEZE_LOW = 0.6f, SQUEEZE_MIN_Y = 0.6f, HEAD_MARGIN = 0.06f;
+    bool Headroom(Vector3 from, Vector3 dir)
+    {
+        squeezeHalf.y = narrowHalf.y; half = squeezeHalf;
+        float clear = 1e6f;
+        RaycastHit h;
+        for (float s = gapFound - 0.1f; s <= gapFound + gapDepth + 0.15f; s += 0.1f)
+            if (Physics.Raycast(from + dir * s + Vector3.up * 0.3f, Vector3.up, out h, 2f * narrowHalf.y, 1 << 11, QueryTriggerInteraction.Ignore)
+                && h.collider == game.builder.collisionCollider)
+                clear = Mathf.Min(clear, h.point.y - from.y);
+        float y = (clear - RAISE - HEAD_MARGIN) * 0.5f;
+        if (y >= narrowHalf.y) return true;
+        if (y < Mathf.Min(narrowHalf.y, Mathf.Max(SQUEEZE_LOW * fullHalf.y, SQUEEZE_MIN_Y))) return false;
+        squeezeHalf.y = y; half = squeezeHalf;
+        return true;
     }
 
     // Squeezing, out of the gap and stopped while going back towards it (or on towards it): lined up with the gap it
@@ -272,7 +306,7 @@ public class PHHiderBody : UdonSharpBehaviour
         if (BlockedOn(from, dir, Mathf.Abs(along) + gapDepth + squeezeHalf.z)) return false;
         // going back: the gap's far end is now its near one
         if (dir != squeezeAxis) { gapAt += squeezeAxis * gapDepth; squeezeAxis = dir; squeezeYaw += 180f; }
-        narrowSince = Time.time;
+        narrowSince = Time.time; loose = false;
         Shift(from);
         SlideMove(dir * delta.magnitude, step);
         return true;
@@ -499,12 +533,16 @@ public class PHHiderBody : UdonSharpBehaviour
     // is no wall: the sweep is tried again raised by the step, where the ceiling allows. Without this a mat in a
     // doorway stopped big props: the look for a way through counted it as a wall (Cor: squished objects could not
     // step onto mats in front of doorways). The move itself still steps up as ever (SlideMove).
+    // Raised no higher than the thing needs, too: a tall prop raised by the whole step met a door's lintel over the
+    // mat, and the squeeze never started (Cor: stuck in a doorway with a mat beyond it, a 1.9 m cabinet under a 2.1 m
+    // lintel). Each try is half the one before, down to a few centimetres.
     bool BlockedOn(Vector3 from, Vector3 dir, float dist)
     {
         if (!SweepH(from, dir, dist)) return false;
         float up = CeilingAbove(from, stepHeight);
-        if (up < 0.01f) return true;
-        return SweepH(from + Vector3.up * up, dir, dist);
+        for (float r = up; r > 0.02f; r *= 0.5f)
+            if (!SweepH(from + Vector3.up * r, dir, dist)) return false;
+        return true;
     }
 
     float groundY;
@@ -623,21 +661,26 @@ public class PHHiderBody : UdonSharpBehaviour
         blocked = hitA;
         if (hitA && allowStep && stepHeight > 0f)
         {
+            // raised by the whole step, then by less (as BlockedOn: over a mat under a lintel); the one that gets
+            // furthest
             float up = CeilingAbove(start, stepHeight);
-            if (up > 0.01f)
+            float da = new Vector2(a.x - start.x, a.z - start.z).sqrMagnitude, best = da + 1e-4f;
+            Vector3 got = a;
+            bool gotHit = hitA;
+            for (float r = up; r > 0.02f; r *= 0.5f)
             {
-                Vector3 b = Slide(start + Vector3.up * up, delta);
+                Vector3 b = Slide(start + Vector3.up * r, delta);
                 bool hitB = hitSomething;
-                if (GroundBelow(b, up + 0.01f) && groundN.y > 0.64f)
-                {
-                    b.y = groundY;
-                    float da = new Vector2(a.x - start.x, a.z - start.z).sqrMagnitude;
-                    float db = new Vector2(b.x - start.x, b.z - start.z).sqrMagnitude;
-                    // (and it fits where it comes down: with its own shape, a box raised over a thing can find the
-                    // floor beyond it with another, and would be set down through that thing)
-                    if (db > da + 1e-4f && b.y - start.y <= stepHeight + 0.01f && (!Fitted() || Fits(b, yaw))) { pos = b; blocked = hitB; return; }
-                }
+                if (!GroundBelow(b, r + 0.01f) || groundN.y <= 0.64f) continue;
+                b.y = groundY;
+                float db = new Vector2(b.x - start.x, b.z - start.z).sqrMagnitude;
+                // (and it fits where it comes down: with its own shape, a box raised over a thing can find the
+                // floor beyond it with another, and would be set down through that thing)
+                if (db > best && b.y - start.y <= stepHeight + 0.01f && (!Fitted() || Fits(b, yaw))) { best = db; got = b; gotHit = hitB; }
+                if (!hitB) break;   // (the whole way: no lower try gets further)
             }
+            pos = got; blocked = gotHit;
+            return;
         }
         pos = a;
     }
@@ -707,10 +750,11 @@ public class PHHiderBody : UdonSharpBehaviour
                         if (off != 0f && SweepH(start, off > 0f ? along : -along, Mathf.Abs(off))) continue;
                         Vector3 from = start + along * off;
                         if (!GapAhead(from, -n, along)) continue;   // a way past a thing on one side is no gap: walk round it
+                        if (!Headroom(from, -n)) continue;          // (and lower under a lintel, if it needs to be)
                         // and the narrow box gets into it (a slanted long prop is stopped with its centre over a metre
                         // short of the wall: a fixed reach ended before the jambs, and it squeezed off the gap's line)
                         if (BlockedOn(from, -n, Mathf.Max(SQUEEZE_PASS, gapFound + 0.1f))) continue;
-                        found = true; narrow = true; narrowSince = Time.time; squeezeAxis = -n;
+                        found = true; narrow = true; loose = false; narrowSince = Time.time; squeezeAxis = -n;
                         gapAt = from - n * gapFound;
                         Shift(from);
                         SlideMove(-n * delta.magnitude, wasGrounded);
@@ -877,14 +921,27 @@ public class PHHiderBody : UdonSharpBehaviour
 
     // Standing inside something (a door swung onto it, a knocked prop came to rest in it) and getting nowhere for
     // half a second of trying: out to the nearest place where it fits
+    // And last, whatever the reason (Cor: hiders must never be trapped), half a second of getting nowhere lets the
+    // prop go on as the narrow box, free of the way through: squeezing, it is let off the gap's line; inside something
+    // with nowhere near to go, it squeezes the way the player pushes, if the narrow box can go there. Where it fits
+    // again, or after a while (SqueezeAfterMove), it is its own shape once more. A wall straight ahead stops the
+    // narrow box too, and a prop that fits where it stands is only stopped (a wall, a cupboard), not trapped.
     float stuckFor;
+    bool loose;   // squeezing, but not held to the way through
     void Unstick(Vector3 start, Vector3 delta, float dt)
     {
         Vector3 got = pos - start; got.y = 0f;
-        if (narrow || lifting || !grounded || got.sqrMagnitude > 0.01f * delta.sqrMagnitude) { stuckFor = 0f; return; }
+        if (lifting || !grounded || got.sqrMagnitude > 0.01f * delta.sqrMagnitude) { stuckFor = 0f; return; }
         stuckFor += dt;
         if (stuckFor < 0.5f) return;
         stuckFor = 0f;
-        if (!Fits(pos, yaw)) Nudge(yaw, Mathf.Max(fullHalf.x, fullHalf.z) + 0.6f);
+        if (narrow) { loose = true; return; }
+        if (Fits(pos, yaw) || Nudge(yaw, Mathf.Max(fullHalf.x, fullHalf.z) + 0.6f) || !canSqueeze) return;
+        Vector3 dir = delta; dir.y = 0f;
+        dir.Normalize();
+        SqueezeBox(dir);
+        if (BlockedOn(pos, dir, 0.3f)) { half = fullHalf; return; }
+        narrow = true; loose = true; narrowSince = Time.time;
+        squeezeAxis = dir; gapAt = pos; gapDepth = 0f;
     }
 }

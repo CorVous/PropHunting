@@ -268,6 +268,7 @@ public class PHSlot : UdonSharpBehaviour
                 // the squash through a doorway starts from the prefab's own scale
                 proxyScale = proxy.transform.localScale;
                 squashX = 1f; squashZ = 1f; squashVX = 0f; squashVZ = 0f; wantX = 1f; wantZ = 1f; squashNext = 0f;
+                squashY = 1f; squashVY = 0f; wantY = 1f;
                 proxyHalf = new Vector3(game.gen.defSx[want], game.gen.defSy[want], game.gen.defSz[want]) / 2000f;
                 // its shade patch (the prefab's last child), shown only while it stands on a floor (ShadeCheck)
                 proxyShade = null; shadeNext = 0f;
@@ -318,9 +319,12 @@ public class PHSlot : UdonSharpBehaviour
     // whatever way it faces (Cor). The gap is looked for all along the prop, from before its front to past its
     // back, so it is one squeeze from the front going in until the back is out. Measured on each client against the
     // architecture's collider: nothing is synced.
+    // And pressed down under a lintel lower than it is tall (Cor: squeeze vertically as well): the architecture
+    // over its footprint, as low as PHHiderBody lets it go (SQUEEZE_LOW of its height), on the same spring.
     public Transform squashRig;
     Vector3 proxyScale = Vector3.one, proxyHalf;
     float squashX = 1f, squashZ = 1f, squashVX, squashVZ, wantX = 1f, wantZ = 1f, squashNext;
+    float squashY = 1f, squashVY, wantY = 1f;
 
     // how far the architecture is from a place along dir, at most reach
     float WallAt(Vector3 from, Vector3 dir, float reach)
@@ -357,7 +361,8 @@ public class PHSlot : UdonSharpBehaviour
     void Squash()
     {
         if (squashRig == null) return;
-        if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f) return;   // it never squeezes (PHHiderBody.SQUEEZE_HALF)
+        // it never squeezes (PHHiderBody.SQUEEZE_HALF, SQUEEZE_HALF_Y)
+        if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f && proxyHalf.y <= 1f) return;
         if (Time.time >= squashNext)
         {
             squashNext = Time.time + 0.08f;
@@ -373,18 +378,32 @@ public class PHSlot : UdonSharpBehaviour
             // squashed one way, it stretches the other (its volume roughly kept, to a limit)
             wantX = fx < 0.999f ? fx : Mathf.Min(1.35f, 1f / Mathf.Sqrt(fz));
             wantZ = fz < 0.999f ? fz : Mathf.Min(1.35f, 1f / Mathf.Sqrt(fx));
+            // the lowest of the architecture over its middle and towards its four sides
+            float tall = 2f * proxyHalf.y, low = tall;
+            if (tall > 1.2f)
+            {
+                Vector3 b = shownPos + Vector3.up * 0.3f;
+                low = Mathf.Min(low, 0.3f + WallAt(b, Vector3.up, tall - 0.3f));
+                low = Mathf.Min(low, 0.3f + WallAt(b + Vector3.right * ex * 0.7f, Vector3.up, tall - 0.3f));
+                low = Mathf.Min(low, 0.3f + WallAt(b - Vector3.right * ex * 0.7f, Vector3.up, tall - 0.3f));
+                low = Mathf.Min(low, 0.3f + WallAt(b + Vector3.forward * ez * 0.7f, Vector3.up, tall - 0.3f));
+                low = Mathf.Min(low, 0.3f + WallAt(b - Vector3.forward * ez * 0.7f, Vector3.up, tall - 0.3f));
+            }
+            wantY = low < tall - 0.001f ? Mathf.Clamp((low - 0.04f) / tall, 0.6f, 1f) : 1f;
         }
-        if (wantX == 1f && wantZ == 1f && Mathf.Abs(squashX - 1f) < 0.002f && Mathf.Abs(squashZ - 1f) < 0.002f && Mathf.Abs(squashVX) < 0.01f && Mathf.Abs(squashVZ) < 0.01f)
+        if (wantX == 1f && wantZ == 1f && wantY == 1f && Mathf.Abs(squashX - 1f) < 0.002f && Mathf.Abs(squashZ - 1f) < 0.002f && Mathf.Abs(squashY - 1f) < 0.002f
+            && Mathf.Abs(squashVX) < 0.01f && Mathf.Abs(squashVZ) < 0.01f && Mathf.Abs(squashVY) < 0.01f)
         {
-            if (squashX != 1f || squashZ != 1f) { squashX = 1f; squashZ = 1f; squashRig.localScale = Vector3.one; }
+            if (squashX != 1f || squashZ != 1f || squashY != 1f) { squashX = 1f; squashZ = 1f; squashY = 1f; squashVY = 0f; squashRig.localScale = Vector3.one; }
             return;
         }
         // a spring, a little under-damped: it overshoots once and settles
         float dt = Mathf.Min(Time.deltaTime, 0.033f);
         squashVX += ((wantX - squashX) * 260f - squashVX * 17f) * dt; squashX += squashVX * dt;
         squashVZ += ((wantZ - squashZ) * 260f - squashVZ * 17f) * dt; squashZ += squashVZ * dt;
-        squashX = Mathf.Clamp(squashX, 0.25f, 1.6f); squashZ = Mathf.Clamp(squashZ, 0.25f, 1.6f);
-        squashRig.localScale = new Vector3(squashX, 1f, squashZ);
+        squashVY += ((wantY - squashY) * 260f - squashVY * 17f) * dt; squashY += squashVY * dt;
+        squashX = Mathf.Clamp(squashX, 0.25f, 1.6f); squashZ = Mathf.Clamp(squashZ, 0.25f, 1.6f); squashY = Mathf.Clamp(squashY, 0.5f, 1.2f);
+        squashRig.localScale = new Vector3(squashX, squashY, squashZ);
     }
 
 
