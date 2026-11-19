@@ -427,6 +427,10 @@ public class PHHiderBody : UdonSharpBehaviour
         profMs += profWatch.Elapsed.TotalMilliseconds - p0;
     }
 
+    Vector3 stillPos, stillHalf;   // where the prop was, and its box, after the last frame (UpdateBody: a still prop)
+    float stillYaw;
+    int stillFrames;
+
     void UpdateBody()
     {
         if (!active) return;
@@ -503,14 +507,25 @@ public class PHHiderBody : UdonSharpBehaviour
         bool run = vr || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         wish *= speed * (run ? 1f : DESKTOP_WALK);
 
-        float left = dt;
-        while (left > 1e-5f)
+        // Perf: a prop standing quite still (no input, on the ground, not squeezing, lifting or settling its seat) only
+        // looked for its ground every frame, about 9 box casts with a fitted shape. Where nothing has moved since the
+        // last look, it looks every fourth frame: a floor taken from under it (a knocked prop) is felt at most three
+        // frames late
+        bool still = wish.sqrMagnitude < 1e-8f && !jump && grounded && !lifting && velY == 0f && !narrow
+            && lag.x == 0f && lag.z == 0f && pos == stillPos && yaw == stillYaw && half == stillHalf;
+        stillFrames = still ? stillFrames + 1 : 0;
+        if (!still || (stillFrames & 3) == 0)
         {
-            float step = Mathf.Min(left, 0.034f);
-            Move(wish, jump, step);
-            jump = false;
-            left -= step;
+            float left = dt;
+            while (left > 1e-5f)
+            {
+                float step = Mathf.Min(left, 0.034f);
+                Move(wish, jump, step);
+                jump = false;
+                left -= step;
+            }
         }
+        stillPos = pos; stillYaw = yaw; stillHalf = half;
         if (ghost && pos.y < -12f) { pos.y = 0f; velY = 0f; grounded = true; }   // fell out of the world
         // the seat's height settles on the prop's floor: at least half a metre a second, quicker the further it is
         float lagY = Mathf.Abs(lag.y);
