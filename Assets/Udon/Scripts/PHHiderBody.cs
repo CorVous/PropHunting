@@ -955,6 +955,8 @@ public class PHHiderBody : UdonSharpBehaviour
             if (wall) return false;
         }
         if (!GroundBelow(at, 0.5f) || groundN.y < 0.64f) return false;   // not out over a drop
+        // (set down on what is under it, it must still fit there: a prop on a sloped or uneven prop sank into it)
+        if (groundY < at.y - 0.01f && !Fits(new Vector3(at.x, groundY, at.z), atYaw)) return false;
         at.y = groundY;
         Shift(at); narrow = false;
         return true;
