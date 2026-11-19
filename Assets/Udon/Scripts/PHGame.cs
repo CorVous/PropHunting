@@ -543,17 +543,25 @@ public class PHGame : UdonSharpBehaviour
 
     public override void OnDeserialization() { OnPhaseChanged(); ThemeLabel(); FailNotice(); }
 
-    // "the map failed to build" over the options board (Cor): in the lobby after the round whose map failed, until the next
-    // round starts (round goes up then)
+    // "the map failed to build" over the options board (Cor): in the lobby after the round whose map failed, for
+    // FAIL_NOTICE_S at most (from the server time it failed, so a late joiner never sees a stale one), until the next
+    // round starts (round goes up then), or until this player closes it (a click on it: local only, Cor)
+    public const float FAIL_NOTICE_S = 20f;
     [UdonSynced] public int failedRound = -1;
+    [UdonSynced] public int failedAtMs;
     public GameObject failNotice;
     public Material revealMat;   // the END reveal's highlight of the hiders' props (PHSlot.MakeRevealCopy; WorldSceneBuilder)
+    int failDismissed = -1;
     void FailNotice()
     {
         if (failNotice == null) return;
-        bool on = phase == PH_LOBBY && failedRound == round && round > 0;
+        bool on = phase == PH_LOBBY && failedRound == round && round > 0 && failDismissed != round
+            && Now - failedAtMs < Mathf.RoundToInt(FAIL_NOTICE_S * 1000f);
         if (failNotice.activeSelf != on) failNotice.SetActive(on);
     }
+
+    // the notice's own button (LobbyBuilder.BuildFailNotice): closed for this player only
+    public void DismissFail() { failDismissed = round; FailNotice(); }
 
     int seenPhase = -1, seenRound = -1;
 
@@ -640,6 +648,7 @@ public class PHGame : UdonSharpBehaviour
 
     void UpdateBody()
     {
+        if (failNotice != null && failNotice.activeSelf) FailNotice();   // (it runs out after FAIL_NOTICE_S)
         if (perfLog)
         {
             if (perfWatch == null) perfWatch = new System.Diagnostics.Stopwatch();
@@ -714,6 +723,7 @@ public class PHGame : UdonSharpBehaviour
                         {
                             if (lastRot >= 0) { NewMap(lastRot); lastRot = -1; }
                             failedRound = round;   // (the lobby says so, over the options board, for everyone)
+                            failedAtMs = Now;
                             BackToLobby();
                         }
                     }

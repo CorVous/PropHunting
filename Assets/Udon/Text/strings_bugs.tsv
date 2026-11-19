@@ -1,0 +1,5 @@
+key	en	ja	ko	zh-CN	zh-HK	es	fr	de	pt-BR	ru
+lobby.fail_notice	MAP FAILED TO BUILD - BACK TO THE LOBBY									
+end.every_hider_left	Every hider left									
+end.every_hunter_left	Every hunter left									
+hud.hit_health_left	Hit! {0} health left. Move!									
