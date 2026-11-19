@@ -252,7 +252,7 @@ public static class TextBaker
         }
         var latinChars = new string(latin.ToArray());
         var futureExtra = latin.Count > 0 && kenneyTtf != null ? Atlas(kenneyTtf, FontDir + "KenneyFuture Extra SDF.asset", latinChars) : null;
-        var rocketExtra = latin.Count > 0 && rocketTtf != null ? Atlas(rocketTtf, FontDir + "KenneyRocket Extra SDF.asset", latinChars) : null;
+        var rocketExtra = latin.Count > 0 && rocketTtf != null ? Atlas(rocketTtf, FontDir + "KenneyRocket Extra SDF.asset", new string(latin.Where(Cmap(RocketTtf).Contains).ToArray())) : null;
 
         SetFallbacks(future, futureExtra, chain);
         SetFallbacks(rocket, rocketExtra != null ? rocketExtra : futureExtra, chain);
@@ -311,14 +311,15 @@ public static class TextBaker
         return fa;
     }
 
-    // the characters a TTF holds (Unity's dynamic font import answers HasCharacter from the file)
+    // the characters a TTF holds, from the list Tools/make_l10n_fonts.py writes next to it (<ttf name>.chars.txt in
+    // Fonts/L10n; KenneyFuture.chars.txt / KenneyRocket.chars.txt for the Kenney fonts)
     static HashSet<char> Cmap(string ttfPath)
     {
+        string name = Path.GetFileNameWithoutExtension(ttfPath);
+        string list = FontDir + name + ".chars.txt";
         var set = new HashSet<char>();
-        var font = AssetDatabase.LoadAssetAtPath<Font>(ttfPath);
-        if (font == null) return set;
-        for (int c = 0x20; c < 0xFFFF; c++)
-            if (c < 0xD800 || c > 0xDFFF) { if (font.HasCharacter((char)c)) set.Add((char)c); }
+        if (!File.Exists(list)) { Debug.LogWarning("[prophunt] text: no " + list + " (run Tools/make_l10n_fonts.py)"); return set; }
+        foreach (char c in File.ReadAllText(list, System.Text.Encoding.UTF8)) set.Add(c);
         return set;
     }
 

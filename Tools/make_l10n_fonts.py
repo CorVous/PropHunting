@@ -83,6 +83,11 @@ def main(src):
         path = os.path.join(OUT, name + "-Bold.ttf")
         f.save(path)
         print(name, len(keep), "chars", os.path.getsize(path) // 1024, "KB")
+        # the characters it holds, for TextBaker (Unity's Font.HasCharacter cannot tell for a dynamic font)
+        open(os.path.join(OUT, name + "-Bold.chars.txt"), "w", encoding="utf-8").write("".join(chr(c) for c in keep if c < 0x10000))
+    for ttf, out in (("Assets/Resources/PropHunt/Fonts/KenneyFuture.ttf", "KenneyFuture.chars.txt"), ("Assets/Lobby/Fonts/KenneyRocket.ttf", "KenneyRocket.chars.txt")):
+        cm = TTFont(os.path.join(ROOT, ttf)).getBestCmap()
+        open(os.path.join(OUT, out), "w", encoding="utf-8").write("".join(chr(c) for c in sorted(cm) if 0x20 <= c < 0x10000))
 
 
 if __name__ == "__main__":
