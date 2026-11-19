@@ -2,9 +2,9 @@
 // does not see their own prop in first person (it would fill the view), so the ground outline (PHView) shows its
 // footprint and this shows its shape: the model's feature edges (PropPrefabBaker.MakeCage), each a quad widened in
 // screen space, so a line is the same few pixels wide near and far. Its core is the outline's teal and its rim a dark
-// teal, unlit, so it reads on light and dark floors alike. An ordered 4x4 dither keeps _Keep of the pixels (opaque,
-// cheap, no sorting), fewer near the eye (gone inside _FadeNear, full from _FadeFar; MapBuilderUdon.Cage sets both
-// by the prop's size), and a sparse _KeepBehind where something stands in front of the line. Nothing at or above
+// teal, unlit, so it reads on light and dark floors alike. It is blended, _Keep its opacity (Cor: the dithered lines
+// looked messy), less near the eye (gone inside _FadeNear, full from _FadeFar; MapBuilderUdon.Cage sets both
+// by the prop's size), and a faint _KeepBehind where something stands in front of the line. Nothing at or above
 // the eye is drawn (_EyeMargin below the camera), nor anything in the third-person view (384 pixels wide, as
 // PropLit's _PipOnly, the other way round).
 // Mesh (half floats): per vertex, position = this end, TEXCOORD1.xyz = the other end (both in the prop's space),
@@ -17,7 +17,7 @@ Shader "PropHunt/Cage"
         _Core ("Core colour", Color) = (0.30, 0.95, 0.85, 1)
         _Rim ("Rim colour", Color) = (0.02, 0.30, 0.27, 1)
         _RimShare ("Rim share of the width", Range(0, 1)) = 0.4
-        _WidthPx ("Width in pixels at 720 lines", Float) = 6
+        _WidthPx ("Width in pixels at 720 lines", Float) = 4
         _Keep ("Share kept at full strength", Range(0, 1)) = 0.85
         _KeepBehind ("Share kept behind things", Range(0, 1)) = 0.2
         _FadeNear ("Gone within (m)", Float) = 0.35
@@ -97,8 +97,10 @@ Shader "PropHunt/Cage"
     ENDCG
     SubShader
     {
-        Tags { "RenderType"="TransparentCutout" "Queue"="AlphaTest" "DisableBatching"="True" "IgnoreProjector"="True" }
+        Tags { "RenderType"="Transparent" "Queue"="Transparent" "DisableBatching"="True" "IgnoreProjector"="True" }
         Cull Off
+        ZWrite Off
+        Blend SrcAlpha OneMinusSrcAlpha
         Pass
         {
             Tags { "LightMode"="Always" }
@@ -111,8 +113,9 @@ Shader "PropHunt/Cage"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 clip(_WorldSpaceCameraPos.y - _EyeMargin - i.world.y);
-                clip(Keep(i, _Keep) - Bayer(i.pos.xy));
-                return Shade(i);
+                fixed4 c = Shade(i);
+                c.a = Keep(i, _Keep);   // a soft fade, no dither (Cor: the wireframe looked messy)
+                return c;
             }
             ENDCG
         }
@@ -130,8 +133,9 @@ Shader "PropHunt/Cage"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 clip(_WorldSpaceCameraPos.y - _EyeMargin - i.world.y);
-                clip(Keep(i, _KeepBehind) - Bayer(i.pos.xy + 2.0));
-                return Shade(i);
+                fixed4 c = Shade(i);
+                c.a = Keep(i, _KeepBehind) * 0.6;   // faint behind things
+                return c;
             }
             ENDCG
         }

@@ -1514,7 +1514,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                     TrimOut(horizontal, ex, ez, d1 - e, d1 + 0.08f, 0f, dh - e, frame, sd);
                     TrimOut(horizontal, ex, ez, d0 - 0.08f, d1 + 0.08f, dh - e, dh + 0.08f, frame, sd);
                 }
-                Porch(horizontal, ex, ez, d1 + 0.3f, dh, sd);
+                // no lantern on the wall beside the door any more (Cor: no wall sconces); the awning stays
                 Awning(horizontal, ex, ez, d0, d1, dh, sd, IsBuilding(zoneA) ? cellA : cellB);
             }
         }
@@ -1539,9 +1539,23 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Trim(horizontal, ex, ez, w0 + 2 * e, m - 0.02f - e, ty - 0.015f, ty + 0.015f, windowFrame);
                 Trim(horizontal, ex, ez, m + 0.02f + e, w1 - 2 * e, ty - 0.015f, ty + 0.015f, windowFrame);
             }
-            if (horizontal) Collider(new Vector3(ex + lo, 0, ez - WALL_HALF), new Vector3(ex + hi, h, ez + WALL_HALF));
-            else Collider(new Vector3(ex - WALL_HALF, 0, ez + lo), new Vector3(ex + WALL_HALF, h, ez + hi));
+            // the window's hole is open (Cor: small props should fit through a window): solid either side, under the
+            // sill and over the head, and the mullion between the two lights
+            float mm = (w0 + w1) / 2;
+            WallBox(horizontal, ex, ez, lo, w0, 0f, h);
+            WallBox(horizontal, ex, ez, w1, hi, 0f, h);
+            WallBox(horizontal, ex, ez, w0, w1, 0f, sill);
+            WallBox(horizontal, ex, ez, w0, w1, head, h);
+            WallBox(horizontal, ex, ez, mm - 0.02f, mm + 0.02f, sill, head);
         }
+    }
+
+    // a piece of a wall's collision, a0..a1 along the edge, y0..y1 high, the wall's thickness
+    void WallBox(bool horizontal, float ex, float ez, float a0, float a1, float y0, float y1)
+    {
+        if (a1 - a0 < 0.001f || y1 - y0 < 0.001f) return;
+        if (horizontal) Collider(new Vector3(ex + a0, y0, ez - WALL_HALF), new Vector3(ex + a1, y1, ez + WALL_HALF));
+        else Collider(new Vector3(ex - WALL_HALF, y0, ez + a0), new Vector3(ex + WALL_HALF, y1, ez + a1));
     }
 
     int capStyle;   // the scheme of the building whose wall Edge is drawing (CapColour's outside colour)
@@ -1560,6 +1574,14 @@ public class MapBuilderUdon : UdonSharpBehaviour
             FacadeBox(horizontal, ex, ez, 0f, d0, 0f, h, n0, n1, side);
             FacadeBox(horizontal, ex, ez, d1, CELL, 0f, h, n0, n1, side);
             FacadeBox(horizontal, ex, ez, d0, d1, dh, h, n0, n1, side);
+        }
+        else if (type == GenData.E_WINDOW && fW1 > fW0 + 0.1f)
+        {
+            // the facade's window hole stays open like the wall's (Facade has set fW0..fW1 and fSill..fHead)
+            FacadeBox(horizontal, ex, ez, 0f, fW0, 0f, h, n0, n1, side);
+            FacadeBox(horizontal, ex, ez, fW1, CELL, 0f, h, n0, n1, side);
+            FacadeBox(horizontal, ex, ez, fW0, fW1, 0f, fSill, n0, n1, side);
+            FacadeBox(horizontal, ex, ez, fW0, fW1, fHead, h, n0, n1, side);
         }
         else FacadeBox(horizontal, ex, ez, 0f, CELL, 0f, h, n0, n1, side);
     }
@@ -2669,6 +2691,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
                     int nx = x + DX[d], nz = z + DZ[d];
                     bool house = InGrid(nx, nz) && IsBuilding(cellZone[nz * W + nx]);
                     if (house != (pass == 1)) continue;
+                    // never in front of a doorway or a gate (Cor: a lamp post stood in a house's door)
+                    if (gen.EdgeType(x, z, d) == GenData.E_DOOR) continue;
                     if (!InGrid(nx, nz)) { side = d; break; }
                     int rn = cellRoom[nz * W + nx];
                     if (rn < 0 || rn >= nr || roomType[rn] != GenData.R_LANE) { side = d; atHouse = house; break; }

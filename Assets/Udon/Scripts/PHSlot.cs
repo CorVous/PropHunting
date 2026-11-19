@@ -162,6 +162,13 @@ public class PHSlot : UdonSharpBehaviour
         if (weapons != null) weapons.OnSwung(index, point, kind);
     }
 
+    // a hunter's blow on a heavy prop (sent to everyone by the hunter): it rocks where it stands (PHLocal.Rock)
+    [NetworkCallable]
+    public void Rocked(int rockEmit, Vector3 rockDir)
+    {
+        if (game != null && game.local != null) game.local.Rock(rockEmit, rockDir);
+    }
+
     // a hider's final-stand shot, sent to everyone by the hider: where it ended and the hunter slot it hit (-1 none)
     [NetworkCallable]
     public void Shot(Vector3 end, int hitSlot)
