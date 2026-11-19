@@ -529,7 +529,7 @@ public class PHGame : UdonSharpBehaviour
     [System.NonSerialized] public string genWorstAt = "";
     System.Diagnostics.Stopwatch genWatch;
 
-    const double GEN_BUDGET_MS = 6.0;   // the generator's time a frame
+    public float genBudgetMs = 6f;      // the generator's time a frame (ms; MapBuilderUdon.budgetMs is the builder's)
     bool beginPending;                  // the generator is done: the builder starts next frame (UpdateBody)
     double[] genStepEst;                // per generator stage: what a step has been costing lately (ms)
 
@@ -629,7 +629,7 @@ public class PHGame : UdonSharpBehaviour
                 while (!finished)
                 {
                     int st = gen.CurrentStage(), cu = 0, ph = 0;
-                    if (!firstStep && s0 + genStepEst[st & 15] >= GEN_BUDGET_MS) break;
+                    if (!firstStep && s0 + genStepEst[st & 15] >= genBudgetMs) break;
                     firstStep = false;
                     string sub = "";
                     if (logSlowSteps) { cu = gen.CurrentCursor(); ph = gen.CurrentPhase(); sub = gen.CurrentSub(); }
