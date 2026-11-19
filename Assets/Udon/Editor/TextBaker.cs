@@ -278,7 +278,8 @@ public static class TextBaker
     static string Ttf(string name)
     {
         var hit = Directory.Exists(FontDir) ? Directory.GetFiles(FontDir, name + "-Bold*.ttf") : new string[0];
-        return hit.Length > 0 ? hit[0].Replace(System.IO.Path.DirectorySeparatorChar, '/') : FontDir + name + "-Bold.ttf";
+        var pick = hit.FirstOrDefault(p => Path.GetFileName(p).StartsWith(name + "-Bold-")) ?? hit.FirstOrDefault();
+        return pick != null ? pick.Replace(System.IO.Path.DirectorySeparatorChar, '/') : FontDir + name + "-Bold.ttf";
     }
 
     static void SetFallbacks(TMP_FontAsset fa, TMP_FontAsset first, List<TMP_FontAsset> chain)
