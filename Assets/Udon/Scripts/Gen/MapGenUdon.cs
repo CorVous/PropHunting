@@ -147,9 +147,14 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
 
     public void Begin(uint seedValue, int sizeBucket, int densityIndex) { Begin(seedValue, sizeBucket, densityIndex, 0); }
 
-    public void Begin(uint seedValue, int sizeBucket, int densityIndex, int evoStep)
+    public void Begin(uint seedValue, int sizeBucket, int densityIndex, int evoStep) { Begin(seedValue, sizeBucket, densityIndex, evoStep, 0); }
+
+    // evoVariant: which replay this is (the map's run count). Every replay of an evolved map draws its changes anew,
+    // in other rooms; variant 0 is the step as it always was.
+    public void Begin(uint seedValue, int sizeBucket, int densityIndex, int evoStep, int evoVariant)
     {
         evo = evoStep < 0 ? 0 : (evoStep > 3 ? 3 : evoStep);
+        evoVar = evo > 0 && evoVariant > 0 ? (evoVariant & 0xFFFF) : 0;
         Init();
         seed = seedValue; size = sizeBucket;
         density = densityIndex < 0 || densityIndex >= DensityPercent.Length ? 0 : densityIndex;
@@ -173,10 +178,10 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     public int ThemeOfSeed(uint seedValue, int sizeBucket)
     {
         uint keep = seed;
-        int keepSize = size, keepAttempt = attempt, keepEvo = evo;
-        seed = seedValue; size = sizeBucket; attempt = 0; evo = 0;
+        int keepSize = size, keepAttempt = attempt, keepEvo = evo, keepVar = evoVar;
+        seed = seedValue; size = sizeBucket; attempt = 0; evo = 0; evoVar = 0;
         int troll = RngRange(Rng(ST_SCENERY, 9, 11), 1000);
-        seed = keep; size = keepSize; attempt = keepAttempt; evo = keepEvo;
+        seed = keep; size = keepSize; attempt = keepAttempt; evo = keepEvo; evoVar = keepVar;
         return troll < GenData.THEME_SPACE_PERMILLE ? GenData.THEME_SPACE : (troll < GenData.THEME_SPACE_PERMILLE + GenData.THEME_MEDIEVAL_PERMILLE ? GenData.THEME_MEDIEVAL : GenData.THEME_NONE);
     }
 
@@ -317,15 +322,16 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     //   3 (big):    one building takes a different plan of its kind (LayoutSite); the rest keeps step 2
     // Each step only changes which numbers some streams draw, so a seed and a step give the same map everywhere.
     public int evo;
+    public int evoVar;   // the number of the replay (0: the step as first designed): which rooms change, and what they draw
 
-    bool EvoPick(int room, int salt) { return UMod(Hash32(seed, 0xE70u, U32(salt), U32(room), 0u), 3u) == 0u; }
+    bool EvoPick(int room, int salt) { return UMod(Hash32(seed, 0xE70u, U32(salt), U32(room), U32(evoVar)), 3u) == 0u; }
 
     int EvoSalt(int st, int a)
     {
         if (evo <= 0) return 0;
-        if (st == ST_LEAK) return 1000003;
-        if (st == ST_SLOT && (EvoPick(a / 4, 1) || (evo >= 2 && RoomEvolves(a / 4)))) return 2000003;
-        if (st == ST_ROOM && evo >= 2 && RoomEvolves(a)) return 3000017;
+        if (st == ST_LEAK) return 1000003 + evoVar * 7919;
+        if (st == ST_SLOT && (EvoPick(a / 4, 1) || (evo >= 2 && RoomEvolves(a / 4)))) return 2000003 + evoVar * 7919;
+        if (st == ST_ROOM && evo >= 2 && RoomEvolves(a)) return 3000017 + evoVar * 7919;
         return 0;
     }
 

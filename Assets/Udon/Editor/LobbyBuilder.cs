@@ -200,14 +200,15 @@ public static partial class LobbyBuilder
             }
         }
 
-        // the die (START) and its caption
-        var dice = Img(cv, "Die", P(1039, 116), new Vector2(172, 172), Icon("dice"), Color.white);
+        // the die (NEW MAP) and its caption; the REPLAY card beside it is made further down (MapCard)
+        var dice = Img(cv, "Die", P(958, 104), new Vector2(112, 112), Icon("dice"), Color.white);
         dice.raycastTarget = true;
         var db = dice.gameObject.AddComponent<Button>();
         var dn = db.navigation; dn.mode = Navigation.Mode.None; db.navigation = dn; db.targetGraphic = dice;
         var diceTile = AddTile(dice.gameObject, db, -1);
         panel.dice = dice.rectTransform; panel.diceImage = dice; panel.diceY = dice.rectTransform.anchoredPosition.y;
-        panel.rollCaption = Txt(cv, "RollToStart", P(1039, 214), new Vector2(270, 30), "ROLL TO START", rocket, 20, Felt, TextAlignmentOptions.Center);
+        panel.rollCaption = Txt(cv, "NewMap", P(958, 190), new Vector2(130, 26), "NEW MAP", rocket, 17, Felt, TextAlignmentOptions.Center);
+        panel.replayCaption = Txt(cv, "Replay", P(1100, 190), new Vector2(130, 26), "REPLAY", rocket, 17, Felt, TextAlignmentOptions.Center);
 
         // the bench: who stands on PLAY
         Img(cv, "Bench", P(1039, 345), new Vector2(262, 126), sRound, C("e9dab6"), 2.2f);
@@ -236,9 +237,9 @@ public static partial class LobbyBuilder
         Txt(cv, "HostLabel", P(110, 470), new Vector2(80, 26), "HOST", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
         panel.hostName = Txt(cv, "HostName", P(330, 470), new Vector2(360, 34), "", null, 24, Color.white, TextAlignmentOptions.Left);
         panel.hostName.fontStyle = FontStyles.Bold;
-        panel.hostButton = new RectTransform[9]; panel.hostButtonImage = new Image[9]; panel.hostButtonText = new TextMeshProUGUI[9];
+        panel.hostButton = new RectTransform[11]; panel.hostButtonImage = new Image[11]; panel.hostButtonText = new TextMeshProUGUI[11];
         string[] hb = { "UNLOCK HOST", "CLAIM HOST" };
-        var hostTiles = new PHPanelTile[9];
+        var hostTiles = new PHPanelTile[11];
         for (int k = 0; k < 2; k++)
         {
             var bimg = Img(cv, "HostButton " + hb[k], P(880 + k * 200, 470), new Vector2(186, 38), sRound, new Color(1f, 1f, 1f, 0.01f), 4f);
@@ -256,8 +257,32 @@ public static partial class LobbyBuilder
             }
         }
 
-        // the map bar: the map's code, a code entry for the host, the seed message (or Play anyway / Discard), the
-        // rotation's run count and cap, and the scrap / undo votes
+        // REPLAY: the card of the map it plays (PHHistory's card 12 draws the trail's picked map on it), with an
+        // arrow on each side to step through the trail (older, newer). Made here, then the veil goes back on top.
+        {
+            var bimg = Img(cv, "Replay Card", P(1100, 104), new Vector2(112, 112), sRound, new Color(1f, 1f, 1f, 0.01f), 3f);
+            bimg.raycastTarget = true;
+            var bt = bimg.gameObject.AddComponent<Button>();
+            var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = bimg;
+            panel.hostButton[6] = bimg.rectTransform;
+            panel.hostButtonImage[6] = MapCard(bimg.transform, History, 12, Vector2.zero, 112f, false);
+            hostTiles[6] = AddTile(bimg.gameObject, bt, -8);
+            for (int a = 0; a < 2; a++)
+            {
+                var ab = Img(cv, a == 0 ? "Replay Older" : "Replay Newer", P(a == 0 ? 1029 : 1171, 104), new Vector2(24, 44), sRound, new Color(1f, 1f, 1f, 0.01f), 4f);
+                ab.raycastTarget = true;
+                var abt = ab.gameObject.AddComponent<Button>();
+                var an = abt.navigation; an.mode = Navigation.Mode.None; abt.navigation = an; abt.targetGraphic = ab;
+                var face = Img(ab.transform, "Face", Vector2.zero, new Vector2(22, 40), sRound, BoardEdge, 4f);
+                panel.hostButtonText[9 + a] = Txt(ab.transform, "Text", new Vector2(0, 1), new Vector2(22, 30), a == 0 ? "<" : ">", future, 18, C("1e190f"), TextAlignmentOptions.Center);
+                panel.hostButton[9 + a] = ab.rectTransform; panel.hostButtonImage[9 + a] = face;
+                hostTiles[9 + a] = AddTile(ab.gameObject, abt, -11 - a);
+            }
+            veil.transform.SetAsLastSibling();
+        }
+
+        // the map bar: the map's code, a code entry for the host, the seed message (or Play anyway / Discard), how
+        // often the picked map was played, RETIRE (host), and the scrap / undo votes
         Img(cv, "MapBar", P(600, 530), new Vector2(1168, 48), sRound, C("173d2c"), 3f);
         Txt(cv, "MapLabel", P(64, 530), new Vector2(80, 26), "MAP", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
         panel.seedCodeText = Txt(cv, "SeedCode", P(205, 530), new Vector2(200, 30), "-", future, 15, Color.white, TextAlignmentOptions.Left);
@@ -284,7 +309,7 @@ public static partial class LobbyBuilder
         // the remaining bar buttons: k, label, centre x, width, colour, parent
         object[][] bar = {
             new object[] { 3, "PLAY ANYWAY", 545f, 116f, C("9bd18a") }, new object[] { 4, "DISCARD", 662f, 104f, C("f19a8a") },
-            new object[] { 5, "-", 765f, 38f, C("e1cfa5") }, new object[] { 6, "+", 905f, 38f, C("e1cfa5") },
+            new object[] { 5, "RETIRE", 882f, 96f, C("f2c45a") },
             new object[] { 7, "SCRAP", 1002f, 124f, C("f19a8a") }, new object[] { 8, "UNDO", 1122f, 108f, C("7fb3e6") } };
         foreach (var b in bar)
         {
@@ -296,11 +321,11 @@ public static partial class LobbyBuilder
             var bt = bimg.gameObject.AddComponent<Button>();
             var bn = bt.navigation; bn.mode = Navigation.Mode.None; bt.navigation = bn; bt.targetGraphic = bimg;
             var face = Img(bimg.transform, "Face", Vector2.zero, new Vector2(w, 36), sRound, (Color)b[4], 4f);
-            panel.hostButtonText[k] = Txt(bimg.transform, "Text", Vector2.zero, new Vector2(w - 6, 30), (string)b[1], future, k == 5 || k == 6 ? 22 : 13, C("1e190f"), TextAlignmentOptions.Center);
+            panel.hostButtonText[k] = Txt(bimg.transform, "Text", Vector2.zero, new Vector2(w - 6, 30), (string)b[1], future, 13, C("1e190f"), TextAlignmentOptions.Center);
             panel.hostButton[k] = bimg.rectTransform; panel.hostButtonImage[k] = face;
             hostTiles[k] = AddTile(bimg.gameObject, bt, -2 - k);
         }
-        panel.runsText = Txt(cv, "Runs", P(835, 530), new Vector2(96, 30), "RUN 0/10", future, 14, Color.white, TextAlignmentOptions.Center);
+        panel.runsText = Txt(cv, "Runs", P(778, 530), new Vector2(100, 30), "", future, 13, Color.white, TextAlignmentOptions.Center);
         panel.scrapText = panel.hostButtonText[7]; panel.undoText = panel.hostButtonText[8];
         confirm.gameObject.SetActive(false);
 
@@ -315,7 +340,96 @@ public static partial class LobbyBuilder
         foreach (var tl in tiles) { tl.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(tl); }
         diceTile.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(diceTile);
         foreach (var ht in hostTiles) if (ht != null) { ht.panel = panel; UdonSharpEditorUtility.CopyProxyToUdon(ht); }
+        if (History != null) UdonSharpEditorUtility.CopyProxyToUdon(History);   // (its card 12 was made here)
         return panel;
+    }
+
+    // ------------------------------------------------------------------ the map trail (north wall, above the panel)
+    // Twelve map cards in a row on a dotted path, 14.4 x 1.2 m at 6 mm a unit, leaning forward a little so they read
+    // from the PLAY square. Display only (no VRC Ui Shape): PHHistory fills the cards from PHGame's trail and takes
+    // each map's photo with the camera made here, into one small render texture per trail slot. Built before the
+    // panel, whose REPLAY card is this component's card 12.
+    public static PHHistory History;
+    const int TrailCards = 12;
+
+    public static PHHistory BuildTrail(Transform lobby, PHGame game, MapBuilderUdon builder, Vector3 localPos)
+    {
+        const float pitch = 200f, cardW = 172f;
+        var cv = Canvas(lobby, "MapTrail", localPos, Quaternion.Euler(-8f, 0f, 0f), new Vector2(TrailCards * pitch, 200f), 0.006f, false);
+        Img(cv, "Path", new Vector2(0, 0), new Vector2(TrailCards * pitch - 40f, 10), sDash, C("e1cfa5"), 2f);
+        var h = cv.gameObject.AddUdonSharpComponent<PHHistory>();
+        h.game = game; h.builder = builder;
+        int n = TrailCards + 1;
+        h.cardFace = new GameObject[n]; h.cardEmpty = new GameObject[n]; h.cardPhoto = new RawImage[n]; h.cardBlank = new GameObject[n];
+        h.cardBlankIcon = new Image[n]; h.cardSize = new TextMeshProUGUI[n]; h.cardRuns = new TextMeshProUGUI[n];
+        h.cardMarker = new GameObject[n]; h.cardRect = new RectTransform[n];
+        h.sizeIcon = new[] { Icon("home"), Icon("tavern"), Icon("church"), Icon("castle") };
+        History = h;
+        for (int i = 0; i < TrailCards; i++)
+        {
+            // each card in a holder of its own: PHHistory lifts and tips the picked card within it
+            var holder = Rect(cv, "Space" + i, new Vector2((i - (TrailCards - 1) * 0.5f) * pitch, 0f), new Vector2(cardW, cardW));
+            MapCard(holder, h, i, Vector2.zero, cardW, true);
+        }
+
+        // the photos: one render texture per trail slot, and the camera that fills them (off; PHHistory switches it on
+        // for the frame of a photo). No players, no UI, not the hider's own prop (layer 23).
+        h.shots = new RenderTexture[TrailCards];
+        for (int i = 0; i < TrailCards; i++)
+        {
+            string path = "Assets/Udon/Generated/MapShot" + i + ".renderTexture";
+            var rt = AssetDatabase.LoadAssetAtPath<RenderTexture>(path);
+            if (rt == null)
+            {
+                rt = new RenderTexture(384, 288, 16) { name = "MapShot" + i };
+                AssetDatabase.CreateAsset(rt, path);
+            }
+            h.shots[i] = rt;
+        }
+        var camGo = new GameObject("MapPhotoCamera");
+        camGo.transform.SetParent(lobby, false);
+        var cam = camGo.AddComponent<Camera>();
+        cam.orthographic = true; cam.orthographicSize = 40f; cam.nearClipPlane = 1f; cam.farClipPlane = 900f;
+        cam.clearFlags = CameraClearFlags.Skybox; cam.allowHDR = false; cam.allowMSAA = false;
+        cam.cullingMask = ~((1 << 5) | (1 << 9) | (1 << 10) | (1 << 12) | (1 << 18) | (1 << 19) | (1 << 22) | (1 << 23));
+        cam.targetTexture = h.shots[0];
+        cam.enabled = false;
+        h.cam = cam;
+        UdonSharpEditorUtility.CopyProxyToUdon(h);
+        return h;
+    }
+
+    // A map card: a cream card with a 4:3 photo (or, where this client has no photo, the size's building on blue) and
+    // under it the size letter on a blue chip and the play count. On the wall an empty space shows a dashed outline
+    // and the picked card carries the red meeple. Returns the card's face (the panel fades it). h may be null (the
+    // panel built alone): then nothing is recorded.
+    static Image MapCard(Transform parent, PHHistory h, int i, Vector2 pos, float w, bool onWall)
+    {
+        float k = w / 172f;
+        float pw = w - 14f * k, ph = pw * 0.75f, capH = 30f * k, hgt = ph + capH + 10f * k;
+        var empty = Img(parent, "Empty", pos, new Vector2(w, hgt), sDashed, onWall ? C("5f8a80") : C("c9b78d"), 2f);
+        var card = Rect(parent, "Card", pos, new Vector2(w, hgt));
+        Img(card, "Edge", new Vector2(0, -5f * k), new Vector2(w, hgt), sRound, C("c9a46a"), 2.2f);
+        var face = Img(card, "Face", Vector2.zero, new Vector2(w, hgt), sRound, Cream, 2.2f);
+        float py = hgt / 2 - 7f * k - ph / 2;
+        var blank = Img(card, "Blank", new Vector2(0, py), new Vector2(pw, ph), null, RowColour[0]);
+        var icon = Img(blank.transform, "Icon", Vector2.zero, new Vector2(ph * 0.72f, ph * 0.72f), Icon("home"), Color.white);
+        var photo = Rect(card, "Photo", new Vector2(0, py), new Vector2(pw, ph)).gameObject.AddComponent<RawImage>();
+        photo.raycastTarget = false;
+        float cy = -hgt / 2 + 4f * k + capH / 2;
+        Img(card, "SizeChip", new Vector2(-w / 2 + 9f * k + 22f * k, cy), new Vector2(44f * k, 22f * k), sRound, RowColour[0], 4f);
+        var size = Txt(card, "Size", new Vector2(-w / 2 + 9f * k + 22f * k, cy + 1f), new Vector2(44f * k, 22f * k), "S", future, 15f * k, C("1e190f"), TextAlignmentOptions.Center);
+        var runs = Txt(card, "Runs", new Vector2(w / 2 - 9f * k - 30f * k, cy + 1f), new Vector2(60f * k, 22f * k), "x1", future, 15f * k, Ink, TextAlignmentOptions.Right);
+        GameObject marker = null;
+        if (onWall) marker = Img(card, "Marker", new Vector2(w / 2 - 10f, hgt / 2 + 6f), new Vector2(58, 58), Icon("meeple_hunt"), Color.white).gameObject;
+        card.gameObject.SetActive(false); photo.gameObject.SetActive(false);
+        if (marker != null) marker.SetActive(false);
+        if (h != null)
+        {
+            h.cardFace[i] = card.gameObject; h.cardEmpty[i] = empty.gameObject; h.cardPhoto[i] = photo; h.cardBlank[i] = blank.gameObject;
+            h.cardBlankIcon[i] = icon; h.cardSize[i] = size; h.cardRuns[i] = runs; h.cardMarker[i] = marker; h.cardRect[i] = card;
+        }
+        return face;
     }
 
     // Debug: a small sign beside the panel that builds a fresh random map for the presser and takes them there (PHExplore)
