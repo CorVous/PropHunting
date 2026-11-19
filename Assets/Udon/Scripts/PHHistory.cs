@@ -34,6 +34,7 @@ public class PHHistory : UdonSharpBehaviour
     uint[] shotSeed = new uint[12];      // what each slot's photo shows (0: none)
     int[] shotSize = new int[12];
     int snapSlot = -1; float snapAt; bool camOn;
+    float fogStartWas, fogEndWas;
     int[] order = new int[12];
     int[] shownSlot; int[] shownRuns; bool[] shownPhoto; bool[] shownPick; uint[] shownSeed;
     float nextRefresh;
@@ -47,7 +48,11 @@ public class PHHistory : UdonSharpBehaviour
 
     void Update()
     {
-        if (camOn) { cam.enabled = false; camOn = false; nextRefresh = 0f; }
+        if (camOn)
+        {
+            cam.enabled = false; camOn = false; nextRefresh = 0f;
+            RenderSettings.fogStartDistance = fogStartWas; RenderSettings.fogEndDistance = fogEndWas;
+        }
         if (snapSlot >= 0 && Time.time >= snapAt)
         {
             int s = snapSlot; snapSlot = -1;
@@ -56,6 +61,10 @@ public class PHHistory : UdonSharpBehaviour
                 Frame();
                 cam.targetTexture = shots[s];
                 cam.enabled = true; camOn = true;
+                // the map's fog would paint the whole photo in its colour (the camera stands far off): pushed out for
+                // this one frame, then put back (above)
+                fogStartWas = RenderSettings.fogStartDistance; fogEndWas = RenderSettings.fogEndDistance;
+                RenderSettings.fogStartDistance = 4000f; RenderSettings.fogEndDistance = 5000f;
                 shotSeed[s] = game.rotSeed[s]; shotSize[s] = game.rotSize[s];
             }
         }
@@ -80,7 +89,9 @@ public class PHHistory : UdonSharpBehaviour
         }
         float aspect = 4f / 3f;
         cam.orthographicSize = Mathf.Max(halfH, halfW / aspect) * 1.04f;
-        cam.transform.SetPositionAndRotation(centre + Vector3.up * 2f - (rot * Vector3.forward) * 300f, rot);
+        // (no further off than the picture needs: less of the frame is at the mercy of fog and clip planes)
+        float back = Mathf.Sqrt(w * w + d * d) * 0.5f + 30f;
+        cam.transform.SetPositionAndRotation(centre + Vector3.up * 2f - (rot * Vector3.forward) * back, rot);
     }
 
     public bool HasPhoto(int slot) { return slot >= 0 && slot < shotSeed.Length && shotSeed[slot] != 0 && shotSeed[slot] == game.rotSeed[slot] && shotSize[slot] == game.rotSize[slot]; }
