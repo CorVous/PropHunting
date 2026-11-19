@@ -32,20 +32,25 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public bool seedNeedsConfirm;
     [UdonSynced] string confirmCode = "";   // (synced: a new host can still "play anyway")
 
-    // ---- map rotation (C1, C6, D2-D6, D8, G49): three maps per size, played in turn; each keeps its run count
-    // while the group plays other sizes. After runCap runs (host setting, default 10) a map retires and a new
-    // one takes its place. Between rounds, more than half of everyone here can vote to scrap the last map
-    // (replaced at once) or to undo the last scrap (one level). A shared seed plays next as a one-off.
-    public const int ROT_PER_SIZE = 3;
-    [UdonSynced] public uint[] rotSeed = new uint[12];        // size * 3 + i; 0 = not made yet
+    // ---- the map trail (Cor, 2026-11-19; it replaces the rotation of three maps per size and the run cap): up to
+    // TRAIL maps that have been played here, each with its size, density and run count. The host starts a round
+    // with NEW MAP (a map nobody has seen, or the code they entered; it joins the trail) or with REPLAY (the picked
+    // map of the trail again: the last one played unless the host stepped to another). A map stays until the host
+    // retires it; only a new map on a full trail pushes one off, the one played longest ago. Between rounds, more
+    // than half of everyone here can vote to scrap the last map or to undo the last removal (one level); the host's
+    // own UNDO does it at once. PHHistory shows the trail on the lobby wall.
+    public const int TRAIL = 12;
+    [UdonSynced] public uint[] rotSeed = new uint[12];        // per trail slot; 0 = empty
     [UdonSynced] public int[] rotRuns = new int[12];
     [UdonSynced] public int[] rotDensity = new int[12];
-    [UdonSynced] public int[] rotNext = new int[4];
-    [UdonSynced] public int runCap = 10;
-    [UdonSynced] public int lastRot = -1;                     // the rotation slot the last round played (-1: a one-off)
-    [UdonSynced] public int undoRot = -1;                     // the slot the last scrap replaced, and what it held
+    [UdonSynced] public int[] rotSize = new int[12];
+    [UdonSynced] public int[] rotPlayed = new int[12];        // the round it was last played in (the wall's order)
+    [UdonSynced] public int replayPick = -1;                  // the slot REPLAY plays (-1: nothing to replay)
+    [UdonSynced] public int lastRot = -1;                     // the slot the last round played
+    [UdonSynced] public int undoRot = -1;                     // 0 while a removed map can be brought back: what it was
     [UdonSynced] public uint undoSeed;
-    [UdonSynced] public int undoRuns, undoDensity;
+    [UdonSynced] public int undoRuns, undoDensity, undoSize, undoPlayed;
+    public PHHistory history;                                 // the wall of played maps (takes the map's photo)
     [UdonSynced] public int voteId = 1;                       // votes count only for the current id (PHSlot.scrapVote/undoVote)
     public BoxCollider lobbyZone;
     public Transform lobbySpawn;
@@ -60,6 +65,7 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public uint seed;
     [UdonSynced] public int mapSize, mapDensity;
     [UdonSynced] public int mapEvo;             // the map's evolution step (0 to 3, MapGen.evo)
+    [UdonSynced] public int mapVar;             // ...and which replay this is (MapGen.evoVar): each one shuffles anew
     [UdonSynced] public int[] slotPlayer = new int[32];   // player id per slot, 0 = free
     [UdonSynced] public int[] slotRole = new int[32];     // ROLE_* for this round
     // the host is whoever owns this object (the instance master to begin with). Locked, only the host keeps
@@ -335,23 +341,95 @@ public class PHGame : UdonSharpBehaviour
         RequestSerialization();
     }
 
-    // Maps evolve (Cor): with the default cap of 10 a map changes after runs 2, 5 and 8, each step bigger; other
-    // caps spread the three steps the same way (after round(0.3 k cap) - 1 runs)
-    public int EvoStep(int runs)
+    // Maps evolve (Cor): every replay shuffles a map, more the longer it has lived. The first play is the map as
+    // generated; replays 1 to 4 take the small step (things on furniture, stray props), 5 to 7 the medium one (rooms
+    // refurnished, outdoors regrown), from 8 on the big one (a building's plan changes): the steps of the old run cap
+    // of 10, the small one now from the first replay. The run count is passed along as the variant, so each replay
+    // changes other rooms.
+    public int EvoStep(int runs) { return runs <= 0 ? 0 : (runs < 5 ? 1 : (runs < 8 ? 2 : 3)); }
+
+    // the trail's maps, the one played last first; returns how many (order needs TRAIL elements)
+    public int TrailOrder(int[] order)
     {
-        int step = 0;
-        for (int k = 1; k <= 3; k++) if (runs >= Mathf.Max(1, Mathf.RoundToInt(k * runCap * 0.3f) - 1)) step = k;
-        return step;
+        int n = 0;
+        for (int r = 0; r < TRAIL; r++)
+        {
+            if (rotSeed[r] == 0) continue;
+            int k = n++;
+            while (k > 0 && rotPlayed[order[k - 1]] < rotPlayed[r]) { order[k] = order[k - 1]; k--; }
+            order[k] = r;
+        }
+        return n;
     }
 
-    void NewMap(int r)
+    // a slot for a new map: an empty one, else the one played longest ago
+    int FreeSlot()
     {
-        rotSeed[r] = (uint)Random.Range(1, int.MaxValue);
-        rotRuns[r] = 0;
-        rotDensity[r] = densityChoice;
+        int best = 0;
+        for (int r = 0; r < TRAIL; r++)
+        {
+            if (rotSeed[r] == 0) return r;
+            if (rotPlayed[r] < rotPlayed[best]) best = r;
+        }
+        return best;
     }
 
-    public void SetRunCap(int v) { if (!IsHost || phase != PH_LOBBY) return; runCap = Mathf.Clamp(v, 1, 99); RequestSerialization(); }
+    int FindMap(uint s, int size, int density)
+    {
+        for (int r = 0; r < TRAIL; r++) if (rotSeed[r] == s && rotSize[r] == size && rotDensity[r] == density) return r;
+        return -1;
+    }
+
+    // takes a map off the trail; it can be brought back until the next removal (Restore)
+    void Retire(int r)
+    {
+        if (r < 0 || r >= TRAIL || rotSeed[r] == 0) return;
+        undoRot = 0; undoSeed = rotSeed[r]; undoRuns = rotRuns[r]; undoDensity = rotDensity[r]; undoSize = rotSize[r]; undoPlayed = rotPlayed[r];
+        Drop(r);
+        voteId++;
+    }
+
+    void Drop(int r)
+    {
+        rotSeed[r] = 0; rotRuns[r] = 0;
+        if (lastRot == r) lastRot = -1;
+        if (replayPick == r)
+        {
+            // REPLAY goes on to the map played most recently of those left
+            replayPick = -1;
+            for (int k = 0; k < TRAIL; k++) if (rotSeed[k] != 0 && (replayPick < 0 || rotPlayed[k] > rotPlayed[replayPick])) replayPick = k;
+        }
+    }
+
+    void Restore()
+    {
+        if (undoRot < 0) return;
+        int r = FreeSlot();
+        rotSeed[r] = undoSeed; rotRuns[r] = undoRuns; rotDensity[r] = undoDensity; rotSize[r] = undoSize; rotPlayed[r] = undoPlayed;
+        if (lastRot == r) lastRot = -1;
+        replayPick = r;
+        undoRot = -1;
+        voteId++;
+    }
+
+    // RETIRE (host): the picked map leaves the trail. UNDO (host): the last map removed comes back, picked.
+    public void HostRetire() { if (!IsHost || phase != PH_LOBBY || replayPick < 0) return; Retire(replayPick); RequestSerialization(); }
+    public void HostUndo() { if (!IsHost || phase != PH_LOBBY || undoRot < 0) return; Restore(); RequestSerialization(); }
+
+    // the arrows beside REPLAY (host): step to the trail's next map, older (1) or newer (-1)
+    public void PickOlder() { PickStep(1); }
+    public void PickNewer() { PickStep(-1); }
+    void PickStep(int dir)
+    {
+        if (!IsHost || phase != PH_LOBBY) return;
+        int[] order = new int[TRAIL];
+        int n = TrailOrder(order);
+        if (n == 0) return;
+        int at = 0;
+        for (int k = 0; k < n; k++) if (order[k] == replayPick) at = k;
+        replayPick = order[(at + dir + n) % n];
+        RequestSerialization();
+    }
 
     // ---- votes (D2-D4, G49): anyone, between rounds; PHSlot keeps each player's vote
     public void VoteScrap() { PHSlot s = LocalSlot(); if (s == null || phase != PH_LOBBY || lastRot < 0) return; s.scrapVote = s.scrapVote == voteId ? 0 : voteId; s.Send(); }
@@ -370,28 +448,15 @@ public class PHGame : UdonSharpBehaviour
     public int VotesNeeded() { return VRCPlayerApi.GetPlayerCount() / 2 + 1; }
     public bool CanScrap() { return phase == PH_LOBBY && lastRot >= 0; }
     public bool CanUndo() { return phase == PH_LOBBY && undoRot >= 0; }
+    public bool CanReplay() { return phase == PH_LOBBY && replayPick >= 0 && rotSeed[replayPick] != 0; }
 
     // the host applies a vote once more than half of everyone here agrees
     void HostVotes()
     {
         if (phase != PH_LOBBY) return;
         int need = VotesNeeded();
-        if (lastRot >= 0 && ScrapVotes() >= need)
-        {
-            undoRot = lastRot; undoSeed = rotSeed[lastRot]; undoRuns = rotRuns[lastRot]; undoDensity = rotDensity[lastRot];
-            NewMap(lastRot);
-            lastRot = -1;
-            voteId++;
-            RequestSerialization();
-        }
-        else if (undoRot >= 0 && UndoVotes() >= need)
-        {
-            rotSeed[undoRot] = undoSeed; rotRuns[undoRot] = undoRuns; rotDensity[undoRot] = undoDensity;
-            lastRot = undoRot;
-            undoRot = -1;
-            voteId++;
-            RequestSerialization();
-        }
+        if (lastRot >= 0 && ScrapVotes() >= need) { Retire(lastRot); RequestSerialization(); }
+        else if (undoRot >= 0 && UndoVotes() >= need) { Restore(); RequestSerialization(); }
     }
 
     public int Participants()
@@ -406,8 +471,13 @@ public class PHGame : UdonSharpBehaviour
 
     public static int Hunters(int participants) { int h = (participants + 2) / 4; return h < 1 ? 1 : h; }
 
-    // START (host, from the panel): the players standing in the zone take part; about 1 in 4 hunt
-    public void StartRound()
+    // NEW MAP and REPLAY (host, from the panel): the players standing in the zone take part; about 1 in 4 hunt.
+    // StartRound is NEW MAP (the test pilot and old buttons call it by that name).
+    bool wantReplay;
+    public void StartRound() { wantReplay = false; StartPlayers(); }
+    public void StartReplay() { if (!CanReplay()) return; wantReplay = true; StartPlayers(); }
+
+    void StartPlayers()
     {
         if (!IsHost || phase != PH_LOBBY) return;
         int n = Participants();
@@ -452,12 +522,13 @@ public class PHGame : UdonSharpBehaviour
             else if (slots[i].inZone) { slotRole[i] = role == ROLE_HUNTER ? ROLE_HIDER : ROLE_HUNTER; others++; }
         }
         debugRound = true; debugQuick = role == ROLE_HUNTER && others == 0;
+        wantReplay = replayPick >= 0 && rotSeed[replayPick] != 0;   // on the picked map if there is one (its run is not counted)
         BeginRound();
     }
 
     // THEME: the host picks the theme of the maps to come (any, town, space base, village). A map of a chosen
-    // theme is a new one-off seed that comes out in that theme (so its code is a normal code), not one of the
-    // rotation's; Explore a new map follows the choice too.
+    // theme is a new seed that comes out in that theme (so its code is a normal code); Explore a new map follows
+    // the choice too.
     [UdonSynced] public int debugTheme = -1;
     public TMPro.TextMeshProUGUI themeLabel;
 
@@ -495,29 +566,32 @@ public class PHGame : UdonSharpBehaviour
     {
         mapSize = RoundSize();
         mapDensity = densityChoice;
-        // the next map of this size's rotation, or a shared seed as a one-off (D8)
-        lastRot = -1;
-        mapEvo = 0;   // a shared seed always plays as generated
-        bool shared = false;
-        if (pendingCode != "" && seedTool != null)
+        // REPLAY: the trail's picked map. NEW MAP: the code the host entered (D8), else a fresh seed (of the debug
+        // THEME button's theme if one is chosen), into a slot of the trail; a code already on the trail is that map
+        // again, with its runs.
+        int r = -1;
+        if (wantReplay && replayPick >= 0 && replayPick < TRAIL && rotSeed[replayPick] != 0) r = replayPick;
+        else
         {
-            int st = seedTool.Decode(pendingCode, GenData.GEN_VERSION);
-            if (st == PHSeed.OK || st == PHSeed.OLDER) { seed = seedTool.seed; mapSize = seedTool.size; mapDensity = seedTool.flags & 7; shared = true; }
+            uint s = 0;
+            if (pendingCode != "" && seedTool != null)
+            {
+                int st = seedTool.Decode(pendingCode, GenData.GEN_VERSION);
+                if (st == PHSeed.OK || st == PHSeed.OLDER) { s = seedTool.seed; mapSize = seedTool.size; mapDensity = seedTool.flags & 7; if (mapDensity > 4) mapDensity = 0; }
+            }
+            if (s == 0) s = debugTheme >= 0 ? ThemedSeed() : (uint)Random.Range(1, int.MaxValue);
+            r = FindMap(s, mapSize, mapDensity);
+            if (r < 0)
+            {
+                r = FreeSlot();
+                rotSeed[r] = s; rotRuns[r] = 0; rotDensity[r] = mapDensity; rotSize[r] = mapSize;
+            }
+            pendingCode = ""; seedStatus = ""; seedNeedsConfirm = false;
         }
-        if (!shared && debugTheme >= 0)
-        {
-            seed = ThemedSeed(); mapDensity = densityChoice;   // a one-off of the chosen theme (the debug THEME button)
-        }
-        else if (!shared)
-        {
-            int r = mapSize * ROT_PER_SIZE + rotNext[mapSize];
-            if (rotSeed[r] == 0) NewMap(r);
-            seed = rotSeed[r]; mapDensity = rotDensity[r];
-            mapEvo = EvoStep(rotRuns[r]);
-            lastRot = r;
-            rotNext[mapSize] = (rotNext[mapSize] + 1) % ROT_PER_SIZE;
-        }
-        pendingCode = ""; seedStatus = ""; seedNeedsConfirm = false;
+        wantReplay = false;
+        seed = rotSeed[r]; mapSize = rotSize[r]; mapDensity = rotDensity[r];
+        mapEvo = EvoStep(rotRuns[r]); mapVar = rotRuns[r];
+        lastRot = r; replayPick = r; rotPlayed[r] = round + 1;
         if (seedTool != null) seedCode = seedTool.Encode(GenData.GEN_VERSION, mapSize, seed, mapDensity);
         round++;
         hidersWin = false; endReason = "";
@@ -596,7 +670,7 @@ public class PHGame : UdonSharpBehaviour
         genWatch.Reset(); genWatch.Start();
         builder.Clear();
         double clearMs = genWatch.Elapsed.TotalMilliseconds;
-        gen.Begin(seed, mapSize, mapDensity, mapEvo);
+        gen.Begin(seed, mapSize, mapDensity, mapEvo, mapVar);
         // (these two are not steps: the profiler's log says what they cost)
         if (logSlowSteps) Debug.Log("[PHProf] map begin: clearing the last map " + clearMs.ToString("0.0") + "ms, the generator's start " + (genWatch.Elapsed.TotalMilliseconds - clearMs).ToString("0.0") + "ms");
         genMs = 0f; genWorstMs = 0f; genSteps = 0; genWorstAt = "";
@@ -709,10 +783,10 @@ public class PHGame : UdonSharpBehaviour
                     {
                         building = false; Debug.LogError("[PHGame] map generation failed: " + gen.failReason);
                         // the same seed fails on every client: back to the lobby at once (not after the 2 min wait,
-                        // then a round on no map), and the rotation's map is replaced so it does not come up again
+                        // then a round on no map), and the map leaves the trail so it does not come up again
                         if (IsHost && phase == PH_LOADING && genRound == round)
                         {
-                            if (lastRot >= 0) { NewMap(lastRot); lastRot = -1; }
+                            if (lastRot >= 0) Drop(lastRot);
                             failedRound = round;   // (the lobby says so, over the options board, for everyone)
                             BackToLobby();
                         }
@@ -726,6 +800,7 @@ public class PHGame : UdonSharpBehaviour
             else if (builder.built)
             {
                 building = false; builtRound = genRound;
+                if (history != null && phase != PH_LOBBY && genRound == round) history.Snap(lastRot);   // the wall's photo of it
                 PHSlot me = LocalSlot();
                 if (me != null) me.ReportReady(round);
             }
@@ -787,13 +862,8 @@ public class PHGame : UdonSharpBehaviour
     void End(bool hiders, string why, bool clock)
     {
         hidersWin = hiders; endReason = why; timeUp = clock;
-        // the run counts; a map at its cap retires and a new one takes its slot (D6)
-        if (lastRot >= 0 && !debugRound)
-        {
-            rotRuns[lastRot]++;
-            // (a retired map is gone: SCRAP would otherwise scrap its unplayed replacement)
-            if (rotRuns[lastRot] >= runCap) { NewMap(lastRot); lastRot = -1; }
-        }
+        // the run counts (there is no cap: the host retires a map, or the players scrap it)
+        if (lastRot >= 0 && !debugRound) rotRuns[lastRot]++;
         voteId++;
         SetPhase(PH_END, ROUND_END);
     }

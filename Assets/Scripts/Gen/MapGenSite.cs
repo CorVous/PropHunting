@@ -604,7 +604,7 @@ public partial class MapGen
             // evolution step 3: one plot's building takes another plan of its kind (the main draw stays as it was,
             // so the other plots keep theirs)
             hq_LayoutSite_sel1 = 0;
-            if (!park && evo >= 3 && i == (int)(GenRng.Hash32(seed, 0xE70u, 3u, 0u, 0u) >> 1) % nk) hq_LayoutSite_sel1 = 1;
+            if (!park && evo >= 3 && i == (int)(GenRng.Hash32(seed, 0xE70u, 3u, 0u, (uint)evoVar) >> 1) % nk) hq_LayoutSite_sel1 = 1;
             hq_LayoutSite_rng = rng;
             hq_LayoutSite_kinds = kinds;
             hq_LayoutSite_nk = nk;

@@ -5,8 +5,9 @@ using UnityEngine.UI;
 using VRC.SDKBase;
 
 // The host panel in the lobby (the "Board Game" design): four coloured tracks (map size, props, round length,
-// forced taunt) with a red meeple on the current pick, a die that starts the round, and a bench showing who stands
-// in the zone. Built by LobbyBuilder. Everyone sees the same synced settings; only the host's presses count.
+// forced taunt) with a red meeple on the current pick, a die that starts the round on a NEW MAP, beside it the card
+// of the map REPLAY plays again (PHHistory draws it; arrows step through the trail of played maps), and a bench
+// showing who stands in the zone. Built by LobbyBuilder. Everyone sees the same synced settings; only the host's presses count.
 // Every change of a setting plays its sound for everyone near the panel: map size plucks higher for bigger maps
 // (Auto rattles), props drop 1-5 crates, round length ticks 2-4 times, taunt rings 3/2/1 bells.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -41,7 +42,9 @@ public class PHPanel : UdonSharpBehaviour
     public TMP_InputField seedInput;
     public GameObject seedInputRoot, confirmRoot;           // shown on Claim host instead of its text while it cannot be used
     // the bar buttons (PHPanelTile index -2 - k): 0 unlock/lock host, 1 claim host, 2 the seed field, 3 play anyway,
-    // 4 discard, 5 fewer runs, 6 more runs, 7 scrap vote, 8 undo vote
+    // 4 discard, 5 retire the picked map, 6 the REPLAY card, 7 scrap vote, 8 undo (a vote; the host's is at once),
+    // 9 and 10 the arrows beside REPLAY (older, newer)
+    public TextMeshProUGUI replayCaption;
     public RectTransform[] hostButton;
     public Image[] hostButtonImage;
     public TextMeshProUGUI[] hostButtonText;
@@ -133,13 +136,24 @@ public class PHPanel : UdonSharpBehaviour
             Queue(select, 0f, 1f);
             if (k == 3) game.SeedPlayAnyway(); else game.SeedDiscard();
         }
-        else if (k == 5 || k == 6)
+        else if (k == 5)
         {
-            if (!CanEdit) { Deny(-2 - k); return; }
-            int v = game.runCap + (k == 5 ? -1 : 1);
-            if (v < 1 || v > 99) { Deny(-2 - k); return; }
-            Queue(tick, 0f, k == 5 ? 0.85f : 1.15f);
-            game.SetRunCap(v);
+            if (!CanEdit || !game.CanReplay()) { Deny(-7); return; }
+            Queue(drop, 0f, 0.8f);
+            game.HostRetire();
+        }
+        else if (k == 6)
+        {
+            // REPLAY: the picked map again (two card flicks, then the jingle a little lower than NEW MAP's)
+            if (!CanStart || !game.CanReplay()) { Deny(-8); return; }
+            Queue(tick, 0f, 1.2f); Queue(tick, 0.12f, 1.4f); Queue(jingle, 0.4f, 0.84f);
+            game.StartReplay();
+        }
+        else if (k == 9 || k == 10)
+        {
+            if (!CanEdit || !game.CanReplay()) { Deny(-2 - k); return; }
+            Queue(tick, 0f, k == 9 ? 0.9f : 1.1f);
+            if (k == 9) game.PickOlder(); else game.PickNewer();
         }
         else if (k == 7)
         {
@@ -151,7 +165,7 @@ public class PHPanel : UdonSharpBehaviour
         {
             if (!game.CanUndo()) { Deny(-10); return; }
             Queue(select, 0f, 1.1f);
-            game.VoteUndo();
+            if (host) game.HostUndo(); else game.VoteUndo();
         }
         Refresh();
     }
@@ -283,6 +297,7 @@ public class PHPanel : UdonSharpBehaviour
     const float HOURGLASS_EVERY = 6f;   // seconds between the veil's hourglass turning over
 
     [HideInInspector] public float diceY;
+    int codeSlot = -1; uint codeSeed; string codeText = "";
 
     // ------------------------------------------------------------------ the picture
     public void Refresh()
@@ -327,6 +342,9 @@ public class PHPanel : UdonSharpBehaviour
         bool go = CanStart;
         diceImage.color = go ? Color.white : new Color(0.55f, 0.55f, 0.55f, 0.6f);
         rollCaption.color = go ? new Color(0.13f, 0.34f, 0.25f) : new Color(0.6f, 0.54f, 0.41f);
+        bool again = go && game.CanReplay();
+        if (replayCaption != null) replayCaption.color = again ? new Color(0.13f, 0.34f, 0.25f) : new Color(0.6f, 0.54f, 0.41f);
+        if (hostButtonImage.Length > 10) { Fade(6, again); Fade(9, CanEdit && game.CanReplay()); Fade(10, CanEdit && game.CanReplay()); }
         if (hostName != null)
         {
             VRCPlayerApi owner = Networking.GetOwner(game.gameObject);
@@ -342,15 +360,27 @@ public class PHPanel : UdonSharpBehaviour
         if (seedCodeText != null)
         {
             bool lobby = game.phase == PHGame.PH_LOBBY, hostNow = Host;
-            seedCodeText.text = game.seedCode == "" ? "-" : game.seedCode;
+            // the code of the map REPLAY shows (the last one played unless the host stepped to another)
+            string code = game.seedCode;
+            int pk = game.replayPick;
+            if (pk >= 0 && pk < game.rotSeed.Length && pk != game.lastRot && game.rotSeed[pk] != 0 && game.seedTool != null)
+            {
+                if (pk != codeSlot || game.rotSeed[pk] != codeSeed)
+                {
+                    codeSlot = pk; codeSeed = game.rotSeed[pk];
+                    codeText = game.seedTool.Encode(GenData.GEN_VERSION, game.rotSize[pk], codeSeed, game.rotDensity[pk]);
+                }
+                code = codeText;
+            }
+            seedCodeText.text = code == "" ? "-" : code;
             bool confirm = game.seedNeedsConfirm && hostNow;
             if (confirmRoot.activeSelf != confirm) confirmRoot.SetActive(confirm);
             seedStatusText.text = confirm ? "" : game.seedStatus;
             bool entry = hostNow && lobby;
             if (seedInputRoot.activeSelf != entry) seedInputRoot.SetActive(entry);
-            int runs = game.lastRot >= 0 && game.lastRot < game.rotRuns.Length ? game.rotRuns[game.lastRot] : 0;
-            runsText.text = "RUN " + runs + "/" + game.runCap;
-            Fade(5, hostNow && lobby); Fade(6, hostNow && lobby);
+            bool anyPick = pk >= 0 && pk < game.rotRuns.Length && game.rotSeed[pk] != 0;
+            runsText.text = anyPick ? "PLAYED " + game.rotRuns[pk] : "";
+            Fade(5, hostNow && lobby && anyPick);
             int need = game.VotesNeeded();
             scrapText.text = "SCRAP " + game.ScrapVotes() + "/" + need;
             undoText.text = "UNDO " + game.UndoVotes() + "/" + need;
