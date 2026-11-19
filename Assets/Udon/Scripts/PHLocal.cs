@@ -610,9 +610,29 @@ public class PHLocal : UdonSharpBehaviour
         while (t != null && t.parent != root) t = t.parent;
         if (t == null) return -1;
         GameObject[] objs = game.builder.objects;
-        for (int i = 0; i < objs.Length; i++) if (objs[i] == t.gameObject) return i;
+        if (objs == null) return -1;
+        // Perf: a scan of every prop (hundreds to ~1,500, 1-3 ms in Udon) each time the pointer moved onto another
+        // prop and on every dart. A prop found once is remembered by its place among propRoot's children (they stay
+        // in place while the map stands), checked against objects before it is trusted
+        GameObject go = t.gameObject;
+        int at = t.GetSiblingIndex();
+        if (emitHintOf != objs) { emitHintOf = objs; emitHint = new int[Mathf.Max(objs.Length, root != null ? root.childCount : 0)]; }
+        if (at < emitHint.Length)
+        {
+            int e = emitHint[at];
+            if (e >= 0 && e < objs.Length && objs[e] == go) return e;
+        }
+        for (int i = 0; i < objs.Length; i++)
+            if (objs[i] == go)
+            {
+                if (at < emitHint.Length) emitHint[at] = i;
+                return i;
+            }
         return -1;
     }
+
+    int[] emitHint;          // emit index by the prop's place among propRoot's children (EmitOf)
+    GameObject[] emitHintOf; // the objects array it is for (a new map, a new table)
 
     // the slot whose hider prop was hit, or -1
     int HiderOf(Transform t)
