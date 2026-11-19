@@ -490,6 +490,8 @@ public static class LobbyBuilder
     const float CW = 1500f;
     // the board's heading and Cor's note above the list (Cor's words, 2026-11-19)
     const string CreditsTitle = "Disclosures!!!";
+    // the world's source, on a banner under the title (Cor: prominent, with its licence)
+    const string CreditsSource = "SOURCE CODE:  github.com/CorVous/PropHunting   ·   AGPL v3.0";
     const string CreditsIntro = "Heya! This map is super vibe coded! I normally like to put in a lot more effort and authorship into my work, but this was (as of writing) made in a week to show to my friends because I wasn't happy with current prop hunt maps! Plus I think even if you're using AI, practice makes perfect! None of the assets were diffusion generated (what most people would call \"Generative AI\") though, and below is a list of the awesome creators of the CC0 public domain asset packs that you should check out! Either if you need free assets or are looking to find awesome assets!";
 
     class CreditRow { public string name, right; public int maker; }
@@ -611,7 +613,8 @@ public static class LobbyBuilder
         intro.enableWordWrapping = true; intro.lineSpacing = 12f;
         float introH = intro.GetPreferredValues(intro.text, introW, 0f).y;
         intro.rectTransform.sizeDelta = new Vector2(introW, introH);
-        float titleH = 92f + introH + 22f;
+        const float introTop = 168f;   // under the title and the source banner
+        float titleH = introTop + introH + 22f;
         float boardH = pad + colsH + (notes.Count > 0 ? 22f + notesH : 0f) + pad - 8f;
         float CH = titleH + boardH + side;
         ((RectTransform)cv).sizeDelta = new Vector2(CW, CH);
@@ -624,7 +627,10 @@ public static class LobbyBuilder
         Img(cv, "MeepleR", Q(CW - side - 46, 56), new Vector2(64, 64), Icon("meeple_hunt"), Color.white);
         var title = Txt(cv, "Title", Q(CW / 2, 50), new Vector2(900, 70), CreditsTitle, rocket, 54, C("f6d773"), TextAlignmentOptions.Center);
         title.characterSpacing = 6f;
-        intro.rectTransform.anchoredPosition = Q(CW / 2, 92f + introH / 2);
+        var banner = Img(cv, "SourceBanner", Q(CW / 2, 124), new Vector2(1120, 56), sTile, RowColour[1], 2f);
+        var src = Txt(banner.transform, "Text", new Vector2(0, 3), new Vector2(1060, 40), Clean(CreditsSource, future), future, 24, C("1e190f"), TextAlignmentOptions.Center);
+        src.enableAutoSizing = true; src.fontSizeMin = 16f; src.fontSizeMax = 24f;
+        intro.rectTransform.anchoredPosition = Q(CW / 2, introTop + introH / 2);
         intro.transform.SetAsLastSibling();
 
         // the board
