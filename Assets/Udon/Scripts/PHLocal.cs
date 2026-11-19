@@ -555,6 +555,7 @@ public class PHLocal : UdonSharpBehaviour
         UpdateJoiner();
         UpdateHud();
         UpdateHover();
+        UpdateRocks();
         if (Time.time >= nextPanel) { nextPanel = Time.time + 0.5f; string st = game.SettingsText(); if (panelText != null) panelText.text = st; if (panelUiText != null) panelUiText.text = st; }
     }
 
@@ -927,11 +928,96 @@ public class PHLocal : UdonSharpBehaviour
     void KnockProp(int e, Vector3 dir, Vector3 point)
     {
         int fl = game.gen.defFlags[game.gen.emitDef[e]];
-        if ((fl & (GenData.FL_HEAVY | GenData.FL_FIXTURE | GenData.FL_SCENERY)) != 0) return;
+        if ((fl & (GenData.FL_HEAVY | GenData.FL_FIXTURE | GenData.FL_SCENERY)) != 0)
+        {
+            // a heavy thing does not fly, but it rocks where it stands, for everyone (Cor: some props did not move
+            // when hit)
+            PHSlot s = Me();
+            if (s != null) s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Rocked), e, dir);
+            return;
+        }
         PHKnock k = game.KnockOf(e);
         if (k != null && k.Busy) return;   // already flying
         if (k == null) k = game.FreeKnock();
         if (k != null) k.Knock(e, dir, point);
+    }
+
+    // ------------------------------------------------------------------ a heavy prop rocks when hit
+    // It tips a few degrees away from the blow about its own foot and settles back in under a second, with what stands
+    // on it. Only the look: it ends exactly where it was (the synced map is unchanged). Up to ROCK_MAX at once.
+    const int ROCK_MAX = 4, ROCK_RIDERS = 8;
+    const float ROCK_TIME = 0.9f;
+    Transform[] rockT;
+    Vector3[] rockPos, rockAxis;
+    Quaternion[] rockRot;
+    float[] rockAt, rockDeg;
+    Transform[] riderT;
+    Vector3[] riderPos;
+    Quaternion[] riderRot;
+    int[] riderOf;
+
+    public void Rock(int e, Vector3 dir)
+    {
+        GameObject[] objs = game.builder.objects;
+        if (objs == null || e < 0 || e >= objs.Length || objs[e] == null) return;
+        if (rockT == null)
+        {
+            rockT = new Transform[ROCK_MAX]; rockPos = new Vector3[ROCK_MAX]; rockAxis = new Vector3[ROCK_MAX]; rockRot = new Quaternion[ROCK_MAX];
+            rockAt = new float[ROCK_MAX]; rockDeg = new float[ROCK_MAX];
+            riderT = new Transform[ROCK_MAX * ROCK_RIDERS]; riderPos = new Vector3[ROCK_MAX * ROCK_RIDERS]; riderRot = new Quaternion[ROCK_MAX * ROCK_RIDERS];
+        }
+        Transform t = objs[e].transform;
+        int slot = -1;
+        for (int i = 0; i < ROCK_MAX; i++) if (rockT[i] == t) { slot = i; break; }
+        if (slot >= 0) { rockAt[slot] = Time.time; return; }   // already rocking: once more from where it began
+        for (int i = 0; i < ROCK_MAX && slot < 0; i++) if (rockT[i] == null) slot = i;
+        if (slot < 0) return;
+        Vector3 h = new Vector3(dir.x, 0f, dir.z);
+        if (h.sqrMagnitude < 1e-4f) h = Vector3.forward;
+        rockT[slot] = t; rockPos[slot] = t.position; rockRot[slot] = t.rotation;
+        rockAxis[slot] = Vector3.Cross(Vector3.up, h.normalized);
+        rockAt[slot] = Time.time;
+        int fl = game.gen.defFlags[game.gen.emitDef[e]];
+        rockDeg[slot] = (fl & GenData.FL_SCENERY) != 0 ? 2.5f : 4f;
+        // what stands on it rocks with it
+        int[] par = game.gen.emitParent;
+        int n = 0, b = slot * ROCK_RIDERS;
+        for (int r = 0; r < ROCK_RIDERS; r++) riderT[b + r] = null;
+        int count = Mathf.Min(objs.Length, par.Length);
+        for (int r = 0; r < count && n < ROCK_RIDERS; r++)
+        {
+            if (par[r] != e || objs[r] == null) continue;
+            PHKnock k = game.KnockOf(r);
+            if (k != null) continue;   // knocked off already: it lies where it fell
+            Transform rt = objs[r].transform;
+            riderT[b + n] = rt; riderPos[b + n] = rt.position; riderRot[b + n] = rt.rotation; n++;
+        }
+        // (no sound of its own: the blow already sounds, PHWeapons.OnSwung)
+    }
+
+    void UpdateRocks()
+    {
+        if (rockT == null) return;
+        for (int i = 0; i < ROCK_MAX; i++)
+        {
+            Transform t = rockT[i];
+            if (t == null) continue;
+            float a = Time.time - rockAt[i];
+            bool done = a >= ROCK_TIME || game.builder.objects == null;
+            float deg = done ? 0f : rockDeg[i] * Mathf.Exp(-5f * a) * Mathf.Sin(a * 22f + 0.6f) / 0.565f;
+            Quaternion q = Quaternion.AngleAxis(deg, rockAxis[i]);
+            Vector3 pivot = rockPos[i];
+            t.SetPositionAndRotation(pivot, q * rockRot[i]);
+            int b = i * ROCK_RIDERS;
+            for (int r = 0; r < ROCK_RIDERS; r++)
+            {
+                Transform rt = riderT[b + r];
+                if (rt == null) continue;
+                rt.SetPositionAndRotation(pivot + q * (riderPos[b + r] - pivot), q * riderRot[b + r]);
+                if (done) riderT[b + r] = null;
+            }
+            if (done) rockT[i] = null;
+        }
     }
 
     // test aid (editor, MCP): knock prop testKnockEmit as if a dart hit it from the south

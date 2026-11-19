@@ -3,8 +3,8 @@
 // camera and the hider's own prop is cut away: a hole along the line from the camera to the prop, a little wider near
 // the camera, made of bubbles fixed in the world (Cor: "a bit more of a bubbly/fractal hole instead of just a porthole",
 // then bubbles that swell in place rather than a cutout dragged around) and a thin rim in the ground outline's teal.
-// A prop in the way (PropLitFade, _Fade) is not cut but drawn see-through, a screen-door
-// dither over the same shape (Cor: "fade nearby props instead of cutting them").
+// A prop in the way (PropLitFade, _Fade) is not cut but drawn see-through, a checkerboard
+// screen door over the same shape (Cor: "fade nearby props instead of cutting them").
 // PHView sets the globals every frame while hiding (radius 0 otherwise). Not cut: the hider's own prop (callers skip
 // _PipOnly materials), anything at or behind the prop, and anything at or below the floor it stands on (the ground
 // around it stays whole). In every other view the cost is one uniform branch.
@@ -106,7 +106,7 @@ float3 PipCutLayerPoint(float3 wp, float3 n)
 }
 
 // what lies in the hole: architecture (fade 0) is clipped and returns 1 in the rim band (draw it in PipCutRim());
-// a prop (fade 1) keeps three pixels in eight there, in a fixed 4x4 pattern, growing to all of them across the rim.
+// a prop (fade 1) keeps every other pixel there (a checkerboard), all of them in the outer half of the rim.
 // n: the surface's world normal (PipCutLayerPoint, architecture only); (0, 0, 0) where there is none.
 // (Call it inside an if, never ?: or &&: its clip() must not run for what skips it.)
 half PipCutN(float3 wp, float3 n, float2 px, float fade)
@@ -127,10 +127,11 @@ half PipCutN(float3 wp, float3 n, float2 px, float fade)
     if (s >= 0.0) return 0;
     if (fade > 0.5)
     {
-        static const float bayer[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
-        uint2 p = uint2(px) & 3;
-        float keep = lerp(0.375, 1.0, saturate(1.0 + s / PIPCUT_RIM));
-        clip(keep - (bayer[p.y * 4 + p.x] + 0.5) / 16.0);
+        // half the pixels in a one-pixel checkerboard: the viewer's picture is shown scaled up and filtered, so it
+        // reads as an even half see-through. (A 4x4 ordered dither keeping 3 in 8 showed as yellow and black hatching,
+        // Cor: really jarring.) The outer half of the rim band stays whole, so the edge is soft, not a hard line.
+        uint2 p = uint2(px) & 1;
+        if (s < -0.5 * PIPCUT_RIM && p.x == p.y) clip(-1.0);
         return 0;
     }
     clip(s < -PIPCUT_RIM ? -1.0 : 1.0);
