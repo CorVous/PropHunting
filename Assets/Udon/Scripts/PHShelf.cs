@@ -33,6 +33,7 @@ public class PHShelf : UdonSharpBehaviour
 
     public Transform cart;
     public float cartMin = -2.5f, cartMax = 2.5f, cartZ = 1.2f;
+    public float panelY = 1.05f;     // the plate's height in the panel's own space
     public TextMeshPro cartCoins;
 
     public int shown = 8;            // shelves showing (one more row root goes round out of sight)
@@ -167,9 +168,19 @@ public class PHShelf : UdonSharpBehaviour
         Vector3 lp = transform.InverseTransformPoint(local.GetPosition());
         if (lp.z < 0f || lp.z > 9f || lp.y < -1f || lp.y > 4f) return;   // not in front of this wall
         Vector3 cp = cart.localPosition;
-        float want = Mathf.Clamp(lp.x, cartMin, cartMax);
-        cp.x = Mathf.Lerp(cp.x, want, 1f - Mathf.Exp(-10f * Time.deltaTime));
+        float follow = 1f - Mathf.Exp(-10f * Time.deltaTime);
+        // when the player steps up to the shelves, past the panel, it slides 1 m to their side (Cor), towards the
+        // half's longer end, and comes back in front of them when they step back
+        bool close = lp.z < cartZ + 0.45f;
+        float side = lp.x + 1f <= cartMax ? 1f : -1f;
+        float want = Mathf.Clamp(close ? lp.x + side : lp.x, cartMin, cartMax);
+        cp.x = Mathf.Lerp(cp.x, want, follow);
         cp.z = cartZ;
+        // its height follows the player's size (Cor): the plate (panelY up in the panel) at 60% of their eye height
+        float eye = local.GetAvatarEyeHeightAsMeters();
+        if (eye < 0.3f || eye > 5f) eye = 1.6f;
+        float plate = eye * 0.6f;
+        cp.y = Mathf.Lerp(cp.y, plate - panelY, 1f - Mathf.Exp(-6f * Time.deltaTime));
         cart.localPosition = cp;
     }
 
