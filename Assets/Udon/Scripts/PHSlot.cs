@@ -152,11 +152,32 @@ public class PHSlot : UdonSharpBehaviour
 
     // a dart from a hunter (sent to the owner). Returns nothing: the owner's synced figures say what happened.
     // (only during the hunt: a dart still on its way when the round ended does not catch anyone in the reveal)
+    // Every hider has 100 health (Cor); the size of the disguise scales what a dart takes: small x2, medium x1, large
+    // x2/3, largest x1/2, so 2, 4, 6 and 8 darts catch them (25 a dart; the endgame's doubled darts halve those).
+    // Whole numbers, rounded up: 17 a dart for a large prop (6 x 17 = 102, 5 x 17 = 85) and 13 for the largest
+    // (8 x 13 = 104, 7 x 13 = 91), so the counts are exact. Worked out from the disguise the hider has when the dart
+    // arrives, on the hider's own client (TakeHit), so changing disguise while it flies gains nothing.
+    public const int HIDER_HEALTH = 100;
+    // the disguise's size class: 0 small, 1 medium, 2 large, 3 largest (the shields over the health bar, PHView)
+    public int SizeClass()
+    {
+        if (def < 0 || game == null || game.gen == null || def >= game.gen.defDisguise.Length) return 1;
+        return Mathf.Clamp(game.gen.defDisguise[def] - 1, 0, 3);
+    }
+
+    public int HitDamage(int damage)
+    {
+        if (def < 0 || game == null || game.gen == null || def >= game.gen.defDisguise.Length) return damage;
+        int cls = SizeClass();
+        int num = cls == 0 ? 2 : (cls == 2 ? 2 : 1), den = cls == 2 ? 3 : (cls == 3 ? 2 : 1);
+        return (damage * num + den - 1) / den;
+    }
+
     [NetworkCallable]
     public void TakeHit(int damage, int shooterPlayerId)
     {
         if (!IsMine || caught || def < 0 || game.phase != PHGame.PH_HUNT) return;
-        health -= damage;
+        health -= HitDamage(damage);
         if (health <= 0)
         {
             health = 0;
@@ -247,7 +268,8 @@ public class PHSlot : UdonSharpBehaviour
             float y = me.GetRotation().eulerAngles.y;
             if ((p - walkPos).sqrMagnitude > 0.0025f || Mathf.Abs(Mathf.DeltaAngle(y, walkYaw)) > 5f) { walkPos = p; walkYaw = y; Send(); }
         }
-        if ((hiding || ghost) && !seated && Time.time >= nextSit)
+        // (not during the END reveal: everyone walks free then, Cor)
+        if ((hiding || ghost) && !seated && Time.time >= nextSit && game.phase != PHGame.PH_END)
         {
             nextSit = Time.time + 3f;
             station.UseStation(me);
@@ -286,6 +308,40 @@ public class PHSlot : UdonSharpBehaviour
     }
 
     // ------------------------------------------------------------------ the prop
+    // A second copy of the prop inside the first, in the reveal's striped overlay material (PHGame.revealMat, drawn over
+    // everything): it moves and squashes with the prop, blocks nothing, and has no shade patch
+    GameObject revealCopy;
+    void MakeRevealCopy()
+    {
+        if (proxyDef < 0 || proxyDef >= game.builder.propPrefabs.Length || game.builder.propPrefabs[proxyDef] == null) return;
+        revealCopy = Instantiate(game.builder.propPrefabs[proxyDef]);
+        revealCopy.name = "Reveal" + index;
+        revealCopy.transform.SetParent(proxy.transform, false);
+        revealCopy.transform.localPosition = Vector3.zero; revealCopy.transform.localRotation = Quaternion.identity; revealCopy.transform.localScale = Vector3.one;
+        Collider[] cols = revealCopy.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++) cols[i].enabled = false;
+        Renderer[] rs = revealCopy.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < rs.Length; i++)
+        {
+            int n = rs[i].sharedMaterials.Length;
+            Material[] ms = new Material[n];
+            for (int j = 0; j < n; j++) ms[j] = game.revealMat;
+            rs[i].sharedMaterials = ms;
+        }
+        Transform t = revealCopy.transform;
+        if (t.childCount > 0 && t.GetChild(t.childCount - 1).name == "Shade") t.GetChild(t.childCount - 1).gameObject.SetActive(false);
+        // (on the default layer: the owner's own prop is on HIDER_SELF, which their own camera leaves out)
+        Transform[] parts = revealCopy.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < parts.Length; i++) parts[i].gameObject.layer = 0;
+    }
+
+    // the END reveal: out of the seat, walking as themselves; their prop stays where it is (PHLocal freezes the body)
+    public void LeaveSeatForReveal()
+    {
+        if (seated) station.ExitStation(Networking.LocalPlayer);
+        seated = false;
+    }
+
     void UpdateProxy(bool mine)
     {
         // (only a hider of this round: a slot handed to a newcomer still carries the last player's prop until the
@@ -294,6 +350,7 @@ public class PHSlot : UdonSharpBehaviour
         if (want != proxyDef)
         {
             proxyDef = want;
+            if (revealCopy != null) { Destroy(revealCopy); revealCopy = null; }
             if (proxy != null) { game.builder.Uncage(proxy); Destroy(proxy); }   // the cage is lent, not the prop's
             proxy = null;
             if (want >= 0 && game.builder.propPrefabs != null && want < game.builder.propPrefabs.Length && game.builder.propPrefabs[want] != null)
@@ -343,6 +400,10 @@ public class PHSlot : UdonSharpBehaviour
             }
         }
         if (proxy == null) return;
+        // the END reveal (Cor): every hider's prop highlighted through walls, for everyone (a late joiner too)
+        bool reveal = game.phase == PHGame.PH_END && game.revealMat != null;
+        if (reveal && revealCopy == null) MakeRevealCopy();
+        else if (!reveal && revealCopy != null) { Destroy(revealCopy); revealCopy = null; }
         float k = mine ? 1f : 1f - Mathf.Exp(-14f * Time.deltaTime);
         if ((propPos - shownPos).sqrMagnitude > 25f) k = 1f;
         shownPos = Vector3.Lerp(shownPos, propPos, k);

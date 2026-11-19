@@ -90,7 +90,7 @@ public class PHGame : UdonSharpBehaviour
     readonly float[] hidePhase = { 35f, 40f, 45f, 50f };
     readonly float[] huntPhase = { 180f, 210f, 240f, 270f };
     readonly float[] roundLengthFactor = { 0.75f, 1f, 1.5f };
-    public const float BRIEF = 8f, ROUND_END = 12f, ENDGAME_AT = 45f, LOADING_TIMEOUT = 120f;
+    public const float BRIEF = 8f, ROUND_END = 30f, ENDGAME_AT = 45f, LOADING_TIMEOUT = 120f;
 
     int builtRound = -1, genRound = -1;
     [System.NonSerialized] public bool building;   // a map is being generated or built
@@ -538,9 +538,22 @@ public class PHGame : UdonSharpBehaviour
         if (p == PH_HUNT) huntStartMs = Now;
         RequestSerialization();
         OnPhaseChanged();
+        FailNotice();
     }
 
-    public override void OnDeserialization() { OnPhaseChanged(); ThemeLabel(); }
+    public override void OnDeserialization() { OnPhaseChanged(); ThemeLabel(); FailNotice(); }
+
+    // "the map failed to build" over the options board (Cor): in the lobby after the round whose map failed, until the next
+    // round starts (round goes up then)
+    [UdonSynced] public int failedRound = -1;
+    public GameObject failNotice;
+    public Material revealMat;   // the END reveal's highlight of the hiders' props (PHSlot.MakeRevealCopy; WorldSceneBuilder)
+    void FailNotice()
+    {
+        if (failNotice == null) return;
+        bool on = phase == PH_LOBBY && failedRound == round && round > 0;
+        if (failNotice.activeSelf != on) failNotice.SetActive(on);
+    }
 
     int seenPhase = -1, seenRound = -1;
 
@@ -700,6 +713,7 @@ public class PHGame : UdonSharpBehaviour
                         if (IsHost && phase == PH_LOADING && genRound == round)
                         {
                             if (lastRot >= 0) { NewMap(lastRot); lastRot = -1; }
+                            failedRound = round;   // (the lobby says so, over the options board, for everyone)
                             BackToLobby();
                         }
                     }
@@ -743,17 +757,18 @@ public class PHGame : UdonSharpBehaviour
                 if (Left <= 0f) SetPhase(PH_HUNT, HuntLength);
                 break;
             case PH_HUNT:
-                int hiders = 0, hunters = 0, hidersIn = 0;
+                int hiders = 0, hunters = 0, hidersIn = 0, huntersIn = 0;
                 for (int i = 0; i < slots.Length; i++)
                 {
                     if (slotPlayer[i] == 0) continue;
                     if (slotRole[i] == ROLE_HIDER) hidersIn++;
                     if (slotRole[i] == ROLE_HIDER && !slots[i].caught) hiders++;
+                    if (slotRole[i] == ROLE_HUNTER) huntersIn++;
                     if (slotRole[i] == ROLE_HUNTER && !slots[i].hunterOut) hunters++;
                 }
                 if (debugRound) { if (Left <= 0f) End(hiders > 0, "Debug round: time's up", true); }
                 else if (hiders == 0) End(false, hidersIn == 0 ? "Every hider left" : "Every hider was caught", false);
-                else if (hunters == 0) End(true, "Every hunter is out", false);
+                else if (hunters == 0) End(true, huntersIn == 0 ? "Every hunter left" : "Every hunter is out", false);   // (Cor: hiders win when the hunters leave)
                 else if (Left <= 0f) End(true, "Time's up: a hider was still uncaught", true);
                 break;
             case PH_END:

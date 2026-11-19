@@ -121,6 +121,21 @@ public static class LobbyBuilder
     const float PW = 1200f, PH = 560f;   // the board is the top 440; the host bar and the map bar are under it
     static Vector2 P(float x, float y) { return new Vector2(x - PW / 2, PH / 2 - y); }
 
+    // Over the options board (Cor): "the map failed to build", big and bold, for everyone, while the lobby follows a
+    // round whose map failed (PHGame.failedRound); off again when the next round starts
+    public static void BuildFailNotice(Transform lobby, PHGame game, Vector3 localPos)
+    {
+        var cv = Canvas(lobby, "FailNotice", localPos, Quaternion.identity, new Vector2(1440, 130), 0.005f, false);
+        var plate = new GameObject("Plate");
+        plate.transform.SetParent(cv, false);
+        var img = plate.AddComponent<Image>(); img.color = C("1e190f", 0.92f); img.raycastTarget = false;
+        var prt = plate.GetComponent<RectTransform>(); prt.anchorMin = Vector2.zero; prt.anchorMax = Vector2.one; prt.offsetMin = Vector2.zero; prt.offsetMax = Vector2.zero;
+        var t = Txt(cv, "Text", Vector2.zero, new Vector2(1400, 120), "MAP FAILED TO BUILD - BACK TO THE LOBBY", rocket != null ? rocket : future, 58, C("ffd34d"), TextAlignmentOptions.Center);
+        t.fontStyle = FontStyles.Bold;
+        game.failNotice = cv.gameObject;
+        cv.gameObject.SetActive(false);
+    }
+
     public static PHPanel BuildPanel(Transform lobby, PHGame game, Vector3 localPos)
     {
         var cv = Canvas(lobby, "HostPanel", localPos, Quaternion.identity, new Vector2(PW, PH), 0.006f, true);

@@ -81,7 +81,10 @@ public static class TestWorldBuilder
         setBuilder.MakeGenericMethod(typeof(ISDKWorldBuilder)).Invoke(null, null);
         var clear = typeof(VRC_SdkBuilder).GetMethod("ClearCallbacks", flags);
         if (clear != null) clear.Invoke(null, null);
-        if (!VRC_SdkBuilder.RunExportSceneResource()) throw new Exception("RunExportSceneResource returned false");
+        // (the pilot world on purpose: PrePublishCheck lets it through)
+        PrePublishCheck.Exporting = true;
+        try { if (!VRC_SdkBuilder.RunExportSceneResource()) throw new Exception("RunExportSceneResource returned false"); }
+        finally { PrePublishCheck.Exporting = false; }
         string path = UnityEngine.Networking.UnityWebRequest.UnEscapeURL(EditorPrefs.GetString("lastVRCPath"));
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) throw new Exception("No .vrcw produced (lastVRCPath='" + path + "')");
         return path;

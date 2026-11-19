@@ -35,7 +35,6 @@ public class PHLocal : UdonSharpBehaviour
     public const int DART_DAMAGE = 25, HIT_REWARD = 5, HUNTER_HEALTH = 100, HUNT_CHANGES = 3;
     public const float HUNT_CHANGE_COOLDOWN = 5f;
     public const int LAYER_PROPS_SOLID = 11, LAYER_PROPS_WALKTHROUGH = 17;
-    readonly int[] hiderHealth = { 50, 100, 150, 200 };
 
     int role, slotIndex = -1;
     float nextDart, lastChange = -99f, lastTaunt = -99f;
@@ -137,7 +136,12 @@ public class PHLocal : UdonSharpBehaviour
                 string result = role == PHGame.ROLE_NONE ? "" : ((role == PHGame.ROLE_HIDER) == game.hidersWin ? "you_win" : "game_over");
                 if (game.timeUp) PlayThen("time_over", 0.8f, result, 0.8f);
                 else if (result != "") sound.Play(result, 0.8f);
-                SetFrozen(true);
+                // the reveal (Cor): every hider's prop stays where it is, highlighted through walls (PHSlot), and
+                // everyone is out of the seats, walking as themselves, until the lobby (PHGame.ROUND_END, 30 s)
+                if (body.active) body.frozen = true;
+                if (s != null) s.LeaveSeatForReveal();
+                RestoreEye();
+                SetFrozen(false);
                 Say((game.hidersWin ? "Hiders win. " : "Hunters win. ") + game.endReason, 10f);
                 break;
         }
@@ -410,10 +414,9 @@ public class PHLocal : UdonSharpBehaviour
             Vector3 was = body.pos; float wasYaw = body.yaw;
             if (!body.FitHere()) { body.SetProp(old); body.pos = was; body.yaw = wasYaw; Say("No room for that here.", 2f); return false; }
         }
-        int cls = Mathf.Clamp(game.gen.defDisguise[d] - 1, 0, 3);
-        int oldMax = s.maxHealth;
-        s.maxHealth = hiderHealth[cls];
-        s.health = oldMax > 0 ? Mathf.Max(1, Mathf.RoundToInt((float)s.health / oldMax * s.maxHealth)) : s.maxHealth;
+        // Every hider has 100 health whatever they are (Cor); size changes how much a dart takes (PHSlot.HitDamage), so
+        // a new disguise keeps the health it had
+        if (s.maxHealth <= 0) { s.maxHealth = PHSlot.HIDER_HEALTH; s.health = PHSlot.HIDER_HEALTH; }
         s.def = d; s.lastDef = d;
         body.SetProp(d);
         s.propPos = body.pos;
@@ -725,13 +728,15 @@ public class PHLocal : UdonSharpBehaviour
             if (target.caught) return;
             // the target's health as synced, less this hunter's own darts it may not have heard of yet (a second dart
             // within the sync delay counted a second catch)
-            int was = target.health;
+            // (the dart's base damage is sent; the hider's own client scales it by their size, PHSlot.TakeHit, and the
+            // same scaling here predicts the catch)
+            int was = target.health, takes = target.HitDamage(damage);
             if (h == lastShotSlot && Time.time - lastShotAt < 2f && lastShotHealth < was) was = lastShotHealth;
-            lastShotSlot = h; lastShotAt = Time.time; lastShotHealth = was - damage;
+            lastShotSlot = h; lastShotAt = Time.time; lastShotHealth = was - takes;
             target.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PHSlot.TakeHit), damage, Networking.LocalPlayer.playerId);
             s.hits++;
             s.hunterHealth = Mathf.Min(HUNTER_HEALTH, s.hunterHealth + HIT_REWARD);
-            if (was > 0 && was - damage <= 0) s.catches++;
+            if (was > 0 && was - takes <= 0) s.catches++;
             s.Send();
             sound.Play("confirmation_002", 0.8f);
             sound.PlayAt("impactPunch_medium_000", hit.point, 14f, 0.8f, 1f);

@@ -223,7 +223,9 @@ public partial class MapGenUdon
         }
         if (btPhase == 2)
         {
-        // doors: keep-clear cells on both sides (two deep, one wider than the doorway), and the room door lists
+        // doors: keep-clear cells on both sides (two deep, one wider than the doorway; three deep straight through the
+        // doorway itself: a bed or a locker at two cells stood 0.9 m past the wall's face over most of the door, and a
+        // prop walking through had to step aside, bugfix 4), and the room door lists
         int btE = btCursor + 100 < W * H ? btCursor + 100 : W * H;
         for (int c = btCursor; c < btE; c++)
         {
@@ -236,7 +238,8 @@ public partial class MapGenUdon
                 for (int a = off - 1; a <= off + GenData.DOOR_CELLS; a++)
                 {
                     if (a < 0 || a > 7) continue;
-                    for (int depth = 0; depth < 2; depth++)
+                    int deep = a >= off && a < off + GenData.DOOR_CELLS ? 3 : 2;
+                    for (int depth = 0; depth < deep; depth++)
                     {
                         int lx, lz;
                         if (d == 0) { lx = a; lz = 7 - depth; }

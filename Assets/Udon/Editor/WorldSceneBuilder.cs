@@ -226,6 +226,7 @@ public static class WorldSceneBuilder
             slots[i] = slot;
         }
         game.slots = slots;
+        game.revealMat = Mat2("Reveal", Shader.Find("PropHunt/Reveal"));   // the END reveal's striped highlight (PHSlot)
 
         var knocksRoot = new GameObject("Knocks");
         knocksRoot.transform.SetParent(gameGo.transform, false);
@@ -245,6 +246,7 @@ public static class WorldSceneBuilder
         // design (LobbyBuilder). Everyone can read it; only the host's presses count (PHPanel and PHGame check).
         // A world-space UI canvas (VRC Ui Shape): point and click on desktop, point and pull the trigger in VR.
         LobbyBuilder.BuildPanel(lobby.transform, game, new Vector3(0f, 0.9f + 1.68f, RoomD / 2 - 0.12f));   // 7.2 x 3.36 m, bottom 0.9 m up
+        LobbyBuilder.BuildFailNotice(lobby.transform, game, new Vector3(0f, 0.9f + 3.36f + 0.5f, RoomD / 2 - 0.12f));   // just over the panel
         LobbyBuilder.BuildExplore(lobby.transform, game, new Vector3(5.9f, 1.7f, RoomD / 2 - 0.12f));   // right of the panel (Cor: the credits take the left); the DEBUG plaque: explore a map, spawn as hunter / hider, end round
         // the last round's results, a score pad on the west wall
         LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
@@ -333,6 +335,7 @@ public static class WorldSceneBuilder
         // (PHView fits the canvas to the screen: 900 units high, as wide as the screen)
         HealthBar(desk.transform, sprite, new Vector2(0f, -410f), new Vector2(280f, 18f), out bar, out fill);
         view.desktopHealthBar = bar; view.desktopHealth = fill;
+        view.desktopShields = Shields(bar, new Vector2(280f, 18f));
         var pip = new GameObject("Pip");
         pip.transform.SetParent(desk.transform, false);
         pip.layer = 5;
@@ -412,6 +415,7 @@ public static class WorldSceneBuilder
         vhr.localScale = Vector3.one * 0.001f;   // canvas units are millimetres: a bar 34 cm by 1.6 cm
         HealthBar(vrHealth.transform, sprite, Vector2.zero, new Vector2(340f, 16f), out bar, out fill);
         view.vrHealthBar = bar; view.vrHealth = fill;
+        view.vrShields = Shields(bar, new Vector2(340f, 16f));
         var button = Empty(viewGo.transform, "TauntButton");
         Part(button, PrimitiveType.Cylinder, "Base", new Vector3(0f, 0f, -0.006f), new Vector3(90f, 0f, 0f), new Vector3(0.082f, 0.006f, 0.082f), dark);
         var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
@@ -555,6 +559,29 @@ public static class WorldSceneBuilder
         f.layer = 5;
         fill = f.AddComponent<Image>(); fill.sprite = null; fill.color = new Color(0.35f, 0.85f, 0.4f, 0.9f); fill.raycastTarget = false; fill.material = hudMat;
         var frt = f.GetComponent<RectTransform>(); frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one; frt.offsetMin = Vector2.zero; frt.offsetMax = Vector2.zero;
+    }
+
+    // The disguise's toughness over the bar (Cor): 0 to 3 shields, one shape in one colour with a dark outline, read
+    // by their count and not by colour. Children of the bar, so they show with it; PHView switches them on.
+    static GameObject[] Shields(GameObject bar, Vector2 barSize)
+    {
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Udon/Textures/Shield.png");
+        var list = new GameObject[3];
+        float h = barSize.y * 1.6f, w = h * 48f / 56f, gap = h * 0.25f;
+        for (int i = 0; i < 3; i++)
+        {
+            var g = new GameObject("Shield" + i);
+            g.transform.SetParent(bar.transform, false);
+            g.layer = 5;
+            var img = g.AddComponent<RawImage>(); img.texture = tex; img.raycastTarget = false; img.material = hudMat;
+            var rt = g.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f); rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0f, 0f);
+            rt.sizeDelta = new Vector2(w, h);
+            rt.anchoredPosition = new Vector2(i * (w + gap), barSize.y * 0.3f);
+            g.SetActive(false);
+            list[i] = g;
+        }
+        return list;
     }
 
     static Material Mat2(string name, Shader shader)

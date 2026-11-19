@@ -114,3 +114,5 @@ Station Kit (`wall`, `wall-window`, `wall-door`: space base) and Kenney Fantasy 
 
 The on-screen control legend (`Assets/Udon/Textures/Legend*.png`) is drawn for this project by `Tools/make_legend.py`;
 its key letters are set in DejaVu Sans Bold (DejaVu fonts licence, https://dejavu-fonts.github.io/License.html).
+The shields over the hider's health bar (`Assets/Udon/Textures/Shield.png`) are drawn for this project by
+`Tools/make_shield.py`.

@@ -33,6 +33,9 @@ public class PHView : UdonSharpBehaviour
     public GameObject desktopPip;
     public Image vrHealth;             // VR: on the screen device's casing, above the screen
     public GameObject vrHealthBar;
+    // over each bar, 0 to 3 shields: how tough the disguise is (small 0, medium 1, large 2, largest 3: PHSlot.HitDamage)
+    public GameObject[] desktopShields, vrShields;
+    int shieldsShown = -1;
     public Camera pipCam;
     public Transform vrPanel;          // the grabbable third-person panel (VRCPickup)
     public VRCPickup vrPanelPickup;
@@ -206,12 +209,26 @@ public class PHView : UdonSharpBehaviour
         profMs += profWatch.Elapsed.TotalMilliseconds - p0;
     }
 
+    // (a scene built before the shields has an empty array here, not null)
+    void ShowShields(GameObject[] list, int n)
+    {
+        if (list == null) return;
+        for (int i = 0; i < list.Length; i++) if (list[i] != null) list[i].SetActive(i < n);
+    }
+
     void UpdateBody()
     {
         PHSlot s = Me();
         bool hider = s != null && game.RoleOf(s.index) == PHGame.ROLE_HIDER && s.hiding && !s.caught && s.def >= 0
             && (game.phase == PHGame.PH_BRIEF || game.phase == PHGame.PH_HIDE || game.phase == PHGame.PH_HUNT);
         float share = hider && s.maxHealth > 0 ? Mathf.Clamp01((float)s.health / s.maxHealth) : 0f;
+        int shields = hider ? s.SizeClass() : 0;
+        if (shields != shieldsShown)
+        {
+            shieldsShown = shields;
+            ShowShields(desktopShields, shields);
+            ShowShields(vrShields, shields);
+        }
         // (Perf: switched only when they change, here and for the pip camera below)
         if (vr)
         {
