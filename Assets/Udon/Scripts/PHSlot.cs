@@ -32,6 +32,7 @@ public class PHSlot : UdonSharpBehaviour
     [UdonSynced] public int lastDef = -1;             // the disguise worn last (for the reveal, after a catch)
     [UdonSynced] public Vector3 propPos;
     [UdonSynced] public float propYaw;
+    [UdonSynced] public bool airborne;                // the prop is off the ground (a hop, a fall): its stretch and squash (Squash)
     [UdonSynced] public bool hiding;                  // seated and hidden this round
     // a ghost: a caught hider, an eliminated hunter or a mid-round joiner. Seated (Mobile on their own client, so
     // they walk as their own avatar) and seen only by the other ghosts: every other client parks the station
@@ -206,6 +207,7 @@ public class PHSlot : UdonSharpBehaviour
             station.transform.SetPositionAndRotation(body.pos + body.lag, Quaternion.Euler(0f, body.stationYaw, 0f));
             if ((body.pos - propPos).sqrMagnitude > 0.0004f) { propPos = body.pos; Send(); }
             if (Mathf.Abs(Mathf.DeltaAngle(body.yaw, propYaw)) > 1f) { propYaw = body.yaw; Send(); }
+            if (body.grounded == airborne) { airborne = !body.grounded; Send(); }
         }
         // otherwise the station follows the player, so sitting down leaves them where they are
         else station.transform.SetPositionAndRotation(me.GetPosition(), me.GetRotation());
@@ -269,6 +271,7 @@ public class PHSlot : UdonSharpBehaviour
                 proxyScale = proxy.transform.localScale;
                 squashX = 1f; squashZ = 1f; squashVX = 0f; squashVZ = 0f; wantX = 1f; wantZ = 1f; squashNext = 0f;
                 squashY = 1f; squashVY = 0f; wantY = 1f;
+                hopS = 1f; hopV = 0f; wasAirborne = airborne; lastY = propPos.y; hopVY = 0f; hopFall = 0f; hopDipped = true;
                 proxyHalf = new Vector3(game.gen.defSx[want], game.gen.defSy[want], game.gen.defSz[want]) / 2000f;
                 // its shade patch (the prefab's last child), shown only while it stands on a floor (ShadeCheck)
                 proxyShade = null; shadeNext = 0f;
@@ -326,6 +329,67 @@ public class PHSlot : UdonSharpBehaviour
     float squashX = 1f, squashZ = 1f, squashVX, squashVZ, wantX = 1f, wantZ = 1f, squashNext;
     float squashY = 1f, squashVY, wantY = 1f;
 
+    // A hop's stretch and squash (Cor: "a bouncy stretch and squash for jumping"), the cartoon way: a quick dip as it
+    // leaves the ground (the hop itself is not held back, the dip is only seen), tall and thin while it rises fast, near its own shape at
+    // the top, a little tall while it falls, then flat and wide where it lands, springing back with a bounce or two.
+    // Its volume is kept (across = 1 / sqrt(up)); about its base, so it never sinks into the floor or leaves it. Only
+    // what is seen: the body is moved as its own shape all the while. Everyone sees it alike: it follows the synced
+    // airborne flag and the prop's shown height, nothing else. At rest it is exactly its own scale.
+    const float HOP_STRETCH = 0.13f;     // most it stretches up, rising fast (a little more with the spring's overshoot)
+    const float HOP_RISE = 0.035f;       // stretch for each m/s it rises (a full hop leaves at 4-5 m/s)
+    const float HOP_FALL = 0.02f;        // and for each m/s it falls
+    const float HOP_DIP = 0.08f;         // squashed this much the moment it is seen rising off the ground
+    const float HOP_LAND = 0.2f;         // squashed this much where it lands from a full hop (to 0.8)
+    const float HOP_LAND_FULL = 4.5f;    // the fall speed (m/s) of a full landing; slower ones squash less (squared)
+    const float HOP_K = 1000f, HOP_DAMP = 26f;   // the spring: overshoots once a little, settled in about 0.3 s
+    float hopS = 1f, hopV, hopVY, hopFall, lastY;
+    bool wasAirborne, hopDipped;
+
+    // the hop's stretch (up) at this frame, on its spring; exactly 1 at rest
+    void Hop()
+    {
+        float dt = Mathf.Min(Time.deltaTime, 0.033f);
+        if (dt <= 0f) return;
+        // how fast the shown prop rises or falls (smoothed: a remote prop's height comes in steps); a jump of more
+        // than half a metre in a frame is a correction or a new place, not movement
+        float dy = shownPos.y - lastY;
+        lastY = shownPos.y;
+        if (Mathf.Abs(dy) > 0.5f) dy = 0f;
+        hopVY = Mathf.Lerp(hopVY, Mathf.Clamp(dy / dt, -12f, 12f), 1f - Mathf.Exp(-25f * dt));
+        // (in the air until the shown prop is down too: elsewhere it follows the synced place a little behind)
+        bool air = airborne || shownPos.y - propPos.y > 0.015f;
+        if (air)
+        {
+            hopFall = Mathf.Max(hopFall, -hopVY);
+            // the dip as it leaves the ground, once it is seen to rise (stepping off an edge has none); elsewhere
+            // as soon as the synced place is above the shown one, while the shown prop is still on the ground
+            if (!hopDipped && (hopVY > 1.5f || propPos.y - shownPos.y > 0.05f)) { hopDipped = true; hopS = 1f - HOP_DIP; hopV = 0f; return; }
+        }
+        if (air != wasAirborne)
+        {
+            wasAirborne = air;
+            if (air) { hopFall = 0f; hopDipped = false; }
+            else
+            {
+                // where it lands: flat at once, by how fast it came down (a step down barely shows)
+                float k = Mathf.Clamp01(hopFall / HOP_LAND_FULL);
+                if (k > 0.05f) { hopS = 1f - HOP_LAND * k * k; hopV = 0f; return; }
+            }
+        }
+        float want = 1f, cap = 1f + HOP_STRETCH + 0.05f;
+        if (air)
+        {
+            want = 1f + Mathf.Min(HOP_STRETCH, hopVY > 0f ? hopVY * HOP_RISE : -hopVY * HOP_FALL);
+            // no taller than the room over it: a hop under a ceiling does not stretch through it
+            float tall = 2f * proxyHalf.y;
+            if (tall > 0.01f) cap = Mathf.Min(cap, Mathf.Max(1f, (WallAt(shownPos + Vector3.up * 0.05f, Vector3.up, tall * cap + 0.1f) + 0.03f) / tall));
+            want = Mathf.Min(want, cap);
+        }
+        if (!air && Mathf.Abs(hopS - 1f) < 0.003f && Mathf.Abs(hopV) < 0.03f) { hopS = 1f; hopV = 0f; return; }
+        hopV += ((want - hopS) * HOP_K - hopV * HOP_DAMP) * dt;
+        hopS = Mathf.Clamp(hopS + hopV * dt, 0.7f, cap);
+    }
+
     // how far the architecture is from a place along dir, at most reach
     float WallAt(Vector3 from, Vector3 dir, float reach)
     {
@@ -361,8 +425,9 @@ public class PHSlot : UdonSharpBehaviour
     void Squash()
     {
         if (squashRig == null) return;
-        // it never squeezes (PHHiderBody.SQUEEZE_HALF, SQUEEZE_HALF_Y)
-        if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f && proxyHalf.y <= 1f) return;
+        Hop();
+        // it never squeezes (PHHiderBody.SQUEEZE_HALF, SQUEEZE_HALF_Y): the hop alone
+        if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f && proxyHalf.y <= 1f) { Scale(); return; }
         if (Time.time >= squashNext)
         {
             squashNext = Time.time + 0.08f;
@@ -394,7 +459,8 @@ public class PHSlot : UdonSharpBehaviour
         if (wantX == 1f && wantZ == 1f && wantY == 1f && Mathf.Abs(squashX - 1f) < 0.002f && Mathf.Abs(squashZ - 1f) < 0.002f && Mathf.Abs(squashY - 1f) < 0.002f
             && Mathf.Abs(squashVX) < 0.01f && Mathf.Abs(squashVZ) < 0.01f && Mathf.Abs(squashVY) < 0.01f)
         {
-            if (squashX != 1f || squashZ != 1f || squashY != 1f) { squashX = 1f; squashZ = 1f; squashY = 1f; squashVY = 0f; squashRig.localScale = Vector3.one; }
+            if (squashX != 1f || squashZ != 1f || squashY != 1f) { squashX = 1f; squashZ = 1f; squashY = 1f; squashVY = 0f; }
+            Scale();
             return;
         }
         // a spring, a little under-damped: it overshoots once and settles
@@ -403,7 +469,20 @@ public class PHSlot : UdonSharpBehaviour
         squashVZ += ((wantZ - squashZ) * 260f - squashVZ * 17f) * dt; squashZ += squashVZ * dt;
         squashVY += ((wantY - squashY) * 260f - squashVY * 17f) * dt; squashY += squashVY * dt;
         squashX = Mathf.Clamp(squashX, 0.25f, 1.6f); squashZ = Mathf.Clamp(squashZ, 0.25f, 1.6f); squashY = Mathf.Clamp(squashY, 0.5f, 1.2f);
-        squashRig.localScale = new Vector3(squashX, squashY, squashZ);
+        Scale();
+    }
+
+    // the doorway's squash and the hop's together, both about the base; exactly the prop's own scale at rest
+    void Scale()
+    {
+        Vector3 s = Vector3.one;
+        if (hopS != 1f)
+        {
+            float across = 1f / Mathf.Sqrt(hopS);
+            s = new Vector3(across, hopS, across);
+        }
+        s = new Vector3(s.x * squashX, s.y * squashY, s.z * squashZ);
+        if (squashRig.localScale != s) squashRig.localScale = s;
     }
 
 
