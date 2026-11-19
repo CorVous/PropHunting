@@ -269,7 +269,9 @@ public class PHSlot : UdonSharpBehaviour
                 shownPos = propPos; shownYaw = propYaw;
                 // the squash through a doorway starts from the prefab's own scale
                 proxyScale = proxy.transform.localScale;
-                squashX = 1f; squashZ = 1f; squashVX = 0f; squashVZ = 0f; wantX = 1f; wantZ = 1f; squashNext = 0f;
+                squashX = 1f; squashZ = 1f; squashVX = 0f; squashVZ = 0f; wantX = 1f; wantZ = 1f;
+                // the slots' looks spread over the 0.08 s between them, never all in one frame
+                squashNext = Time.time + (index % 32) * 0.0025f; gapMeasured = false;
                 squashY = 1f; squashVY = 0f; wantY = 1f;
                 hopS = 1f; hopV = 0f; wasAirborne = airborne; lastY = propPos.y; hopVY = 0f; hopFall = 0f; hopDipped = true;
                 proxyHalf = new Vector3(game.gen.defSx[want], game.gen.defSy[want], game.gen.defSz[want]) / 2000f;
@@ -328,6 +330,9 @@ public class PHSlot : UdonSharpBehaviour
     Vector3 proxyScale = Vector3.one, proxyHalf;
     float squashX = 1f, squashZ = 1f, squashVX, squashVZ, wantX = 1f, wantZ = 1f, squashNext;
     float squashY = 1f, squashVY, wantY = 1f;
+    bool gapMeasured;          // the last look's place and facing (Squash: not measured again until it moves)
+    Vector3 gapPos;
+    float gapYaw;
 
     // A hop's stretch and squash (Cor: "a bouncy stretch and squash for jumping"), the cartoon way: a quick dip as it
     // leaves the ground (the hop itself is not held back, the dip is only seen), tall and thin while it rises fast, near its own shape at
@@ -428,9 +433,15 @@ public class PHSlot : UdonSharpBehaviour
         Hop();
         // it never squeezes (PHHiderBody.SQUEEZE_HALF, SQUEEZE_HALF_Y): the hop alone
         if (proxyHalf.x <= 0.3f && proxyHalf.z <= 0.3f && proxyHalf.y <= 1f) { Scale(); return; }
+        // a prop that has not moved or turned since the last look has the same gap and the same lintel over it (the
+        // architecture does not move; doors are not in its collider): measured again only once it has (perf: a still
+        // big prop cast about 75 rays every 0.08 s on every client)
+        if (Time.time >= squashNext && gapMeasured && (shownPos - gapPos).sqrMagnitude < 1e-4f && Mathf.Abs(Mathf.DeltaAngle(shownYaw, gapYaw)) < 0.5f)
+            squashNext = Time.time + 0.08f;
         if (Time.time >= squashNext)
         {
             squashNext = Time.time + 0.08f;
+            gapMeasured = true; gapPos = shownPos; gapYaw = shownYaw;
             // the prop's half extents along the world's x and z, as it is turned
             float rad = shownYaw * Mathf.Deg2Rad, c = Mathf.Abs(Mathf.Cos(rad)), sn = Mathf.Abs(Mathf.Sin(rad));
             float ex = c * proxyHalf.x + sn * proxyHalf.z, ez = sn * proxyHalf.x + c * proxyHalf.z;
