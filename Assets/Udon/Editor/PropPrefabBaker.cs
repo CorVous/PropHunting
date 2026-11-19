@@ -79,6 +79,7 @@ public static class PropPrefabBaker
         var prefabs = new GameObject[GenData.nDefs];
         for (int d = 0; d < GenData.nDefs; d++)
             prefabs[d] = MakePrefab(d, mat);
+        var cages = BakeCages();
 
         var fence = new GameObject("fence");
         int fm = Array.IndexOf(GenModels.Name, "fence_planks");
@@ -113,7 +114,7 @@ public static class PropPrefabBaker
         BakeParts();
         BakeSkyExtras();
         AssetDatabase.SaveAssets();
-        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor, partMesh, partOpening, partBody, skyPrefabs, starDome, moonPrefab);
+        MapBuilderBaker.Assign(prefabs, fencePrefab, mat, bounds[fm], railPrefab, fixtures, decor, partMesh, partOpening, partBody, skyPrefabs, starDome, moonPrefab, cages);
         Debug.Log("[prophunt] baked " + mesh.Length + " meshes and " + prefabs.Length + " prop prefabs");
         Debug.Log("[prophunt] fitted colliders: " + fitProps + " props, " + fitBoxes + " boxes (" + fitSingle + " props of one box)");
     }
@@ -147,7 +148,7 @@ public static class PropPrefabBaker
                 var d = new GameObject("door" + k++);
                 d.transform.SetParent(go.transform, false);
                 // a door whose face lies in the plane of its cupboard's front (the wardrobe's did) stands 3 mm proud
-                d.transform.localPosition = pivot[pm] + ZFight.PartShift(mesh[model], mesh[pm], pivot[pm]);
+                d.transform.localPosition = DoorAt(model, pm);
                 d.layer = LAYER_PROP;
                 d.AddComponent<MeshFilter>().sharedMesh = mesh[pm];
                 d.AddComponent<MeshRenderer>().sharedMaterial = mat;
@@ -177,6 +178,250 @@ public static class PropPrefabBaker
         var prefab = PrefabUtility.SaveAsPrefabAsset(go, OUT + "/Props/" + def.ToString("000") + "_" + GenData.defId[def] + ".prefab");
         UnityEngine.Object.DestroyImmediate(go);
         return prefab;
+    }
+
+    // a door or lid part's place in its prefab: its hinge, 3 mm proud when its face lay in its cupboard's front
+    static Vector3 DoorAt(int model, int pm) { return pivot[pm] + ZFight.PartShift(mesh[model], mesh[pm], pivot[pm]); }
+
+    // ------------------------------------------------------------------ the cage (shader PropHunt/Cage)
+    // The hider's own prop in first person: its feature edges as lines (MapBuilderUdon.Cage lends one object to the
+    // local hider's prop). An edge is a feature where the mesh ends (an open edge, or the rim of a two-sided card) or
+    // where its faces meet at more than CAGE_ANGLE degrees (positions welded, so split normals and uv seams do not
+    // count). Runs of edges in one line become one edge. A busy model gets a steeper angle, 10 degrees at a time up to
+    // 80, until it has no more than CAGE_CAP lines; past that the longest and sharpest are kept. Lines shorter than
+    // CAGE_SHORT on the largest prop that uses the model are dropped (bevels and screws would be dots). In the
+    // prefab's space before its scale (the cage hangs under the prop's root), so one mesh serves a model at every
+    // scale: one per model (and its doors, for openables). Each edge is a quad of 4 vertices in two half-float
+    // streams (16 bytes a vertex): position = this end; TEXCOORD1 = the other end, and the side (-1, +1) in w. The
+    // shader widens it on screen. All in Cages.asset; the prefabs themselves are untouched.
+    public const int CAGE_CAP = 160;
+    const float CAGE_ANGLE = 40f, CAGE_SHORT = 0.015f;
+    public static int cageMade, cageLines, cageMaxLines, cageCapped, cageStepped, cageVerts;
+
+    static Mesh[] BakeCages()
+    {
+        var t0 = System.Diagnostics.Stopwatch.StartNew();
+        string path = OUT + "/Cages.asset";
+        AssetDatabase.DeleteAsset(path);
+        var byKey = new System.Collections.Generic.Dictionary<string, Mesh>();
+        // the largest scale each model is used at (the short lines are judged there)
+        var bigScale = new System.Collections.Generic.Dictionary<string, float>();
+        for (int d = 0; d < GenData.nDefs; d++)
+        {
+            string k = GenData.defModel[d] + "/" + ((GenData.defFlags[d] & GenData.FL_OPENABLE) != 0);
+            float s0;
+            bigScale[k] = Mathf.Max(bigScale.TryGetValue(k, out s0) ? s0 : 0f, GenData.defScale[d] / 1000f);
+        }
+        cageVerts = 0;
+        var result = new Mesh[GenData.nDefs];
+        cageMade = 0; cageLines = 0; cageMaxLines = 0; cageCapped = 0; cageStepped = 0;
+        Mesh first = null;
+        for (int d = 0; d < GenData.nDefs; d++)
+        {
+            int model = GenData.defModel[d];
+            if (model < 0 || model >= mesh.Length || mesh[model] == null) continue;
+            bool open = (GenData.defFlags[d] & GenData.FL_OPENABLE) != 0;
+            string key = model + "/" + open;
+            Mesh m;
+            if (!byKey.TryGetValue(key, out m))
+            {
+                m = MakeCage(model, bigScale[key], open);
+                byKey[key] = m;
+                if (m != null)
+                {
+                    m.name = "Cage_" + GenModels.Name[model] + (open ? "_doors" : "");
+                    if (first == null) { first = m; AssetDatabase.CreateAsset(m, path); }
+                    else AssetDatabase.AddObjectToAsset(m, first);
+                    var so = new SerializedObject(m);   // only drawn, never read: no CPU copy in the build
+                    so.FindProperty("m_IsReadable").boolValue = false;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
+            result[d] = m;
+        }
+        AssetDatabase.SaveAssets();
+        long bytes = File.Exists(path) ? new FileInfo(path).Length : 0;
+        Debug.Log("[prophunt] cages: " + cageMade + " meshes, " + cageLines + " lines, " + cageVerts + " vertices (most " + cageMaxLines + ", cap " + CAGE_CAP + "; " + cageStepped
+            + " took a steeper angle, " + cageCapped + " cut to the cap), " + (bytes / 1024) + " KB, " + t0.ElapsedMilliseconds + " ms");
+        return result;
+    }
+
+    struct CageEdge { public int a, b; public float sharp; }
+
+    static Mesh MakeCage(int model, float sc, bool open)
+    {
+        // the parts as they stand in the prefab (doors closed)
+        var parts = new System.Collections.Generic.List<Mesh> { mesh[model] };
+        var at = new System.Collections.Generic.List<Vector3> { Vector3.zero };
+        if (open)
+            for (int pm = 0; pm < mesh.Length; pm++)
+                if (parent[pm] == model && mesh[pm] != null) { parts.Add(mesh[pm]); at.Add(DoorAt(model, pm)); }
+        // weld by position (half a millimetre on the prop)
+        float weld = 0.0005f / sc;
+        var ids = new System.Collections.Generic.Dictionary<Vector3Int, int>();
+        var pts = new System.Collections.Generic.List<Vector3>();
+        var faces = new System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<Vector3>>();
+        for (int k = 0; k < parts.Count; k++)
+        {
+            Vector3[] v = parts[k].vertices;
+            int[] tri = parts[k].triangles;
+            var id = new int[v.Length];
+            for (int i = 0; i < v.Length; i++)
+            {
+                Vector3 p = v[i] + at[k];
+                var key = new Vector3Int(Mathf.RoundToInt(p.x / weld), Mathf.RoundToInt(p.y / weld), Mathf.RoundToInt(p.z / weld));
+                int n;
+                if (!ids.TryGetValue(key, out n)) { n = pts.Count; pts.Add(p); ids[key] = n; }
+                id[i] = n;
+            }
+            for (int i = 0; i + 2 < tri.Length; i += 3)
+            {
+                int a = id[tri[i]], b = id[tri[i + 1]], c = id[tri[i + 2]];
+                if (a == b || b == c || a == c) continue;
+                Vector3 nr = Vector3.Cross(pts[b] - pts[a], pts[c] - pts[a]);
+                if (nr.sqrMagnitude < 1e-14f) continue;
+                nr.Normalize();
+                AddFace(faces, a, b, nr); AddFace(faces, b, c, nr); AddFace(faces, c, a, nr);
+            }
+        }
+        // each edge's sharpness: the widest angle between its faces (an open edge, or a two-sided card's rim: 90)
+        var all = new System.Collections.Generic.List<CageEdge>();
+        foreach (var kv in faces)
+        {
+            var l = kv.Value;
+            float sharp;
+            if (l.Count == 1 || (l.Count == 2 && Vector3.Dot(l[0], l[1]) < -0.999f)) sharp = 90f;
+            else
+            {
+                float minDot = 1f;
+                for (int i = 0; i < l.Count; i++)
+                    for (int j = i + 1; j < l.Count; j++)
+                    {
+                        float dt = Vector3.Dot(l[i], l[j]);
+                        if (dt > -0.999f && dt < minDot) minDot = dt;   // two faces back to back are one sheet
+                    }
+                sharp = Mathf.Acos(Mathf.Clamp(minDot, -1f, 1f)) * Mathf.Rad2Deg;
+            }
+            if (sharp < CAGE_ANGLE) continue;
+            all.Add(new CageEdge { a = (int)(kv.Key >> 32), b = (int)(kv.Key & 0xffffffffL), sharp = sharp });
+        }
+        // steeper and steeper until it fits
+        System.Collections.Generic.List<CageEdge> keep = null;
+        float shortest = CAGE_SHORT / sc;
+        bool stepped = false;
+        for (float angle = CAGE_ANGLE; angle <= 80.5f; angle += 10f)
+        {
+            var sel = new System.Collections.Generic.List<CageEdge>();
+            for (int i = 0; i < all.Count; i++) if (all[i].sharp >= angle) sel.Add(all[i]);
+            keep = JoinRuns(sel, pts);
+            keep.RemoveAll(e => (pts[e.a] - pts[e.b]).magnitude < shortest);
+            if (keep.Count <= CAGE_CAP) break;
+            stepped = true;
+        }
+        if (keep == null || keep.Count == 0) return null;
+        if (stepped) cageStepped++;
+        if (keep.Count > CAGE_CAP)
+        {
+            cageCapped++;
+            keep.Sort((x, y) => Score(y, pts).CompareTo(Score(x, pts)));
+            keep.RemoveRange(CAGE_CAP, keep.Count - CAGE_CAP);
+        }
+        // the quads: two half-float streams
+        int nv = keep.Count * 4;
+        var pos = new ushort[nv * 4];
+        var oth = new ushort[nv * 4];
+        var tris = new ushort[keep.Count * 6];
+        Bounds bb = new Bounds(pts[keep[0].a], Vector3.zero);
+        for (int i = 0; i < keep.Count; i++)
+        {
+            Vector3 p = pts[keep[i].a], q = pts[keep[i].b];
+            bb.Encapsulate(p); bb.Encapsulate(q);
+            int k = i * 4;
+            CageVertex(pos, oth, k, p, q, 1f);
+            CageVertex(pos, oth, k + 1, p, q, -1f);
+            CageVertex(pos, oth, k + 2, q, p, -1f);   // seen from q, its -1 side is p's +1 side
+            CageVertex(pos, oth, k + 3, q, p, 1f);
+            int t = i * 6;
+            tris[t] = (ushort)k; tris[t + 1] = (ushort)(k + 1); tris[t + 2] = (ushort)(k + 3);
+            tris[t + 3] = (ushort)(k + 1); tris[t + 4] = (ushort)(k + 2); tris[t + 5] = (ushort)(k + 3);
+        }
+        var m = new Mesh();
+        m.SetVertexBufferParams(nv,
+            new UnityEngine.Rendering.VertexAttributeDescriptor(UnityEngine.Rendering.VertexAttribute.Position, UnityEngine.Rendering.VertexAttributeFormat.Float16, 4, 0),
+            new UnityEngine.Rendering.VertexAttributeDescriptor(UnityEngine.Rendering.VertexAttribute.TexCoord1, UnityEngine.Rendering.VertexAttributeFormat.Float16, 4, 1));
+        m.SetVertexBufferData(pos, 0, 0, pos.Length, 0);
+        m.SetVertexBufferData(oth, 0, 0, oth.Length, 1);
+        m.SetIndexBufferParams(tris.Length, UnityEngine.Rendering.IndexFormat.UInt16);
+        m.SetIndexBufferData(tris, 0, 0, tris.Length);
+        m.subMeshCount = 1;
+        m.SetSubMesh(0, new UnityEngine.Rendering.SubMeshDescriptor(0, tris.Length), UnityEngine.Rendering.MeshUpdateFlags.DontRecalculateBounds);
+        bb.Expand(0.05f / sc);   // the lines' width on screen
+        m.bounds = bb;
+        cageVerts += nv;
+        cageMade++; cageLines += keep.Count; cageMaxLines = Mathf.Max(cageMaxLines, keep.Count);
+        return m;
+    }
+
+    static void CageVertex(ushort[] pos, ushort[] oth, int k, Vector3 p, Vector3 q, float side)
+    {
+        pos[k * 4] = Mathf.FloatToHalf(p.x); pos[k * 4 + 1] = Mathf.FloatToHalf(p.y); pos[k * 4 + 2] = Mathf.FloatToHalf(p.z); pos[k * 4 + 3] = Mathf.FloatToHalf(1f);
+        oth[k * 4] = Mathf.FloatToHalf(q.x); oth[k * 4 + 1] = Mathf.FloatToHalf(q.y); oth[k * 4 + 2] = Mathf.FloatToHalf(q.z); oth[k * 4 + 3] = Mathf.FloatToHalf(side);
+    }
+
+    static float Score(CageEdge e, System.Collections.Generic.List<Vector3> pts)
+    {
+        return (pts[e.a] - pts[e.b]).magnitude * (0.5f + 0.5f * Mathf.Clamp01(e.sharp / 90f));
+    }
+
+    static void AddFace(System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<Vector3>> faces, int a, int b, Vector3 n)
+    {
+        long key = ((long)Mathf.Min(a, b) << 32) | (long)Mathf.Max(a, b);
+        System.Collections.Generic.List<Vector3> l;
+        if (!faces.TryGetValue(key, out l)) { l = new System.Collections.Generic.List<Vector3>(2); faces[key] = l; }
+        l.Add(n);
+    }
+
+    // edges that continue each other in a straight line through a point no other edge meets become one
+    static System.Collections.Generic.List<CageEdge> JoinRuns(System.Collections.Generic.List<CageEdge> sel, System.Collections.Generic.List<Vector3> pts)
+    {
+        var edges = new System.Collections.Generic.List<CageEdge>(sel);
+        var alive = new System.Collections.Generic.List<bool>();
+        var at = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<int>>();
+        for (int i = 0; i < edges.Count; i++) { alive.Add(true); Link(at, edges[i].a, i); Link(at, edges[i].b, i); }
+        bool joined = true;
+        while (joined)
+        {
+            joined = false;
+            foreach (var kv in at)
+            {
+                var l = kv.Value;
+                l.RemoveAll(i => !alive[i]);
+                if (l.Count != 2) continue;
+                int v = kv.Key;
+                CageEdge e0 = edges[l[0]], e1 = edges[l[1]];
+                int p = e0.a == v ? e0.b : e0.a, q = e1.a == v ? e1.b : e1.a;
+                if (p == q) continue;
+                Vector3 d0 = (pts[v] - pts[p]).normalized, d1 = (pts[q] - pts[v]).normalized;
+                if (Vector3.Dot(d0, d1) < 0.9995f) continue;
+                alive[l[0]] = false; alive[l[1]] = false;
+                edges.Add(new CageEdge { a = p, b = q, sharp = Mathf.Min(e0.sharp, e1.sharp) });
+                alive.Add(true);
+                int ni = edges.Count - 1;
+                l.Clear();
+                Link(at, p, ni); Link(at, q, ni);
+                joined = true;   // (the keys never change while this runs: p and q are in it already)
+            }
+        }
+        var outList = new System.Collections.Generic.List<CageEdge>();
+        for (int i = 0; i < edges.Count; i++) if (alive[i]) outList.Add(edges[i]);
+        return outList;
+    }
+
+    static void Link(System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<int>> at, int v, int e)
+    {
+        System.Collections.Generic.List<int> l;
+        if (!at.TryGetValue(v, out l)) { l = new System.Collections.Generic.List<int>(); at[v] = l; }
+        l.Add(e);
     }
 
     // ------------------------------------------------------------------ the blob (as ModelLibrary.Load)

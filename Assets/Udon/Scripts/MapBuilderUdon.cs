@@ -1682,6 +1682,53 @@ public class MapBuilderUdon : UdonSharpBehaviour
         for (int i = 0; i < rs.Length; i++) rs[i].sharedMaterial = rs[i].gameObject.name == "Shade" ? shadeSelfMat : selfMat;
     }
 
+    // The local hider's own prop in first person: the cage of its edges (shader PropHunt/Cage; Cor chose it with the
+    // ground outline, PHView). One object (WorldSceneBuilder) is lent to the prop: it hangs under the prop's root, so
+    // it follows its place, its turn and the doorway squash, and is given back before the prop goes. Only the local
+    // hider's own prop ever has it (PHSlot), so nobody else draws anything. The shader keeps it out of the
+    // third-person view. Its fade near the eye goes with the prop's size: gone within 0.2 m and full from 0.5 m for a
+    // small prop, 0.35 and 0.8 m for a big one (1.5 m and more). The eye sits at 0.9 of the prop's height (PHLocal
+    // .SetEye), so on a small or low prop the base is near the eye too: the fade is also kept within 0.45 and 0.9 of
+    // the eye's distance to the middle of the base's nearer sides, so the whole base outline is at full strength.
+    public Mesh[] cageMeshes;          // by def (PropPrefabBaker.BakeCages); null where a model has no lines
+    public GameObject cage;            // WorldSceneBuilder
+    public MeshFilter cageFilter;
+    public MeshRenderer cageRenderer;
+    Transform cageHome;
+    MaterialPropertyBlock cageBlock;
+
+    public void Cage(GameObject go, int def, Vector3 half)
+    {
+        if (cage == null || go == null) return;
+        if (cageHome == null) cageHome = cage.transform.parent;
+        Mesh m = cageMeshes != null && def >= 0 && def < cageMeshes.Length ? cageMeshes[def] : null;
+        if (m == null) { Uncage(null); return; }
+        cageFilter.sharedMesh = m;
+        if (cageBlock == null) cageBlock = new MaterialPropertyBlock();
+        float h = 2f * half.y;
+        float t = Mathf.Clamp01((2f * Mathf.Max(half.x, Mathf.Max(half.y, half.z)) - 0.3f) / 1.2f);
+        float eye = h > 2.5f ? 1.6f : Mathf.Clamp(Mathf.Round(0.9f * h / 0.05f) * 0.05f, 0.25f, 2.0f);   // as PHLocal.SetEye
+        float side = Mathf.Min(half.x, half.z);
+        float toBase = Mathf.Sqrt(eye * eye + side * side);
+        cageBlock.SetFloat("_FadeNear", Mathf.Min(Mathf.Lerp(0.2f, 0.35f, t), 0.45f * toBase));
+        cageBlock.SetFloat("_FadeFar", Mathf.Min(Mathf.Lerp(0.5f, 0.8f, t), 0.9f * toBase));
+        cageRenderer.SetPropertyBlock(cageBlock);
+        Transform ct = cage.transform;
+        ct.SetParent(go.transform, false);
+        ct.localPosition = Vector3.zero; ct.localRotation = Quaternion.identity; ct.localScale = Vector3.one;
+        cage.SetActive(true);
+    }
+
+    // takes the cage back from go (from anywhere when go is null)
+    public void Uncage(GameObject go)
+    {
+        if (cage == null) return;
+        Transform ct = cage.transform;
+        if (go != null && ct.parent != go.transform) return;
+        cage.SetActive(false);
+        if (cageHome != null) ct.SetParent(cageHome, false);
+    }
+
     public void Hover(GameObject go, int def, bool on)
     {
         if (go == null || hoverMat == null) return;

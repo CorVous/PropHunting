@@ -391,6 +391,29 @@ public static class WorldSceneBuilder
             view.outlineParts[i] = Part(outline, PrimitiveType.Cube, i < 40 ? "Piece" + i : "Nub", Vector3.zero, Vector3.zero, new Vector3(0.02f, 0.004f, 0.02f), outlineMat).transform;
         view.outline = outline;
 
+        // and the own prop's shape in first person: the cage of its edges (MapBuilderUdon.Cage lends this one object
+        // to the local hider's prop; the meshes are PropPrefabBaker's). Off until lent; no collider, no shadows.
+        var cageMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropCage.mat");
+        var cageShader = Shader.Find("PropHunt/Cage");
+        if (cageMat == null) { cageMat = new Material(cageShader); AssetDatabase.CreateAsset(cageMat, "Assets/Udon/Generated/PropCage.mat"); }
+        cageMat.shader = cageShader;
+        cageMat.SetColor("_Core", new Color(0.30f, 0.95f, 0.85f));   // the outline's teal
+        cageMat.SetColor("_Rim", new Color(0.02f, 0.30f, 0.27f));
+        cageMat.enableInstancing = true;   // single-pass instanced stereo
+        EditorUtility.SetDirty(cageMat);
+        var cageGo = new GameObject("PropCage");
+        cageGo.transform.SetParent(viewGo.transform, false);
+        var cageFilter = cageGo.AddComponent<MeshFilter>();
+        var cageRenderer = cageGo.AddComponent<MeshRenderer>();
+        cageRenderer.sharedMaterial = cageMat;
+        cageRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; cageRenderer.receiveShadows = false;
+        cageRenderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off; cageRenderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+        cageRenderer.allowOcclusionWhenDynamic = false;
+        cageGo.SetActive(false);
+        game.builder.cage = cageGo; game.builder.cageFilter = cageFilter; game.builder.cageRenderer = cageRenderer;
+        UdonSharpEditorUtility.CopyProxyToUdon(game.builder);
+        EditorUtility.SetDirty(game.builder);
+
         // desktop: the controls in the bottom left corner, drawn as VRChat's own panels are (Cor): a dark rounded
         // panel, a white picture over a key cap. One picture for each state; PHView shows and sizes them.
         var lg = new GameObject("Legend");

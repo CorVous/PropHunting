@@ -249,7 +249,7 @@ public class PHSlot : UdonSharpBehaviour
         if (want != proxyDef)
         {
             proxyDef = want;
-            if (proxy != null) Destroy(proxy);
+            if (proxy != null) { game.builder.Uncage(proxy); Destroy(proxy); }   // the cage is lent, not the prop's
             proxy = null;
             if (want >= 0 && game.builder.propPrefabs != null && want < game.builder.propPrefabs.Length && game.builder.propPrefabs[want] != null)
             {
@@ -287,6 +287,8 @@ public class PHSlot : UdonSharpBehaviour
                     Transform[] parts = proxy.GetComponentsInChildren<Transform>(true);
                     for (int i = 0; i < parts.Length; i++) parts[i].gameObject.layer = HIDER_SELF;
                     game.builder.SelfOnly(proxy, want);   // ...and the shader keeps it out of any other camera too
+                    // what the hider sees of it instead: the cage of its edges (and PHView's outline on the ground)
+                    game.builder.Cage(proxy, want, proxyHalf);
                 }
                 else game.builder.FadeProp(proxy);   // another hider's prop is a prop: see-through in the prop viewer's cutout, not cut
             }
