@@ -164,7 +164,8 @@ public class PHHiderBody : UdonSharpBehaviour
     {
         settleDue = false;
         if (mask == 0 || Fits(pos, yaw)) return;
-        if (Nudge(yaw, Mathf.Min(Mathf.Max(fullHalf.x, fullHalf.z) + 1f, LAG_MAX - 0.1f))) home = pos;
+        // (a short reach: a spawn overlaps a facade by a few tens of cm; a far move would part the prop from the view)
+        if (Nudge(yaw, Mathf.Min(Mathf.Max(fullHalf.x, fullHalf.z) + 0.3f, 0.8f))) home = pos;
     }
 
     public void End() { active = false; }

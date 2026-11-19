@@ -195,6 +195,7 @@ public class PHLocal : UdonSharpBehaviour
         if (!round || game.RoleOf(s.index) != PHGame.ROLE_NONE) { joinChecked = true; return; }
         if (!game.MapReady) return;
         joinChecked = true;
+        s.Claim();   // (first: the slot's takeover clearing, PHSlot.Fresh, must not wipe the ghost state written next)
         Networking.LocalPlayer.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
         s.StartGhost();
         Say("A round is on: you walk the map as a ghost until it ends.", 5f);

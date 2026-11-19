@@ -270,7 +270,9 @@ public class PHSlot : UdonSharpBehaviour
     // ------------------------------------------------------------------ the prop
     void UpdateProxy(bool mine)
     {
-        int want = (hiding && def >= 0 && game.slotPlayer[index] != 0) ? def : -1;
+        // (only a hider of this round: a slot handed to a newcomer still carries the last player's prop until the
+        // newcomer's client takes it over, and that stray prop could be seen and shot)
+        int want = (hiding && def >= 0 && game.slotPlayer[index] != 0 && game.slotRole[index] == PHGame.ROLE_HIDER) ? def : -1;
         if (want != proxyDef)
         {
             proxyDef = want;
