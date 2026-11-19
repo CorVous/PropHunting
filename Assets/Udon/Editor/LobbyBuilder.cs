@@ -272,7 +272,7 @@ public static class LobbyBuilder
         }
 
         // the map bar: the map's code, a code entry for the host, the seed message (or Play anyway / Discard), how
-        // often the picked map was played, RETIRE (host), and the scrap / undo votes
+        // often the picked map was played, and the scrap / undo votes (Cor: no retire button)
         Img(cv, "MapBar", P(600, 530), new Vector2(1168, 48), sRound, C("173d2c"), 3f);
         Txt(cv, "MapLabel", P(64, 530), new Vector2(80, 26), "MAP", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
         panel.seedCodeText = Txt(cv, "SeedCode", P(205, 530), new Vector2(200, 30), "-", future, 15, Color.white, TextAlignmentOptions.Left);
@@ -299,7 +299,6 @@ public static class LobbyBuilder
         // the remaining bar buttons: k, label, centre x, width, colour, parent
         object[][] bar = {
             new object[] { 3, "PLAY ANYWAY", 545f, 116f, C("9bd18a") }, new object[] { 4, "DISCARD", 662f, 104f, C("f19a8a") },
-            new object[] { 5, "RETIRE", 882f, 96f, C("f2c45a") },
             new object[] { 7, "SCRAP", 1002f, 124f, C("f19a8a") }, new object[] { 8, "UNDO", 1122f, 108f, C("7fb3e6") } };
         foreach (var b in bar)
         {
@@ -315,7 +314,7 @@ public static class LobbyBuilder
             panel.hostButton[k] = bimg.rectTransform; panel.hostButtonImage[k] = face;
             hostTiles[k] = AddTile(bimg.gameObject, bt, -2 - k);
         }
-        panel.runsText = Txt(cv, "Runs", P(778, 530), new Vector2(100, 30), "", future, 13, Color.white, TextAlignmentOptions.Center);
+        panel.runsText = Txt(cv, "Runs", P(835, 530), new Vector2(110, 30), "", future, 13, Color.white, TextAlignmentOptions.Center);
         panel.scrapText = panel.hostButtonText[7]; panel.undoText = panel.hostButtonText[8];
         confirm.gameObject.SetActive(false);
 
@@ -347,6 +346,8 @@ public static class LobbyBuilder
         const float pitch = 200f, cardW = 172f;
         var cv = Canvas(lobby, "MapTrail", localPos, Quaternion.Euler(-8f, 0f, 0f), new Vector2(TrailCards * pitch, 200f), 0.006f, false);
         Img(cv, "Path", new Vector2(0, 0), new Vector2(TrailCards * pitch - 40f, 10), sDash, C("e1cfa5"), 2f);
+        var title = Txt(cv, "Title", new Vector2(0, 128), new Vector2(600, 34), "MAPS PLAYED", rocket, 26, C("e1cfa5"), TextAlignmentOptions.Center);   // (Cor: just this)
+        title.characterSpacing = 4f;
         var h = cv.gameObject.AddUdonSharpComponent<PHHistory>();
         h.game = game; h.builder = builder;
         int n = TrailCards + 1;

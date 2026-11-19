@@ -35,8 +35,8 @@ public class PHGame : UdonSharpBehaviour
     // ---- the map trail (Cor, 2026-11-19; it replaces the rotation of three maps per size and the run cap): up to
     // TRAIL maps that have been played here, each with its size, density and run count. The host starts a round
     // with NEW MAP (a map nobody has seen, or the code they entered; it joins the trail) or with REPLAY (the picked
-    // map of the trail again: the last one played unless the host stepped to another). A map stays until the host
-    // retires it; only a new map on a full trail pushes one off, the one played longest ago. Between rounds, more
+    // map of the trail again: the last one played unless the host stepped to another). There is no run cap and no
+    // retire button (Cor): a new map on a full trail pushes off the one played longest ago. Between rounds, more
     // than half of everyone here can vote to scrap the last map or to undo the last removal (one level); the host's
     // own UNDO does it at once. PHHistory shows the trail on the lobby wall.
     public const int TRAIL = 12;
