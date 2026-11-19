@@ -22,6 +22,7 @@ Shader "PropHunt/Shade"
             #pragma fragment frag
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
+            #pragma multi_compile_local _ PH_PIP
             #include "UnityCG.cginc"
             #include "PipCut.cginc"
 
@@ -59,7 +60,10 @@ Shader "PropHunt/Shade"
             {
                 // a patch on an upper floor goes with the floor in the prop viewer's cutout (PipCut.cginc); its rim stays unshaded
                 // (nested ifs: HLSL works out both sides of &&, and PipCut's clip() would cut the own prop's patch)
+                // (the PH_PIP variant only: see PropLit.cginc)
+                #if defined(PH_PIP)
                 [branch] if (_PipOnly < 0.5) { if (PipCut(i.worldPos, i.pos.xy, 0) > 0.5) return fixed4(1, 1, 1, 1); }
+                #endif
                 half a = i.a * i.a * (3.0 - 2.0 * i.a);
                 fixed4 col = fixed4(lerp(float3(1, 1, 1), _Shade.rgb, a), 1);
                 UNITY_APPLY_FOG_COLOR(i.fogCoord, col, fixed4(1, 1, 1, 1));   // far off it fades out with the fog

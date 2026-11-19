@@ -238,8 +238,9 @@ public class PHView : UdonSharpBehaviour
         // the third-person camera renders every second frame while there is a prop to show
         frame++;
         bool pip = hider;
-        bool pipOn = pip && (frame & 1) == 0;
-        if (pipCam.enabled != pipOn) pipCam.enabled = pipOn;
+        // (rendered by hand at the end of the frame, RenderPip; the camera itself stays off)
+        pipWant = pip && (frame & 1) == 0;
+        if (pipCam.enabled) pipCam.enabled = false;
         if (pip) PlaceCamera(s);
         SetCut(s, pip);
     }
@@ -597,10 +598,50 @@ public class PHView : UdonSharpBehaviour
 
     public override void PostLateUpdate()
     {
-        if (profWatch == null) { PostLateBody(); return; }
+        if (profWatch == null) { PostLateBody(); RenderPip(); return; }
         double p0 = profWatch.Elapsed.TotalMilliseconds;
         PostLateBody();
+        RenderPip();
         profMs += profWatch.Elapsed.TotalMilliseconds - p0;
+    }
+
+    // The prop viewer's picture. Its cutout (PipCut.cginc) needs clip(), and a shader that can discard keeps a tile GPU
+    // (Quest) from testing depth early for every draw of it, in every view. So the cut is compiled only into the PH_PIP
+    // variant of PropLit and PropShade: the materials that use them are switched to it for this camera's render alone,
+    // and the main view draws the plain variant, without clip(). The camera is rendered here, after everything has
+    // moved for the frame (it used to render with the frame's cameras), every second frame while there is a prop.
+    bool pipWant;
+    Material[] pipMats;
+
+    void RenderPip()
+    {
+        if (!pipWant) return;
+        pipWant = false;
+        if (pipMats == null) CollectPipMats();
+        for (int i = 0; i < pipMats.Length; i++) if (pipMats[i] != null) pipMats[i].EnableKeyword(PIP_KEYWORD);
+        pipCam.Render();
+        for (int i = 0; i < pipMats.Length; i++) if (pipMats[i] != null) pipMats[i].DisableKeyword(PIP_KEYWORD);
+    }
+    const string PIP_KEYWORD = "PH_PIP";
+
+    // every material drawn with PropLit or PropShade: the builder's (WorldSceneBuilder sets them) and the shade
+    // patch's, as a prop prefab's last child ("Shade") has it
+    void CollectPipMats()
+    {
+        MapBuilderUdon b = game.builder;
+        Material shade = null;
+        GameObject[] prefabs = b.propPrefabs;
+        for (int i = 0; prefabs != null && i < prefabs.Length && shade == null; i++)
+        {
+            if (prefabs[i] == null) continue;
+            Transform t = prefabs[i].transform;
+            if (t.childCount == 0) continue;
+            Transform last = t.GetChild(t.childCount - 1);
+            if (last.name != "Shade") continue;
+            MeshRenderer r = last.GetComponent<MeshRenderer>();
+            if (r != null) shade = r.sharedMaterial;
+        }
+        pipMats = new Material[] { b.propLitMat, b.selfMat, b.hoverMat, b.fadeMat, b.shadeSelfMat, shade };
     }
 
     Vector3 outlineShownPos;   // where the outline was last put (PostLateBody), and the heights its rays found

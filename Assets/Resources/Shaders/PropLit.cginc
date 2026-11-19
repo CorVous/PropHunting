@@ -153,7 +153,11 @@ fixed4 frag (v2f i) : SV_Target
     // the half of it nearer the camera (Cor: half the prop was clipped out)
     float3 n = normalize(i.normal);
     half cutRim = 0;
+    // (only in the PH_PIP variant, which the prop viewer's camera alone renders with (PHView.RenderPip): the main
+    // view's draws have no clip() at all, so a tile GPU (Quest) keeps its early depth test)
+    #if defined(PH_PIP)
     [branch] if (_PipOnly < 0.5) cutRim = PipCutN(i.worldPos, n, i.pos.xy, _Fade);
+    #endif
     float3 c;
     bool lvOn = LightVolumesEnabled() > 0;
     // the spot sun (once PHSun has baked it) and the lamps (MapBuilderUdon's light points)

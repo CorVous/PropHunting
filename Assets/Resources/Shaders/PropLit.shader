@@ -31,6 +31,7 @@ Shader "PropHunt/Lit"
             #pragma fragment frag
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
+            #pragma multi_compile_local _ PH_PIP
             #pragma target 3.5
             #include "PropLit.cginc"
             ENDCG
