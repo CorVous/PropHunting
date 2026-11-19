@@ -109,7 +109,9 @@ public class PHKnock : UdonSharpBehaviour
         GameObject go = game.builder.objects[emit];
         if (go == null) return;
         Transform g = go.transform;
-        if (!moving) { g.SetPositionAndRotation(pos, rot); return; }
+        // (at rest: put once where it lies, not every frame; OnDeserialization puts it there too. Perf)
+        if (!moving) { if (restPut != go) { g.SetPositionAndRotation(pos, rot); restPut = go; } return; }
+        restPut = null;
         float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
         g.SetPositionAndRotation(Vector3.Lerp(g.position, pos, k), Quaternion.Slerp(g.rotation, rot, k));
     }
@@ -128,8 +130,11 @@ public class PHKnock : UdonSharpBehaviour
         a.PlayAt(a.Pick(soft ? a.softKnock : a.woodKnock, Random.Range(0, 100)), at, 16f, 0.9f, Random.Range(0.9f, 1.1f));
     }
 
+    GameObject restPut;   // the prop last put at its resting pose (UpdateBody); a new sync puts it again
+
     public override void OnDeserialization()
     {
+        restPut = null;
         // a knock that has just started: everyone hears it
         if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0) KnockSound(pos);
         wasMoving = moving; heardEmit = emit;
