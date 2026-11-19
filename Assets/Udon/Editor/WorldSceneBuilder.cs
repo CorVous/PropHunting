@@ -39,13 +39,11 @@ public static class WorldSceneBuilder
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(lobby.scene);
     }
 
-    // 5.4 m wide, its foot 0.6 m up and its top under the name; facing north (into the room)
+    // on the north wall between the west wall and the DEBUG plaque (Cor): 4.65 m wide, centred on the plaque's height;
+    // facing south (into the room), like the host panel
     static void BuildCredits(Transform lobby)
     {
-        var cv = LobbyBuilder.BuildCredits(lobby, Vector3.zero, Quaternion.Euler(0f, 180f, 0f));
-        if (cv == null) return;
-        float h = ((RectTransform)cv).sizeDelta.y * cv.localScale.y;
-        cv.localPosition = new Vector3(-6.3f, 0.6f + h / 2f, -RoomD / 2 + 0.06f);
+        LobbyBuilder.BuildCredits(lobby, new Vector3(-9.35f, 1.8f, RoomD / 2 - 0.12f), Quaternion.identity, 0.0031f);
     }
 
     [MenuItem("PropHunt/Build world scene")]
@@ -252,7 +250,7 @@ public static class WorldSceneBuilder
         // the last round's results, a score pad on the west wall
         LobbyBuilder.BuildScorePad(lobby.transform, game, local, new Vector3(-RoomW / 2 + 0.06f, 3.0f, 0f));
         local.panelUiText = null; local.resultsText = null;
-        // the credits (from CREDITS.md), on the south wall left of the spawn, under the PROPHUNT name
+        // the credits (from CREDITS.md), on the north wall left of the DEBUG plaque
         BuildCredits(lobby.transform);
 
         // the profiler (its plaque right of the panel) and the scripts it watches: every one that runs each frame

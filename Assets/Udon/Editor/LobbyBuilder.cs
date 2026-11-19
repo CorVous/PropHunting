@@ -486,12 +486,12 @@ public static class LobbyBuilder
     // ------------------------------------------------------------------ the credits board (south wall)
     // Made from CREDITS.md at the project's root each time the world is built (and by PropHunt > Rebuild credits board),
     // so it follows the file: the packs table, grouped by maker into three columns, and every paragraph that names a
-    // licence (other software, fonts) as fine print. 1500 canvas units wide at 3.6 mm: 5.4 m; the height follows the text.
+    // licence (other software, fonts) as fine print. 1500 canvas units wide; the height follows the text.
     const float CW = 1500f;
 
     class CreditRow { public string name, right; public int maker; }
 
-    public static Transform BuildCredits(Transform lobby, Vector3 localPos, Quaternion rot)
+    public static Transform BuildCredits(Transform lobby, Vector3 localPos, Quaternion rot, float scale)
     {
         string path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.dataPath), "CREDITS.md");
         if (!System.IO.File.Exists(path)) { Debug.LogWarning("[lobby] no CREDITS.md at " + path); return null; }
@@ -591,7 +591,7 @@ public static class LobbyBuilder
         // measure the fine print, then size the canvas: title band, board (columns, a rule, the notes), margin
         const float side = 24f, titleH = 112f, pad = 26f, colGap = 34f;
         float boardW = CW - 2 * side, innerW = boardW - 2 * pad;
-        var cv = Canvas(lobby, "Credits", localPos, rot, new Vector2(CW, 100f), 0.0036f, false);
+        var cv = Canvas(lobby, "Credits", localPos, rot, new Vector2(CW, 100f), scale, false);
         var noteTexts = new System.Collections.Generic.List<TextMeshProUGUI>();
         float notesH = 0f;
         foreach (var n in notes)
@@ -675,7 +675,7 @@ public static class LobbyBuilder
                 ny += h + 8f;
             }
         }
-        Debug.Log("[lobby] credits board: " + rows.Count + " packs, " + notes.Count + " notes, " + (CW * 0.0036f).ToString("0.00") + " x " + (CH * 0.0036f).ToString("0.00") + " m");
+        Debug.Log("[lobby] credits board: " + rows.Count + " packs, " + notes.Count + " notes, " + (CW * scale).ToString("0.00") + " x " + (CH * scale).ToString("0.00") + " m");
         return cv;
     }
 
