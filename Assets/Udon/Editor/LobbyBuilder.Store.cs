@@ -13,7 +13,7 @@ using UnityEngine.UI;
 //   the Trophies board  the spawn (south) wall under the PROPHUNT name (PHTrophyBoard)
 //   PHStore           the catalog, the trophies' texts, the player's coins and trophies
 // Data: Tools/weapon_catalog.json (the melee work's), Tools/store_prices.json, Assets/Udon/Text/strings_store.tsv
-// and Assets/Lobby/WeaponIcons.png (Tools/make_store.py makes the last three). Models: the sub-assets of
+// Tools/store_free.json and Assets/Lobby/WeaponIcons.png (Tools/make_store.py makes the last three). Models: the sub-assets of
 // Assets/Udon/Generated/Weapons.asset (WeaponBuilder), named by id with ':' -> '_'; a weapon not converted yet
 // shows only its tag. Call after the weapons are built (PHWeapons' lists give the picks' numbers).
 public static partial class LobbyBuilder
@@ -35,6 +35,11 @@ public static partial class LobbyBuilder
         string pp = System.IO.Path.Combine(proj, "Tools", "store_prices.json");
         if (System.IO.File.Exists(pp))
             foreach (Match m in Regex.Matches(System.IO.File.ReadAllText(pp), "\"([^\"]+)\"\\s*:\\s*(\\d+)")) prices[m.Groups[1].Value] = int.Parse(m.Groups[2].Value);
+        // the free weapons (Cor: 10 cheap shop weapons a side, picked once by make_store.py): owned by everyone
+        var free = new HashSet<string>();
+        string fp = System.IO.Path.Combine(proj, "Tools", "store_free.json");
+        if (System.IO.File.Exists(fp))
+            foreach (Match m in Regex.Matches(System.IO.File.ReadAllText(fp), "\"([^\"]+)\"")) free.Add(m.Groups[1].Value);
         var text = ReadTsv(System.IO.Path.Combine(Application.dataPath, "Udon/Text/strings_store.tsv"));
 
         // the models, by name
@@ -65,6 +70,7 @@ public static partial class LobbyBuilder
             store.wId[i] = w.id;
             store.wKind[i] = w.kind == "gun" ? 1 : 0;
             store.wCat[i] = w.category == "starter" ? PHStore.CAT_STARTER : w.category == "cool" ? PHStore.CAT_COOL : w.category == "goofy" ? PHStore.CAT_GOOFY : PHStore.CAT_SHOP;
+            if (free.Contains(w.id)) store.wCat[i] = PHStore.CAT_STARTER;
             int price; store.wPrice[i] = prices.TryGetValue(w.id, out price) ? price : 200;
             store.wTrophy[i] = -1;
             string[] list = store.wKind[i] == 0 ? gameMelee : gameGun;
@@ -256,9 +262,9 @@ public static partial class LobbyBuilder
         CartButton(cart, shelf, "Down", new Vector3(-0.2f, 0.98f, 0f), false);
         Slab(cart, "Purse", new Vector3(0f, 0.6f, 0.172f), new Vector3(0.5f, 0.16f, 0.012f), felt);
         var coin = new GameObject("Coin").transform; coin.SetParent(cart, false);
-        Disc(coin, "Disc", new Vector3(-0.16f, 0.6f, 0.182f), 0.1f, gold);
+        Disc(coin, "Disc", new Vector3(0.17f, 0.6f, 0.182f), 0.1f, gold);   // (+x is the player's left)
         coin.GetChild(0).localRotation = Quaternion.Euler(90f, 0f, 0f);
-        var coins = WorldText(cart, "Coins", new Vector3(0.05f, 0.6f, 0.182f), Quaternion.Euler(0f, 180f, 0f), "0", 1.1f, C("f6d773"), new Vector2(0.34f, 0.14f));
+        var coins = WorldText(cart, "Coins", new Vector3(-0.05f, 0.6f, 0.182f), Quaternion.Euler(0f, 180f, 0f), "0", 1.1f, C("f6d773"), new Vector2(0.28f, 0.14f));
         coins.font = future; coins.alignment = TextAlignmentOptions.Left;
         shelf.cartCoins = coins;
 

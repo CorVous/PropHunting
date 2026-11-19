@@ -6,8 +6,8 @@ using VRC.SDK3.Persistence;
 // The weapon store and the trophies (Cor, 2026-11-19), all on the local player's own client:
 //   coins       earned at the end of every real round (not a debug round, and only with hunters and hiders both
 //               playing), spent on the weapon wall's shop weapons (PHShelf)
-//   weapons     the catalog of Tools/weapon_catalog.json, baked by the scene builder (StoreBuilder): starters are
-//               free, cool and goofy ones come from trophies, shop ones are bought. What the player carries is
+//   weapons     the catalog of Tools/weapon_catalog.json, baked by the scene builder (StoreBuilder): starters and
+//               the 10 free weapons a side (Tools/store_free.json) are free; a new player carries a random free one; cool and goofy ones come from trophies, shop ones are bought. What the player carries is
 //               written to their PHSlot (meleeChoice / gunChoice, the melee work's synced picks)
 //   trophies    44: 22 hunter ones unlock melee weapons, 22 hider ones guns. Watched from the player's own PHSlot
 //               (a light 0.25 s check during the round, 1 s otherwise) and settled when the round ends
@@ -41,7 +41,7 @@ public class PHStore : UdonSharpBehaviour
     [System.NonSerialized] public int coins;
     [System.NonSerialized] public bool[] own;
     [System.NonSerialized] public bool[] got;
-    [System.NonSerialized] public int pickMelee = -1, pickGun = -1;   // catalog index, -1 = the theme's default
+    [System.NonSerialized] public int pickMelee = -1, pickGun = -1;   // catalog index (a random free one until chosen)
     [System.NonSerialized] public int[] st;
     [System.NonSerialized] public bool loaded;
     byte[] defs;   // the props this player has been (a bit per disguise def), for Chameleon
@@ -90,6 +90,19 @@ public class PHStore : UdonSharpBehaviour
         st = new int[STATS];
         defs = new byte[128];
         GiveStarters();
+        // until the save is read (and for a new player): a random free weapon a side (Cor), never a theme's default
+        pickMelee = RandomFree(0); pickGun = RandomFree(1);
+    }
+
+    // a random free weapon of a kind (melee 0, gun 1)
+    int RandomFree(int kind)
+    {
+        int n = 0;
+        for (int i = 0; i < wId.Length; i++) if (wKind[i] == kind && wCat[i] == CAT_STARTER) n++;
+        if (n == 0) return -1;
+        int k = Random.Range(0, n);
+        for (int i = 0; i < wId.Length; i++) if (wKind[i] == kind && wCat[i] == CAT_STARTER) { if (k == 0) return i; k--; }
+        return -1;
     }
 
     void GiveStarters() { for (int i = 0; i < own.Length; i++) if (wCat[i] == CAT_STARTER) own[i] = true; }
@@ -108,13 +121,16 @@ public class PHStore : UdonSharpBehaviour
             st[i] = b[i * 4] | (b[i * 4 + 1] << 8) | (b[i * 4 + 2] << 16) | (b[i * 4 + 3] << 24);
         if (PlayerData.TryGetBytes(player, "ph.defs", out b)) for (int i = 0; i < defs.Length && i < b.Length; i++) defs[i] = b[i];
         string s;
-        if (PlayerData.TryGetString(player, "ph.melee", out s)) pickMelee = Find(s);
-        if (PlayerData.TryGetString(player, "ph.gun", out s)) pickGun = Find(s);
+        // a saved pick wins; a first visit keeps the random free one from Init
+        if (PlayerData.TryGetString(player, "ph.melee", out s) && Find(s) >= 0) pickMelee = Find(s);
+        if (PlayerData.TryGetString(player, "ph.gun", out s) && Find(s) >= 0) pickGun = Find(s);
         // a trophy earned before its weapon was in the catalog, or a weapon lost: what a trophy gives is always owned
         for (int t = 0; t < TROPHIES; t++) if (got[t] && tWeapon[t] >= 0) own[tWeapon[t]] = true;
-        if (pickMelee >= 0 && (!own[pickMelee] || wKind[pickMelee] != 0)) pickMelee = -1;
-        if (pickGun >= 0 && (!own[pickGun] || wKind[pickGun] != 1)) pickGun = -1;
+        if (pickMelee < 0 || !own[pickMelee] || wKind[pickMelee] != 0) pickMelee = RandomFree(0);
+        if (pickGun < 0 || !own[pickGun] || wKind[pickGun] != 1) pickGun = RandomFree(1);
         loaded = true;
+        Save();   // (a first visit's random picks stay theirs)
+        ApplyPicks();
         RefreshAll();
     }
 

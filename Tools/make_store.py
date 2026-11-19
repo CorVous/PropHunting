@@ -2,6 +2,8 @@
   Assets/Udon/Text/strings_store.tsv   every text the weapon wall and the Trophies board show (English; the
                                        localization work fills the other columns)
   Tools/store_prices.json              the shop weapons' prices (edit by hand; run again keeps them)
+  Tools/store_free.json                the free weapons: 10 cheap shop weapons a side, picked once at random (Cor);
+                                       a new player carries a random one of them. Run again keeps the pick
   Assets/Lobby/WeaponIcons.png         a 16 x 12 atlas of 128 px icons, one per catalog weapon in catalog order
                                        (the Trophies board's medals), background keyed out
 StoreBuilder.cs reads all three when the world is built. Run from the project root:
@@ -147,7 +149,23 @@ def icons(folder):
     print('wrote', p, len(CAT), 'icons')
 
 
+def free():
+    import random
+    p = os.path.join(ROOT, 'Tools', 'store_free.json')
+    if os.path.exists(p):
+        print('kept', p); return
+    prices = json.load(open(os.path.join(ROOT, 'Tools', 'store_prices.json'), encoding='utf8'))
+    rng = random.Random(20261119)
+    out = []
+    for kind in ('melee', 'gun'):
+        cheap = sorted(w['id'] for w in CAT if w['kind'] == kind and w['category'] == 'shop' and prices.get(w['id']) == min(prices.values()))
+        out += sorted(rng.sample(cheap, 10))
+    json.dump(out, open(p, 'w', encoding='utf8'), indent=1)
+    print('wrote', p, len(out), 'free weapons')
+
+
 if __name__ == '__main__':
     folder = sys.argv[sys.argv.index('--thumbs') + 1] if '--thumbs' in sys.argv else None
     assert len(HUNT) == 22 and len(HIDE) == 22
-    tsv(); prices(); icons(folder)
+    tsv(); prices(); free()
+    if '--no-icons' not in sys.argv: icons(folder)
