@@ -288,15 +288,16 @@ public static partial class LobbyBuilder
         // often the picked map was played, and the scrap / undo votes (Cor: no retire button)
         Img(cv, "MapBar", P(600, 530), new Vector2(1168, 48), sRound, C("173d2c"), 3f);
         Txt(cv, "MapLabel", P(64, 530), new Vector2(80, 26), "MAP", future, 16, C("e1cfa5"), TextAlignmentOptions.Left);
-        panel.seedCodeText = Txt(cv, "SeedCode", P(205, 530), new Vector2(200, 30), "-", future, 15, Color.white, TextAlignmentOptions.Left);
-        // host-only code entry (a TMP input field: VRChat opens its keyboard)
-        var fieldBg = Img(cv, "SeedField", P(400, 530), new Vector2(180, 38), sRound, C("f6ecd4"), 4f);
+        // the map's code and the code entry in one field (Cor): a TMP input field showing the code; clicking it opens
+        // VRChat's text box with the code, to copy it, or (the host) to type another
+        var fieldBg = Img(cv, "SeedField", P(270, 530), new Vector2(280, 38), sRound, C("f6ecd4"), 4f);
         fieldBg.raycastTarget = true;
         panel.seedInputRoot = fieldBg.gameObject;
-        var area = Rect(fieldBg.transform, "Text Area", Vector2.zero, new Vector2(164, 32));
+        var area = Rect(fieldBg.transform, "Text Area", Vector2.zero, new Vector2(264, 32));
         area.gameObject.AddComponent<RectMask2D>();
-        var ph = Txt(area, "Placeholder", Vector2.zero, new Vector2(164, 32), "ENTER CODE", future, 14, C("6d5524", 0.55f), TextAlignmentOptions.Center);
-        var tx = Txt(area, "Text", Vector2.zero, new Vector2(164, 32), "", future, 16, C("1e190f"), TextAlignmentOptions.Center);
+        var ph = Txt(area, "Placeholder", Vector2.zero, new Vector2(264, 32), "ENTER CODE", future, 14, C("6d5524", 0.55f), TextAlignmentOptions.Center);
+        var tx = Txt(area, "Text", Vector2.zero, new Vector2(264, 32), "", future, 15, C("1e190f"), TextAlignmentOptions.Center);
+        panel.seedCodeText = tx;
         var input = fieldBg.gameObject.AddComponent<TMP_InputField>();
         input.textViewport = area; input.textComponent = tx; input.placeholder = ph; input.fontAsset = future;
         input.characterLimit = 24; input.lineType = TMP_InputField.LineType.SingleLine; input.targetGraphic = fieldBg;
@@ -304,6 +305,7 @@ public static partial class LobbyBuilder
         panel.seedInput = input;
         panel.hostButton[2] = fieldBg.rectTransform; panel.hostButtonImage[2] = fieldBg;
         var panelUdon = UdonSharpEditorUtility.GetBackingUdonBehaviour(panel);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onSelect, panelUdon.SendCustomEvent, nameof(PHPanel.SeedSelected));
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onEndEdit, panelUdon.SendCustomEvent, nameof(PHPanel.SeedEntered));
         panel.seedStatusText = Txt(cv, "SeedStatus", P(612, 530), new Vector2(232, 40), "", future, 11, C("c9d8c9"), TextAlignmentOptions.Center);
         panel.seedStatusText.enableWordWrapping = true;

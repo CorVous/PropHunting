@@ -129,7 +129,7 @@ public class PHPanel : UdonSharpBehaviour
             Queue(jingle, 0f, 1.25f);
             game.SendCustomEvent("ClaimHost");
         }
-        else if (k == 2) { if (!CanEdit) Deny(-4); }   // the field itself: typing happens in SeedEntered
+        else if (k == 2) { }   // the code field: anyone may open it to copy the code; a host's new code goes in SeedEntered
         else if (k == 3 || k == 4)
         {
             if (!host || !game.seedNeedsConfirm) { Deny(-2 - k); return; }
@@ -164,15 +164,22 @@ public class PHPanel : UdonSharpBehaviour
         Refresh();
     }
 
-    // the seed field's OnEndEdit
+    // the code field (Cor: the map's code and the code entry are one field): clicking it opens VRChat's text box
+    // with the code in it, ready to copy; the host may type another code there instead. OnSelect:
+    public void SeedSelected() { seedEditing = true; }
+
+    // the code field's OnEndEdit: a different code from the host is submitted; the field shows the map's code again
     public void SeedEntered()
     {
+        seedEditing = false;
         string t = seedInput.text;
-        if (t == null || t.Trim().Length == 0) return;
+        if (seedInput.text != seedShown) seedInput.text = seedShown;
+        if (t == null) return;
+        t = t.Trim();
+        if (t.Length == 0 || t == seedShown) return;
         if (!CanEdit) { Deny(-4); return; }
         Queue(select, 0f, 1f);
-        game.SubmitSeed(t.Trim());
-        seedInput.text = "";
+        game.SubmitSeed(t);
     }
 
     void Deny(int i)
@@ -292,6 +299,7 @@ public class PHPanel : UdonSharpBehaviour
 
     [HideInInspector] public float diceY;
     int codeSlot = -1; uint codeSeed; string codeText = "";
+    string seedShown = ""; bool seedEditing;   // the merged code field: the code it shows, and whether VRChat's text box is open on it
 
     // ------------------------------------------------------------------ the picture
     void Start() { if (game != null && game.text != null) game.text.Register(this); }
@@ -369,12 +377,12 @@ public class PHPanel : UdonSharpBehaviour
                 }
                 code = codeText;
             }
-            seedCodeText.text = code == "" ? "-" : code;
+            seedShown = code;
+            if (!seedEditing && seedInput.text != seedShown) seedInput.text = seedShown;
             bool confirm = game.seedNeedsConfirm && hostNow;
             if (confirmRoot.activeSelf != confirm) confirmRoot.SetActive(confirm);
             seedStatusText.text = confirm ? "" : game.text.Coded(game.seedStatus);
-            bool entry = hostNow && lobby;
-            if (seedInputRoot.activeSelf != entry) seedInputRoot.SetActive(entry);
+            if (!seedInputRoot.activeSelf) seedInputRoot.SetActive(true);
             bool anyPick = pk >= 0 && pk < game.rotRuns.Length && game.rotSeed[pk] != 0;
             runsText.text = anyPick ? game.text.F1("maps.played", game.rotRuns[pk].ToString()) : "";
             int need = game.VotesNeeded();

@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!28 &-7812946082793211453
+--- !u!28 &-8374189492324983906
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -48,7 +48,7 @@ Texture2D:
     offset: 0
     size: 0
     path: 
---- !u!21 &-1779539643536239239
+--- !u!21 &-4458670660462721473
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -72,7 +72,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: -7812946082793211453}
+        m_Texture: {fileID: -8374189492324983906}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -127,7 +127,7 @@ MonoBehaviour:
   m_Name: NotoSansTC SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: -1779539643536239239}
+  material: {fileID: -4458670660462721473}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: 55b79a7c9dd03724298ad510763b1c80
@@ -4777,7 +4777,7 @@ MonoBehaviour:
     m_GlyphIndex: 6227
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: -7812946082793211453}
+  - {fileID: -8374189492324983906}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
