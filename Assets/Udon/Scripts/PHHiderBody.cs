@@ -156,15 +156,15 @@ public class PHHiderBody : UdonSharpBehaviour
 
     // A spawn can hold the starting disguise partly inside something: an outdoor spawn cell against a building is
     // 0.25 m from the wall line and the facade's collider reaches 0.28-0.43 m out. The first frame after Begin (the
-    // disguise is set by then, PHLocal.StartingDisguise) it is moved to the nearest place it fits. The player was
-    // just teleported, so the view goes with it (no lag).
+    // disguise is set by then, PHLocal.StartingDisguise) the prop alone is moved to the nearest place it fits, as
+    // it faces (never turned: no input asked for it) and within the lag's reach (Shift: the seat and the view stay
+    // where the player landed). Where nothing fits that near, it stays and Unstick frees it as it moves.
     bool settle;
     void Settle()
     {
         settle = false;
         if (mask == 0 || Fits(pos, yaw)) return;
-        // (FitHere moves the prop by Shift: the seat, and the view, stay where the player landed)
-        if (FitHere()) home = pos;
+        if (Nudge(yaw, Mathf.Min(Mathf.Max(fullHalf.x, fullHalf.z) + 1f, LAG_MAX - 0.1f))) home = pos;
     }
 
     public void End() { active = false; }
@@ -897,7 +897,8 @@ public class PHHiderBody : UdonSharpBehaviour
         if (Mathf.Abs(Mathf.DeltaAngle(yaw, newYaw)) < 0.01f) return true;
         // (always asked, a square prop too: turned 15 or 45 degrees its corners reach further, into a wall it stood against)
         if (Fits(pos, newYaw)) { yaw = newYaw; return true; }
-        for (float d = 3f; d <= 15f; d += 3f)
+        // (short of a whole 15 degree step: at 15 one side is the facing it already has, and the nudge was never reached)
+        for (float d = 3f; d < 14.9f; d += 3f)
         {
             if (Fits(pos, newYaw + d)) { yaw = newYaw + d; return true; }
             if (Fits(pos, newYaw - d)) { yaw = newYaw - d; return true; }

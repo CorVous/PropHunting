@@ -352,8 +352,8 @@ public class PHGame : UdonSharpBehaviour
     public void VoteScrap() { PHSlot s = LocalSlot(); if (s == null || phase != PH_LOBBY || lastRot < 0) return; s.scrapVote = s.scrapVote == voteId ? 0 : voteId; s.Send(); }
     public void VoteUndo() { PHSlot s = LocalSlot(); if (s == null || phase != PH_LOBBY || undoRot < 0) return; s.undoVote = s.undoVote == voteId ? 0 : voteId; s.Send(); }
 
-    public int ScrapVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (Seated(i) && slots[i].scrapVote == voteId) n++; return n; }
-    public int UndoVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (Seated(i) && slots[i].undoVote == voteId) n++; return n; }
+    public int ScrapVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (slots[i].scrapVote == voteId && Seated(i)) n++; return n; }
+    public int UndoVotes() { int n = 0; for (int i = 0; i < slots.Length; i++) if (slots[i].undoVote == voteId && Seated(i)) n++; return n; }
 
     // the slot's player has taken it over (until then a reused slot still shows the last player's vote)
     bool Seated(int i)

@@ -213,7 +213,8 @@ public class PHLocal : UdonSharpBehaviour
         for (int i = 0; i < game.slots.Length; i++)
         {
             PHSlot o = game.slots[i];
-            if (i == mine || o == null || !o.seated) continue;
+            // (a slot that also lists this player is theirs too: never fight its own re-seat)
+            if (i == mine || o == null || !o.seated || game.slotPlayer[i] == Networking.LocalPlayer.playerId) continue;
             o.station.ExitStation(Networking.LocalPlayer);
             o.seated = false;
         }
