@@ -55,6 +55,22 @@ public class PHHiderBody : UdonSharpBehaviour
     int grabSrc;                          // what the grab is: 1 the trigger, 2 + hand the ring
     float grabHand, grabProp, propDetent; // the hand's and the prop's facing when the grab began; the step it stands on
     public bool Turning() { return turnHeld || ringHand >= 0; }
+
+    // the grab ring round the seat (PHView draws it): its radius and how near it a hand takes hold (both x the avatar's
+    // size), and its height x the eye height (Cor: higher, at the player's height). ringShown: drawn now
+    public const float RING_R = 0.42f, RING_REACH = 0.13f, RING_Y = 0.8f;
+    [HideInInspector] public bool ringShown;
+    public Vector3 RingCentre(float eye) { return pos + lag + Vector3.up * (eye * RING_Y); }
+    public bool NearRing(Vector3 hand, float sc, float eye)
+    {
+        if (!ringShown || !active || frozen) return false;
+        Vector3 d = hand - RingCentre(eye);
+        float across = new Vector2(d.x, d.z).magnitude - RING_R * sc;
+        return Mathf.Abs(across) < RING_REACH * sc && Mathf.Abs(d.y) < RING_REACH * sc;
+    }
+    // the screen device's taunt button, where PHView last put it, and how near it a trigger press presses it (0: not shown)
+    [HideInInspector] public Vector3 tauntAt;
+    [HideInInspector] public float tauntReach;
     int keyDir;                           // desktop: Q (-1) or E (+1) held
     float keyNext;
     const float KEY_FIRST = 0.35f, KEY_REPEAT = 0.09f;
@@ -412,7 +428,7 @@ public class PHHiderBody : UdonSharpBehaviour
     // way its back faces)
     float HandYaw(VRCPlayerApi me)
     {
-        Quaternion r = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation;
+        Quaternion r = local.VrAimRot();   // the gun's own facing (its barrel), as the laser shows it
         Vector3 f = r * Vector3.forward;
         if (f.x * f.x + f.z * f.z < 0.04f) f = r * Vector3.up * (f.y > 0f ? -1f : 1f);
         return Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;

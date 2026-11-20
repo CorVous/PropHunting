@@ -584,6 +584,13 @@ public class PHWeapons : UdonSharpBehaviour
         }
     }
 
+    // VR: how far the muzzle is in front of the selector's grip, in metres as it is drawn now
+    public float VrMuzzleLen()
+    {
+        if (vrSelectorModel == null) return selectorMuzzle;
+        return Muzzle(game.LocalSlot()) * vrSelectorModel.lossyScale.x;
+    }
+
     float Muzzle(PHSlot s) { int g = GunOf(s); return gunMuzzle != null && g < gunMuzzle.Length ? gunMuzzle[g] : selectorMuzzle; }
 
     void UpdateSelector(VRCPlayerApi me, int mine)
