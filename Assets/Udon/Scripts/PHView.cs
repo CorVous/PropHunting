@@ -296,7 +296,18 @@ public class PHView : UdonSharpBehaviour
         if (pipCam.enabled) pipCam.enabled = false;
         if (pip) PlaceCamera(s);
         SetCut(s, pip);
+        // Perf (Cor's profile: a 115 ms frame in the hide, with little script time): the prop viewer's first picture of
+        // a session draws every map material in its own shader variant, which the client readies on first use. One
+        // picture is taken while the map is new and nobody is hiding yet, so that cost lands in the briefing.
+        if (!pip && game.round != pipWarmRound && game.MapReady && (game.phase == PHGame.PH_LOADING || game.phase == PHGame.PH_BRIEF))
+        {
+            pipWarmRound = game.round;
+            Vector3 at = game.builder.ReleasePoint();
+            pipCam.transform.SetPositionAndRotation(at + new Vector3(0f, 3f, 0f), Quaternion.Euler(30f, game.builder.ReleaseYaw(), 0f));
+            pipWant = true;
+        }
     }
+    int pipWarmRound = -1;
 
     // the own prop's outline: shown while hiding, laid out anew when the prop changes. It is the footprint of the
     // prop's own collider boxes as the hider's body is moved (Cor: the projection should match the actual collider),
