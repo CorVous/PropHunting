@@ -223,7 +223,7 @@ public static class WorldSceneBuilder
             voiceGo.transform.SetParent(gameGo.transform, false);
             voiceGo.name = "Voice" + i;
             var voice = voiceGo.AddComponent<AudioSource>();
-            voice.spatialBlend = 1f; voice.rolloffMode = AudioRolloffMode.Linear; voice.maxDistance = 20f; voice.playOnAwake = false;
+            voice.spatialBlend = 1f; voice.rolloffMode = AudioRolloffMode.Linear; voice.maxDistance = 32f; voice.playOnAwake = false;   // (group playtest: taunts heard a little further)
             slot.voice = voice;
             var beacon = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             beacon.name = "Beacon" + i;
@@ -323,7 +323,7 @@ public static class WorldSceneBuilder
         var viewGo = new GameObject("View");
         viewGo.transform.SetParent(parent, false);
         var view = viewGo.AddUdonSharpComponent<PHView>();
-        view.game = game; view.local = local;
+        view.game = game; view.local = local; local.view = view;
 
         var rt = AssetDatabase.LoadAssetAtPath<RenderTexture>("Assets/Udon/Generated/Pip.renderTexture");
         if (rt == null)
@@ -464,7 +464,57 @@ public static class WorldSceneBuilder
             Vector3 at = Quaternion.Euler(0f, a, 0f) * Vector3.forward;
             Part(ring, PrimitiveType.Cube, "Seg" + i, at, new Vector3(0f, a, 0f), new Vector3(seg, 0.03f, 0.05f), teal);
         }
+        // two hands on the ring in front (Cor: hand icons, so it is clear it is grabbed), left and right of straight
+        // ahead, upright, facing in; built in the ring's own units (radius 1)
+        for (int side = -1; side <= 1; side += 2)
+        {
+            float a = side * 38f;
+            var hand = Empty(ring, side < 0 ? "HandLeft" : "HandRight");
+            hand.localPosition = Quaternion.Euler(0f, a, 0f) * Vector3.forward + Vector3.up * 0.16f;
+            hand.localRotation = Quaternion.Euler(0f, a, 0f);
+            hand.localScale = new Vector3(-side, 1f, 1f);   // (mirrored: thumbs towards the middle)
+            Part(hand, PrimitiveType.Cube, "Palm", new Vector3(0f, 0f, 0f), Vector3.zero, new Vector3(0.12f, 0.13f, 0.025f), light);
+            for (int f = 0; f < 4; f++)
+                Part(hand, PrimitiveType.Cube, "Finger" + f, new Vector3(-0.045f + f * 0.03f, 0.11f - Mathf.Abs(f - 1.5f) * 0.012f, 0f), Vector3.zero, new Vector3(0.022f, 0.09f, 0.025f), light);
+            Part(hand, PrimitiveType.Cube, "Thumb", new Vector3(0.075f, 0.01f, 0f), new Vector3(0f, 0f, -35f), new Vector3(0.024f, 0.075f, 0.025f), light);
+        }
         view.grabRing = ring; view.ringIdle = teal; view.ringHeld = amber;
+
+        // the final stand's flames on the hider's own gun (PHView.UpdateFire): small additive embers rising from the
+        // muzzle, on the UI layer (the third-person view leaves them out)
+        var fireMat = Mat2("GunFire", Shader.Find("PropHunt/Fx"));
+        fireMat.SetColor("_Color", new Color(1f, 0.55f, 0.15f, 0.9f));
+        fireMat.SetFloat("_Src", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        fireMat.SetFloat("_Dst", (float)UnityEngine.Rendering.BlendMode.One);
+        fireMat.SetFloat("_Round", 1f); fireMat.SetFloat("_Trail", 0f);
+        fireMat.renderQueue = 3000;
+        EditorUtility.SetDirty(fireMat);
+        var fireGo = new GameObject("GunFire");
+        fireGo.transform.SetParent(viewGo.transform, false);
+        fireGo.layer = 5;
+        var fire = fireGo.AddComponent<ParticleSystem>();
+        fire.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var fm = fire.main;
+        fm.playOnAwake = false; fm.loop = false; fm.duration = 1f;
+        fm.simulationSpace = ParticleSystemSimulationSpace.World;
+        fm.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.5f);
+        fm.startSpeed = new ParticleSystem.MinMaxCurve(0.05f, 0.25f);
+        fm.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.05f);
+        fm.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.85f, 0.3f), new Color(1f, 0.35f, 0.05f));
+        fm.gravityModifier = -0.25f;   // (they rise)
+        fm.maxParticles = 120;
+        var fe = fire.emission; fe.enabled = true; fe.rateOverTime = 0f;
+        var fs = fire.shape; fs.enabled = true; fs.shapeType = ParticleSystemShapeType.Sphere; fs.radius = 0.012f;
+        var fc = fire.colorOverLifetime; fc.enabled = true;
+        var fg = new Gradient();
+        fg.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.4f, 0.1f), 1f) },
+                   new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+        fc.color = fg;
+        var fsz = fire.sizeOverLifetime; fsz.enabled = true; fsz.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.3f));
+        var fr = fireGo.GetComponent<ParticleSystemRenderer>();
+        fr.sharedMaterial = fireMat; fr.renderMode = ParticleSystemRenderMode.Billboard;
+        fr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; fr.receiveShadows = false;
+        view.gunFire = fire;
 
         // and the own prop's shape in first person: the cage of its edges (MapBuilderUdon.Cage lends this one object
         // to the local hider's prop; the meshes are PropPrefabBaker's). Off until lent; no collider, no shadows.

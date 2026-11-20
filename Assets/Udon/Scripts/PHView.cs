@@ -63,6 +63,10 @@ public class PHView : UdonSharpBehaviour
     Material outlineMat;               // ...and otherwise (the pieces' own, as built)
     public Transform grabRing;         // unit radius, flat; scaled to RING_R and put round the seat while hiding (VR)
     public Material ringIdle, ringHeld;
+    // the final stand (group playtest: hiders did not know when the gun shoots): the hider's own gun burns while it can
+    // shoot, flames at its muzzle, VR and desktop; nobody else sees them
+    public ParticleSystem gunFire;
+    float fireNext;
     MeshRenderer[] ringRenderers;
     bool ringIsHeld;
     MeshRenderer[] outlineRenderers;
@@ -72,6 +76,9 @@ public class PHView : UdonSharpBehaviour
     readonly Vector3 BUTTON_AT = new Vector3(-0.12f, -0.175f, -0.010f);
     const float CAP_REST = -0.022f, CAP_FRONT = -0.034f, CAP_IN = -0.012f, PRESS_AT = -0.02f;
     const float GRAB_GUARD = 0.5f, ARM_TIME = 0.7f;
+    const float PRESS_SHOW = 0.45f;   // the cap stays down this long after a press (group playtest: a longer visible press)
+    const float CONTACT_R = 0.055f;   // how far round a hand's contact points it counts as touching the cap (Cor: easy to hit)
+    float pressShownUntil;
     bool[] gripHeld = new bool[2];         // 0 left, 1 right
     float[] gripUpAt = new float[2];
     float[] armedUntil = new float[2];
@@ -261,6 +268,9 @@ public class PHView : UdonSharpBehaviour
             if (hider) vrHealth.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(share), 1f);
             if (vrPanel.gameObject.activeSelf != hider)
             {
+                // (group playtest: one player's screen never showed for a whole round. It kept the place it had in the
+                // room from the round before, wherever that now was: it starts beside the view each time hiding begins)
+                if (hider) panelPlaced = false;
                 // still in the hand when the hiding ends (caught, round over): let go first, so the hand is not left holding a hidden pickup
                 if (!hider && vrPanelPickup != null && vrPanelPickup.IsHeld) vrPanelPickup.Drop();
                 vrPanel.gameObject.SetActive(hider);
@@ -640,9 +650,26 @@ public class PHView : UdonSharpBehaviour
         return false;
     }
 
+    // flames at the muzzle while the hider can shoot (the final stand)
+    void UpdateFire()
+    {
+        if (gunFire == null || !local.CanShoot() || Time.time < fireNext) return;
+        fireNext = Time.time + 0.035f;
+        PHWeapons w = local.weapons;
+        Vector3 at;
+        if (vr) { if (!gunOn) return; at = local.VrMuzzle(); }
+        else
+        {
+            if (w == null || w.deskSelectorModel == null || !w.deskSelectorModel.gameObject.activeInHierarchy) return;
+            at = w.DeskMuzzlePoint();
+        }
+        gunFire.transform.position = at;
+        gunFire.Emit(2);
+    }
+
     public override void PostLateUpdate()
     {
-        if (profWatch == null) { PostLateBody(); RenderPip(); return; }
+        if (profWatch == null) { PostLateBody(); UpdateFire(); RenderPip(); return; }
         double p0 = profWatch.Elapsed.TotalMilliseconds;
         PostLateBody();
         RenderPip();
@@ -791,6 +818,8 @@ public class PHView : UdonSharpBehaviour
         vrPanel.localScale = new Vector3(panelBaseScale.x * sc, panelBaseScale.y * sc, panelBaseScale.z);
         VRCPlayerApi.TrackingData origin = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Origin);
         Quaternion inv = Quaternion.Inverse(origin.rotation);
+        // brought back beside the view when it is far from the head (put down and walked away from, a play space reset)
+        if (panelPlaced && !vrPanelPickup.IsHeld && (vrPanel.position - headT.position).sqrMagnitude > (2.5f * sc) * (2.5f * sc)) panelPlaced = false;
         if (!panelPlaced)
         {
             // where it first appears: to the left of the view (Cor: away from the selector's hand), a little below the
@@ -827,7 +856,7 @@ public class PHView : UdonSharpBehaviour
     {
         PHHiderBody b = local.body;
         float eye = me.GetAvatarEyeHeightAsMeters();
-        grabRing.SetPositionAndRotation(b.RingCentre(eye), Quaternion.identity);
+        grabRing.SetPositionAndRotation(b.RingCentre(eye), Quaternion.Euler(0f, b.stationYaw, 0f));   // (its hand icons in front)
         grabRing.localScale = Vector3.one * (PHHiderBody.RING_R * sc);
         bool held = b.ringHand >= 0;
         if (held != ringIsHeld && ringRenderers != null && ringIdle != null && ringHeld != null)
@@ -884,24 +913,40 @@ public class PHView : UdonSharpBehaviour
         for (int h = 0; h < 2; h++)
         {
             if (carried || gripHeld[h] || Time.time - gripUpAt[h] < GRAB_GUARD) { armedUntil[h] = 0f; continue; }
-            Vector3 tip = me.GetBonePosition(h == 0 ? HumanBodyBones.LeftIndexDistal : HumanBodyBones.RightIndexDistal);
-            if (tip.sqrMagnitude < 1e-6f) tip = h == 0 ? lh.position : rh.position;
+            // the hand's contact (Cor: put a contact in the hand): the index fingertip, the middle fingertip and the
+            // hand itself; whichever is nearest the cap counts, within CONTACT_R of its face
+            Vector3 tip = NearestContact(me, h, h == 0 ? lh.position : rh.position, bPos);
             Vector3 p = bInv * (tip - bPos) / sc;
             float r = Mathf.Sqrt(p.x * p.x + p.y * p.y);
-            if (r < 0.06f && p.z < CAP_FRONT - 0.006f && p.z > -0.30f) armedUntil[h] = Time.time + ARM_TIME;
-            if (latched[h] && (p.z < CAP_FRONT - 0.006f || r > 0.08f)) latched[h] = false;
-            if (Time.time >= armedUntil[h] || r > 0.045f || p.z < CAP_FRONT || p.z > 0.03f) continue;
+            if (r < 0.09f && p.z < CAP_FRONT - 0.004f && p.z > -0.30f) armedUntil[h] = Time.time + ARM_TIME;
+            if (latched[h] && (p.z < CAP_FRONT - 0.02f || r > 0.10f)) latched[h] = false;
+            if (Time.time >= armedUntil[h] || r > CONTACT_R || p.z < CAP_FRONT - 0.012f || p.z > 0.05f) continue;
             if (p.z > deepest) deepest = p.z;
-            if (!latched[h] && p.z > PRESS_AT) { latched[h] = true; PressTaunt(h); }
+            if (!latched[h] && p.z > CAP_FRONT + 0.004f) { latched[h] = true; PressTaunt(h); }
         }
         float capZ = deepest > CAP_FRONT ? Mathf.Clamp(deepest + 0.012f, CAP_REST, CAP_IN) : CAP_REST;
+        if (Time.time < pressShownUntil) capZ = CAP_IN;
         tauntCap.localPosition = new Vector3(0f, 0f, capZ);
         bool ready = local.TauntReady();
         if (ready != capIsReady) { capIsReady = ready; tauntCapRenderer.sharedMaterial = ready ? capReady : capWait; }
     }
 
+    Vector3 NearestContact(VRCPlayerApi me, int h, Vector3 hand, Vector3 at)
+    {
+        Vector3 best = hand;
+        Vector3 a = me.GetBonePosition(h == 0 ? HumanBodyBones.LeftIndexDistal : HumanBodyBones.RightIndexDistal);
+        Vector3 b = me.GetBonePosition(h == 0 ? HumanBodyBones.LeftMiddleDistal : HumanBodyBones.RightMiddleDistal);
+        if (a.sqrMagnitude > 1e-6f && (a - at).sqrMagnitude < (best - at).sqrMagnitude) best = a;
+        if (b.sqrMagnitude > 1e-6f && (b - at).sqrMagnitude < (best - at).sqrMagnitude) best = b;
+        return best;
+    }
+
+    // the cap shows a press for PRESS_SHOW (also a trigger press at the button, PHLocal.TriggerButton)
+    public void ShowPress() { pressShownUntil = Time.time + PRESS_SHOW; }
+
     void PressTaunt(int h)
     {
+        ShowPress();
         bool done = local.ButtonTaunt();
         Networking.LocalPlayer.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.08f, 0.8f, 120f);
         if (local.sound != null) local.sound.Play(done ? "click_001" : "error_004", done ? 0.5f : 0.3f);
