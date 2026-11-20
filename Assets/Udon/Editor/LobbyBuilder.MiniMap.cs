@@ -40,7 +40,12 @@ public static partial class LobbyBuilder
         // the map's meshes go into these (the builder's own material); the scenery tiles too
         Material mapMat = builder.wallsFilter != null ? builder.wallsFilter.GetComponent<MeshRenderer>().sharedMaterial : wood;
         mm.dioGround = Holder(model.transform, "Ground", mapMat);
-        mm.dioWalls = Holder(model.transform, "Walls", mapMat);
+        // the walls in their own material (PropHunt/Diorama): cut above the ground floor when the upper floors are off
+        var dioMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/Diorama.mat");
+        if (dioMat == null) { dioMat = new Material(Shader.Find("PropHunt/Diorama")) { name = "Diorama" }; AssetDatabase.CreateAsset(dioMat, "Assets/Udon/Generated/Diorama.mat"); }
+        dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
+        mm.dioMat = dioMat;
+        mm.dioWalls = Holder(model.transform, "Walls", dioMat);
         mm.dioScenery = new MeshFilter[16];
         for (int i = 0; i < mm.dioScenery.Length; i++) mm.dioScenery[i] = Holder(model.transform, "Scenery" + i, mapMat);
 
@@ -77,7 +82,11 @@ public static partial class LobbyBuilder
             mm.pins[i] = pin.transform; mm.pinLabel[i] = tmp;
         }
 
-        // (no card: Cor, the names are on the pins)
+        // (no card: Cor, the names are on the pins). Two buttons on the near edge: the upper floors on or off, and
+        // everyone or one player alone (Cor)
+        var cv = Canvas(table.transform, "Buttons", new Vector3(0f, top + 0.12f, -side / 2 - 0.1f), Quaternion.Euler(35f, 0f, 0f), new Vector2(600f, 80f), 0.002f, true);
+        mm.upperLabel = DebugButton(cv, game, "Upper floors: shown", nameof(PHMiniMap.ToggleUpper), new Vector2(-150, 0), C("f2c45a"), mm);
+        mm.soloLabel = DebugButton(cv, game, "Everyone", nameof(PHMiniMap.NextSolo), new Vector2(150, 0), C("8fc7e8"), mm);
         UdonSharpEditorUtility.CopyProxyToUdon(mm);
         return mm;
     }

@@ -26,6 +26,9 @@ public class PHMiniMap : UdonSharpBehaviour
     public TextMeshPro[] pinLabel;
     public TextMeshProUGUI list, title, waiting;
     public float tableSize = 2.3f;       // the table top's usable side, metres
+    public Material dioMat;              // PropHunt/Diorama on the walls: cut above _ClipY when the upper floors are off
+    public Transform propRoot;           // the map's props in miniature (under model)
+    public TextMeshProUGUI upperLabel, soloLabel;   // the table's two buttons
 
     const int MAXP = 360;                // a point a second: six minutes of hide and hunt
     const float STEP = 1f, MIN_MOVE = 0.3f;
@@ -44,7 +47,12 @@ public class PHMiniMap : UdonSharpBehaviour
     int recRound = -1, shownRound = -1, snapRound = -1, lastPhase = -1;
     float snapAt = -1f;
     bool hasData;
-    GameObject[] shownProp;
+    GameObject[] shownProp;              // per slot * MAXD: a hider's disguise where they stayed a long while in it
+    GameObject[] mapProp; bool[] mapUpper; int nMapProp, propNext = 99999;
+    bool upperOn = true;
+    int solo = -1;                       // the one player shown alone, -1 everyone
+    const float LONG_STAY = 15f, UPPER_Y = 2.0f, CLIP_Y = 2.9f;
+    const int MAX_MAP_PROPS = 400;
     Color[] palette;
 
     void Start()
@@ -54,7 +62,8 @@ public class PHMiniMap : UdonSharpBehaviour
         nameOf = new string[n]; caughtAt = new float[n]; catches = new int[n];
         dDef = new int[n * MAXD]; dTime = new float[n * MAXD]; dBestStill = new float[n * MAXD]; dBestPos = new Vector3[n * MAXD]; dBestYaw = new float[n * MAXD];
         still = new float[n]; stillAt = new Vector3[n]; stillDef = new int[n];
-        shownProp = new GameObject[n];
+        shownProp = new GameObject[n * MAXD];
+        mapProp = new GameObject[MAX_MAP_PROPS]; mapUpper = new bool[MAX_MAP_PROPS];
         palette = new Color[] {
             new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
             new Color(0.85f, 0.5f, 0.9f), new Color(1f, 0.62f, 0.2f), new Color(0.4f, 0.9f, 0.8f), new Color(0.95f, 0.55f, 0.7f) };
@@ -69,6 +78,8 @@ public class PHMiniMap : UdonSharpBehaviour
         if (game.text == null) return;
         if (title != null) title.text = game.text.Get("mini.title");
         if (waiting != null) waiting.text = game.text.Get("mini.waiting");
+        if (upperLabel != null) upperLabel.text = game.text.Get(upperOn ? "mini.upperOn" : "mini.upperOff");
+        if (soloLabel != null) soloLabel.text = solo < 0 || solo >= nameOf.Length ? game.text.Get("mini.all") : Clean(nameOf[solo]);
     }
 
     void Update()
@@ -93,7 +104,8 @@ public class PHMiniMap : UdonSharpBehaviour
         if (show && shownRound != recRound) { shownRound = recRound; FillList(); drawNext = 0; ClearProps(); }
         if (content.activeSelf != show) Show(show);
         // Perf: a path or a prop a frame (all at once was a hitch at END)
-        if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; }
+        if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; if (drawNext >= paths.Length) { propNext = 0; Apply(); } }
+        else if (show && builder.objects != null && propNext < builder.objects.Length) PlaceMapProps();
         if (show) FaceLabels();
     }
 
@@ -222,7 +234,9 @@ public class PHMiniMap : UdonSharpBehaviour
     void ClearProps()
     {
         for (int i = 0; i < shownProp.Length; i++) if (shownProp[i] != null) { Destroy(shownProp[i]); shownProp[i] = null; }
-        for (int i = 0; i < pins.Length; i++) pins[i].gameObject.SetActive(false);
+        for (int i = 0; i < nMapProp; i++) if (mapProp[i] != null) { Destroy(mapProp[i]); mapProp[i] = null; }
+        nMapProp = 0; propNext = 99999; solo = -1;
+        for (int i = 0; i < pins.Length; i++) { pins[i].gameObject.SetActive(false); pinLabel[i].text = ""; }
         for (int i = 0; i < paths.Length; i++) paths[i].gameObject.SetActive(false);
     }
 
@@ -247,30 +261,99 @@ public class PHMiniMap : UdonSharpBehaviour
         lr.startColor = c; lr.endColor = c;
         lr.gameObject.SetActive(true);
         if (roleOf[i] != PHGame.ROLE_HIDER) return;
+        // the disguises they stayed in a long while in one spot (Cor: highlight them), larger than life; the pin with
+        // their name over the one they were longest
         int best = -1;
         for (int j = 0; j < MAXD; j++) { int x = i * MAXD + j; if (dDef[x] >= 0 && (best < 0 || dTime[x] > dTime[best])) best = x; }
         if (best < 0) return;
-        int def = dDef[best];
-        if (def >= 0 && def < builder.propPrefabs.Length && builder.propPrefabs[def] != null)
+        for (int j = 0; j < MAXD; j++)
         {
-            GameObject go = Instantiate(builder.propPrefabs[def]);
-            Transform t = go.transform;
-            Vector3 sc = t.localScale;
-            t.SetParent(model, false);
-            t.localPosition = dBestPos[best] - origin;
-            t.localRotation = Quaternion.Euler(0f, dBestYaw[best], 0f);
-            t.localScale = sc * 2.5f;   // (larger than life on the table: a lamp at true scale was a speck)
-            Collider[] cols = go.GetComponentsInChildren<Collider>(true);
-            for (int q = 0; q < cols.Length; q++) cols[q].enabled = false;
-            Transform[] parts = go.GetComponentsInChildren<Transform>(true);
-            for (int q = 0; q < parts.Length; q++) parts[q].gameObject.layer = 0;
-            shownProp[i] = go;
+            int x = i * MAXD + j;
+            int def = dDef[x];
+            if (def < 0 || (x != best && dBestStill[x] < LONG_STAY)) continue;
+            if (def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
+            GameObject go = Copy(builder.propPrefabs[def], dBestPos[x], dBestYaw[x], 2.5f);   // (a lamp at true scale was a speck)
+            shownProp[x] = go;
         }
         Transform pin = pins[i];
         pin.localPosition = dBestPos[best] - origin;
         pin.gameObject.SetActive(true);
         pinLabel[i].text = Clean(nameOf[i]);
         pinLabel[i].color = c;
+    }
+
+    // a prop's copy on the table: no colliders, on the default layer
+    GameObject Copy(GameObject prefab, Vector3 at, float yaw, float size)
+    {
+        GameObject go = Instantiate(prefab);
+        Transform t = go.transform;
+        Vector3 sc = t.localScale;
+        t.SetParent(model, false);
+        t.localPosition = at - origin;
+        t.localRotation = Quaternion.Euler(0f, yaw, 0f);
+        t.localScale = sc * size;
+        Collider[] cols = go.GetComponentsInChildren<Collider>(true);
+        for (int q = 0; q < cols.Length; q++) cols[q].enabled = false;
+        Transform[] parts = go.GetComponentsInChildren<Transform>(true);
+        for (int q = 0; q < parts.Length; q++) parts[q].gameObject.layer = 0;
+        return go;
+    }
+
+    // the map's own props, true to scale, a few a frame (Cor: show all the props): those that stand on the floor
+    void PlaceMapProps()
+    {
+        GameObject[] objs = builder.objects;
+        int[] par = builder.gen.emitParent, ed = builder.gen.emitDef, fl = builder.gen.defFlags;
+        for (int n = 0; n < 6 && propNext < objs.Length; propNext++)
+        {
+            GameObject src = objs[propNext];
+            if (src == null || nMapProp >= MAX_MAP_PROPS || propNext >= par.Length) continue;
+            if (par[propNext] >= 0 || (fl[ed[propNext]] & GenData.FL_DECOR) != 0) continue;
+            int def = ed[propNext];
+            if (def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
+            Transform st = src.transform;
+            GameObject go = Copy(builder.propPrefabs[def], st.position, st.eulerAngles.y, 1f);
+            mapUpper[nMapProp] = st.position.y - origin.y > UPPER_Y;
+            go.SetActive(upperOn || !mapUpper[nMapProp]);
+            mapProp[nMapProp++] = go;
+            n++;
+        }
+    }
+
+    // the buttons: the upper floors on or off; everyone, or one player alone (each press the next one)
+    public void ToggleUpper() { upperOn = !upperOn; Apply(); }
+
+    public void NextSolo()
+    {
+        int n = paths.Length;
+        for (int k = 1; k <= n + 1; k++)
+        {
+            int c = solo + k;
+            if (c >= n) { solo = -1; break; }
+            if (roleOf[c] != 0 && npts[c] > 0) { solo = c; break; }
+        }
+        Apply();
+    }
+
+    void Apply()
+    {
+        if (dioMat != null) dioMat.SetFloat("_ClipY", upperOn ? 100000f : model.position.y + CLIP_Y * model.localScale.x);
+        for (int i = 0; i < paths.Length; i++)
+        {
+            bool mine = solo < 0 || solo == i;
+            bool has = roleOf[i] != 0 && npts[i] > 0;
+            paths[i].gameObject.SetActive(has && mine);
+            bool pinOn = has && mine && roleOf[i] == PHGame.ROLE_HIDER && pinLabel[i].text != "" && (upperOn || pins[i].localPosition.y <= UPPER_Y);
+            if (pins[i].gameObject.activeSelf != pinOn) pins[i].gameObject.SetActive(pinOn);
+            for (int j = 0; j < MAXD; j++)
+            {
+                GameObject go = shownProp[i * MAXD + j];
+                if (go == null) continue;
+                go.SetActive(mine && (upperOn || go.transform.localPosition.y <= UPPER_Y));
+            }
+        }
+        for (int i = 0; i < nMapProp; i++) if (mapProp[i] != null) mapProp[i].SetActive(upperOn || !mapUpper[i]);
+        SetTitle();
     }
 
     void FillList()
