@@ -22,8 +22,7 @@ public static partial class LobbyBuilder
         {
             var leg = GameObject.CreatePrimitive(PrimitiveType.Cube);
             leg.name = "Leg"; leg.transform.SetParent(stand.transform, false);
-            leg.transform.localPosition = new Vector3(side * 0.95f, 1.2f, 0.06f); leg.transform.localScale = new Vector3(0.07f, 2.4f, 0.07f);
-            leg.transform.localRotation = Quaternion.Euler(-6f, 0f, 0f);
+            leg.transform.localPosition = new Vector3(side * 0.95f, 1.2f, 0.09f); leg.transform.localScale = new Vector3(0.07f, 2.4f, 0.07f);
             Object.DestroyImmediate(leg.GetComponent<Collider>());
             var lr = leg.GetComponent<MeshRenderer>(); lr.sharedMaterial = wood; lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             SetColour(leg, C("8a5a34"));
@@ -63,6 +62,8 @@ public static partial class LobbyBuilder
         int n = game.slots != null && game.slots.Length > 0 ? game.slots.Length : 32;
         var lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/MiniMapLine.mat");
         if (lineMat == null) { lineMat = new Material(Shader.Find("Sprites/Default")) { name = "MiniMapLine" }; AssetDatabase.CreateAsset(lineMat, "Assets/Udon/Generated/MiniMapLine.mat"); }
+        lineMat.renderQueue = 3100;   // after the board's UI (3000), which drew over the lines
+        EditorUtility.SetDirty(lineMat);
         mm.paths = new LineRenderer[n]; mm.marks = new RectTransform[n]; mm.markImage = new Image[n];
         for (int i = 0; i < n; i++)
         {
@@ -70,7 +71,7 @@ public static partial class LobbyBuilder
             go.transform.SetParent(photo, false);
             var lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = false; lr.alignment = LineAlignment.TransformZ;
-            lr.widthMultiplier = 0.008f; lr.numCapVertices = 2; lr.numCornerVertices = 2;
+            lr.widthMultiplier = 4f;   // (in the canvas's units: the line is drawn in its space, 2 mm a unit) lr.numCapVertices = 2; lr.numCornerVertices = 2;
             lr.sharedMaterial = lineMat; lr.positionCount = 0;
             lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; lr.receiveShadows = false;
             go.SetActive(false);
@@ -85,7 +86,7 @@ public static partial class LobbyBuilder
         var camGo = new GameObject("MiniMapCamera");
         camGo.transform.SetParent(lobby, false);
         var cam = camGo.AddComponent<Camera>();
-        cam.orthographic = true; cam.orthographicSize = 40f; cam.nearClipPlane = 1f; cam.farClipPlane = 600f;
+        cam.orthographic = true; cam.orthographicSize = 40f; cam.nearClipPlane = 0.5f; cam.farClipPlane = 60f;
         cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = C("4f7a47"); cam.allowHDR = false; cam.allowMSAA = false;
         cam.cullingMask = ~((1 << 5) | (1 << 9) | (1 << 10) | (1 << 12) | (1 << 18) | (1 << 19) | (1 << 22) | (1 << 23));
         cam.targetTexture = rt;

@@ -152,7 +152,8 @@ public class PHMiniMap : UdonSharpBehaviour
         centre = builder.transform.position + new Vector3(w * 0.5f, 0f, d * 0.5f);
         half = Mathf.Max(w, d) * 0.5f + 2f;
         cam.orthographicSize = half;
-        cam.transform.SetPositionAndRotation(centre + Vector3.up * 200f, Quaternion.Euler(90f, 0f, 0f));
+        // just over the roofs, under the clouds (they drift over the map, and a photo from high up had them in it)
+        cam.transform.SetPositionAndRotation(centre + Vector3.up * 24f, Quaternion.Euler(90f, 0f, 0f));
         bool roofs = builder.roofsFilter != null && builder.roofsFilter.GetComponent<MeshRenderer>().enabled;
         float fs = RenderSettings.fogStartDistance, fe = RenderSettings.fogEndDistance;
         RenderSettings.fogStartDistance = 4000f; RenderSettings.fogEndDistance = 5000f;

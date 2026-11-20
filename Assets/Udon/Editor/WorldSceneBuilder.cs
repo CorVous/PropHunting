@@ -24,8 +24,8 @@ public static class WorldSceneBuilder
     // 5 cm up so its floor does not fight the map's ground plane, which reaches out under it
     static readonly Vector3 LobbyOrigin = new Vector3(-170f, 0.05f, -170f);
     const float RoomW = 24f, RoomD = 22f, WallH = 7f, ZoneHalf = 5.5f;
-    static readonly Vector3 MiniMapAt = new Vector3(6.8f, 0f, -6.0f);   // the LAST ROUND easel, lobby space (centre of the room at 0, north +z)
-    const float MiniMapYaw = 131f;                                         // its face turned towards the room's middle
+    static readonly Vector3 MiniMapAt = new Vector3(-7.0f, 0f, -5.0f);   // the LAST ROUND easel, lobby space (centre of the room at 0, north +z)
+    const float MiniMapYaw = -125f;                                         // its face turned towards the room's middle
     const int SLOTS = 32;
 
     // the credits board alone, after CREDITS.md changes (the open scene's lobby keeps everything else)
