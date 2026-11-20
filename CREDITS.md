@@ -104,6 +104,7 @@ Other assets, under other licences:
 | DejaVu Sans Bold | DejaVu fonts | control legend key letters | DejaVu fonts licence | https://dejavu-fonts.github.io/License.html |
 | Noto Sans, Noto Sans JP, KR, SC, TC, Arabic and Thai | Google (Noto) | translated text: Japanese, Korean, Chinese, Arabic, Thai, Vietnamese letters | SIL OFL 1.1 | https://github.com/notofonts |
 | Rubik | The Rubik Project Authors | translated text: Cyrillic, Hebrew and Central European letters | SIL OFL 1.1 | https://github.com/googlefonts/rubik |
+| nasin sitelen pu mono | jan Ke Tami, kili pan Juli (glyphs after Sonja Lang and jan Pensa) | Toki Pona in sitelen pona | CC0 1.0 | https://github.com/RetSamys/nasin-sitelen-pu |
 
 Other software: Unity 2022.3.22f1; the VRChat world template and SDK (not part of the browser build).
 

@@ -26,20 +26,28 @@ public static class TextBaker
 
     // the languages, in the board's order: VRChat's codes and each one's name in itself
     public static readonly string[] Codes = { "en", "ja", "ko", "zh-CN", "zh-HK", "es", "fr", "de", "pt-BR", "ru", "it", "pl",
-        "id", "nl", "sv", "uk", "da", "no", "fi", "hu", "cs", "tr", "ro", "vi", "ar", "he", "th", "tok" };
+        "id", "nl", "sv", "uk", "da", "no", "fi", "hu", "cs", "tr", "ro", "vi", "ar", "he", "th", "tok", "tok-sp" };
     public static readonly string[] Names = { "English", "日本語", "한국어", "简体中文", "繁體中文", "Español", "Français", "Deutsch", "Português", "Русский", "Italiano", "Polski",
-        "Indonesia", "Nederlands", "Svenska", "Українська", "Dansk", "Norsk", "Suomi", "Magyar", "Čeština", "Türkçe", "Română", "Tiếng Việt", "العربية", "עברית", "ไทย", "toki pona" };
+        "Indonesia", "Nederlands", "Svenska", "Українська", "Dansk", "Norsk", "Suomi", "Magyar", "Čeština", "Türkçe", "Română", "Tiếng Việt", "العربية", "עברית", "ไทย", "toki pona", "sitelen pona" };
     // which column's characters go to which fallback font first (a Han character used by Japanese and Chinese takes the
     // Japanese shape: one fallback chain serves every language)
     // (Latin letters the Kenney fonts hold come from them; Cyrillic and Latin Extended-A from Rubik; Vietnamese from Noto Sans)
     static readonly string[] FontFor = { null, "NotoSansJP", "NotoSansKR", "NotoSansSC", "NotoSansTC", null, null, null, null, "Rubik", null, "Rubik",
-        null, null, null, "Rubik", null, null, null, "Rubik", "Rubik", "Rubik", "Rubik", "NotoSans", "NotoSansArabic", "Rubik", "NotoSansThai", null };
+        null, null, null, "Rubik", null, null, null, "Rubik", "Rubik", "Rubik", "Rubik", "NotoSans", "NotoSansArabic", "Rubik", "NotoSansThai", null, null };
     static readonly string[] FontOrder = { "NotoSansJP", "NotoSansKR", "NotoSansSC", "NotoSansTC", "Rubik", "NotoSans", "NotoSansArabic", "NotoSansThai" };
     // right to left: shaped (Arabic) and put in visual order at bake time (RtlText)
     static readonly string[] Rtl = { "ar", "he" };
 
     // a language's own name as the board draws it (right-to-left ones shaped and in visual order)
-    public static string DisplayName(int i) { string c = Codes[i]; return c == "ar" || c == "he" ? RtlText.Visual(Names[i], c == "ar") : Names[i]; }
+    public static string DisplayName(int i)
+    {
+        string c = Codes[i];
+        if (c == "tok-sp") return SitelenPona.Write(Names[i]);
+        return c == "ar" || c == "he" ? RtlText.Visual(Names[i], c == "ar") : Names[i];
+    }
+    // "tok-sp" (sitelen pona) is no column of its own in the TSVs: it is the "tok" column written in the script
+    const string SpCode = "tok-sp";
+    public const string SpFont = FontDir + "NasinSitelenPuMono.otf";
 
     public class Table
     {
@@ -79,9 +87,11 @@ public static class TextBaker
                     int l = System.Array.IndexOf(Codes, code);
                     if (!string.IsNullOrEmpty(row[l])) row[l] = RtlText.Visual(row[l], code == "ar");
                 }
+                int sp = System.Array.IndexOf(Codes, SpCode), tk = System.Array.IndexOf(Codes, "tok");
+                if (string.IsNullOrEmpty(row[sp]) && !string.IsNullOrEmpty(row[tk])) row[sp] = SitelenPona.Write(row[tk]);
                 var gaps = new List<string>();
-                for (int l = 1; l < row.Length; l++) if (string.IsNullOrEmpty(row[l])) { row[l] = row[0]; gaps.Add(Codes[l]); }
-                if (gaps.Count > 0) t.missing.Add(key + " (" + (gaps.Count == Codes.Length - 1 ? "all" : string.Join(" ", gaps)) + ")");
+                for (int l = 1; l < row.Length; l++) if (string.IsNullOrEmpty(row[l])) { row[l] = row[0]; if (l != sp) gaps.Add(Codes[l]); }
+                if (gaps.Count > 0) t.missing.Add(key + " (" + (gaps.Count >= Codes.Length - 2 ? "all" : string.Join(" ", gaps)) + ")");
                 if (key.StartsWith("prop:")) { t.props[key.Substring(5)] = row; continue; }
                 if (at.TryGetValue(key, out int was)) { t.warnings.Add(Path.GetFileName(path) + ":" + n + " " + key + " repeats an earlier key (this one wins)"); t.rows[was] = row; continue; }
                 at[key] = t.keys.Count; t.keys.Add(key); t.rows.Add(row);
@@ -228,7 +238,7 @@ public static class TextBaker
         var assigned = new HashSet<char>();
         foreach (char c in all)
         {
-            if (c < 0x20 || char.IsWhiteSpace(c)) { assigned.Add(c); continue; }
+            if (c < 0x20 || char.IsWhiteSpace(c) || char.IsSurrogate(c)) { assigned.Add(c); continue; }
             if (future != null && future.HasCharacter(c, false)) { assigned.Add(c); continue; }
             if (kenneyCover.Contains(c)) { latin.Add(c); assigned.Add(c); }
         }
@@ -263,6 +273,22 @@ public static class TextBaker
             }
             if (fa != null) chain.Add(fa);
         }
+        // sitelen pona: the glyphs (UCSUR, beyond the 16-bit range) of the derived column, from nasin sitelen pu mono
+        var spCodes = new SortedSet<uint>();
+        foreach (var row in rows)
+        {
+            string v = row[System.Array.IndexOf(Codes, SpCode)];
+            for (int i = 0; i < v.Length; i++)
+                if (char.IsHighSurrogate(v[i]) && i + 1 < v.Length) { spCodes.Add((uint)char.ConvertToUtf32(v[i], v[i + 1])); i++; }
+        }
+        spCodes.Add((uint)SitelenPona.MiddleDot);
+        var spFont = AssetDatabase.LoadAssetAtPath<Font>(SpFont);
+        if (spFont != null && spCodes.Count > 0)
+        {
+            var sa = AtlasCodes(spFont, FontDir + "SitelenPona SDF.asset", spCodes.ToArray());
+            if (sa != null) chain.Add(sa);
+        }
+        else if (spCodes.Count > 1) Debug.LogError("[prophunt] text: missing " + SpFont);
         var latinChars = new string(latin.ToArray());
         var futureExtra = latin.Count > 0 && kenneyTtf != null ? Atlas(kenneyTtf, FontDir + "KenneyFuture Extra SDF.asset", latinChars) : null;
         var rocketExtra = latin.Count > 0 && rocketTtf != null ? Atlas(rocketTtf, FontDir + "KenneyRocket Extra SDF.asset", new string(latin.Where(Cmap(RocketTtf).Contains).ToArray())) : null;
@@ -305,6 +331,25 @@ public static class TextBaker
         fa.atlasPopulationMode = AtlasPopulationMode.Static;
         string name = Path.GetFileNameWithoutExtension(path);
         // a fresh asset every bake (the fallback lists are set again right after)
+        if (AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path) != null) AssetDatabase.DeleteAsset(path);
+        AssetDatabase.CreateAsset(fa, path);
+        fa.atlasTextures[0].name = name + " Atlas";
+        AssetDatabase.AddObjectToAsset(fa.atlasTextures[0], fa);
+        fa.material.name = name + " Material";
+        AssetDatabase.AddObjectToAsset(fa.material, fa);
+        EditorUtility.SetDirty(fa);
+        return fa;
+    }
+
+    // the same for codepoints beyond the 16-bit range (sitelen pona)
+    static TMP_FontAsset AtlasCodes(Font font, string path, uint[] codes)
+    {
+        int n = codes.Length, size = n <= 45 ? 512 : (n <= 190 ? 1024 : 2048);
+        UnityEngine.TextCore.LowLevel.FontEngine.LoadFontFace(font, 56);
+        var fa = TMP_FontAsset.CreateFontAsset(font, 56, 7, GlyphRenderMode.SDFAA, size, size, AtlasPopulationMode.Dynamic, false);
+        if (!fa.TryAddCharacters(codes, out uint[] missing)) Debug.LogWarning("[prophunt] text: " + Path.GetFileName(path) + " is missing " + (missing != null ? missing.Length : 0) + " glyphs");
+        fa.atlasPopulationMode = AtlasPopulationMode.Static;
+        string name = Path.GetFileNameWithoutExtension(path);
         if (AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path) != null) AssetDatabase.DeleteAsset(path);
         AssetDatabase.CreateAsset(fa, path);
         fa.atlasTextures[0].name = name + " Atlas";
