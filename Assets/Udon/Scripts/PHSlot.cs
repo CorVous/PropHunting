@@ -136,7 +136,7 @@ public class PHSlot : UdonSharpBehaviour
         if (!seated) return;
         station.ExitStation(Networking.LocalPlayer);
         seated = false;
-        nextSit = Time.time + 0.3f;
+        nextSit = Time.time + 0.6f;   // (a wider gap: the exit should reach everyone before the enter does)
     }
 
     // A slot is reused when its player leaves and someone else joins: everything the last player left in it
