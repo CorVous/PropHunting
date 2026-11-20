@@ -289,7 +289,7 @@ public class PHLocal : UdonSharpBehaviour
             float gain = 15f, near = 0f, far = 25f, radius = 0f;
             bool lowpass = true;
             if (want == 2) gain = 0f;
-            else if (want == 3) { near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }
+            else if (want == 3) { gain = 9f; near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }   // (quieter: Cor's group playtest)
             p.SetVoiceGain(gain);
             p.SetVoiceDistanceNear(near);
             p.SetVoiceDistanceFar(far);
@@ -1016,6 +1016,11 @@ public class PHLocal : UdonSharpBehaviour
         {
             VRCPlayerApi.TrackingData t = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
             o = t.position; dir = t.rotation * Vector3.forward;
+            // in third person the view (and its tracking) sits a few metres behind the avatar, so the reach would end
+            // before it got past the player (Cor's group playtest: no attacks in third person): reach from the
+            // avatar's own head, along the view
+            Vector3 hb = Networking.LocalPlayer.GetBonePosition(HumanBodyBones.Head);
+            if (hb != Vector3.zero && (hb - o).sqrMagnitude > 0.25f) o = hb;
         }
         any = Physics.SphereCast(o, 0.15f, dir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
         hit = r;

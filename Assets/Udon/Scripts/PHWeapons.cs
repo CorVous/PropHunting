@@ -457,8 +457,7 @@ public class PHWeapons : UdonSharpBehaviour
         mySwingStruck = false;
         int mine = game.SlotOf(Networking.LocalPlayer.playerId);
         if (mine >= 0) { trailUntil[mine] = Time.time + SWING_HIT_AT + 0.12f; }
-        sound.Play(Random.Range(0, 2) == 0 ? "knifeSlice" : "knifeSlice2", 0.55f);
-        return true;
+        return true;   // (no swing sound: Cor's group playtest, only hits are heard)
     }
 
     // VR: the head of the weapon sweeps; a fast enough sweep strikes the first thing it passes through
@@ -479,8 +478,7 @@ public class PHWeapons : UdonSharpBehaviour
             float handSpeed = (w.position - prevGrip).magnitude / dt;
             if (whooshArmed && speed > WHOOSH_SPEED * sc && handSpeed > WHOOSH_HAND * sc)
             {
-                whooshArmed = false;
-                sound.PlayAt(Random.Range(0, 2) == 0 ? "knifeSlice" : "knifeSlice2", tip, 6f, 0.35f, 1f);
+                whooshArmed = false;   // (a real swing; no sound for it any more, Cor's group playtest)
             }
             else if (speed < WHOOSH_REARM * sc) whooshArmed = true;
             if (fast && Time.time >= nextVrHit && local.CanStrike())
@@ -513,7 +511,6 @@ public class PHWeapons : UdonSharpBehaviour
         {
             swingAt[slot] = Time.time;
             trailUntil[slot] = Time.time + SWING_HIT_AT + 0.12f;
-            sound.PlayAt(Random.Range(0, 2) == 0 ? "knifeSlice" : "knifeSlice2", p.GetPosition() + Vector3.up, 8f, 0.4f, 1f);
         }
         if (kind == 1) Burst(fxSpark, point, 10);
         else if (kind == 2) { Burst(fxDust, point, 8); Burst(fxChips, point, 10); sound.PlayAt("chop", point, 14f, 0.8f, Random.Range(0.92f, 1.08f)); }

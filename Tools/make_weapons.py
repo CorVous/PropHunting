@@ -128,7 +128,8 @@ def frame_melee(V, flip_end=False):
 
 # guns the rules get wrong: 'flip' = muzzle and stock swapped, 'swap' = the barrel is the shorter level axis (a crossbow
 # is wider than long)
-GUN_FIX = {('quaternius-scifigun', 'Lightning Gun'): 'flip',
+GUN_FIX = {('quaternius-scifigun', 'Lightning Gun'): 'flip', ('quaternius-low-poly-animated-guns', 'P90'): 'flip',
+           ('quaternius-50-lowpoly-guns', 'SubmachineGun_3'): 'flip',
            ('quaternius-scifimodularguns', 'Crossbow_1'): 'swap', ('quaternius-scifimodularguns', 'Crossbow_2'): 'swap'}
 
 
