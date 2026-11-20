@@ -1,46 +1,50 @@
 using TMPro;
 using UdonSharp;
 using UnityEngine;
-using UnityEngine.UI;
 using VRC.SDKBase;
 
-// The LAST ROUND board in the lobby (Cor's group playtest, item 40: a mini map with paths and stats). A top-down
-// photo of the round's map, every player's path over it, a mark where each hider ended (a cross where caught), and a
-// short list: who, how far they went, caught when or survived. Shown from the END reveal until the next round's map
-// starts loading; blank before the first round.
-// Nothing is synced here: each client samples the positions it already has (a hider's synced prop position, or the
-// player while they walk as themselves; a hunter's avatar) once a second through the hide and the hunt. A player
-// who joins mid-round has the path from when they joined.
+// The LAST ROUND diorama in the ready area (Cor's group playtest, item 40; then "a 3D diorama style instead, showing
+// what props people hid as for the most time, on a table in the play area"): the last round's map in miniature on a
+// table (its ground, walls and scenery, the roofs off), every player's path over it, and each hider's disguise of
+// the round, the one they were longest, standing where they stayed longest in it, with their name on a pin; a card
+// on the table's edge lists who went how far and who was caught when.
+// The map's meshes are the builder's own (shared, nothing copied); the hiders' props are copies of the map's prop
+// prefabs, colliders off. Shown from the END reveal until the next map starts loading; blank before the first round.
+// Nothing is synced: each client samples positions it already has (a hider's synced prop position and disguise, or
+// the player while they walk as themselves; a hunter's avatar) once a second through the hide and the hunt.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHMiniMap : UdonSharpBehaviour
 {
     public PHGame game;
     public MapBuilderUdon builder;
-    public Camera cam;                   // off; renders the photo once per map (Render() by hand)
-    public GameObject content;           // the photo, the paths, the marks and the list (off when there is nothing to show)
-    public RectTransform mapRect;        // the photo's rectangle: the paths and marks are laid in its local space
-    public LineRenderer[] paths;         // one per slot
-    public RectTransform[] marks;        // one per slot: where they ended
-    public Image[] markImage;
-    public Sprite markEnd, markCaught;
+    public Transform model;              // the miniature's root on the table top (its scale set per map)
+    public GameObject content;           // the miniature, the paths, the pins and the list (off when there is nothing)
+    public MeshFilter dioGround, dioWalls;
+    public MeshFilter[] dioScenery;      // the merged scenery tiles (fences, hedges, trees)
+    public LineRenderer[] paths;         // one per slot, under model
+    public Transform[] pins;             // one per slot: a pin over the hider's prop, its name on it
+    public TextMeshPro[] pinLabel;
     public TextMeshProUGUI list, title, waiting;
+    public float tableSize = 2.3f;       // the table top's usable side, metres
 
     const int MAXP = 360;                // a point a second: six minutes of hide and hunt
     const float STEP = 1f, MIN_MOVE = 0.3f;
+    const int MAXD = 6;                  // disguises remembered per hider
     Vector3[] pts;                       // slot * MAXP + i
     int[] npts;
     float[] dist;
-    int[] roleOf;                        // the slot's role this round (0 none)
-    int[] playerOf;
+    int[] roleOf, playerOf, catches;
     string[] nameOf;
     float[] caughtAt;                    // seconds into the hunt, -1 survived
-    int[] catches;
-    float huntStart, nextSample, half;
-    Vector3 centre;
-    int recRound = -1, shownRound = -1, photoRound = -1, lastPhase = -1;
-    float photoAt = -1f;
+    // per hider and disguise (slot * MAXD + k): the def, its seconds, the longest stay in it and where
+    int[] dDef; float[] dTime, dBestStill; Vector3[] dBestPos; float[] dBestYaw;
+    float[] still; Vector3[] stillAt; int[] stillDef;
+    float huntStart, nextSample;
+    Vector3 origin;                      // the map's middle on the ground: the table's middle
+    int recRound = -1, shownRound = -1, snapRound = -1, lastPhase = -1;
+    float snapAt = -1f;
     bool hasData;
-
+    GameObject[] shownProp;
     Color[] palette;
 
     void Start()
@@ -48,6 +52,9 @@ public class PHMiniMap : UdonSharpBehaviour
         int n = paths.Length;
         pts = new Vector3[n * MAXP]; npts = new int[n]; dist = new float[n]; roleOf = new int[n]; playerOf = new int[n];
         nameOf = new string[n]; caughtAt = new float[n]; catches = new int[n];
+        dDef = new int[n * MAXD]; dTime = new float[n * MAXD]; dBestStill = new float[n * MAXD]; dBestPos = new Vector3[n * MAXD]; dBestYaw = new float[n * MAXD];
+        still = new float[n]; stillAt = new Vector3[n]; stillDef = new int[n];
+        shownProp = new GameObject[n];
         palette = new Color[] {
             new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
             new Color(0.85f, 0.5f, 0.9f), new Color(1f, 0.62f, 0.2f), new Color(0.4f, 0.9f, 0.8f), new Color(0.95f, 0.55f, 0.7f) };
@@ -55,7 +62,7 @@ public class PHMiniMap : UdonSharpBehaviour
         Show(false);
     }
 
-    public void _OnTextLanguage() { if (hasData && content.activeSelf) Fill(); else SetTitle(); }
+    public void _OnTextLanguage() { if (hasData && content.activeSelf) FillList(); else SetTitle(); }
 
     void SetTitle()
     {
@@ -67,11 +74,11 @@ public class PHMiniMap : UdonSharpBehaviour
     void Update()
     {
         int phase = game.phase;
-        // a new round's map: the photo, a moment after it is built (as the map trail's); the paths start again
-        if (game.MapReady && game.round != photoRound && phase != PHGame.PH_LOBBY)
+        // a new round's map: the miniature takes its meshes a moment after it is built (the scenery is merged last)
+        if (game.MapReady && game.round != snapRound && phase != PHGame.PH_LOBBY)
         {
-            if (photoAt < 0f) photoAt = Time.time + 1.5f;
-            else if (Time.time >= photoAt) { Photo(); photoRound = game.round; photoAt = -1f; }
+            if (snapAt < 0f) snapAt = Time.time + 2f;
+            else if (Time.time >= snapAt) { Snap(); snapRound = game.round; snapAt = -1f; }
         }
         if (phase != lastPhase)
         {
@@ -81,32 +88,20 @@ public class PHMiniMap : UdonSharpBehaviour
         }
         bool rec = recRound == game.round && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT);
         if (rec && Time.time >= nextSample) { nextSample = Time.time + STEP; Sample(phase == PHGame.PH_HUNT); }
-        // shown from the reveal until the next map starts loading
-        bool show = hasData && (phase == PHGame.PH_END || phase == PHGame.PH_LOBBY);
-        if (show && shownRound != recRound) { shownRound = recRound; Fill(); }
+        // shown from the reveal until the next map starts loading (and only while the miniature has its map)
+        bool show = hasData && snapRound == recRound && dioWalls.sharedMesh != null && (phase == PHGame.PH_END || phase == PHGame.PH_LOBBY);
+        if (show && shownRound != recRound) { shownRound = recRound; FillList(); drawNext = 0; ClearProps(); }
         if (content.activeSelf != show) Show(show);
-        // Perf: the paths are laid one a frame (a path is up to 360 points; all of them at once was a hitch at END)
-        if (show && drawNext < paths.Length)
-        {
-            while (drawNext < paths.Length && !paths[drawNext].gameObject.activeSelf) drawNext++;
-            if (drawNext < paths.Length) { DrawPath(drawNext); drawNext++; }
-        }
+        // Perf: a path or a prop a frame (all at once was a hitch at END)
+        if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; }
     }
 
     int drawNext = 9999;
-    Rect mapR;
-
-    void DrawPath(int i)
-    {
-        LineRenderer lr = paths[i];
-        int k = npts[i];
-        lr.positionCount = k;
-        for (int j = 0; j < k; j++) lr.SetPosition(j, OnMap(pts[i * MAXP + j]));
-    }
 
     void Show(bool on)
     {
         content.SetActive(on);
+        if (list != null) list.gameObject.SetActive(on);
         if (waiting != null) waiting.gameObject.SetActive(!on);
         SetTitle();
     }
@@ -119,7 +114,9 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int i = 0; i < npts.Length; i++)
         {
             npts[i] = 0; dist[i] = 0f; caughtAt[i] = -1f; catches[i] = 0; roleOf[i] = 0; playerOf[i] = 0; nameOf[i] = "";
+            still[i] = 0f; stillDef[i] = -1;
         }
+        for (int k = 0; k < dDef.Length; k++) { dDef[k] = -1; dTime[k] = 0f; dBestStill[k] = 0f; }
     }
 
     void Sample(bool hunt)
@@ -137,7 +134,9 @@ public class PHMiniMap : UdonSharpBehaviour
             if (role == PHGame.ROLE_HIDER)
             {
                 if (s.caught) { if (caughtAt[i] < 0f) caughtAt[i] = hunt ? Time.time - huntStart : 0f; continue; }
-                Add(i, s.def >= 0 ? s.propPos : p.GetPosition());
+                Vector3 at = s.def >= 0 ? s.propPos : p.GetPosition();
+                Add(i, at);
+                if (s.def >= 0) Dwell(i, s.def, at, s.propYaw);
             }
             else if (role == PHGame.ROLE_HUNTER && hunt)
             {
@@ -145,6 +144,24 @@ public class PHMiniMap : UdonSharpBehaviour
                 Add(i, p.GetPosition());
             }
         }
+    }
+
+    // a second in a disguise: its time, and the longest it stood still in it (where, facing which way)
+    void Dwell(int i, int def, Vector3 at, float yaw)
+    {
+        int k = -1, free = -1;
+        for (int j = 0; j < MAXD; j++)
+        {
+            int x = i * MAXD + j;
+            if (dDef[x] == def) { k = x; break; }
+            if (dDef[x] < 0 && free < 0) free = x;
+        }
+        if (k < 0) { if (free < 0) return; k = free; dDef[k] = def; dTime[k] = 0f; dBestStill[k] = 0f; dBestPos[k] = at; dBestYaw[k] = yaw; }
+        dTime[k] += STEP;
+        Vector3 d = at - stillAt[i];
+        if (stillDef[i] == def && new Vector2(d.x, d.z).magnitude < 0.5f) still[i] += STEP;
+        else { still[i] = STEP; stillAt[i] = at; stillDef[i] = def; }
+        if (still[i] >= dBestStill[k]) { dBestStill[k] = still[i]; dBestPos[k] = at; dBestYaw[k] = yaw; }
     }
 
     void Add(int i, Vector3 at)
@@ -162,64 +179,107 @@ public class PHMiniMap : UdonSharpBehaviour
         npts[i] = k + 1;
     }
 
-    // the photo: straight down over the site, the roofs off for the frame, the fog pushed out (the camera is high up)
-    void Photo()
+    // the miniature takes the map's own meshes (ground, walls, merged scenery; no roofs), scaled to the table
+    void Snap()
     {
         float w = builder.SiteWidth(), d = builder.SiteDepth();
-        centre = builder.transform.position + new Vector3(w * 0.5f, 0f, d * 0.5f);
-        half = Mathf.Max(w, d) * 0.5f + 2f;
-        cam.orthographicSize = half;
-        // just over the roofs, under the clouds (they drift over the map, and a photo from high up had them in it)
-        cam.transform.SetPositionAndRotation(centre + Vector3.up * 24f, Quaternion.Euler(90f, 0f, 0f));
-        bool roofs = builder.roofsFilter != null && builder.roofsFilter.GetComponent<MeshRenderer>().enabled;
-        float fs = RenderSettings.fogStartDistance, fe = RenderSettings.fogEndDistance;
-        RenderSettings.fogStartDistance = 4000f; RenderSettings.fogEndDistance = 5000f;
-        builder.ShowRoofs(false);
-        cam.Render();
-        builder.ShowRoofs(roofs);
-        RenderSettings.fogStartDistance = fs; RenderSettings.fogEndDistance = fe;
+        origin = builder.transform.position + new Vector3(w * 0.5f, 0f, d * 0.5f);
+        float k = tableSize / Mathf.Max(8f, Mathf.Max(w, d));
+        model.localScale = new Vector3(k, k, k);
+        Place(dioGround, builder.groundFilter);
+        Place(dioWalls, builder.wallsFilter);
+        int n = builder.SceneryTileCount();
+        for (int i = 0; i < dioScenery.Length; i++)
+        {
+            GameObject tile = i < n ? builder.SceneryTile(i) : null;
+            MeshFilter f = tile != null ? tile.GetComponent<MeshFilter>() : null;
+            if (f == null || f.sharedMesh == null) { dioScenery[i].gameObject.SetActive(false); continue; }
+            // (only what lies on and near the map: the far hills and the sky ring stay out)
+            if ((tile.transform.position + f.sharedMesh.bounds.center - origin).magnitude > Mathf.Max(w, d)) { dioScenery[i].gameObject.SetActive(false); continue; }
+            Place(dioScenery[i], f);
+        }
     }
 
-    // a world position on the photo, in the photo rectangle's local space (its pivot in the middle)
-    Vector3 OnMap(Vector3 p)
+    void Place(MeshFilter dio, MeshFilter src)
     {
-        Rect r = mapR;
-        float u = half > 0f ? (p.x - centre.x) / (2f * half) : 0f, v = half > 0f ? (p.z - centre.z) / (2f * half) : 0f;
-        return new Vector3(Mathf.Clamp(u, -0.5f, 0.5f) * r.width, Mathf.Clamp(v, -0.5f, 0.5f) * r.height, -2f);
+        if (dio == null) return;
+        if (src == null || src.sharedMesh == null) { dio.gameObject.SetActive(false); return; }
+        dio.sharedMesh = src.sharedMesh;
+        Transform t = dio.transform;
+        t.localPosition = src.transform.position - origin;
+        t.localRotation = src.transform.rotation;
+        t.localScale = src.transform.lossyScale;
+        dio.gameObject.SetActive(true);
     }
 
-    void Fill()
+    void ClearProps()
+    {
+        for (int i = 0; i < shownProp.Length; i++) if (shownProp[i] != null) { Destroy(shownProp[i]); shownProp[i] = null; }
+        for (int i = 0; i < pins.Length; i++) pins[i].gameObject.SetActive(false);
+        for (int i = 0; i < paths.Length; i++) paths[i].gameObject.SetActive(false);
+    }
+
+    Color ColourOf(int i)
+    {
+        if (roleOf[i] == PHGame.ROLE_HUNTER) return new Color(0.92f, 0.2f, 0.18f);
+        int c = 0;
+        for (int j = 0; j < i; j++) if (roleOf[j] == PHGame.ROLE_HIDER && npts[j] > 0) c++;
+        return palette[c % palette.Length];
+    }
+
+    // one player's path, and a hider's longest disguise standing where they stayed longest in it
+    void DrawOne(int i)
+    {
+        int k = npts[i];
+        if (roleOf[i] == 0 || k == 0) return;
+        Color c = ColourOf(i);
+        LineRenderer lr = paths[i];
+        lr.positionCount = k;
+        for (int j = 0; j < k; j++) lr.SetPosition(j, pts[i * MAXP + j] - origin + new Vector3(0f, 0.3f, 0f));
+        lr.widthMultiplier = 0.006f / Mathf.Max(0.001f, model.localScale.x);
+        lr.startColor = c; lr.endColor = c;
+        lr.gameObject.SetActive(true);
+        if (roleOf[i] != PHGame.ROLE_HIDER) return;
+        int best = -1;
+        for (int j = 0; j < MAXD; j++) { int x = i * MAXD + j; if (dDef[x] >= 0 && (best < 0 || dTime[x] > dTime[best])) best = x; }
+        if (best < 0) return;
+        int def = dDef[best];
+        if (def >= 0 && def < builder.propPrefabs.Length && builder.propPrefabs[def] != null)
+        {
+            GameObject go = Instantiate(builder.propPrefabs[def]);
+            Transform t = go.transform;
+            Vector3 sc = t.localScale;
+            t.SetParent(model, false);
+            t.localPosition = dBestPos[best] - origin;
+            t.localRotation = Quaternion.Euler(0f, dBestYaw[best], 0f);
+            t.localScale = sc;
+            Collider[] cols = go.GetComponentsInChildren<Collider>(true);
+            for (int q = 0; q < cols.Length; q++) cols[q].enabled = false;
+            Transform[] parts = go.GetComponentsInChildren<Transform>(true);
+            for (int q = 0; q < parts.Length; q++) parts[q].gameObject.layer = 0;
+            shownProp[i] = go;
+        }
+        Transform pin = pins[i];
+        pin.localPosition = dBestPos[best] - origin;
+        pin.gameObject.SetActive(true);
+        pinLabel[i].text = Clean(nameOf[i]);
+        pinLabel[i].color = c;
+    }
+
+    void FillList()
     {
         SetTitle();
-        mapR = mapRect.rect;
-        drawNext = 0;
         string text = "";
-        int colour = 0;
         for (int i = 0; i < paths.Length; i++)
         {
-            LineRenderer lr = paths[i];
-            int k = npts[i];
-            bool on = roleOf[i] != 0 && k > 0;
-            lr.gameObject.SetActive(on);
-            marks[i].gameObject.SetActive(on && roleOf[i] == PHGame.ROLE_HIDER);
-            if (!on) continue;
-            Color c = roleOf[i] == PHGame.ROLE_HUNTER ? new Color(0.92f, 0.2f, 0.18f) : palette[colour++ % palette.Length];
-            lr.positionCount = 0;   // (laid in Update, one path a frame)
-            lr.startColor = c; lr.endColor = c;
-            if (roleOf[i] == PHGame.ROLE_HIDER)
-            {
-                Vector3 m = OnMap(pts[i * MAXP + k - 1]);
-                marks[i].anchoredPosition = new Vector2(m.x, m.y);
-                markImage[i].sprite = caughtAt[i] >= 0f ? markCaught : markEnd;
-                markImage[i].color = c;
-            }
-            string hex = Hex(c);
+            if (roleOf[i] == 0 || npts[i] == 0) continue;
+            Color c = ColourOf(i);
             string metres = Mathf.RoundToInt(dist[i]).ToString();
             string line;
             if (roleOf[i] == PHGame.ROLE_HUNTER) line = game.text.F2("mini.hunter", metres, catches[i].ToString());
             else if (caughtAt[i] >= 0f) line = game.text.F2("mini.caught", metres, Clock(caughtAt[i]));
             else line = game.text.F1("mini.survived", metres);
-            text += "<color=#" + hex + ">" + Clean(nameOf[i]) + "</color>  <color=#B8AE98>" + line + "</color>\n";
+            text += "<color=#" + Hex(c) + ">" + Clean(nameOf[i]) + "</color>  <color=#6D5524>" + line + "</color>\n";
         }
         list.text = text;
     }
