@@ -5,8 +5,8 @@ the PropHunt/Weapon shader draws only where the grid's value is above the hunter
 into the grid from the model's surface, so the gnawed faces look solid.
 
 How the wear eats a weapon:
-  - u, the normalised depth of a point: 0 on the surface, 1 on the long axis through the grip (depth / (depth + the
-    distance to the axis)). Every part is eaten towards the same core, so near the end a thin stick is left.
+  - u, the normalised depth of a point: 0 on the surface, 1 on the core (depth / (depth + the distance to the core));
+    the core is each cross-section's middle, so it follows a curved or off-centre weapon. Every part is eaten towards the same core, so near the end a thin stick is left.
   - nibbles: a cell noise (7 cm cells, 3 cm on top) gives each region its own pace, so it is gnawed unevenly in
     angular bites instead of shrinking smoothly.
   - a point is eaten once wear * (1 - STICK) * (0.35 + 0.65 * nibble) passes its u.
@@ -122,7 +122,18 @@ def bake(m):
         er[0] = er[-1] = False
         cur = er; k += 1
     P = (np.indices(shape).transpose(1, 2, 3, 0) + 0.5) * RES + lo
-    r = np.linalg.norm(P[..., :2], axis=-1)
+    # the core each cross-section is eaten towards: its middle (the centre of its solid part, moved onto the nearest
+    # solid voxel), not a straight line out from the grip. A curved blade, a pan's dish or an umbrella's shaft has its
+    # core inside it, so it wears down to a stick of its own shape instead of vanishing (Cor)
+    core = np.zeros((shape[2], 2)); last = np.zeros(2)
+    for k in range(shape[2]):
+        idx = np.argwhere(solid[:, :, k])
+        if len(idx):
+            pts = P[idx[:, 0], idx[:, 1], k, :2]
+            c = pts.mean(0)
+            last = pts[np.argmin(np.linalg.norm(pts - c, axis=1))]
+        core[k] = last
+    r = np.linalg.norm(P[..., :2] - core[None, None, :, :], axis=-1)
     u = np.where(solid, (depth + 0.5 * RES) / np.maximum(depth + 0.5 * RES + r, 1e-6), 0.0)
     nib = cellval(P, NIB, 0) * 0.8 + 0.2 * cellval(P, NIB * 0.45, 7)
     pace = (1 - STICK) * (0.35 + 0.65 * nib)          # eaten once wear * pace > u
