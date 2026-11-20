@@ -401,13 +401,18 @@ public class PHLocal : UdonSharpBehaviour
     void StartingDisguise()
     {
         // a random medium type from the map's menu (05 section 3.8)
-        int n = game.gen.defDisguise.Length;
-        for (int k = 0; k < 60; k++)
+        // (only one that has room where they stand; a few tries a call, then smaller ones: UpdatePropless asks again)
+        int n = game.gen.defDisguise.Length, tried = 0;
+        for (int k = 0; k < 60 && tried < 4; k++)
         {
             int d = Random.Range(0, n);
-            if (d < game.gen.menu.Length && game.gen.menu[d] && game.gen.defDisguise[d] == 2) { SetDisguise(d); return; }
+            if (d < game.gen.menu.Length && game.gen.menu[d] && game.gen.defDisguise[d] == 2) { tried++; if (SetDisguise(d)) return; }
         }
-        for (int d = 0; d < n; d++) if (d < game.gen.menu.Length && game.gen.menu[d]) { SetDisguise(d); return; }
+        for (int k = 0; k < 60 && tried < 8; k++)
+        {
+            int d = Random.Range(0, n);
+            if (d < game.gen.menu.Length && game.gen.menu[d] && game.gen.defDisguise[d] == 1) { tried++; if (SetDisguise(d)) return; }
+        }
     }
 
     // Become a prop of this type, unless its box has no room here (05 section 3.7)
@@ -417,12 +422,14 @@ public class PHLocal : UdonSharpBehaviour
         if (s == null) return false;
         if (!body.active)
         {
-            // the first prop: the body starts where the player stands, facing their way, and they sit in it
-            // (PHHiderBody settles a prop that starts partly inside something on its first frame)
+            // the first prop: the body starts where the player stands, facing their way, and they sit in it. Only
+            // where its box has room (or room close by, FitHere): Cor's prop ended up inside a wall when a player
+            // standing against one picked something big, as the landing's short settle could not free it
             VRCPlayerApi me = Networking.LocalPlayer;
             body.Begin(me.GetPosition(), Mathf.Round(me.GetRotation().eulerAngles.y / 15f) * 15f);
             body.frozen = false;
             body.SetProp(d);
+            if (!body.FitHere()) { body.End(); Say(T("say.noRoom"), 2f); return false; }
             s.StartHiding();
         }
         else if (s.def >= 0)
@@ -465,7 +472,10 @@ public class PHLocal : UdonSharpBehaviour
     {
         if (!value)
         {
-            if (args.handType == VRC.Udon.Common.HandType.RIGHT && Networking.LocalPlayer.IsUserInVR()) TriggerUp();
+            if (!Networking.LocalPlayer.IsUserInVR()) return;
+            int h = args.handType == VRC.Udon.Common.HandType.LEFT ? 0 : 1;
+            if (ringByTrigger[h]) { ringByTrigger[h] = false; if (body.ringHand == h) body.ringHand = -1; return; }
+            if (h == 1) TriggerUp();
             return;
         }
         int phase = game.phase;
@@ -474,8 +484,17 @@ public class PHLocal : UdonSharpBehaviour
         if (!vr && TryDoor()) return;
         // VR: the left trigger does nothing (Cor: no left-hand device); a hider's right trigger is a tap or a hold,
         // told apart while it is held and as it is let go (TriggerDown, UpdateTrigger, TriggerUp)
+        if (vr && role == PHGame.ROLE_HIDER)
+        {
+            int h = args.handType == VRC.Udon.Common.HandType.LEFT ? 0 : 1;
+            // a trigger with the hand at the screen's button presses it (Cor: the button was hard to press); one at
+            // the grab ring takes hold of it (Cor: the ring with the trigger too)
+            // (the right hand on the ring only while its laser is on no prop it could pick: aimed at one, it picks)
+            if (TriggerButton(h) || ((h == 0 || hoverObj == null) && TriggerRing(h))) return;
+            if (h == 1) TriggerDown();
+            return;
+        }
         if (vr && args.handType == VRC.Udon.Common.HandType.LEFT) return;
-        if (vr && role == PHGame.ROLE_HIDER) { TriggerDown(); return; }
         if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT))
         {
             // the final stand (Cor): no new disguises; the selector shoots hunters instead
@@ -496,6 +515,59 @@ public class PHLocal : UdonSharpBehaviour
     public const float HOLD_TIME = 0.25f;
     bool triggerDown, grabbing;
     float triggerAt;
+
+    bool[] ringByTrigger = new bool[2];
+
+    Vector3 HandAt(int h) { return Networking.LocalPlayer.GetTrackingData(h == 0 ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand).position; }
+
+    float AvatarScale()
+    {
+        float eye = Networking.LocalPlayer.GetAvatarEyeHeightAsMeters();
+        return Mathf.Clamp(eye > 0.01f ? eye / 1.6f : 1f, 0.2f, 5f);
+    }
+
+    bool TriggerButton(int h)
+    {
+        if (body.tauntReach <= 0f) return false;
+        VRCPlayerApi me = Networking.LocalPlayer;
+        Vector3 tip = me.GetBonePosition(h == 0 ? HumanBodyBones.LeftIndexDistal : HumanBodyBones.RightIndexDistal);
+        Vector3 hand = HandAt(h);
+        bool near = (hand - body.tauntAt).sqrMagnitude < body.tauntReach * body.tauntReach
+            || (tip.sqrMagnitude > 1e-6f && (tip - body.tauntAt).sqrMagnitude < body.tauntReach * body.tauntReach);
+        if (!near) return false;
+        bool done = ButtonTaunt();
+        me.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.08f, 0.8f, 120f);
+        sound.Play(done ? "click_001" : "error_004", done ? 0.5f : 0.3f);
+        return true;
+    }
+
+    bool TriggerRing(int h)
+    {
+        if (body.ringHand >= 0) return false;
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (!body.NearRing(HandAt(h), AvatarScale(), me.GetAvatarEyeHeightAsMeters())) return false;
+        body.ringHand = h; ringByTrigger[h] = true;
+        me.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.06f, 0.7f, 120f);
+        return true;
+    }
+
+    // ---- the gun in a VR hider's right hand (Cor: its grip was wrong, and the laser must come out of the gun): posed
+    // from the avatar's own hand bones (PHWeapons.HandPose, shared with the hunters' weapons; tracking data for an
+    // avatar without them). The pick and shot rays and the laser all start at its muzzle and run along its barrel.
+    public Quaternion VrAimRot() { return AimRotation(Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation); }
+
+    public Vector3 VrAimPos()
+    {
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (weapons != null && weapons.HandPose(me)) return weapons.handPos;
+        return me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
+    }
+
+    public Vector3 VrMuzzle()
+    {
+        float len = weapons != null ? weapons.VrMuzzleLen() : 0.135f * AvatarScale();
+        return VrAimPos() + VrAimRot() * Vector3.forward * len;
+    }
 
     void TriggerDown()
     {
@@ -730,9 +802,11 @@ public class PHLocal : UdonSharpBehaviour
         bool any;
         if (aimOverride) { any = Physics.SphereCast(aimOrigin, 0.04f, aimDir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore); hit = r; return any; }
         VRCPlayerApi me = Networking.LocalPlayer;
-        VRCPlayerApi.TrackingData t = me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
-        Vector3 dir = me.IsUserInVR() ? AimRotation(t.rotation) * Vector3.forward : t.rotation * Vector3.forward;
-        any = Physics.SphereCast(t.position, 0.04f, dir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18), QueryTriggerInteraction.Ignore);
+        Vector3 o, dir;
+        if (me.IsUserInVR()) { o = VrMuzzle(); dir = VrAimRot() * Vector3.forward; }
+        else { VRCPlayerApi.TrackingData t = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head); o = t.position; dir = t.rotation * Vector3.forward; }
+        // (not the screen device in the hand or beside them: it is a pickup, layer 13)
+        any = Physics.SphereCast(o, 0.04f, dir, out r, range, ~(1 << 9 | 1 << 10 | 1 << 18 | 1 << 13), QueryTriggerInteraction.Ignore);
         hit = r;
         return any;
     }
@@ -833,8 +907,8 @@ public class PHLocal : UdonSharpBehaviour
         if (aimOverride) { o = aimOrigin; dir = aimDir.normalized; }
         else
         {
-            VRCPlayerApi.TrackingData t = me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
-            o = t.position; dir = (me.IsUserInVR() ? AimRotation(t.rotation) : t.rotation) * Vector3.forward;
+            if (me.IsUserInVR()) { o = VrMuzzle(); dir = VrAimRot() * Vector3.forward; }
+            else { VRCPlayerApi.TrackingData t = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head); o = t.position; dir = t.rotation * Vector3.forward; }
         }
         float wall = SHOT_RANGE;
         RaycastHit r;

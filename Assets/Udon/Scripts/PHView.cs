@@ -65,7 +65,6 @@ public class PHView : UdonSharpBehaviour
     public Material ringIdle, ringHeld;
     MeshRenderer[] ringRenderers;
     bool ringIsHeld;
-    const float RING_R = 0.42f, RING_REACH = 0.13f, RING_Y = 0.55f;   // radius, how near the ring a grip takes it (both x avatar size), height x eye height
     MeshRenderer[] outlineRenderers;
     bool outlineTurning;
 
@@ -119,6 +118,13 @@ public class PHView : UdonSharpBehaviour
         devicesOn = false;
         if (legend != null) legend.gameObject.SetActive(false);
         if (outline != null) outline.gameObject.SetActive(false);
+        // the screen device's carry handle (Cor: "an unknown blue bar on top of the screen"): gone (the scene build no
+        // longer makes it; this hides it in a scene built before)
+        if (casing != null)
+        {
+            Transform handle = casing.Find("Handle");
+            if (handle != null) handle.gameObject.SetActive(false);
+        }
         if (grabRing != null)
         {
             ringRenderers = grabRing.GetComponentsInChildren<MeshRenderer>(true);
@@ -169,14 +175,11 @@ public class PHView : UdonSharpBehaviour
         // the grab ring: a grip near it holds the prop, let go lets go
         PHHiderBody b = local.body;
         if (!value) { if (b.ringHand == h) b.ringHand = -1; return; }
-        if (vr && hiderNow && grabRing != null && grabRing.gameObject.activeSelf && b.ringHand < 0 && b.active && !b.frozen)
+        if (vr && hiderNow && b.ringHand < 0)
         {
             VRCPlayerApi me = Networking.LocalPlayer;
             Vector3 hand = me.GetTrackingData(h == 0 ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand).position;
-            Vector3 d = hand - grabRing.position;
-            float sc = AvatarScale();
-            float across = new Vector2(d.x, d.z).magnitude - RING_R * sc;
-            if (Mathf.Abs(across) < RING_REACH * sc && Mathf.Abs(d.y) < RING_REACH * sc)
+            if (b.NearRing(hand, AvatarScale(), me.GetAvatarEyeHeightAsMeters()))
             {
                 b.ringHand = h;
                 me.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.06f, 0.7f, 120f);
@@ -778,7 +781,9 @@ public class PHView : UdonSharpBehaviour
         if (gunOn && !vrPanel.gameObject.activeSelf) { PlaceGun(me, AvatarScale()); return; }   // (picking the first prop)
         bool ringOn = hiderNow && grabRing != null;
         if (grabRing != null && grabRing.gameObject.activeSelf != ringOn) grabRing.gameObject.SetActive(ringOn);
+        local.body.ringShown = ringOn;
         if (!ringOn && local.body.ringHand >= 0) local.body.ringHand = -1;
+        if (!hiderNow) local.body.tauntReach = 0f;
         if (!vrPanel.gameObject.activeSelf) return;   // (before the avatar and head queries: not hiding, nothing to place. Perf)
         float sc = AvatarScale();
         if (ringOn) PlaceRing(me, sc);
@@ -822,8 +827,8 @@ public class PHView : UdonSharpBehaviour
     {
         PHHiderBody b = local.body;
         float eye = me.GetAvatarEyeHeightAsMeters();
-        grabRing.SetPositionAndRotation(b.pos + b.lag + Vector3.up * (eye * RING_Y), Quaternion.identity);
-        grabRing.localScale = Vector3.one * (RING_R * sc);
+        grabRing.SetPositionAndRotation(b.RingCentre(eye), Quaternion.identity);
+        grabRing.localScale = Vector3.one * (PHHiderBody.RING_R * sc);
         bool held = b.ringHand >= 0;
         if (held != ringIsHeld && ringRenderers != null && ringIdle != null && ringHeld != null)
         {
@@ -838,19 +843,26 @@ public class PHView : UdonSharpBehaviour
         VRCPlayerApi.TrackingData rh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);
         if (!gunOn) return rh;
         Vector3 one = Vector3.one * sc;
-        Quaternion aim = local.AimRotation(rh.rotation);
-        gun.SetPositionAndRotation(rh.position, aim);
+        Quaternion aim = local.VrAimRot();
+        gun.SetPositionAndRotation(local.VrAimPos(), aim);
         gun.localScale = one;
-        float muzzle = 0.135f * sc;
-        float len = local.aimDist - muzzle;
-        bool showBeam = local.canPick && len > 0.02f;
+        // the laser (Cor: keep a laser pointer on the gun, and out of it): from the muzzle along the barrel, to what a
+        // pick would take, else to the first thing in the way (the final stand's shots go that way too)
+        Vector3 from = local.VrMuzzle(), dir = aim * Vector3.forward;
+        float len = local.aimDist;
+        if (!local.canPick)
+        {
+            RaycastHit lh;
+            len = Physics.Raycast(from, dir, out lh, PHLocal.SHOT_RANGE, ~(1 << 9 | 1 << 10 | 1 << 18 | 1 << 5 | 1 << 13), QueryTriggerInteraction.Ignore) ? lh.distance : PHLocal.SHOT_RANGE;
+        }
+        bool showBeam = len > 0.02f;
         if (beam.gameObject.activeSelf != showBeam) beam.gameObject.SetActive(showBeam);
         if (showBeam)
         {
             float w = Mathf.Max(0.002f, 0.004f * sc);
-            beam.SetPositionAndRotation(rh.position + aim * Vector3.forward * (muzzle + len * 0.5f), aim);
+            beam.SetPositionAndRotation(from + dir * (len * 0.5f), aim);
             beam.localScale = new Vector3(w, w, len);
-            bool valid = local.AimValid();
+            bool valid = local.canPick && local.AimValid();
             if (valid != beamIsHit) { beamIsHit = valid; beamRenderer.sharedMaterial = valid ? beamHit : beamIdle; }
         }
         return rh;
@@ -863,6 +875,8 @@ public class PHView : UdonSharpBehaviour
         // device is carried or was just put down: grabbing the device can never taunt (Cor).
         Vector3 bPos = panelPos + panelRot * (BUTTON_AT * sc);
         tauntButton.SetPositionAndRotation(bPos, panelRot);
+        // (a trigger pressed with a hand this near the button presses it too, PHLocal.TriggerButton)
+        local.body.tauntAt = bPos; local.body.tauntReach = 0.08f * sc;
         tauntButton.localScale = one;
         Quaternion bInv = Quaternion.Inverse(panelRot);
         bool carried = held || Time.time - panelDropAt < GRAB_GUARD;
