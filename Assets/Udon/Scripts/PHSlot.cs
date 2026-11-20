@@ -307,7 +307,7 @@ public class PHSlot : UdonSharpBehaviour
         // (not during the END reveal: everyone walks free then, Cor)
         if ((hiding || ghost) && !seated && Time.time >= nextSit && game.phase != PHGame.PH_END)
         {
-            nextSit = Time.time + 3f;
+            nextSit = Time.time + 1f;   // (every second until the enter event comes: a hider standing free is seen)
             station.UseStation(me);
         }
     }
@@ -320,7 +320,7 @@ public class PHSlot : UdonSharpBehaviour
     {
         // everyone else's copy of a hiding player's station is parked out of sight
         if (!remoteSet) { station.PlayerMobility = VRCStation.Mobility.Immobilize; remoteSet = true; }
-        if (hiding) Park();
+        if (hiding) { Park(); CheckLeak(); }
         else if (ghost)
         {
             // ghosts see ghosts; nobody else does (Cor: the dead see only the dead and the hunters)
@@ -332,7 +332,7 @@ public class PHSlot : UdonSharpBehaviour
                 station.transform.SetPositionAndRotation(Vector3.Lerp(at, walkPos, k), Quaternion.Euler(0f, walkYaw, 0f));
                 parked = false;
             }
-            else Park();
+            else { Park(); CheckLeak(); }
         }
     }
 
@@ -673,6 +673,47 @@ public class PHSlot : UdonSharpBehaviour
     {
         if (player.isLocal) seated = true;
     }
+
+    // ------------------------------------------------------------------ the leak check (Cor: hiders seen by hunters)
+    // A seated hider is drawn at this client's copy of their station only once this client has had their enter event
+    // (Station Lab). A client that missed it (it joined while they sat: the re-seat on a join, 1.5 s after it, comes
+    // while a joiner is still loading the world; an avatar change; a lost event) draws them where they really are,
+    // for the whole round. So every client looks: where this client draws a hidden player against where it parked
+    // their station. Far apart for two looks in a row, it asks them to sit again (their re-seat sends a fresh enter
+    // event to everyone), at most every LEAK_RETRY seconds, and logs it.
+    const float LEAK_EVERY = 1f, LEAK_DIST = 3f, LEAK_RETRY = 4f;
+    float leakNext, leakAskAt = -99f;
+    int leakSeen;
+    [HideInInspector] public int leaksAsked;   // (tests read it)
+
+    void CheckLeak()
+    {
+        if (Time.time < leakNext) return;
+        leakNext = Time.time + LEAK_EVERY;
+        if (!parked || game.phase == PHGame.PH_END) { leakSeen = 0; return; }
+        VRCPlayerApi p = VRCPlayerApi.GetPlayerById(game.slotPlayer[index]);
+        if (p == null || !Utilities.IsValid(p) || p.isLocal) { leakSeen = 0; return; }
+        float d = Vector3.Distance(p.GetPosition(), station.transform.position);
+        if (d < LEAK_DIST) { leakSeen = 0; return; }
+        leakSeen++;
+        if (leakSeen < 2 || Time.time - leakAskAt < LEAK_RETRY) return;
+        leakAskAt = Time.time;
+        leaksAsked++;
+        Debug.Log("[prophunt] leak: slot " + index + " (" + p.displayName + ") drawn " + d.ToString("F1") + " m from its parked station; asking for a re-seat");
+        SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestReseat));
+    }
+
+    // another client draws this hider in the open: sit again, so everyone gets a fresh enter event
+    [NetworkCallable]
+    public void RequestReseat()
+    {
+        if (!IsMine || !(hiding || ghost) || game.phase == PHGame.PH_END) return;
+        if (Time.time - reseatAt < 2f) return;   // (several clients asking at once: one re-seat)
+        reseatAt = Time.time;
+        Debug.Log("[prophunt] re-seat asked by another client (seated=" + seated + ")");
+        if (seated) Reseat(); else nextSit = 0f;
+    }
+    float reseatAt = -99f;
 
     public override void OnStationExited(VRCPlayerApi player)
     {
