@@ -491,8 +491,8 @@ public class PHLocal : UdonSharpBehaviour
             // a trigger with the hand at the screen's button presses it (Cor: the button was hard to press); one at
             // the grab ring takes hold of it (Cor: the ring with the trigger too)
             // (the right hand on the ring only while its laser is on no prop it could pick: aimed at one, it picks)
-            // (and never in the final stand, where the right trigger shoots: the group playtest's ring grabs instead of shots)
-            if (TriggerButton(h) || ((h == 0 || (hoverObj == null && !game.Endgame)) && TriggerRing(h))) return;
+            // (the ring only by a grip, PHView: Cor wants the trigger kept for shooting and picking)
+            if (TriggerButton(h)) return;
             if (h == 1) TriggerDown();
             return;
         }
