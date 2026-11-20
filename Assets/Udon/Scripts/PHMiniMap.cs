@@ -41,7 +41,12 @@ public class PHMiniMap : UdonSharpBehaviour
     float[] caughtAt;                    // seconds into the hunt, -1 survived
     // per hider and disguise (slot * MAXD + k): the def, its seconds, the longest stay in it and where
     int[] dDef; float[] dTime, dBestStill; Vector3[] dBestPos; float[] dBestYaw;
-    float[] still; Vector3[] stillAt; int[] stillDef;
+    float[] still; Vector3[] stillAt; int[] stillDef; float[] stillYaw;
+    // every hiding spot (Cor: where they stood still a little while, in the prop they hid as): slot * MAXS + k
+    const int MAXS = 10;
+    const float STAY_MIN = 5f;
+    int[] sDef, nStay; Vector3[] sPos; float[] sYaw, sDur;
+    [HideInInspector] public int buttonArg;   // PHButton: the slot + 1 of the name tag pressed
     float huntStart, nextSample;
     Vector3 origin;                      // the map's middle on the ground: the table's middle
     int recRound = -1, shownRound = -1, snapRound = -1, lastPhase = -1;
@@ -61,8 +66,9 @@ public class PHMiniMap : UdonSharpBehaviour
         pts = new Vector3[n * MAXP]; npts = new int[n]; dist = new float[n]; roleOf = new int[n]; playerOf = new int[n];
         nameOf = new string[n]; caughtAt = new float[n]; catches = new int[n];
         dDef = new int[n * MAXD]; dTime = new float[n * MAXD]; dBestStill = new float[n * MAXD]; dBestPos = new Vector3[n * MAXD]; dBestYaw = new float[n * MAXD];
-        still = new float[n]; stillAt = new Vector3[n]; stillDef = new int[n];
-        shownProp = new GameObject[n * MAXD];
+        still = new float[n]; stillAt = new Vector3[n]; stillDef = new int[n]; stillYaw = new float[n];
+        sDef = new int[n * MAXS]; nStay = new int[n]; sPos = new Vector3[n * MAXS]; sYaw = new float[n * MAXS]; sDur = new float[n * MAXS];
+        shownProp = new GameObject[n * MAXS];
         mapProp = new GameObject[MAX_MAP_PROPS]; mapUpper = new bool[MAX_MAP_PROPS];
         palette = new Color[] {
             new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
@@ -101,7 +107,12 @@ public class PHMiniMap : UdonSharpBehaviour
         if (rec && Time.time >= nextSample) { nextSample = Time.time + STEP; Sample(phase == PHGame.PH_HUNT); }
         // shown from the reveal until the next map starts loading (and only while the miniature has its map)
         bool show = hasData && snapRound == recRound && dioWalls.sharedMesh != null && (phase == PHGame.PH_END || phase == PHGame.PH_LOBBY);
-        if (show && shownRound != recRound) { shownRound = recRound; FillList(); drawNext = 0; ClearProps(); }
+        if (show && shownRound != recRound)
+        {
+            shownRound = recRound;
+            for (int i = 0; i < npts.Length; i++) EndStay(i);
+            FillList(); drawNext = 0; ClearProps();
+        }
         if (content.activeSelf != show) Show(show);
         // Perf: a path or a prop a frame (all at once was a hitch at END)
         if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; if (drawNext >= paths.Length) { propNext = 0; fenceNext = 0; Apply(); } }
@@ -141,7 +152,7 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int i = 0; i < npts.Length; i++)
         {
             npts[i] = 0; dist[i] = 0f; caughtAt[i] = -1f; catches[i] = 0; roleOf[i] = 0; playerOf[i] = 0; nameOf[i] = "";
-            still[i] = 0f; stillDef[i] = -1;
+            still[i] = 0f; stillDef[i] = -1; nStay[i] = 0;
         }
         for (int k = 0; k < dDef.Length; k++) { dDef[k] = -1; dTime[k] = 0f; dBestStill[k] = 0f; }
     }
@@ -160,7 +171,7 @@ public class PHMiniMap : UdonSharpBehaviour
             if (roleOf[i] == 0) { roleOf[i] = role; playerOf[i] = pid; nameOf[i] = p.displayName; }
             if (role == PHGame.ROLE_HIDER)
             {
-                if (s.caught) { if (caughtAt[i] < 0f) caughtAt[i] = hunt ? Time.time - huntStart : 0f; continue; }
+                if (s.caught) { if (caughtAt[i] < 0f) { caughtAt[i] = hunt ? Time.time - huntStart : 0f; EndStay(i); } continue; }
                 Vector3 at = s.def >= 0 ? s.propPos : p.GetPosition();
                 Add(i, at);
                 if (s.def >= 0) Dwell(i, s.def, at, s.propYaw);
@@ -187,8 +198,26 @@ public class PHMiniMap : UdonSharpBehaviour
         dTime[k] += STEP;
         Vector3 d = at - stillAt[i];
         if (stillDef[i] == def && new Vector2(d.x, d.z).magnitude < 0.5f) still[i] += STEP;
-        else { still[i] = STEP; stillAt[i] = at; stillDef[i] = def; }
+        else { EndStay(i); still[i] = STEP; stillAt[i] = at; stillDef[i] = def; stillYaw[i] = yaw; }
         if (still[i] >= dBestStill[k]) { dBestStill[k] = still[i]; dBestPos[k] = at; dBestYaw[k] = yaw; }
+    }
+
+    // a stay that has ended: kept when it lasted STAY_MIN or more (the same disguise in the same spot again adds to it)
+    void EndStay(int i)
+    {
+        if (stillDef[i] < 0 || still[i] < STAY_MIN) { still[i] = 0f; return; }
+        int b = i * MAXS;
+        for (int k = 0; k < nStay[i]; k++)
+        {
+            Vector3 d = sPos[b + k] - stillAt[i];
+            if (sDef[b + k] == stillDef[i] && new Vector2(d.x, d.z).magnitude < 0.5f) { sDur[b + k] += still[i]; still[i] = 0f; return; }
+        }
+        if (nStay[i] < MAXS)
+        {
+            int x = b + nStay[i]++;
+            sDef[x] = stillDef[i]; sPos[x] = stillAt[i]; sYaw[x] = stillYaw[i]; sDur[x] = still[i];
+        }
+        still[i] = 0f;
     }
 
     void Add(int i, Vector3 at)
@@ -280,22 +309,21 @@ public class PHMiniMap : UdonSharpBehaviour
         lr.startColor = c; lr.endColor = c;
         lr.gameObject.SetActive(true);
         if (roleOf[i] != PHGame.ROLE_HIDER) return;
-        // the disguises they stayed in a long while in one spot (Cor: highlight them), larger than life; the pin with
-        // their name over the one they were longest
-        int best = -1;
-        for (int j = 0; j < MAXD; j++) { int x = i * MAXD + j; if (dDef[x] >= 0 && (best < 0 || dTime[x] > dTime[best])) best = x; }
-        if (best < 0) return;
-        for (int j = 0; j < MAXD; j++)
+        // every spot they hid in (stood still STAY_MIN or more), the prop they were there, glowing at its edge (Cor:
+        // outlined) and larger than life; the pin with their name over the longest
+        int bs = i * MAXS, longest = -1;
+        for (int q = 0; q < nStay[i]; q++)
         {
-            int x = i * MAXD + j;
-            int def = dDef[x];
-            if (def < 0 || (x != best && dBestStill[x] < LONG_STAY)) continue;
-            if (def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
-            GameObject go = Copy(builder.propPrefabs[def], dBestPos[x], dBestYaw[x], 2.5f);   // (a lamp at true scale was a speck)
+            int x = bs + q;
+            if (longest < 0 || sDur[x] > sDur[longest]) longest = x;
+            int def = sDef[x];
+            if (def < 0 || def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
+            GameObject go = Copy(builder.propPrefabs[def], sPos[x], sYaw[x], 2f);
+            builder.Hover(go, def, true);
             shownProp[x] = go;
         }
         Transform pin = pins[i];
-        pin.localPosition = dBestPos[best] - origin;
+        pin.localPosition = (longest >= 0 ? sPos[longest] : pts[i * MAXP + k - 1]) - origin;
         pin.gameObject.SetActive(true);
         pinLabel[i].text = Clean(nameOf[i]);
         pinLabel[i].color = c;
@@ -382,6 +410,14 @@ public class PHMiniMap : UdonSharpBehaviour
     // the buttons: the upper floors on or off; everyone, or one player alone (each press the next one)
     public void ToggleUpper() { upperOn = !upperOn; Apply(); }
 
+    // a name tag pressed (PHButton, buttonArg = slot + 1): that player alone, or everyone again
+    public void PickSolo()
+    {
+        int c = buttonArg - 1;
+        solo = solo == c || c < 0 ? -1 : c;
+        Apply();
+    }
+
     public void NextSolo()
     {
         int n = paths.Length;
@@ -405,9 +441,9 @@ public class PHMiniMap : UdonSharpBehaviour
             paths[i].gameObject.SetActive(has && mine);
             bool pinOn = has && mine && roleOf[i] == PHGame.ROLE_HIDER && pinLabel[i].text != "" && (upperOn || pins[i].localPosition.y <= UPPER_Y);
             if (pins[i].gameObject.activeSelf != pinOn) pins[i].gameObject.SetActive(pinOn);
-            for (int j = 0; j < MAXD; j++)
+            for (int j = 0; j < MAXS; j++)
             {
-                GameObject go = shownProp[i * MAXD + j];
+                GameObject go = shownProp[i * MAXS + j];
                 if (go == null) continue;
                 go.SetActive(mine && (upperOn || go.transform.localPosition.y <= UPPER_Y));
             }

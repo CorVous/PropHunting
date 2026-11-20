@@ -78,6 +78,12 @@ public static partial class LobbyBuilder
             tmp.font = future; tmp.fontSize = 14f; tmp.alignment = TextAlignmentOptions.Center; tmp.enableWordWrapping = false;
             tmp.rectTransform.sizeDelta = new Vector2(20f, 3f); tmp.text = "";
 
+            // the tag is a button (Cor): pressing it shows that player alone, pressing it again everyone
+            var hit = label.AddComponent<BoxCollider>(); hit.size = new Vector3(14f, 3f, 0.5f);
+            var tagBtn = label.AddUdonSharpComponent<PHButton>();
+            tagBtn.game = game; tagBtn.target = mm; tagBtn.action = nameof(PHMiniMap.PickSolo); tagBtn.arg = i + 1;
+            UdonSharpEditorUtility.CopyProxyToUdon(tagBtn);
+            UdonSharpEditorUtility.GetBackingUdonBehaviour(tagBtn).InteractionText = "Show their path";
             pin.SetActive(false);
             mm.pins[i] = pin.transform; mm.pinLabel[i] = tmp;
         }
@@ -85,8 +91,8 @@ public static partial class LobbyBuilder
         // (no card: Cor, the names are on the pins). Two buttons on the near edge: the upper floors on or off, and
         // everyone or one player alone (Cor)
         var cv = Canvas(table.transform, "Buttons", new Vector3(0f, top + 0.12f, -side / 2 - 0.1f), Quaternion.Euler(35f, 0f, 0f), new Vector2(600f, 80f), 0.002f, true);
-        mm.upperLabel = DebugButton(cv, game, "Upper floors: shown", nameof(PHMiniMap.ToggleUpper), new Vector2(-150, 0), C("f2c45a"), mm);
-        mm.soloLabel = DebugButton(cv, game, "Everyone", nameof(PHMiniMap.NextSolo), new Vector2(150, 0), C("8fc7e8"), mm);
+        mm.upperLabel = DebugButton(cv, game, "Upper floors: shown", nameof(PHMiniMap.ToggleUpper), new Vector2(0, 0), C("f2c45a"), mm);
+        // (one player alone: press their name tag)
         UdonSharpEditorUtility.CopyProxyToUdon(mm);
         return mm;
     }

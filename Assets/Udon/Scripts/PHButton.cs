@@ -35,7 +35,7 @@ public class PHButton : UdonSharpBehaviour
     public override void Interact()
     {
         if (fx != null) fx.Press();
-        if (target != null) { target.SendCustomEvent(action); return; }
+        if (target != null) { if (arg > 0) target.SetProgramVariable("buttonArg", arg); target.SendCustomEvent(action); return; }   // (a target that takes a number has buttonArg: the diorama's name tags)
         if (game == null) return;
         game.panelArg = arg;
         game.SendCustomEvent(action);
