@@ -352,6 +352,7 @@ public class PHSlot : UdonSharpBehaviour
     // A second copy of the prop inside the first, in the reveal's striped overlay material (PHGame.revealMat, drawn over
     // everything): it moves and squashes with the prop, blocks nothing, and has no shade patch
     GameObject revealCopy;
+    float revealAt = -1f;
     void MakeRevealCopy()
     {
         if (proxyDef < 0 || proxyDef >= game.builder.propPrefabs.Length || game.builder.propPrefabs[proxyDef] == null) return;
@@ -442,7 +443,10 @@ public class PHSlot : UdonSharpBehaviour
         }
         if (proxy == null) return;
         // the END reveal (Cor): every hider's prop highlighted through walls, for everyone (a late joiner too)
-        bool reveal = game.phase == PHGame.PH_END && game.revealMat != null;
+        // (each slot a little after the one before: every hider's copy made in the one frame was part of the END hitch)
+        if (game.phase == PHGame.PH_END) { if (revealAt < 0f) revealAt = Time.time + index * 0.05f; }
+        else revealAt = -1f;
+        bool reveal = game.phase == PHGame.PH_END && game.revealMat != null && Time.time >= revealAt;
         if (reveal && revealCopy == null) MakeRevealCopy();
         else if (!reveal && revealCopy != null) { Destroy(revealCopy); revealCopy = null; }
         float k = mine ? 1f : 1f - Mathf.Exp(-14f * Time.deltaTime);

@@ -85,6 +85,23 @@ public class PHMiniMap : UdonSharpBehaviour
         bool show = hasData && (phase == PHGame.PH_END || phase == PHGame.PH_LOBBY);
         if (show && shownRound != recRound) { shownRound = recRound; Fill(); }
         if (content.activeSelf != show) Show(show);
+        // Perf: the paths are laid one a frame (a path is up to 360 points; all of them at once was a hitch at END)
+        if (show && drawNext < paths.Length)
+        {
+            while (drawNext < paths.Length && !paths[drawNext].gameObject.activeSelf) drawNext++;
+            if (drawNext < paths.Length) { DrawPath(drawNext); drawNext++; }
+        }
+    }
+
+    int drawNext = 9999;
+    Rect mapR;
+
+    void DrawPath(int i)
+    {
+        LineRenderer lr = paths[i];
+        int k = npts[i];
+        lr.positionCount = k;
+        for (int j = 0; j < k; j++) lr.SetPosition(j, OnMap(pts[i * MAXP + j]));
     }
 
     void Show(bool on)
@@ -166,7 +183,7 @@ public class PHMiniMap : UdonSharpBehaviour
     // a world position on the photo, in the photo rectangle's local space (its pivot in the middle)
     Vector3 OnMap(Vector3 p)
     {
-        Rect r = mapRect.rect;
+        Rect r = mapR;
         float u = half > 0f ? (p.x - centre.x) / (2f * half) : 0f, v = half > 0f ? (p.z - centre.z) / (2f * half) : 0f;
         return new Vector3(Mathf.Clamp(u, -0.5f, 0.5f) * r.width, Mathf.Clamp(v, -0.5f, 0.5f) * r.height, -2f);
     }
@@ -174,6 +191,8 @@ public class PHMiniMap : UdonSharpBehaviour
     void Fill()
     {
         SetTitle();
+        mapR = mapRect.rect;
+        drawNext = 0;
         string text = "";
         int colour = 0;
         for (int i = 0; i < paths.Length; i++)
@@ -185,8 +204,7 @@ public class PHMiniMap : UdonSharpBehaviour
             marks[i].gameObject.SetActive(on && roleOf[i] == PHGame.ROLE_HIDER);
             if (!on) continue;
             Color c = roleOf[i] == PHGame.ROLE_HUNTER ? new Color(0.92f, 0.2f, 0.18f) : palette[colour++ % palette.Length];
-            lr.positionCount = k;
-            for (int j = 0; j < k; j++) lr.SetPosition(j, OnMap(pts[i * MAXP + j]));
+            lr.positionCount = 0;   // (laid in Update, one path a frame)
             lr.startColor = c; lr.endColor = c;
             if (roleOf[i] == PHGame.ROLE_HIDER)
             {
