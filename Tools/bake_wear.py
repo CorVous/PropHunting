@@ -139,8 +139,23 @@ def bake(m):
     pace = (1 - STICK) * (0.35 + 0.65 * nib)          # eaten once wear * pace > u
     # never eaten: the grip in the hand, and a thin stick along the axis (so a thin weapon at a coarse grid is not cut
     # through by one nibble, and the end is "a stick", Cor)
+    # the stick: the core voxel of every cross-section past the grip, and the voxels on the way from one to the next
+    # (so a blade or a dish thinner than a voxel still keeps an unbroken stick), plus what lies near the core
+    stick = np.zeros(shape, bool)
+    ci = np.clip(np.floor((core - lo[:2]) / RES).astype(int), 0, np.array(shape[:2]) - 1)
+    have = np.array([solid[:, :, k].any() for k in range(shape[2])])
+    ks = np.nonzero(have)[0]
+    for a_, b_ in zip(ks[:-1], ks[1:]):
+        p0 = np.array([ci[a_, 0], ci[a_, 1], a_], float); p1 = np.array([ci[b_, 0], ci[b_, 1], b_], float)
+        n = int(np.abs(p1 - p0).max() * 2) + 2
+        for t_ in np.linspace(0, 1, n):
+            q_ = np.round(p0 + (p1 - p0) * t_).astype(int)
+            stick[q_[0], q_[1], q_[2]] = True
+    stick = dilate(stick)   # a voxel either side: a one-voxel line samples away to nothing between voxel centres
+    stick |= solid & (r < max(0.75 * RES, 0.012))
+    solid = solid | stick
     hand = solid & (P[..., 2] < GRIP)
-    grip = grow(hand, solid & ((P[..., 2] < GRIP) | (r < max(0.75 * RES, 0.012))))   # (only the stick still joined to the hand)
+    grip = grow(hand, (solid & (P[..., 2] < GRIP)) | stick)   # (only the stick still joined to the hand)
     gone = np.full(shape, 2.0)                         # the wear at which each voxel goes (2 = never)
     alive_prev = solid.copy()
     for s in range(1, STEPS + 1):
