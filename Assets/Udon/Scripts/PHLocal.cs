@@ -565,6 +565,7 @@ public class PHLocal : UdonSharpBehaviour
 
     public Vector3 VrMuzzle()
     {
+        if (weapons != null && weapons.vrSelectorModel != null && weapons.vrSelectorModel.gameObject.activeInHierarchy) return weapons.VrMuzzlePoint();
         float len = weapons != null ? weapons.VrMuzzleLen() : 0.135f * AvatarScale();
         return VrAimPos() + VrAimRot() * Vector3.forward * len;
     }

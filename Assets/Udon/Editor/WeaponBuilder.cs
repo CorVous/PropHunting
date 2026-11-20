@@ -233,6 +233,18 @@ public static class WeaponBuilder
         w.gunMesh = guns.ConvertAll(m => m.mesh).ToArray();
         w.gunId = guns.ConvertAll(m => m.id).ToArray();
         w.gunMuzzle = guns.ConvertAll(m => m.tip).ToArray();
+        // where the barrel ends, in the model's own space: the middle of its front-most vertices (the barrel need
+        // not lie on the model's z axis; Cor: the laser must come out of the gun)
+        w.gunMuzzlePoint = guns.ConvertAll(m =>
+        {
+            var v = m.mesh.vertices;
+            float zMax = float.MinValue;
+            foreach (var p in v) zMax = Mathf.Max(zMax, p.z);
+            Vector2 sum = Vector2.zero; int n = 0;
+            foreach (var p in v) if (p.z > zMax - 0.012f) { sum += new Vector2(p.x, p.y); n++; }
+            if (n > 0) sum /= n;
+            return new Vector3(sum.x, sum.y, zMax);
+        }).ToArray();
         w.meleeTip = melee.ConvertAll(m => m.tip).ToArray();
         w.meleeHead = melee.ConvertAll(m => m.head).ToArray();
         w.meleeColor = melee.ConvertAll(m => m.color).ToArray();

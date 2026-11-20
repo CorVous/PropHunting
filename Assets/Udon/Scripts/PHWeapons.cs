@@ -30,6 +30,7 @@ public class PHWeapons : UdonSharpBehaviour
     public string[] gunId;
     public Mesh[] gunMesh;             // the selectors (the hider's gun); gunMuzzle: the muzzle's z
     public float[] gunMuzzle;
+    public Vector3[] gunMuzzlePoint;   // the barrel's end in the model's own space (WeaponBuilder; may be missing in an older scene)
     public float[] meleeTip;           // the head's far end along +Z (metres, grip at 0)
     public float[] meleeHead;          // where the head begins along +Z (the swing sweeps from here to the tip)
     public Vector3[] chipSpots;        // SPOTS per model, on the head's surface, in the model's own space
@@ -585,6 +586,14 @@ public class PHWeapons : UdonSharpBehaviour
             fxMuzzle.transform.position = model.position + model.rotation * (Vector3.forward * Muzzle(game.LocalSlot()) * model.lossyScale.x);
             fxMuzzle.Emit(6);
         }
+    }
+
+    // VR: the end of the selector's barrel in the world, as it is drawn now (the laser and the pick ray start there)
+    public Vector3 VrMuzzlePoint()
+    {
+        int g = GunOf(game.LocalSlot());
+        Vector3 local = gunMuzzlePoint != null && g >= 0 && g < gunMuzzlePoint.Length ? gunMuzzlePoint[g] : new Vector3(0f, 0f, Muzzle(game.LocalSlot()));
+        return vrSelectorModel.TransformPoint(local);
     }
 
     // VR: how far the muzzle is in front of the selector's grip, in metres as it is drawn now
