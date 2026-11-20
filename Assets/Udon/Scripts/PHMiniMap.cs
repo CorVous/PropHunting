@@ -30,8 +30,8 @@ public class PHMiniMap : UdonSharpBehaviour
     public Transform propRoot;           // the map's props in miniature (under model)
     public TextMeshProUGUI upperLabel, soloLabel;   // the table's two buttons
 
-    const int MAXP = 360;                // a point a second: six minutes of hide and hunt
-    const float STEP = 1f, MIN_MOVE = 0.3f;
+    const int MAXP = 1440;               // four points a second: six minutes of hide and hunt
+    const float STEP = 0.25f, MIN_MOVE = 0.3f;   // (Cor: a point a second cut corners through the walls)
     const int MAXD = 6;                  // disguises remembered per hider
     Vector3[] pts;                       // slot * MAXP + i
     int[] npts;
@@ -271,8 +271,11 @@ public class PHMiniMap : UdonSharpBehaviour
         if (roleOf[i] == 0 || k == 0) return;
         Color c = ColourOf(i);
         LineRenderer lr = paths[i];
+        Vector3[] line = new Vector3[k];
+        Vector3 lift = new Vector3(0f, 0.15f, 0f) - origin;
+        for (int j = 0; j < k; j++) line[j] = pts[i * MAXP + j] + lift;
         lr.positionCount = k;
-        for (int j = 0; j < k; j++) lr.SetPosition(j, pts[i * MAXP + j] - origin + new Vector3(0f, 0.15f, 0f));
+        lr.SetPositions(line);   // (one call: a point at a time was a call each)
         lr.widthMultiplier = 0.0012f / Mathf.Max(0.001f, model.localScale.x);   // (Cor: thinner)
         lr.startColor = c; lr.endColor = c;
         lr.gameObject.SetActive(true);
@@ -338,16 +341,9 @@ public class PHMiniMap : UdonSharpBehaviour
         }
     }
 
-    // Perf: every copy is a draw of its own; a PC batches the small ones, Quest does not (dynamic batching off for
-    // Android), so it shows the first 120 only
-    int MapPropCap()
-    {
-#if UNITY_ANDROID
-        return 120;
-#else
-        return MAX_MAP_PROPS;
-#endif
-    }
+    // every copy is a draw of its own unless dynamic batching joins the small ones (on for Android too since Cor's
+    // go, 2026-11-20)
+    int MapPropCap() { return MAX_MAP_PROPS; }
 
     // the map's fences, as they stand (Cor: include the fences), a few a frame; only those on the map itself
     GameObject[] fence = new GameObject[300];
@@ -381,14 +377,7 @@ public class PHMiniMap : UdonSharpBehaviour
         }
     }
 
-    int FenceCap()
-    {
-#if UNITY_ANDROID
-        return 60;
-#else
-        return 300;
-#endif
-    }
+    int FenceCap() { return 300; }
 
     // the buttons: the upper floors on or off; everyone, or one player alone (each press the next one)
     public void ToggleUpper() { upperOn = !upperOn; Apply(); }
