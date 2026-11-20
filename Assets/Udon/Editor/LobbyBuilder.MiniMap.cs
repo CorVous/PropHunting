@@ -19,7 +19,7 @@ public static partial class LobbyBuilder
         table.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
         var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
         // the table: a green felt top in a wooden frame on four legs (solid, as the lobby's furniture)
-        Block(table.transform, "Top", new Vector3(0f, top - 0.03f, 0f), new Vector3(side, 0.06f, side), wood, C("3f7a3a"), true);
+        Block(table.transform, "Top", new Vector3(0f, top - 0.03f, 0f), new Vector3(side, 0.06f, side), wood, C("6fae5a"), true);   // (grass: the map's ground)
         Block(table.transform, "Rim", new Vector3(0f, top - 0.06f, 0f), new Vector3(side + 0.12f, 0.06f, side + 0.12f), wood, C("7a5030"), false);
         for (int i = 0; i < 4; i++)
         {
@@ -64,15 +64,15 @@ public static partial class LobbyBuilder
             // the pin: a thin post 5 map-metres tall from the prop up, the name over it, turned to the room's south
             var pin = new GameObject("Pin" + i);
             pin.transform.SetParent(model.transform, false);
-            var post = Block(pin.transform, "Post", new Vector3(0f, 3.5f, 0f), new Vector3(0.12f, 3f, 0.12f), wood, C("f6ecd4"), false);
+            var post = Block(pin.transform, "Post", new Vector3(0f, 5f, 0f), new Vector3(0.15f, 6f, 0.15f), wood, C("f6ecd4"), false);
             var label = new GameObject("Name");
             label.transform.SetParent(pin.transform, false);
-            label.transform.localPosition = new Vector3(0f, 5.6f, 0f);
+            label.transform.localPosition = new Vector3(0f, 8.6f, 0f);
             label.transform.localRotation = Quaternion.Euler(0f, -yaw, 0f);   // (read from the room's south, where the spawn is)
             var tmp = label.AddComponent<TextMeshPro>();
             tmp.font = future; tmp.fontSize = 14f; tmp.alignment = TextAlignmentOptions.Center; tmp.enableWordWrapping = false;
             tmp.rectTransform.sizeDelta = new Vector2(20f, 3f); tmp.text = "";
-            tmp.outlineWidth = 0.2f; tmp.outlineColor = new Color32(30, 25, 15, 255);
+
             pin.SetActive(false);
             mm.pins[i] = pin.transform; mm.pinLabel[i] = tmp;
         }

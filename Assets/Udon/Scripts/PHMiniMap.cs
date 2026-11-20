@@ -186,7 +186,8 @@ public class PHMiniMap : UdonSharpBehaviour
         origin = builder.transform.position + new Vector3(w * 0.5f, 0f, d * 0.5f);
         float k = tableSize / Mathf.Max(8f, Mathf.Max(w, d));
         model.localScale = new Vector3(k, k, k);
-        Place(dioGround, builder.groundFilter);
+        // (not the ground: its mesh runs hundreds of metres past the map. The table's felt is the ground)
+        if (dioGround != null) dioGround.gameObject.SetActive(false);
         Place(dioWalls, builder.wallsFilter);
         int n = builder.SceneryTileCount();
         for (int i = 0; i < dioScenery.Length; i++)
@@ -194,8 +195,9 @@ public class PHMiniMap : UdonSharpBehaviour
             GameObject tile = i < n ? builder.SceneryTile(i) : null;
             MeshFilter f = tile != null ? tile.GetComponent<MeshFilter>() : null;
             if (f == null || f.sharedMesh == null) { dioScenery[i].gameObject.SetActive(false); continue; }
-            // (only what lies on and near the map: the far hills and the sky ring stay out)
-            if ((tile.transform.position + f.sharedMesh.bounds.center - origin).magnitude > Mathf.Max(w, d)) { dioScenery[i].gameObject.SetActive(false); continue; }
+            // (only what lies on the map and just round it: the far tile (0), the hills and the woods outside stay out)
+            Vector3 mid = tile.transform.TransformPoint(f.sharedMesh.bounds.center) - origin;
+            if (i == 0 || Mathf.Abs(mid.x) > w * 0.5f || Mathf.Abs(mid.z) > d * 0.5f) { dioScenery[i].gameObject.SetActive(false); continue; }
             Place(dioScenery[i], f);
         }
     }
@@ -235,8 +237,8 @@ public class PHMiniMap : UdonSharpBehaviour
         Color c = ColourOf(i);
         LineRenderer lr = paths[i];
         lr.positionCount = k;
-        for (int j = 0; j < k; j++) lr.SetPosition(j, pts[i * MAXP + j] - origin + new Vector3(0f, 0.3f, 0f));
-        lr.widthMultiplier = 0.006f / Mathf.Max(0.001f, model.localScale.x);
+        for (int j = 0; j < k; j++) lr.SetPosition(j, pts[i * MAXP + j] - origin + new Vector3(0f, 0.15f, 0f));
+        lr.widthMultiplier = 0.0025f / Mathf.Max(0.001f, model.localScale.x);
         lr.startColor = c; lr.endColor = c;
         lr.gameObject.SetActive(true);
         if (roleOf[i] != PHGame.ROLE_HIDER) return;
@@ -252,7 +254,7 @@ public class PHMiniMap : UdonSharpBehaviour
             t.SetParent(model, false);
             t.localPosition = dBestPos[best] - origin;
             t.localRotation = Quaternion.Euler(0f, dBestYaw[best], 0f);
-            t.localScale = sc;
+            t.localScale = sc * 2.5f;   // (larger than life on the table: a lamp at true scale was a speck)
             Collider[] cols = go.GetComponentsInChildren<Collider>(true);
             for (int q = 0; q < cols.Length; q++) cols[q].enabled = false;
             Transform[] parts = go.GetComponentsInChildren<Transform>(true);

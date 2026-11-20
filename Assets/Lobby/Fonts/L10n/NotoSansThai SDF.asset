@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!28 &-3325053987146119070
+--- !u!28 &-1652016047760139052
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -61,7 +61,7 @@ MonoBehaviour:
   m_Name: NotoSansThai SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 1749442390029971144}
+  material: {fileID: 4323212754547245603}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: a5a3dffe3d11c894b868ba1dd821870f
@@ -1177,7 +1177,7 @@ MonoBehaviour:
     m_GlyphIndex: 100
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: -3325053987146119070}
+  - {fileID: -1652016047760139052}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -1646,7 +1646,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!21 &1749442390029971144
+--- !u!21 &4323212754547245603
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -1670,7 +1670,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: -3325053987146119070}
+        m_Texture: {fileID: -1652016047760139052}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
