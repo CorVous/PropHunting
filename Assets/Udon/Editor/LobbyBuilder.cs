@@ -1050,9 +1050,9 @@ public static partial class LobbyBuilder
         // the track along the walls, the weapon wall's walkway and the spawn's path
         Piece(root, "board-game-bits/D20_blue", L(17.5f, 17.0f), 1.8f, -15f, true);
         Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(4.2f, 9.2f), 1, 1.4f);
-        Piece(root, "furniture-bits/couch_pillows", L(5.6f, 15.0f), 2.6f, 270f, true);   // facing the Trophies board
-        Piece(root, "furniture-bits/armchair", L(5.6f, 18.3f), 1.5f, 270f, true);
-        Piece(root, "furniture-bits/lamp_standing", L(6.3f, 16.9f), 2.4f, 0f, false);
+        Piece(root, "furniture-bits/couch_pillows", L(0.95f, 15.0f), 2.6f, 90f, true);   // backs to the west wall, facing the room (Cor)
+        Piece(root, "furniture-bits/armchair", L(1.0f, 18.3f), 1.5f, 90f, true);
+        Piece(root, "furniture-bits/lamp_standing", L(0.7f, 16.75f), 2.4f, 0f, false);
         Piece(root, "board-game-bits/pawn_A_blue", L(8.6f, 12.8f), 2.4f, 0f, true);
         Piece(root, "board-game-bits/flag_A_red", L(16.2f, 14.2f), 2.6f, 200f, true);
         Piece(root, "board-game-bits/domino_tile_6-6", L(19.2f, 12.6f), 2.4f, 25f, true);
@@ -1063,7 +1063,7 @@ public static partial class LobbyBuilder
         // the two standing lamps light the room around them (Point Light Volumes: Cor, VRC Light Volumes); the shelf's
         // small lamps get a faint glow
         Color warm = new Color(1f, 0.82f, 0.58f);
-        LampBuilder.MakeLight(root, "LampLightCouch", L(6.3f, 16.9f, 2.05f), warm, 2.2f, 0.9f);
+        LampBuilder.MakeLight(root, "LampLightCouch", L(0.7f, 16.75f, 2.05f), warm, 2.2f, 0.9f);
         LampBuilder.MakeLight(root, "LampLightCorner", L(20.2f, 21.3f, 2.05f), warm, 2.2f, 0.9f);
 
         // the sun lights the room through the open box; the walls and the lid cast no shadows into it
