@@ -619,6 +619,14 @@ public class PHWeapons : UdonSharpBehaviour
         return vrSelectorModel.TransformPoint(local);
     }
 
+    // desktop: the same for the selector in the corner of the view
+    public Vector3 DeskMuzzlePoint()
+    {
+        int g = GunOf(game.LocalSlot());
+        Vector3 local = gunMuzzlePoint != null && g >= 0 && g < gunMuzzlePoint.Length ? gunMuzzlePoint[g] : new Vector3(0f, 0f, Muzzle(game.LocalSlot()));
+        return deskSelectorModel.TransformPoint(local);
+    }
+
     // VR: how far the muzzle is in front of the selector's grip, in metres as it is drawn now
     public float VrMuzzleLen()
     {

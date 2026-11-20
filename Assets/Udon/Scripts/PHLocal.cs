@@ -26,7 +26,8 @@ public class PHLocal : UdonSharpBehaviour
     public PHAudio sound;
     public PHDoors doors;                // openable props' doors and lids
     public const float HANDLE_RANGE = 1.5f, HUNTER_HANDLE_RANGE = 2.5f, GRAB_REACH = 0.25f;
-    public PHHiderBody body;             // the hider's prop-shaped body (custom controller in the station)
+    public PHHiderBody body;
+    public PHView view;                  // (the screen device's button shows a trigger's press)             // the hider's prop-shaped body (custom controller in the station)
     public TextMeshPro panelText;
     public TextMeshProUGUI panelUiText;  // the same, on the host panel's canvas
     public TextMeshPro resultsText;      // the last round's results, on the lobby wall
@@ -35,7 +36,7 @@ public class PHLocal : UdonSharpBehaviour
     float nextPanel;
 
     // ---- balance (Balance.cs)
-    public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 0.5f;   // (Cor: no cooldown; this only keeps a held key from flooding the network)
+    public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 3f;   // (group playtest: a short cooldown, taunts back to back got annoying)
     public const int HIT_DAMAGE = 25, HUNTER_HEALTH = 100, HUNT_CHANGES = 3;   // HUNTER_HEALTH: a new weapon's condition
     public const float HUNT_CHANGE_COOLDOWN = 5f;
     public const int LAYER_PROPS_SOLID = 11, LAYER_PROPS_WALKTHROUGH = 17;
@@ -490,7 +491,8 @@ public class PHLocal : UdonSharpBehaviour
             // a trigger with the hand at the screen's button presses it (Cor: the button was hard to press); one at
             // the grab ring takes hold of it (Cor: the ring with the trigger too)
             // (the right hand on the ring only while its laser is on no prop it could pick: aimed at one, it picks)
-            if (TriggerButton(h) || ((h == 0 || hoverObj == null) && TriggerRing(h))) return;
+            // (and never in the final stand, where the right trigger shoots: the group playtest's ring grabs instead of shots)
+            if (TriggerButton(h) || ((h == 0 || (hoverObj == null && !game.Endgame)) && TriggerRing(h))) return;
             if (h == 1) TriggerDown();
             return;
         }
@@ -538,6 +540,7 @@ public class PHLocal : UdonSharpBehaviour
             || (tip.sqrMagnitude > 1e-6f && (tip - body.tauntAt).sqrMagnitude < body.tauntReach * body.tauntReach);
         if (!near) return false;
         bool done = ButtonTaunt();
+        if (view != null) view.ShowPress();
         me.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.08f, 0.8f, 120f);
         sound.Play(done ? "click_001" : "error_004", done ? 0.5f : 0.3f);
         return true;
@@ -635,7 +638,7 @@ public class PHLocal : UdonSharpBehaviour
     public bool TauntReady()
     {
         PHSlot s = Me();
-        return s != null && role == PHGame.ROLE_HIDER && !s.caught && game.phase == PHGame.PH_HUNT;
+        return s != null && role == PHGame.ROLE_HIDER && !s.caught && game.phase == PHGame.PH_HUNT && Time.time - lastTaunt >= TAUNT_COOLDOWN;
     }
 
     public bool ButtonTaunt()
@@ -734,9 +737,9 @@ public class PHLocal : UdonSharpBehaviour
     {
         int phase = game.phase;
         bool can = role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || (phase == PHGame.PH_HUNT && !game.Endgame)) && !aimOverride && !IsGhost();
-        // in the hunt only while a change can be made now (Cor saw props light up that a pull then refused: the hunt's
-        // three changes were used up, or the last one was under HUNT_CHANGE_COOLDOWN ago)
-        if (can && phase == PHGame.PH_HUNT && (changesLeft <= 0 || Time.time - lastChange < HUNT_CHANGE_COOLDOWN)) can = false;
+        // in the hunt only while a change can be made now (not within HUNT_CHANGE_COOLDOWN of the last; no limit on how
+        // many, Cor after the group playtest)
+        if (can && phase == PHGame.PH_HUNT && Time.time - lastChange < HUNT_CHANGE_COOLDOWN) can = false;
         Collider c = null;
         canPick = can;
         aimDist = TAKE_RANGE;
@@ -885,11 +888,9 @@ public class PHLocal : UdonSharpBehaviour
         if (game.gen.defDisguise[d] <= 0) { sound.Play("error_004", 0.5f); Say(T("say.notDisguise"), 2f); return; }
         if (game.phase == PHGame.PH_HUNT)
         {
-            if (changesLeft <= 0) { sound.Play("error_004", 0.5f); Say(T("say.noChanges"), 2f); return; }
             if (Time.time - lastChange < HUNT_CHANGE_COOLDOWN) { sound.Play("error_004", 0.5f); return; }
-            changesLeft--;
         }
-        if (!SetDisguise(d)) { sound.Play("error_004", 0.5f); if (game.phase == PHGame.PH_HUNT) changesLeft++; return; }
+        if (!SetDisguise(d)) { sound.Play("error_004", 0.5f); return; }
         lastChange = Time.time;
         statPropChanges++;
         // one soft pluck, at once (Cor: the three rising tones were not immediate)
