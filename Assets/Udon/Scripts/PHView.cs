@@ -39,7 +39,10 @@ public class PHView : UdonSharpBehaviour
     public GameObject vrHealthBar;
     // over each bar, 0 to 3 shields: how tough the disguise is (small 0, medium 1, large 2, largest 3: PHSlot.HitDamage)
     public GameObject[] desktopShields, vrShields;
-    int shieldsShown = -1;
+    public UnityEngine.UI.RawImage[] desktopSizes, vrSizes;   // the prop-size pictogram beside them: small to largest crates
+    int shieldsShown = -2;
+    float shieldPopAt = -99f;
+    bool shieldPopping;
     public Camera pipCam;
     public Transform vrPanel;          // the grabbable third-person panel (VRCPickup)
     public VRCPickup vrPanelPickup;
@@ -260,18 +263,49 @@ public class PHView : UdonSharpBehaviour
         for (int i = 0; i < list.Length; i++) if (list[i] != null) list[i].SetActive(i < n);
     }
 
+    // n: the size class, -1 when not hiding (the crates go)
+    void ShowSizes(UnityEngine.UI.RawImage[] list, int n)
+    {
+        if (list == null) return;
+        for (int i = 0; i < list.Length; i++)
+        {
+            if (list[i] == null) continue;
+            list[i].gameObject.SetActive(n >= 0);
+            list[i].color = i == n ? Color.white : new Color(1f, 1f, 1f, 0.45f);
+        }
+    }
+
+    // a short pop of the shields when their count changes
+    void PopShields(GameObject[] list, float k)
+    {
+        if (list == null) return;
+        Vector3 sc = new Vector3(k, k, 1f);
+        for (int i = 0; i < list.Length; i++) if (list[i] != null) list[i].transform.localScale = sc;
+    }
+
     void UpdateBody()
     {
         PHSlot s = Me();
         bool hider = s != null && game.RoleOf(s.index) == PHGame.ROLE_HIDER && s.hiding && !s.caught && s.def >= 0
             && (game.phase == PHGame.PH_BRIEF || game.phase == PHGame.PH_HIDE || game.phase == PHGame.PH_HUNT);
         float share = hider && s.maxHealth > 0 ? Mathf.Clamp01((float)s.health / s.maxHealth) : 0f;
-        int shields = hider ? s.SizeClass() : 0;
+        int shields = hider ? s.SizeClass() : -1;
         if (shields != shieldsShown)
         {
+            if (shields > 0 && shieldsShown >= -1) { shieldPopAt = Time.time; shieldPopping = true; }
             shieldsShown = shields;
             ShowShields(desktopShields, shields);
             ShowShields(vrShields, shields);
+            ShowSizes(desktopSizes, shields);
+            ShowSizes(vrSizes, shields);
+        }
+        if (shieldPopping)
+        {
+            float pt = (Time.time - shieldPopAt) / 0.35f;
+            float k = pt >= 1f ? 1f : 1f + 0.45f * Mathf.Sin(pt * Mathf.PI);
+            if (pt >= 1f) shieldPopping = false;
+            PopShields(desktopShields, k);
+            PopShields(vrShields, k);
         }
         // (Perf: switched only when they change, here and for the pip camera below)
         if (vr)

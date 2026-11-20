@@ -385,6 +385,7 @@ public static class WorldSceneBuilder
         HealthBar(desk.transform, sprite, new Vector2(0f, -410f), new Vector2(280f, 18f), out bar, out fill);
         view.desktopHealthBar = bar; view.desktopHealth = fill;
         view.desktopShields = Shields(bar, new Vector2(280f, 18f));
+        view.desktopSizes = SizeBoxes(bar, new Vector2(280f, 18f));
         var pip = new GameObject("Pip");
         pip.transform.SetParent(desk.transform, false);
         pip.layer = 5;
@@ -454,6 +455,7 @@ public static class WorldSceneBuilder
         HealthBar(vrHealth.transform, sprite, Vector2.zero, new Vector2(340f, 16f), out bar, out fill);
         view.vrHealthBar = bar; view.vrHealth = fill;
         view.vrShields = Shields(bar, new Vector2(340f, 16f));
+        view.vrSizes = SizeBoxes(bar, new Vector2(340f, 16f));
         var button = Empty(viewGo.transform, "TauntButton");
         Part(button, PrimitiveType.Cylinder, "Base", new Vector3(0f, 0f, -0.006f), new Vector3(90f, 0f, 0f), new Vector3(0.082f, 0.006f, 0.082f), dark);
         var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
@@ -735,6 +737,7 @@ public static class WorldSceneBuilder
         var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Udon/Textures/Shield.png");
         var list = new GameObject[3];
         float h = barSize.y * 1.6f, w = h * 48f / 56f, gap = h * 0.25f;
+        float x0 = SizeBoxesWidth(barSize) + gap * 2f;   // (after the prop-size boxes, SizeBoxes)
         for (int i = 0; i < 3; i++)
         {
             var g = new GameObject("Shield" + i);
@@ -742,11 +745,44 @@ public static class WorldSceneBuilder
             g.layer = 5;
             var img = g.AddComponent<RawImage>(); img.texture = tex; img.raycastTarget = false; img.material = hudMat;
             var rt = g.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 1f); rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0f, 0f);
+            rt.anchorMin = new Vector2(0f, 1f); rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0.5f, 0.5f);   // (centred: PHView pops them)
             rt.sizeDelta = new Vector2(w, h);
-            rt.anchoredPosition = new Vector2(i * (w + gap), barSize.y * 0.3f);
+            rt.anchoredPosition = new Vector2(x0 + i * (w + gap) + w / 2f, barSize.y * 0.3f + h / 2f);
             g.SetActive(false);
             list[i] = g;
+        }
+        return list;
+    }
+
+    // beside the shields, a prop-size pictogram: four crates from small to largest standing on the bar, the hider's
+    // own size bright and the others faint (PHView), so it reads "bigger prop, more shields"
+    static readonly float[] SizeBoxK = { 0.55f, 0.75f, 0.95f, 1.2f };
+    static float SizeBoxesWidth(Vector2 barSize)
+    {
+        float h = barSize.y * 1.6f, w = 0f;
+        for (int i = 0; i < SizeBoxK.Length; i++) w += h * SizeBoxK[i] + (i > 0 ? h * 0.12f : 0f);
+        return w;
+    }
+
+    static RawImage[] SizeBoxes(GameObject bar, Vector2 barSize)
+    {
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Lobby/Icons/crate.png");
+        var list = new RawImage[SizeBoxK.Length];
+        float h = barSize.y * 1.6f, x = 0f;
+        for (int i = 0; i < SizeBoxK.Length; i++)
+        {
+            float s = h * SizeBoxK[i];
+            var g = new GameObject("Size" + i);
+            g.transform.SetParent(bar.transform, false);
+            g.layer = 5;
+            var img = g.AddComponent<RawImage>(); img.texture = tex; img.raycastTarget = false; img.material = hudMat;
+            var rt = g.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f); rt.anchorMax = new Vector2(0f, 1f); rt.pivot = new Vector2(0f, 0f);
+            rt.sizeDelta = new Vector2(s, s);
+            rt.anchoredPosition = new Vector2(x, barSize.y * 0.3f);
+            x += s + h * 0.12f;
+            g.SetActive(false);
+            list[i] = img;
         }
         return list;
     }
