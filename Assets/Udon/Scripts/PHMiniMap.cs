@@ -313,8 +313,8 @@ public class PHMiniMap : UdonSharpBehaviour
         lr.startColor = c; lr.endColor = c;
         lr.gameObject.SetActive(true);
         if (roleOf[i] != PHGame.ROLE_HIDER) return;
-        // every spot they hid in (stood still STAY_MIN or more), the prop they were there, glowing at its edge (Cor:
-        // outlined) and larger than life; the pin with their name over the longest
+        // every spot they hid in (stood still STAY_MIN or more), the prop they were there, (Cor:
+        // outlined); the pin with their name over the longest
         int bs = i * MAXS, longest = -1;
         for (int q = 0; q < nStay[i]; q++)
         {
@@ -322,12 +322,12 @@ public class PHMiniMap : UdonSharpBehaviour
             if (longest < 0 || sDur[x] > sDur[longest]) longest = x;
             int def = sDef[x];
             if (def < 0 || def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
-            GameObject go = Copy(builder.propPrefabs[def], sPos[x], sYaw[x], 2f);
+            GameObject go = Copy(builder.propPrefabs[def], sPos[x], sYaw[x], 1f);
             shownProp[x] = go;
             // its outline: the same copy again, in the outline material (the back faces pushed out), the player's colour
             if (outlineMat != null)
             {
-                GameObject ol = Copy(builder.propPrefabs[def], sPos[x], sYaw[x], 2f);
+                GameObject ol = Copy(builder.propPrefabs[def], sPos[x], sYaw[x], 1f);
                 if (outlineBlock == null) outlineBlock = new MaterialPropertyBlock();
                 outlineBlock.SetColor("_Color", c);
                 MeshRenderer[] rs = ol.GetComponentsInChildren<MeshRenderer>(true);
