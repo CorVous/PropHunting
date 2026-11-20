@@ -310,6 +310,10 @@ public class PHSlot : UdonSharpBehaviour
         {
             nextSit = Time.time + 1f;   // (every second until the enter event comes: a hider standing free is seen)
             station.UseStation(me);
+            // a seat can be forced only on a humanoid avatar (VRChat): a hider on any other cannot be hidden. Said
+            // once in the log, after a few tries, so a playtest can find it
+            sitTries++;
+            if (sitTries == 4) Debug.LogWarning("[prophunt] cannot seat this player (tried 4 s): their avatar may not be humanoid; they stay visible");
         }
     }
 
@@ -670,9 +674,10 @@ public class PHSlot : UdonSharpBehaviour
         if (proxyShade.activeSelf != floor) proxyShade.SetActive(floor);
     }
 
+    int sitTries;
     public override void OnStationEntered(VRCPlayerApi player)
     {
-        if (player.isLocal) seated = true;
+        if (player.isLocal) { seated = true; sitTries = 0; }
         // (in the log: when each client hears each sit and stand, to tell later where a hider leaked)
         if (Utilities.IsValid(player)) Debug.Log("[prophunt] station " + index + " enter " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
     }
