@@ -94,7 +94,11 @@ def load_gltf_any(loc):
     return load_glb(loc) if loc.endswith('.glb') else q.load_gltf(loc)
 
 
-def frame_melee(V):
+# models whose head the rules above get wrong, turned end for end (checked on a side-view sheet of the whole catalog)
+FLIP = {('quaternius-zombieapocalypsekit', 'Spear')}
+
+
+def frame_melee(V, flip_end=False):
     lo, hi = V.min(0), V.max(0); ext = hi - lo
     ax = int(np.argmax(ext))                         # the length
     L = ext[ax]
@@ -102,6 +106,11 @@ def frame_melee(V):
     others = [i for i in range(3) if i != ax]
     def spread(mask): return np.prod(np.ptp(V[mask][:, others], axis=0) + 1e-6)
     head_hi = spread(t > 0.7) >= spread(t < 0.3)
+    # a model standing upright (+Y the length) with its origin in its lower part is held at the bottom: the head is up.
+    # (A sword's guard is wider than its blade, so the spread alone pointed the swords and daggers backwards; Cor)
+    o = (0.0 - lo[ax]) / L
+    if ax == 1 and -0.02 <= o <= 0.45: head_hi = True
+    if flip_end: head_hi = not head_hi
     if not head_hi: t = 1 - t
     # the broad side of the head
     hm = t > 0.6
@@ -117,13 +126,21 @@ def frame_melee(V):
     return W, det < 0
 
 
-def frame_gun(V):
+# guns the rules get wrong: 'flip' = muzzle and stock swapped, 'swap' = the barrel is the shorter level axis (a crossbow
+# is wider than long)
+GUN_FIX = {('quaternius-scifigun', 'Lightning Gun'): 'flip',
+           ('quaternius-scifimodularguns', 'Crossbow_1'): 'swap', ('quaternius-scifimodularguns', 'Crossbow_2'): 'swap'}
+
+
+def frame_gun(V, fix=None):
     lo, hi = V.min(0), V.max(0); ext = hi - lo
     ax = 0 if ext[0] >= ext[2] else 2              # the barrel: the longer level axis (models stand upright, +Y up)
+    if fix == 'swap': ax = 2 - ax
     low = V[:, 1] < lo[1] + 0.25 * ext[1]           # the handle hangs down at the back
     hc = V[low].mean(0)
     mid = (lo[ax] + hi[ax]) / 2
     front = 1 if hc[ax] < mid else -1               # the muzzle is away from the handle
+    if fix == 'flip': front = -front
     z = (V[:, ax] - hc[ax]) * front
     other = 2 if ax == 0 else 0
     x = V[:, other] - hc[other]
@@ -242,7 +259,7 @@ def main():
         if far.any() and far.mean() < 0.5:
             T, C = T[~far], C[~far]
             used = np.unique(T); remap = np.full(len(V), -1); remap[used] = np.arange(len(used)); V = V[used]; T = remap[T]
-        W, flip = (frame_melee if kind == 'melee' else frame_gun)(V)
+        W, flip = frame_melee(V, (pack, name) in FLIP) if kind == 'melee' else frame_gun(V, GUN_FIX.get((pack, name)))
         if flip: T = T[:, ::-1]
         s = length / np.ptp(W[:, 2])
         W = W * s

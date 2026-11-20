@@ -1,21 +1,25 @@
-// A held weapon or selector (PHWeapons): vertex colour, a sky/ground ambient and the sun in the props' toon bands,
-// and the wear: up to 12 spheres (_Chip0.._Chip11: centre in the mesh's own space, radius; radius 0 = none, set
-// per weapon by property block) cut chunks out of it. Faces are drawn on both sides, so a cut shows the inside
-// (_Inner, a dark core); the surface darkens a little towards each cut's edge, a bitten rim.
+// A held weapon or selector (PHWeapons): vertex colour, a sky/ground ambient and the sun in the props' toon bands.
+// Wear (Cor: "like a mouse nibbled along the entire weapon, leaving a stick near the end"): a melee weapon carries a
+// small 3D texture (Tools/bake_wear.py, WeaponBuilder) holding, for each bit of it, the wear at which it is eaten or
+// comes loose (r x 255/254; 1 and over = never: the grip). Where the model's surface is already eaten at the current
+// _Wear, the view ray is followed into the texture to where the weapon is still whole, and that point is drawn (a
+// solid gnawed face, its depth written), or nothing if the ray passes right through. _Wear 0 (or no texture) draws the
+// model as it is. Set per weapon by property block: _WearTex, _WearLo (the grid's corner, model space), _WearInv
+// (1 / the grid's size in metres), _Wear.
 Shader "PropHunt/Weapon"
 {
     Properties
     {
-        _Inner ("Inside", Color) = (0.16, 0.13, 0.11, 1)
-        _Chip0 ("", Vector) = (0,0,0,0)  _Chip1 ("", Vector) = (0,0,0,0)  _Chip2 ("", Vector) = (0,0,0,0)
-        _Chip3 ("", Vector) = (0,0,0,0)  _Chip4 ("", Vector) = (0,0,0,0)  _Chip5 ("", Vector) = (0,0,0,0)
-        _Chip6 ("", Vector) = (0,0,0,0)  _Chip7 ("", Vector) = (0,0,0,0)  _Chip8 ("", Vector) = (0,0,0,0)
-        _Chip9 ("", Vector) = (0,0,0,0)  _Chip10 ("", Vector) = (0,0,0,0) _Chip11 ("", Vector) = (0,0,0,0)
+        _Wear ("Wear", Range(0, 1)) = 0
+        _WearTex ("Wear grid", 3D) = "white" {}
+        _WearLo ("Grid corner", Vector) = (0,0,0,0)
+        _WearInv ("1 / grid size", Vector) = (1,1,1,0)
+        _Fresh ("Gnawed face tint", Color) = (0.82, 0.78, 0.72, 1)
     }
     SubShader
     {
         Tags { "RenderType"="Opaque" "Queue"="Geometry" }
-        Cull Off
+        Cull Back
         Pass
         {
             Tags { "LightMode"="ForwardBase" }
@@ -27,25 +31,30 @@ Shader "PropHunt/Weapon"
             #include "UnityCG.cginc"
             #include "UnityLightingCommon.cginc"
 
-            fixed4 _Inner;
-            float4 _Chip0, _Chip1, _Chip2, _Chip3, _Chip4, _Chip5, _Chip6, _Chip7, _Chip8, _Chip9, _Chip10, _Chip11;
+            sampler3D _WearTex;
+            float _Wear;
+            float4 _WearLo, _WearInv;
+            fixed4 _Fresh;
 
-            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; };
+            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f
             {
                 float4 pos : SV_POSITION;
                 float3 obj : TEXCOORD0;
-                half3 normal : TEXCOORD1;
+                float3 objN : TEXCOORD1;
                 half3 albedo : TEXCOORD2;
                 UNITY_FOG_COORDS(3)
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             v2f vert (appdata v)
             {
                 v2f o;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.obj = v.vertex.xyz;
-                o.normal = UnityObjectToWorldNormal(v.normal);
+                o.objN = v.normal;
                 float3 a = v.color.rgb;
                 #ifndef UNITY_COLORSPACE_GAMMA
                 a = GammaToLinearSpace(a);
@@ -55,33 +64,69 @@ Shader "PropHunt/Weapon"
                 return o;
             }
 
-            // how near a cut's edge (0 far, 1 at the edge); a point inside a cut is clipped
-            float Cut(float3 p, float4 c)
+            // the wear at which this point goes (over 1: never)
+            float Gone(float3 p)
             {
-                if (c.w <= 0.0) return 0.0;
-                float d = distance(p, c.xyz);
-                clip(d - c.w);
-                return 1.0 - saturate((d - c.w) / (c.w * 0.4));
+                float3 uvw = (p - _WearLo.xyz) * _WearInv.xyz;
+                if (any(uvw < 0.0) || any(uvw > 1.0)) return 0.0;
+                return tex3Dlod(_WearTex, float4(uvw, 0)).r * (255.0 / 254.0);
             }
 
             float Ramp(float x) { return 0.5 * smoothstep(0.03, 0.22, x) + 0.5 * smoothstep(0.34, 0.66, x); }
 
-            fixed4 frag (v2f i, fixed facing : VFACE) : SV_Target
+            float3 Light(float3 albedo, float3 n)
             {
-                float rim = 0.0;
-                rim = max(rim, Cut(i.obj, _Chip0)); rim = max(rim, Cut(i.obj, _Chip1)); rim = max(rim, Cut(i.obj, _Chip2));
-                rim = max(rim, Cut(i.obj, _Chip3)); rim = max(rim, Cut(i.obj, _Chip4)); rim = max(rim, Cut(i.obj, _Chip5));
-                rim = max(rim, Cut(i.obj, _Chip6)); rim = max(rim, Cut(i.obj, _Chip7)); rim = max(rim, Cut(i.obj, _Chip8));
-                rim = max(rim, Cut(i.obj, _Chip9)); rim = max(rim, Cut(i.obj, _Chip10)); rim = max(rim, Cut(i.obj, _Chip11));
-                bool inside = facing < 0;
-                float3 n = normalize(i.normal) * (inside ? -1.0 : 1.0);
-                float3 albedo = inside ? _Inner.rgb * (0.6 + 0.4 * i.albedo) : i.albedo * lerp(1.0, 0.45, rim * rim);
                 float d = dot(n, _WorldSpaceLightPos0.xyz);
                 float3 amb = n.y >= 0 ? lerp(unity_AmbientEquator.rgb, unity_AmbientSky.rgb, n.y)
                                       : lerp(unity_AmbientEquator.rgb, unity_AmbientGround.rgb, -n.y * 0.5);
-                float3 sun = _LightColor0.rgb * Ramp(max(0, d)) * 0.8;
-                float3 col = albedo * (amb + sun + _LightColor0.rgb * (d * 0.5 + 0.5) * 0.2);
-                fixed4 o = fixed4(col, 1);
+                return albedo * (amb + _LightColor0.rgb * Ramp(max(0, d)) * 0.8 + _LightColor0.rgb * (d * 0.5 + 0.5) * 0.2);
+            }
+
+            fixed4 frag (v2f i, out float depth : SV_Depth) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                depth = i.pos.z;
+                float3 nObj = normalize(i.objN);
+                float3 albedo = i.albedo;
+                float3 nWorld = normalize(UnityObjectToWorldNormal(nObj));
+                if (_Wear > 0.001)
+                {
+                    float cell = 1.0 / min(min(_WearInv.x, _WearInv.y), _WearInv.z) / 48.0;   // about a voxel (the grid is 48 along its longest side)
+                    if (Gone(i.obj - nObj * cell * 0.5) <= _Wear)
+                    {
+                        // eaten here: follow the view ray in until the weapon is whole again
+                        float3 cam = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1)).xyz;
+                        float3 rd = normalize(i.obj - cam);
+                        float stepLen = cell * 0.6;
+                        float3 p = i.obj;
+                        bool hit = false;
+                        [loop] for (int k = 1; k <= 64; k++)
+                        {
+                            p = i.obj + rd * (stepLen * k);
+                            if (Gone(p) > _Wear) { hit = true; break; }
+                        }
+                        if (!hit) discard;
+                        // refine between the last two steps
+                        float3 a = p - rd * stepLen, b = p;
+                        [unroll] for (int r = 0; r < 4; r++)
+                        {
+                            float3 m = (a + b) * 0.5;
+                            if (Gone(m) > _Wear) b = m; else a = m;
+                        }
+                        p = b;
+                        // the gnawed face's normal: away from where the weapon lasts longer
+                        float e = cell * 0.8;
+                        float3 g = float3(Gone(p + float3(e, 0, 0)) - Gone(p - float3(e, 0, 0)),
+                                          Gone(p + float3(0, e, 0)) - Gone(p - float3(0, e, 0)),
+                                          Gone(p + float3(0, 0, e)) - Gone(p - float3(0, 0, e)));
+                        float3 gn = dot(g, g) > 1e-8 ? -normalize(g) : -rd;
+                        nWorld = normalize(UnityObjectToWorldNormal(gn));
+                        albedo = albedo * _Fresh.rgb + 0.04;
+                        float4 clip = UnityObjectToClipPos(float4(p, 1));
+                        depth = clip.z / clip.w;
+                    }
+                }
+                fixed4 o = fixed4(Light(albedo, nWorld), 1);
                 UNITY_APPLY_FOG(i.fogCoord, o);
                 return o;
             }

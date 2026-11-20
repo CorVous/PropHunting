@@ -14,6 +14,7 @@ public static class WeaponBuilder
 {
     const string GEN = "Assets/Udon/Generated/";
     const string MESHES = GEN + "Weapons.asset";
+    const string WEAR = GEN + "WeaponWear.asset";
 
     [MenuItem("PropHunt/Build weapons")]
     static void Menu()
@@ -83,6 +84,58 @@ public static class WeaponBuilder
         }
         AssetDatabase.SaveAssets();
         return list;
+    }
+
+    // the nibbled wear grids (Tools/bake_wear.py -> Resources/PropHunt/weapon_wear.bytes): one Texture3D per melee model,
+    // kept as sub-assets of WeaponWear.asset; a model without a grid is drawn whole whatever its wear
+    static void LoadWear(PHWeapons w, List<Model> melee)
+    {
+        int n = melee.Count;
+        w.meleeWear = new Texture[n]; w.meleeWearLo = new Vector4[n]; w.meleeWearInv = new Vector4[n];
+        var asset = Resources.Load<TextAsset>("PropHunt/weapon_wear");
+        if (asset == null) { Debug.LogWarning("[prophunt] weapon_wear.bytes is missing (run Tools/bake_wear.py): weapons will not wear"); return; }
+        byte[] b = asset.bytes;
+        if (b[0] != 'P' || b[1] != 'H' || b[2] != 'W' || b[3] != '1') throw new Exception("weapon_wear.bytes: bad header");
+        var old = new Dictionary<string, Texture3D>();
+        foreach (var o in AssetDatabase.LoadAllAssetsAtPath(WEAR)) if (o is Texture3D t3) old[t3.name] = t3;
+        Texture3D holder = AssetDatabase.LoadAssetAtPath<Texture3D>(WEAR);
+        int p = 4;
+        int count = BitConverter.ToInt32(b, p); p += 4;
+        int found = 0;
+        for (int m = 0; m < count; m++)
+        {
+            int nl = b[p++]; string name = System.Text.Encoding.UTF8.GetString(b, p, nl); p += nl;
+            Vector3 lo = V(b, p); p += 12;
+            float res = BitConverter.ToSingle(b, p); p += 4;
+            int dx = BitConverter.ToInt32(b, p), dy = BitConverter.ToInt32(b, p + 4), dz = BitConverter.ToInt32(b, p + 8); p += 12;
+            int len = dx * dy * dz;
+            int k = melee.FindIndex(mo => mo.id == name);
+            if (k >= 0)
+            {
+                string texName = name.Replace(':', '_');
+                Texture3D tex;
+                if (old.TryGetValue(texName, out tex) && (tex.width != dx || tex.height != dy || tex.depth != dz)) { AssetDatabase.RemoveObjectFromAsset(tex); tex = null; }
+                if (tex == null)
+                {
+                    tex = new Texture3D(dx, dy, dz, TextureFormat.R8, false) { name = texName };
+                    if (holder == null) { AssetDatabase.CreateAsset(tex, WEAR); holder = tex; }
+                    else AssetDatabase.AddObjectToAsset(tex, WEAR);
+                }
+                tex.wrapMode = TextureWrapMode.Clamp; tex.filterMode = FilterMode.Bilinear;
+                var data = new byte[len];
+                Buffer.BlockCopy(b, p, data, 0, len);
+                tex.SetPixelData(data, 0);
+                tex.Apply(false, false);
+                EditorUtility.SetDirty(tex);
+                w.meleeWear[k] = tex;
+                w.meleeWearLo[k] = new Vector4(lo.x, lo.y, lo.z, res);
+                w.meleeWearInv[k] = new Vector4(1f / (dx * res), 1f / (dy * res), 1f / (dz * res), 0f);
+                found++;
+            }
+            p += len;
+        }
+        AssetDatabase.SaveAssets();
+        Debug.Log("[prophunt] weapon wear grids: " + found + " of " + n + " melee models");
     }
 
     static Vector3 V(byte[] b, int p) { return new Vector3(BitConverter.ToSingle(b, p), BitConverter.ToSingle(b, p + 4), BitConverter.ToSingle(b, p + 8)); }
@@ -183,6 +236,7 @@ public static class WeaponBuilder
         w.meleeTip = melee.ConvertAll(m => m.tip).ToArray();
         w.meleeHead = melee.ConvertAll(m => m.head).ToArray();
         w.meleeColor = melee.ConvertAll(m => m.color).ToArray();
+        LoadWear(w, melee);
         var spots = new List<Vector3>();
         foreach (var m in melee) spots.AddRange(m.spots);
         w.chipSpots = spots.ToArray();
@@ -293,7 +347,7 @@ public static class WeaponBuilder
                 pmr.sharedMaterial = pelletMat;
                 pmr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; pmr.receiveShadows = false;
                 var trail = pellet.AddComponent<TrailRenderer>();
-                trail.time = 0.35f; trail.minVertexDistance = 0.1f; trail.emitting = false; trail.autodestruct = false;
+                trail.time = PHWeapons.BULLET_TRAIL; trail.minVertexDistance = 0.1f; trail.emitting = false; trail.autodestruct = false;
                 trail.widthMultiplier = 0.09f;
                 trail.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0f));
                 var tg = new Gradient();
