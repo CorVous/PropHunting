@@ -299,6 +299,7 @@ public class PHSlot : UdonSharpBehaviour
         }
         // otherwise the station follows the player, so sitting down leaves them where they are
         else station.transform.SetPositionAndRotation(me.GetPosition(), me.GetRotation());
+        SeatCheck(me);
         if (ghost)
         {
             Vector3 p = me.GetPosition();
@@ -315,6 +316,31 @@ public class PHSlot : UdonSharpBehaviour
             sitTries++;
             if (sitTries == 4) Debug.LogWarning("[prophunt] cannot seat this player (tried 4 s): their avatar may not be humanoid; they stay visible");
         }
+    }
+
+    // A hider who thinks they are seated but stands somewhere else: VRChat can drop a player out of a station
+    // without the exit event (playtest 2026-11-19: a still hider's view jumped out to the map's edge; from there they
+    // walked free as themselves, and the prop, moved by the same stick, walked along at that offset). The seat is
+    // where this client puts the
+    // station (at the prop), so a seated hider is always within a step of it; two looks in a row more than 3 m away
+    // and the seat is taken again, which brings the player back to the prop. Twice a second, hiding only (a ghost's
+    // station follows the player).
+    float seatCheckAt;
+    bool seatAway, parkSkipLogged;
+    [HideInInspector] public int seatLost;   // (tests read it)
+
+    void SeatCheck(VRCPlayerApi me)
+    {
+        if (!hiding || !seated || game.phase == PHGame.PH_END) { seatAway = false; return; }
+        if (Time.time < seatCheckAt) return;
+        seatCheckAt = Time.time + 0.5f;
+        float d = Vector3.Distance(me.GetPosition(), station.transform.position);
+        if (d <= 3f) { seatAway = false; return; }
+        if (!seatAway) { seatAway = true; return; }
+        seatAway = false;
+        seatLost++;
+        Debug.LogWarning("[prophunt] seat lost: " + d.ToString("F1") + " m from the seat with no exit event; sitting again");
+        Reseat();
     }
 
     // Perf: the mobility and the parking were set every frame for every slot; nothing else moves a remote slot's
@@ -344,6 +370,14 @@ public class PHSlot : UdonSharpBehaviour
     void Park()
     {
         if (parked) return;
+        // never with this player in it: for a moment this slot may not count as theirs (ownership or the slot table
+        // in flux), and parking it then would carry them 400 m under the map. UpdateStrayStation lets them out if
+        // the slot really is someone else's now.
+        if (seated)
+        {
+            if (!parkSkipLogged) { parkSkipLogged = true; Debug.LogWarning("[prophunt] slot " + index + " not counted as mine while I sit in it; not parking it"); }
+            return;
+        }
         parked = true;
         station.transform.SetPositionAndRotation(parkAt + new Vector3(index * 3f, 0f, 0f), Quaternion.identity);
     }

@@ -623,7 +623,9 @@ public class PHLocal : UdonSharpBehaviour
                 watchDead[i] = true;
                 Debug.LogWarning("[prophunt] watch: slot " + i + " stopped running (halted?); its station is parked from here now");
             }
-            if (pid == 0 || pid == myId) { watchLeak[i] = 0; continue; }
+            // (never the station this player sits in: for a moment its slot may not count as theirs, and parking it then
+            // carried them 400 m under the map; PHLocal.UpdateStrayStation lets them out if it really is someone else's)
+            if (pid == 0 || pid == myId || s.seated) { watchLeak[i] = 0; continue; }
             bool hidden = (s.hiding || (s.ghost && !meGhost)) && !reveal;
             if (!hidden) { watchLeak[i] = 0; continue; }
             Vector3 park = s.parkAt + new Vector3(i * 3f, 0f, 0f);
