@@ -292,6 +292,8 @@ public static class WorldSceneBuilder
         BuildCredits(lobby.transform);
         // the language board: a lectern ahead and right of the spawn disc, turned towards it
         LobbyBuilder.BuildLanguageBoard(lobby.transform, game, new Vector3(2.7f, 0f, -RoomD / 2 + 3.6f), 28f);
+        // the how-to-play wall: three looping picture panels on the spawn wall at eye height, centred behind the spawn
+        LobbyBuilder.BuildHowTo(lobby.transform, new Vector3(0f, 1.6f, -RoomD / 2 + 0.03f), 0f);
         // the LAST ROUND diorama (Cor, item 40: the last round in miniature on a table in the ready area): move it here
         LobbyBuilder.BuildMiniMap(lobby.transform, game, builder, MiniMapAt, MiniMapYaw);
 
