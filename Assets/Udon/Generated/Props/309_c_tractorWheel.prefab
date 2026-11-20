@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 3958765329993206383}
   - component: {fileID: 6583080758038573758}
   - component: {fileID: 3079835006702518612}
+  - component: {fileID: 221503652663326336}
   m_Layer: 11
   m_Name: 309_c_tractorWheel
   m_TagString: Untagged
@@ -46,7 +47,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3235503287020389421}
-  m_Mesh: {fileID: -4298027181190534923, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 8780178482567417287, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &7550351283183249901
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -194,6 +195,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.53758, y: 0.51008064, z: 0.0864405}
   m_Center: {x: 0, y: 0.43757996, z: 0.39435977}
+--- !u!54 &221503652663326336
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3235503287020389421}
+  serializedVersion: 4
+  m_Mass: 24
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &6873017677015205229
 GameObject:
   m_ObjectHideFlags: 0

@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 4033014309532090273}
   - component: {fileID: 4298168713444329140}
   - component: {fileID: 186424200081902179}
+  - component: {fileID: 8117239833005758194}
   m_Layer: 11
   m_Name: 756_md_pineCrooked
   m_TagString: Untagged
@@ -48,7 +49,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4067993717694962613}
-  m_Mesh: {fileID: 3121289099192790600, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -4495236832689985900, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &207401149911492305
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -259,3 +260,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.16980237, y: 0.19066668, z: 0.6429958}
   m_Center: {x: -0.42659882, y: 0.58077335, z: 0}
+--- !u!54 &8117239833005758194
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4067993717694962613}
+  serializedVersion: 4
+  m_Mass: 40
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3

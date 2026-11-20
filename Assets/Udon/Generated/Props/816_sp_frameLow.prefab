@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 6626360362649534580}
   - component: {fileID: 1221607588774483778}
   - component: {fileID: 2311283884737442456}
+  - component: {fileID: 5161975684071207638}
   m_Layer: 11
   m_Name: 816_sp_frameLow
   m_TagString: Untagged
@@ -49,7 +50,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3935078894816364254}
-  m_Mesh: {fileID: 124673204885626366, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 4714305809842756678, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &1800098371250604671
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.47641438, y: 0.100000486, z: 0.1009984}
   m_Center: {x: -0.0034864247, y: 0.10000042, z: -0.79950106}
+--- !u!54 &5161975684071207638
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3935078894816364254}
+  serializedVersion: 4
+  m_Mass: 30
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &5023880438484479219
 GameObject:
   m_ObjectHideFlags: 0

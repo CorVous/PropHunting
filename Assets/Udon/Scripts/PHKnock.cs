@@ -12,7 +12,7 @@ public class PHKnock : UdonSharpBehaviour
 {
     public PHGame game;
     public const float SETTLE_TIME = 4f, SEND_INTERVAL = 0.12f;
-    public const float KNOCK_SPEED_LIGHT = 5.5f, KNOCK_SPEED = 3.2f, KNOCK_SPEED_HEAVY = 1.4f;
+    public const float KNOCK_SPEED_LIGHT = 5.5f, KNOCK_SPEED = 3.2f, KNOCK_SPEED_HEAVY = 2.2f;
 
     [UdonSynced] public int emit = -1;
     [UdonSynced] public int round = -1;

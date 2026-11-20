@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 6658538300498589566}
   - component: {fileID: 6804723831346345997}
   - component: {fileID: 7603859111995091226}
+  - component: {fileID: 268254459574141665}
   m_Layer: 11
   m_Name: 697_sp_turret
   m_TagString: Untagged
@@ -49,7 +50,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4410502379257981882}
-  m_Mesh: {fileID: -5385171124899902029, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -5275665594283578095, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &7963063806040360565
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.08221963, y: 0.03333336, z: 0.33025074}
   m_Center: {x: 0.17101362, y: 0.13333334, z: 0.009855986}
+--- !u!54 &268254459574141665
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4410502379257981882}
+  serializedVersion: 4
+  m_Mass: 40
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &5759642444724970639
 GameObject:
   m_ObjectHideFlags: 0

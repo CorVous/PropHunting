@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 1831195997912995807}
   - component: {fileID: 7581542321506828212}
   - component: {fileID: 5693739726509398605}
+  - component: {fileID: 2102502301802502165}
   m_Layer: 11
   m_Name: 031_k_bathSink
   m_TagString: Untagged
@@ -49,7 +50,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3991300362327523512}
-  m_Mesh: {fileID: -8009393820968104518, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -7753417388035871639, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &7113488422755796731
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.21551202, y: 0.04666668, z: 0.028423667}
   m_Center: {x: 0.000000007450581, y: 0.46666667, z: 0.10135166}
+--- !u!54 &2102502301802502165
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3991300362327523512}
+  serializedVersion: 4
+  m_Mass: 15
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &8067089905798988099
 GameObject:
   m_ObjectHideFlags: 0
