@@ -51,6 +51,7 @@ public class PHWeapons : UdonSharpBehaviour
     // ---- effects (world space particle systems, moved where they are needed and told to emit)
     public ParticleSystem fxDust;      // a prop struck: a puff
     public ParticleSystem fxChips;     // ...and splinters; also the chunks off a weapon, and the pieces of a broken one
+    public ParticleSystem fxWear;      // the weapon's own pieces when it wears: little tumbling blocks
     public ParticleSystem fxSpark;     // a wall struck; the sparks along a desktop slash
     public ParticleSystem fxHider;     // a hider struck: confetti
     public ParticleSystem fxMuzzle;    // the selector's flash
@@ -591,7 +592,8 @@ public class PHWeapons : UdonSharpBehaviour
     {
         Vector3 c = chipSpots[model * SPOTS + SpotOf(i, s, PHLocal.HUNTER_HEALTH - s.hunterHealth)];
         Vector3 at = held[i].position + held[i].rotation * (c * held[i].localScale.x);
-        Burst(fxChips, at, 8);
+        Burst(fxChips, at, 6);
+        Burst(fxWear, at, 5);   // (seen by everyone: every client follows the synced condition)
         sound.PlayAt("impactMetal_light_002", at, 8f, 0.6f, 1.2f);
     }
 

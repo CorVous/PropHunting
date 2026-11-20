@@ -296,6 +296,26 @@ public static class WeaponBuilder
             new Vector2(0.5f, 0.9f), new Vector2(0.4f, 1.4f), new Vector2(0.08f, 0.2f), 0.05f, -0.05f, new Color(1, 1, 1, 1), new Color(0.9f, 0.88f, 0.84f, 1), true, false);
         w.fxChips = Fx(fxRoot, "Chips", FxMat("FxChips", Color.white, false, false, false),
             new Vector2(0.6f, 1.0f), new Vector2(1.4f, 3.2f), new Vector2(0.018f, 0.05f), 0.04f, 1.6f, new Color(0.55f, 0.40f, 0.26f, 1), new Color(0.45f, 0.45f, 0.48f, 1), false, true);
+        // the weapon's own pieces when it wears (PHWeapons.ChipOff, onboarding): a handful of little tumbling blocks,
+        // bigger than the splinters, steel and wood, that fly off and drop (cube meshes, one pooled system)
+        w.fxWear = Fx(fxRoot, "WearPieces", FxMat("FxWear", Color.white, false, false, false),
+            new Vector2(0.7f, 1.1f), new Vector2(1.2f, 2.6f), new Vector2(0.014f, 0.03f), 0.03f, 1.5f, new Color(0.62f, 0.64f, 0.68f, 1), new Color(0.50f, 0.36f, 0.22f, 1), false, false);
+        {
+            var main = w.fxWear.main;
+            main.startRotation3D = true;
+            main.startRotationX = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startRotationY = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startRotationZ = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.maxParticles = 60;
+            var rol = w.fxWear.rotationOverLifetime; rol.enabled = true; rol.separateAxes = true;
+            rol.x = new ParticleSystem.MinMaxCurve(-12f, 12f); rol.y = new ParticleSystem.MinMaxCurve(-12f, 12f); rol.z = new ParticleSystem.MinMaxCurve(-12f, 12f);
+            var sh = w.fxWear.shape; sh.shapeType = ParticleSystemShapeType.Hemisphere;   // (mostly up and out)
+            sh.rotation = new Vector3(-90f, 0f, 0f);
+            var pr = w.fxWear.GetComponent<ParticleSystemRenderer>();
+            pr.renderMode = ParticleSystemRenderMode.Mesh;
+            pr.mesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            pr.alignment = ParticleSystemRenderSpace.World;
+        }
         w.fxSpark = Fx(fxRoot, "Spark", FxMat("FxSpark", Color.white, true, true, false),
             new Vector2(0.15f, 0.35f), new Vector2(1.8f, 4.2f), new Vector2(0.015f, 0.035f), 0.02f, 0.9f, new Color(1f, 0.9f, 0.5f, 1), new Color(1f, 1f, 0.85f, 1), false, false);
         w.fxHider = Fx(fxRoot, "Confetti", FxMat("FxConfetti", Color.white, false, false, false),
