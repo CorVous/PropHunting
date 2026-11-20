@@ -44,7 +44,7 @@ MonoBehaviour:
       Data: 
     - Name: 
       Entry: 12
-      Data: 112
+      Data: 113
     - Name: 
       Entry: 7
       Data: 
@@ -4442,13 +4442,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutId
+      Data: pipWarmRound
     - Name: $v
       Entry: 7
       Data: 204|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutId
+      Data: pipWarmRound
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 30
@@ -4491,13 +4491,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutFloorId
+      Data: cutId
     - Name: $v
       Entry: 7
       Data: 206|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutFloorId
+      Data: cutId
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 30
@@ -4540,19 +4540,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutOn
+      Data: cutFloorId
     - Name: $v
       Entry: 7
       Data: 208|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutOn
+      Data: cutFloorId
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 102
+      Data: 30
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 102
+      Data: 30
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -4589,13 +4589,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutWant
+      Data: cutOn
     - Name: $v
       Entry: 7
       Data: 210|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutWant
+      Data: cutOn
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 102
@@ -4638,19 +4638,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutRay
+      Data: cutWant
     - Name: $v
       Entry: 7
       Data: 212|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutRay
+      Data: cutWant
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 30
+      Data: 102
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 30
+      Data: 102
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -4687,13 +4687,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutBlocked
+      Data: cutRay
     - Name: $v
       Entry: 7
       Data: 214|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutBlocked
+      Data: cutRay
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 30
@@ -4736,13 +4736,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutMask
+      Data: cutBlocked
     - Name: $v
       Entry: 7
       Data: 216|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutMask
+      Data: cutBlocked
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 30
@@ -4785,19 +4785,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutNext
+      Data: cutMask
     - Name: $v
       Entry: 7
       Data: 218|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutNext
+      Data: cutMask
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 96
+      Data: 30
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 96
+      Data: 30
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -4834,13 +4834,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutAmt
+      Data: cutNext
     - Name: $v
       Entry: 7
       Data: 220|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutAmt
+      Data: cutNext
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 96
@@ -4883,19 +4883,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutLo
+      Data: cutAmt
     - Name: $v
       Entry: 7
       Data: 222|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutLo
+      Data: cutAmt
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 109
+      Data: 96
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 109
+      Data: 96
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -4932,13 +4932,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutHi
+      Data: cutLo
     - Name: $v
       Entry: 7
       Data: 224|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutHi
+      Data: cutLo
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 109
@@ -4981,19 +4981,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: cutHidden
+      Data: cutHi
     - Name: $v
       Entry: 7
       Data: 226|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: cutHidden
+      Data: cutHi
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 96
+      Data: 109
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 96
+      Data: 109
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5009,61 +5009,6 @@ MonoBehaviour:
     - Name: _fieldAttributes
       Entry: 7
       Data: 227|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
-        mscorlib
-    - Name: 
-      Entry: 12
-      Data: 1
-    - Name: 
-      Entry: 7
-      Data: 228|System.NonSerializedAttribute, mscorlib
-    - Name: 
-      Entry: 8
-      Data: 
-    - Name: 
-      Entry: 13
-      Data: 
-    - Name: 
-      Entry: 8
-      Data: 
-    - Name: 
-      Entry: 8
-      Data: 
-    - Name: 
-      Entry: 8
-      Data: 
-    - Name: 
-      Entry: 7
-      Data: 
-    - Name: $k
-      Entry: 1
-      Data: fenceDirty
-    - Name: $v
-      Entry: 7
-      Data: 229|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
-    - Name: <Name>k__BackingField
-      Entry: 1
-      Data: fenceDirty
-    - Name: <UserType>k__BackingField
-      Entry: 9
-      Data: 102
-    - Name: <SystemType>k__BackingField
-      Entry: 9
-      Data: 102
-    - Name: <SyncMode>k__BackingField
-      Entry: 7
-      Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
-    - Name: 
-      Entry: 6
-      Data: 
-    - Name: 
-      Entry: 8
-      Data: 
-    - Name: <IsSerialized>k__BackingField
-      Entry: 5
-      Data: false
-    - Name: _fieldAttributes
-      Entry: 7
-      Data: 230|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
         mscorlib
     - Name: 
       Entry: 12
@@ -5085,19 +5030,74 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: fenceX
+      Data: cutHidden
+    - Name: $v
+      Entry: 7
+      Data: 228|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
+    - Name: <Name>k__BackingField
+      Entry: 1
+      Data: cutHidden
+    - Name: <UserType>k__BackingField
+      Entry: 9
+      Data: 96
+    - Name: <SystemType>k__BackingField
+      Entry: 9
+      Data: 96
+    - Name: <SyncMode>k__BackingField
+      Entry: 7
+      Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
+    - Name: 
+      Entry: 6
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: <IsSerialized>k__BackingField
+      Entry: 5
+      Data: false
+    - Name: _fieldAttributes
+      Entry: 7
+      Data: 229|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
+        mscorlib
+    - Name: 
+      Entry: 12
+      Data: 1
+    - Name: 
+      Entry: 7
+      Data: 230|System.NonSerializedAttribute, mscorlib
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: fenceDirty
     - Name: $v
       Entry: 7
       Data: 231|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: fenceX
+      Data: fenceDirty
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 114
+      Data: 102
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 114
+      Data: 102
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5134,13 +5134,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: fenceZ
+      Data: fenceX
     - Name: $v
       Entry: 7
       Data: 233|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: fenceZ
+      Data: fenceX
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 114
@@ -5183,19 +5183,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: fenceI0
+      Data: fenceZ
     - Name: $v
       Entry: 7
       Data: 235|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: fenceI0
+      Data: fenceZ
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 30
+      Data: 114
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 30
+      Data: 114
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5232,13 +5232,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: fenceJ0
+      Data: fenceI0
     - Name: $v
       Entry: 7
       Data: 237|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: fenceJ0
+      Data: fenceI0
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 30
@@ -5281,13 +5281,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: fenceNx
+      Data: fenceJ0
     - Name: $v
       Entry: 7
       Data: 239|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: fenceNx
+      Data: fenceJ0
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 30
@@ -5330,13 +5330,13 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: fenceNz
+      Data: fenceNx
     - Name: $v
       Entry: 7
       Data: 241|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: fenceNz
+      Data: fenceNx
     - Name: <UserType>k__BackingField
       Entry: 9
       Data: 30
@@ -5379,25 +5379,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: fenceArch
+      Data: fenceNz
     - Name: $v
       Entry: 7
       Data: 243|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: fenceArch
+      Data: fenceNz
     - Name: <UserType>k__BackingField
-      Entry: 7
-      Data: 244|System.RuntimeType, mscorlib
-    - Name: 
-      Entry: 1
-      Data: UnityEngine.Collider, UnityEngine.PhysicsModule
-    - Name: 
-      Entry: 8
-      Data: 
+      Entry: 9
+      Data: 30
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 244
+      Data: 30
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5412,7 +5406,7 @@ MonoBehaviour:
       Data: false
     - Name: _fieldAttributes
       Entry: 7
-      Data: 245|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
+      Data: 244|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
         mscorlib
     - Name: 
       Entry: 12
@@ -5434,19 +5428,25 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: pipWant
+      Data: fenceArch
     - Name: $v
       Entry: 7
-      Data: 246|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
+      Data: 245|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: pipWant
+      Data: fenceArch
     - Name: <UserType>k__BackingField
-      Entry: 9
-      Data: 102
+      Entry: 7
+      Data: 246|System.RuntimeType, mscorlib
+    - Name: 
+      Entry: 1
+      Data: UnityEngine.Collider, UnityEngine.PhysicsModule
+    - Name: 
+      Entry: 8
+      Data: 
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 102
+      Data: 246
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5483,25 +5483,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: pipMats
+      Data: pipWant
     - Name: $v
       Entry: 7
       Data: 248|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: pipMats
+      Data: pipWant
     - Name: <UserType>k__BackingField
-      Entry: 7
-      Data: 249|System.RuntimeType, mscorlib
-    - Name: 
-      Entry: 1
-      Data: UnityEngine.Material[], UnityEngine.CoreModule
-    - Name: 
-      Entry: 8
-      Data: 
+      Entry: 9
+      Data: 102
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 249
+      Data: 102
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5516,7 +5510,7 @@ MonoBehaviour:
       Data: false
     - Name: _fieldAttributes
       Entry: 7
-      Data: 250|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
+      Data: 249|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
         mscorlib
     - Name: 
       Entry: 12
@@ -5538,19 +5532,25 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: outlineShownPos
+      Data: pipMats
     - Name: $v
       Entry: 7
-      Data: 251|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
+      Data: 250|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: outlineShownPos
+      Data: pipMats
     - Name: <UserType>k__BackingField
-      Entry: 9
-      Data: 109
+      Entry: 7
+      Data: 251|System.RuntimeType, mscorlib
+    - Name: 
+      Entry: 1
+      Data: UnityEngine.Material[], UnityEngine.CoreModule
+    - Name: 
+      Entry: 8
+      Data: 
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 109
+      Data: 251
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5587,19 +5587,19 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: outlineShownYaw
+      Data: outlineShownPos
     - Name: $v
       Entry: 7
       Data: 253|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
-      Data: outlineShownYaw
+      Data: outlineShownPos
     - Name: <UserType>k__BackingField
       Entry: 9
-      Data: 96
+      Data: 109
     - Name: <SystemType>k__BackingField
       Entry: 9
-      Data: 96
+      Data: 109
     - Name: <SyncMode>k__BackingField
       Entry: 7
       Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
@@ -5636,10 +5636,59 @@ MonoBehaviour:
       Data: 
     - Name: $k
       Entry: 1
-      Data: pieceY
+      Data: outlineShownYaw
     - Name: $v
       Entry: 7
       Data: 255|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
+    - Name: <Name>k__BackingField
+      Entry: 1
+      Data: outlineShownYaw
+    - Name: <UserType>k__BackingField
+      Entry: 9
+      Data: 96
+    - Name: <SystemType>k__BackingField
+      Entry: 9
+      Data: 96
+    - Name: <SyncMode>k__BackingField
+      Entry: 7
+      Data: System.Nullable`1[[UdonSharp.UdonSyncMode, UdonSharp.Runtime]], mscorlib
+    - Name: 
+      Entry: 6
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: <IsSerialized>k__BackingField
+      Entry: 5
+      Data: false
+    - Name: _fieldAttributes
+      Entry: 7
+      Data: 256|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
+        mscorlib
+    - Name: 
+      Entry: 12
+      Data: 0
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: pieceY
+    - Name: $v
+      Entry: 7
+      Data: 257|UdonSharp.Compiler.FieldDefinition, UdonSharp.Editor
     - Name: <Name>k__BackingField
       Entry: 1
       Data: pieceY
@@ -5663,7 +5712,7 @@ MonoBehaviour:
       Data: false
     - Name: _fieldAttributes
       Entry: 7
-      Data: 256|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
+      Data: 258|System.Collections.Generic.List`1[[System.Attribute, mscorlib]],
         mscorlib
     - Name: 
       Entry: 12
