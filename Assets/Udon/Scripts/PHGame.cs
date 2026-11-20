@@ -633,6 +633,11 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public int failedAtMs;
     public GameObject failNotice;
     public PHStore store;        // the weapon wall's coins and trophies (LobbyBuilder.BuildStore): taunts count there
+    public PHDiag diag;          // the game log on the debug sign's back, for testers to copy (LobbyBuilder.BuildGameLog)
+
+    // a diagnostic line: VRChat's log ("[prophunt] ...") and the game log in the lobby
+    public void Log(string s) { Debug.Log("[prophunt] " + s); if (diag != null) diag.Add(s); }
+    public void Warn(string s) { Debug.LogWarning("[prophunt] " + s); if (diag != null) diag.Add("! " + s); }
     public Material revealMat;   // the END reveal's highlight of the hiders' props (PHSlot.MakeRevealCopy; WorldSceneBuilder)
     int failDismissed = -1;
     void FailNotice()

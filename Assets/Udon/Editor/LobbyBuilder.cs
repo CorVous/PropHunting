@@ -509,8 +509,45 @@ public static partial class LobbyBuilder
         Box(root, "LegR", new Vector3(1.15f, 0.95f, 0.06f), new Vector3(0.1f, 1.9f, 0.1f), wood);
         Slab(root, "Board", new Vector3(0f, 1.42f, 0.03f), new Vector3(2.62f, 1.74f, 0.05f), wood);
         const float k = 0.0038f;   // 300 canvas units: 1.14 m
+        BuildGameLog(root, game, new Vector3(0f, 1.42f, 0.062f), k);
         BuildExplore(root, game, new Vector3(-0.63f, 1.42f, 0f), k);
         return BuildProfiler(root, game, new Vector3(0.63f, 1.42f + (418f - 250f) * k / 2f, 0f), k);
+    }
+
+    // The game log (Cor: testers copy it in game rather than dig up output_log), on the back of the debug sign, between
+    // its legs: a title, a hint, and a text field with the last lines of this client's diagnostics, newest at the
+    // bottom (PHDiag, fed by PHGame.Log and Warn). Clicking the field brings up VRChat's text box with the whole log,
+    // ready to copy. 540 x 430 canvas units at k: 2.05 x 1.63 m.
+    static void BuildGameLog(Transform sign, PHGame game, Vector3 localPos, float k)
+    {
+        var cv = Canvas(sign, "GameLog", localPos, Quaternion.Euler(0f, 180f, 0f), new Vector2(540f, 430f), k, true);
+        var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
+        Txt(cv, "Label", new Vector2(0, 196), new Vector2(520, 24), "GAME LOG", future, 16, C("e1cfa5"), TextAlignmentOptions.Center);
+        Txt(cv, "Hint", new Vector2(0, 172), new Vector2(520, 20), "Click the text to copy it for a bug report", future, 10, C("e1cfa5"), TextAlignmentOptions.Center);
+        var size = new Vector2(520f, 340f);
+        var box = Img(cv, "Field", new Vector2(0, -26), size, sRound, C("1d4a36"), 3f);
+        box.raycastTarget = true;
+        var area = Rect(box.transform, "Text Area", Vector2.zero, size - new Vector2(16f, 12f));
+        area.gameObject.AddComponent<RectMask2D>();
+        var lib = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+        var tx = Txt(area, "Text", Vector2.zero, area.sizeDelta, "", lib, 9.5f, C("f6ecd4"), TextAlignmentOptions.BottomLeft);
+        tx.enableWordWrapping = true; tx.overflowMode = TextOverflowModes.Masking;
+        var input = box.gameObject.AddComponent<TMP_InputField>();
+        input.textViewport = area; input.textComponent = tx; if (lib != null) input.fontAsset = lib;
+        input.lineType = TMP_InputField.LineType.MultiLineNewline; input.targetGraphic = box;
+        input.customCaretColor = true; input.caretColor = new Color(0f, 0f, 0f, 0f);
+        var nav = input.navigation; nav.mode = Navigation.Mode.None; input.navigation = nav;
+        var cb = input.colors;
+        cb.normalColor = new Color(0.82f, 0.82f, 0.82f, 1f); cb.highlightedColor = Color.white;
+        cb.pressedColor = Color.white; cb.selectedColor = Color.white; cb.disabledColor = cb.normalColor;
+        input.colors = cb;
+        var diag = box.gameObject.AddUdonSharpComponent<PHDiag>();
+        diag.field = input;
+        UdonSharpEditorUtility.CopyProxyToUdon(diag);
+        var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(diag);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onEndEdit, udon.SendCustomEvent, nameof(PHDiag.Restore));
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onValueChanged, udon.SendCustomEvent, nameof(PHDiag.Restore));
+        game.diag = diag;
     }
 
     // a button of the DEBUG plaque that calls one of PHGame's methods (PHButton): host only, as the game checks

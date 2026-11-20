@@ -72,6 +72,7 @@ public class PHLocal : UdonSharpBehaviour
         slotIndex = game.SlotOf(me.playerId);
         PHSlot s = Me();
         role = game.RoleOf(slotIndex);
+        game.Log("phase " + phase + " round " + game.round + " slot " + slotIndex + " role " + role);
         if (s != null) s.Claim();
         switch (phase)
         {
@@ -621,7 +622,7 @@ public class PHLocal : UdonSharpBehaviour
             else if (!watchDead[i] && Time.time - watchBeatAt[i] > 3f)
             {
                 watchDead[i] = true;
-                Debug.LogWarning("[prophunt] watch: slot " + i + " stopped running (halted?); its station is parked from here now");
+                game.Warn("watch: slot " + i + " stopped running (halted?); its station is parked from here now");
             }
             // (never the station this player sits in: for a moment its slot may not count as theirs, and parking it then
             // carried them 400 m under the map; PHLocal.UpdateStrayStation lets them out if it really is someone else's)
@@ -633,7 +634,7 @@ public class PHLocal : UdonSharpBehaviour
             if ((st.position - park).sqrMagnitude > 1f)
             {
                 st.SetPositionAndRotation(park, Quaternion.identity);
-                if (!watchMoved[i]) { watchMoved[i] = true; Debug.LogWarning("[prophunt] watch: slot " + i + " station was not parked; parked it"); }
+                if (!watchMoved[i]) { watchMoved[i] = true; game.Warn("watch: slot " + i + " station was not parked; parked it"); }
             }
             VRCPlayerApi p = VRCPlayerApi.GetPlayerById(pid);
             if (p == null || !Utilities.IsValid(p)) { watchLeak[i] = 0; continue; }
@@ -643,7 +644,7 @@ public class PHLocal : UdonSharpBehaviour
             if (watchLeak[i] < 2 || Time.time - watchAskAt[i] < WATCH_RETRY) continue;
             watchAskAt[i] = Time.time;
             s.leaksAsked++;
-            Debug.LogWarning("[prophunt] leak: slot " + i + " (player " + pid + ") drawn " + d.ToString("F1") + " m from its parking spot; asking them to sit again");
+            game.Warn("leak: slot " + i + " (player " + pid + ") drawn " + d.ToString("F1") + " m from its parking spot; asking them to sit again");
             if (game.leakHeal) s.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PHSlot.RequestReseat));
         }
     }

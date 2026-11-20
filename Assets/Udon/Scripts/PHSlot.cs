@@ -314,7 +314,7 @@ public class PHSlot : UdonSharpBehaviour
             // a seat can be forced only on a humanoid avatar (VRChat): a hider on any other cannot be hidden. Said
             // once in the log, after a few tries, so a playtest can find it
             sitTries++;
-            if (sitTries == 4) Debug.LogWarning("[prophunt] cannot seat this player (tried 4 s): their avatar may not be humanoid; they stay visible");
+            if (sitTries == 4) game.Warn("cannot seat this player (tried 4 s): their avatar may not be humanoid; they stay visible");
         }
     }
 
@@ -339,7 +339,7 @@ public class PHSlot : UdonSharpBehaviour
         if (!seatAway) { seatAway = true; return; }
         seatAway = false;
         seatLost++;
-        Debug.LogWarning("[prophunt] seat lost: " + d.ToString("F1") + " m from the seat with no exit event; sitting again");
+        game.Warn("seat lost: " + d.ToString("F1") + " m from the seat with no exit event; sitting again");
         Reseat();
     }
 
@@ -375,7 +375,7 @@ public class PHSlot : UdonSharpBehaviour
         // the slot really is someone else's now.
         if (seated)
         {
-            if (!parkSkipLogged) { parkSkipLogged = true; Debug.LogWarning("[prophunt] slot " + index + " not counted as mine while I sit in it; not parking it"); }
+            if (!parkSkipLogged) { parkSkipLogged = true; game.Warn("slot " + index + " not counted as mine while I sit in it; not parking it"); }
             return;
         }
         parked = true;
@@ -717,7 +717,7 @@ public class PHSlot : UdonSharpBehaviour
     {
         if (player.isLocal) { seated = true; sitTries = 0; enteredAt = Time.time; }
         // (in the log: when each client hears each sit and stand, to tell later where a hider leaked)
-        if (Utilities.IsValid(player)) Debug.Log("[prophunt] station " + index + " enter " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
+        if (Utilities.IsValid(player)) game.Log("station " + index + " enter " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
     }
 
     // the leak check lives in PHLocal.UpdateWatch (another behaviour: it must keep working if this one stops)
@@ -734,14 +734,14 @@ public class PHSlot : UdonSharpBehaviour
         // to everyone. A viewer still missing it asks again in a few seconds, PHLocal.UpdateWatch)
         if (seated && Time.time - enteredAt < 3f) return;
         reseatAt = Time.time;
-        Debug.Log("[prophunt] re-seat asked by another client (seated=" + seated + ")");
+        game.Log("re-seat asked by another client (seated=" + seated + ")");
         if (seated) Reseat(); else nextSit = 0f;
     }
     float reseatAt = -99f, enteredAt = -99f;
 
     public override void OnStationExited(VRCPlayerApi player)
     {
-        if (Utilities.IsValid(player)) Debug.Log("[prophunt] station " + index + " exit " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
+        if (Utilities.IsValid(player)) game.Log("station " + index + " exit " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
         if (Utilities.IsValid(player) && player.isLocal)
         {
             seated = false;
