@@ -15,6 +15,7 @@ Shader "PropHunt/Weapon"
         _WearLo ("Grid corner", Vector) = (0,0,0,0)
         _WearInv ("1 / grid size", Vector) = (1,1,1,0)
         _Fresh ("Gnawed face tint", Color) = (0.82, 0.78, 0.72, 1)
+        _Dither ("Dithered (growing back)", Float) = 0
     }
     SubShader
     {
@@ -35,6 +36,7 @@ Shader "PropHunt/Weapon"
             float _Wear;
             float4 _WearLo, _WearInv;
             fixed4 _Fresh;
+            float _Dither;
 
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f
@@ -85,6 +87,8 @@ Shader "PropHunt/Weapon"
             fixed4 frag (v2f i, out float depth : SV_Depth) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                // growing back after it broke (PHWeapons): every other pixel, a see-through screen
+                if (_Dither > 0.5 && (((int)i.pos.x + (int)i.pos.y) & 1) == 0) discard;
                 depth = i.pos.z;
                 float3 nObj = normalize(i.objN);
                 float3 albedo = i.albedo;

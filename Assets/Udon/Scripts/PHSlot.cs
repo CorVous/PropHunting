@@ -48,6 +48,7 @@ public class PHSlot : UdonSharpBehaviour
     [UdonSynced] public bool hunterOut;
     // the weapons this player picked on the selection wall (PHWeapons model indices; -1 = the map's default)
     [UdonSynced] public int meleeChoice = -1, gunChoice = -1;
+    [UdonSynced] public bool weaponRecovering;       // a hunter's weapon broke and is growing back (unusable, drawn dithered)
     [UdonSynced] public bool armed;                  // a hider has shot in the final stand: their gun is seen by all (PHWeapons)
     [UdonSynced] public int wrongProps, hits, catches;
     [UdonSynced] public int round = -1;               // the round these figures belong to
@@ -92,7 +93,7 @@ public class PHSlot : UdonSharpBehaviour
         round = r;
         def = -1; lastDef = -1; hiding = false; ghost = false; caught = false; survivedMs = 0;
         health = 0; maxHealth = 0;
-        hunterHealth = 100; hunterOut = false; armed = false; wrongProps = 0; hits = 0; catches = 0;
+        hunterHealth = 100; hunterOut = false; weaponRecovering = false; armed = false; wrongProps = 0; hits = 0; catches = 0;
         Send();
     }
 
@@ -149,7 +150,7 @@ public class PHSlot : UdonSharpBehaviour
         def = -1; lastDef = -1; airborne = false; hiding = false; ghost = false;
         scrapVote = 0; undoVote = 0;
         health = 0; maxHealth = 0; caught = false; survivedMs = 0;
-        hunterHealth = 100; hunterOut = false; armed = false; wrongProps = 0; hits = 0; catches = 0;
+        hunterHealth = 100; hunterOut = false; weaponRecovering = false; armed = false; wrongProps = 0; hits = 0; catches = 0;
         round = -1;
         Send();
     }

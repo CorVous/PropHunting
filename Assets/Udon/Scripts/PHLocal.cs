@@ -684,6 +684,7 @@ public class PHLocal : UdonSharpBehaviour
 
     void UpdateBody()
     {
+        UpdateWeaponRepair();
         if (Input.GetKeyDown(KeyCode.T)) Taunt();
         if (propLayer >= 0 && game.builder.built && (!layerDone || layerObjs != game.builder.objects)) SetPropLayer(propLayer);
         bool eg = game.Endgame;
@@ -959,17 +960,55 @@ public class PHLocal : UdonSharpBehaviour
     public void OnShot(int wear, int shooter)
     {
         PHSlot s = Me();
-        if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut) return;
+        if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut || s.weaponRecovering) return;
         s.hunterHealth -= wear;
         sound.Play("impactMetal_light_002", 0.8f);
+        lastWearAt = Time.time;
         if (s.hunterHealth <= 0)
         {
-            s.hunterHealth = 0; s.hunterOut = true;
-            myWeaponBroken++; lastBrokenBy = shooter;
-            myWeaponBroken++; lastBrokenBy = 0;
-            sound.Play("you_lose", 0.7f);
+            // the weapon breaks (Cor): it shatters for everyone (PHWeapons) and grows back from nothing, unusable and
+            // dithered meanwhile; in the final stand it stays broken and the hunter is out, a ghost to the end
+            WeaponBreaks(s, shooter);
+        }
+        s.Send();
+    }
+
+    // ---- the weapon's own repair (Cor, group playtest: hunters were out too fast): it grows back a point at a time
+    // while no wrong prop or shot has worn it for a while; a broken one grows back from nothing faster, and is usable
+    // again once whole
+    public const float REGROW_DELAY = 3f, REGROW_EVERY = 3f, RECOVER_EVERY = 1f;
+    public const int RECOVER_STEP = 5;   // a broken weapon: 5 points a second, whole again in 20 s
+    float lastWearAt = -99f, nextRegrow;
+
+    void WeaponBreaks(PHSlot s, int brokenBy)
+    {
+        s.hunterHealth = 0;
+        myWeaponBroken++; lastBrokenBy = brokenBy;
+        lastWearAt = Time.time; nextRegrow = Time.time + RECOVER_EVERY;
+        if (game.Endgame)
+        {
+            s.hunterOut = true;
             s.StartGhost();
         }
+        else s.weaponRecovering = true;
+    }
+
+    void UpdateWeaponRepair()
+    {
+        if (role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || Time.time < nextRegrow) return;
+        PHSlot s = Me();
+        if (s == null || s.hunterOut) return;
+        if (s.weaponRecovering)
+        {
+            nextRegrow = Time.time + RECOVER_EVERY;
+            s.hunterHealth = Mathf.Min(HUNTER_HEALTH, s.hunterHealth + RECOVER_STEP);
+            if (s.hunterHealth >= HUNTER_HEALTH) s.weaponRecovering = false;
+            s.Send();
+            return;
+        }
+        if (s.hunterHealth >= HUNTER_HEALTH || Time.time - lastWearAt < REGROW_DELAY) return;
+        nextRegrow = Time.time + REGROW_EVERY;
+        s.hunterHealth++;
         s.Send();
     }
 
@@ -988,7 +1027,7 @@ public class PHLocal : UdonSharpBehaviour
     public bool CanStrike()
     {
         PHSlot s = Me();
-        return s != null && role == PHGame.ROLE_HUNTER && game.phase == PHGame.PH_HUNT && !s.hunterOut && !aimOverride;
+        return s != null && role == PHGame.ROLE_HUNTER && game.phase == PHGame.PH_HUNT && !s.hunterOut && !s.weaponRecovering && !aimOverride;
     }
 
     // a hider's selector shows (PHWeapons: desktop, in the view) while they can pick
@@ -1071,12 +1110,12 @@ public class PHLocal : UdonSharpBehaviour
         if (game.Endgame) penalty *= 2;
         s.wrongProps++;
         s.hunterHealth -= penalty;
+        lastWearAt = Time.time;
         if (s.hunterHealth <= 0)
         {
-            // the weapon breaks (PHWeapons shows it for everyone): out, a ghost until the round ends
-            s.hunterHealth = 0; s.hunterOut = true;
-            sound.Play("you_lose", 0.7f);
-            s.StartGhost();
+            // the weapon breaks (Cor): it shatters for everyone (PHWeapons) and grows back from nothing, unusable and
+            // dithered meanwhile; in the final stand it stays broken and the hunter is out, a ghost to the end
+            WeaponBreaks(s, 0);
         }
         s.Send();
     }

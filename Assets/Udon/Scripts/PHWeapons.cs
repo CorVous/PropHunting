@@ -82,11 +82,11 @@ public class PHWeapons : UdonSharpBehaviour
 
     int[] heldModel;                   // the model each held weapon shows (-1 hidden)
     int[] heldWear;                    // the condition it was last drawn with
-    bool[] heldOut;
+    bool[] heldOut, heldBroke;
     float[] swingAt;                   // when its last slash began (desktop players, seen by everyone)
     float[] trailUntil;
     MaterialPropertyBlock block;
-    int idWear, idWearTex, idWearLo, idWearInv;
+    int idWear, idWearTex, idWearLo, idWearInv, idDither;
     bool ready;
 
     // the local VR swing
@@ -114,11 +114,12 @@ public class PHWeapons : UdonSharpBehaviour
         if (ready) return;
         ready = true;
         int n = held.Length;
-        heldModel = new int[n]; heldWear = new int[n]; heldOut = new bool[n]; swingAt = new float[n]; trailUntil = new float[n];
+        heldModel = new int[n]; heldWear = new int[n]; heldOut = new bool[n]; heldBroke = new bool[n]; swingAt = new float[n]; trailUntil = new float[n];
         for (int i = 0; i < n; i++) { heldModel[i] = -2; heldWear[i] = -1; swingAt[i] = -99f; }
         block = new MaterialPropertyBlock();
         idWear = VRCShader.PropertyToID("_Wear"); idWearTex = VRCShader.PropertyToID("_WearTex");
         idWearLo = VRCShader.PropertyToID("_WearLo"); idWearInv = VRCShader.PropertyToID("_WearInv");
+        idDither = VRCShader.PropertyToID("_Dither");
         for (int i = 0; i < n; i++) { held[i].gameObject.SetActive(false); heldTrail[i].emitting = false; }
         if (deskSelector != null) deskSelector.gameObject.SetActive(false);
         shotAt = new float[n]; shotEnd = new Vector3[n]; gunShown = new Vector3[n];
@@ -167,6 +168,9 @@ public class PHWeapons : UdonSharpBehaviour
             VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
             if (p == null || !Utilities.IsValid(p)) show = false;
             // the break: everyone sees it fall apart where it was
+            // a weapon that breaks and grows back (not out): the same shatter, and it stays in the hand
+            if (show && s.weaponRecovering && !heldBroke[i] && heldModel[i] >= 0) ShatterFx(i);
+            if (show) heldBroke[i] = s.weaponRecovering;
             if (show && s.hunterOut != heldOut[i])
             {
                 heldOut[i] = s.hunterOut;
@@ -190,11 +194,12 @@ public class PHWeapons : UdonSharpBehaviour
                 held[i].gameObject.SetActive(true);
                 heldTrail[i].Clear();
             }
-            if (s.hunterHealth != heldWear[i])
+            int key = s.hunterHealth + (s.weaponRecovering ? 1000 : 0);
+            if (key != heldWear[i])
             {
-                bool more = heldWear[i] >= 0 && s.hunterHealth < heldWear[i];
-                heldWear[i] = s.hunterHealth;
-                SetWear(i, mm, s.hunterHealth);
+                bool more = heldWear[i] >= 0 && heldWear[i] < 1000 && !s.weaponRecovering && s.hunterHealth < heldWear[i];
+                heldWear[i] = key;
+                SetWear(i, mm, s.hunterHealth, s.weaponRecovering);
                 if (more) ChipOff(i, s, mm);
             }
             if (i == mine) PlaceMine(i, p, mm);
@@ -526,7 +531,7 @@ public class PHWeapons : UdonSharpBehaviour
 
     // ------------------------------------------------------------------ wear
     // the wear the shader draws: 0 whole .. 1 used up (the hunter's weapon condition, PHSlot.hunterHealth)
-    void SetWear(int i, int model, int condition)
+    void SetWear(int i, int model, int condition, bool recovering)
     {
         float lost = Mathf.Clamp01((PHLocal.HUNTER_HEALTH - condition) / (float)PHLocal.HUNTER_HEALTH);
         heldRenderer[i].GetPropertyBlock(block);
@@ -538,6 +543,7 @@ public class PHWeapons : UdonSharpBehaviour
             block.SetVector(idWearInv, meleeWearInv[model]);
         }
         block.SetFloat(idWear, grid ? lost : 0f);
+        block.SetFloat(idDither, recovering ? 1f : 0f);   // growing back: see-through dither (Cor)
         heldRenderer[i].SetPropertyBlock(block);
     }
 
@@ -556,6 +562,16 @@ public class PHWeapons : UdonSharpBehaviour
         Vector3 at = held[i].position + held[i].rotation * (c * held[i].localScale.x);
         Burst(fxChips, at, 8);
         sound.PlayAt("impactMetal_light_002", at, 8f, 0.6f, 1.2f);
+    }
+
+    // the weapon breaks and stays in the hand to grow back: the pieces and the crack only
+    void ShatterFx(int i)
+    {
+        int model = heldModel[i];
+        float sc = held[i].localScale.x;
+        for (int k = 0; k < 4; k++)
+            Burst(fxChips, held[i].position + held[i].rotation * (Vector3.forward * meleeTip[model] * sc * (0.25f + 0.25f * k)), 10);
+        sound.PlayAt("impactMetal_heavy_000", held[i].position, 18f, 1f, 1f);
     }
 
     // the weapon breaks: pieces all along it, a loud crack; then it is gone
