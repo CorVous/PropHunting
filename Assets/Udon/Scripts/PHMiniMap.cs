@@ -28,6 +28,7 @@ public class PHMiniMap : UdonSharpBehaviour
     public float tableSize = 2.3f;       // the table top's usable side, metres
     public Material dioMat;              // PropHunt/Diorama on the walls: cut above _ClipY when the upper floors are off
     public Transform propRoot;           // the map's props in miniature (under model)
+    public Material outlineMat;          // PropHunt/DioramaOutline: a hiding spot's prop outlined in the player's colour
     public TextMeshProUGUI upperLabel, soloLabel;   // the table's two buttons
 
     const int MAXP = 1440;               // four points a second: six minutes of hide and hunt
@@ -45,13 +46,15 @@ public class PHMiniMap : UdonSharpBehaviour
     // every hiding spot (Cor: where they stood still a little while, in the prop they hid as): slot * MAXS + k
     const int MAXS = 10;
     const float STAY_MIN = 5f;
-    int[] sDef, nStay; Vector3[] sPos; float[] sYaw, sDur;
+    int[] sDef, nStay, longestStay; Vector3[] sPos; float[] sYaw, sDur;
     [HideInInspector] public int buttonArg;   // PHButton: the slot + 1 of the name tag pressed
     float huntStart, nextSample;
     Vector3 origin;                      // the map's middle on the ground: the table's middle
     int recRound = -1, shownRound = -1, snapRound = -1, lastPhase = -1;
     float snapAt = -1f;
     bool hasData;
+    GameObject[] shownOutline;
+    MaterialPropertyBlock outlineBlock;
     GameObject[] shownProp;              // per slot * MAXD: a hider's disguise where they stayed a long while in it
     GameObject[] mapProp; bool[] mapUpper; int nMapProp, propNext = 99999;
     bool upperOn = true;
@@ -67,8 +70,8 @@ public class PHMiniMap : UdonSharpBehaviour
         nameOf = new string[n]; caughtAt = new float[n]; catches = new int[n];
         dDef = new int[n * MAXD]; dTime = new float[n * MAXD]; dBestStill = new float[n * MAXD]; dBestPos = new Vector3[n * MAXD]; dBestYaw = new float[n * MAXD];
         still = new float[n]; stillAt = new Vector3[n]; stillDef = new int[n]; stillYaw = new float[n];
-        sDef = new int[n * MAXS]; nStay = new int[n]; sPos = new Vector3[n * MAXS]; sYaw = new float[n * MAXS]; sDur = new float[n * MAXS];
-        shownProp = new GameObject[n * MAXS];
+        sDef = new int[n * MAXS]; nStay = new int[n]; longestStay = new int[n]; sPos = new Vector3[n * MAXS]; sYaw = new float[n * MAXS]; sDur = new float[n * MAXS];
+        shownProp = new GameObject[n * MAXS]; shownOutline = new GameObject[n * MAXS];
         mapProp = new GameObject[MAX_MAP_PROPS]; mapUpper = new bool[MAX_MAP_PROPS];
         palette = new Color[] {
             new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
@@ -277,6 +280,7 @@ public class PHMiniMap : UdonSharpBehaviour
     void ClearProps()
     {
         for (int i = 0; i < shownProp.Length; i++) if (shownProp[i] != null) { Destroy(shownProp[i]); shownProp[i] = null; }
+        for (int i = 0; i < shownOutline.Length; i++) if (shownOutline[i] != null) { Destroy(shownOutline[i]); shownOutline[i] = null; }
         for (int i = 0; i < nMapProp; i++) if (mapProp[i] != null) { Destroy(mapProp[i]); mapProp[i] = null; }
         nMapProp = 0; propNext = 99999; solo = -1;
         for (int i = 0; i < nFence; i++) if (fence[i] != null) { Destroy(fence[i]); fence[i] = null; }
@@ -319,9 +323,25 @@ public class PHMiniMap : UdonSharpBehaviour
             int def = sDef[x];
             if (def < 0 || def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
             GameObject go = Copy(builder.propPrefabs[def], sPos[x], sYaw[x], 2f);
-            builder.Hover(go, def, true);
             shownProp[x] = go;
+            // its outline: the same copy again, in the outline material (the back faces pushed out), the player's colour
+            if (outlineMat != null)
+            {
+                GameObject ol = Copy(builder.propPrefabs[def], sPos[x], sYaw[x], 2f);
+                if (outlineBlock == null) outlineBlock = new MaterialPropertyBlock();
+                outlineBlock.SetColor("_Color", c);
+                MeshRenderer[] rs = ol.GetComponentsInChildren<MeshRenderer>(true);
+                for (int r = 0; r < rs.Length; r++)
+                {
+                    Material[] ms = new Material[rs[r].sharedMaterials.Length];
+                    for (int m = 0; m < ms.Length; m++) ms[m] = outlineMat;
+                    rs[r].sharedMaterials = ms;
+                    rs[r].SetPropertyBlock(outlineBlock);
+                }
+                shownOutline[x] = ol;
+            }
         }
+        longestStay[i] = longest;
         Transform pin = pins[i];
         pin.localPosition = (longest >= 0 ? sPos[longest] : pts[i * MAXP + k - 1]) - origin;
         pin.gameObject.SetActive(true);
@@ -445,7 +465,11 @@ public class PHMiniMap : UdonSharpBehaviour
             {
                 GameObject go = shownProp[i * MAXS + j];
                 if (go == null) continue;
-                go.SetActive(mine && (upperOn || go.transform.localPosition.y <= UPPER_Y));
+                // everyone: each player's longest hide; one player alone: all of their hiding spots (Cor)
+                bool spot = solo == i || (solo < 0 && longestStay[i] == i * MAXS + j);
+                bool on = spot && (upperOn || go.transform.localPosition.y <= UPPER_Y);
+                go.SetActive(on);
+                if (shownOutline[i * MAXS + j] != null) shownOutline[i * MAXS + j].SetActive(on);
             }
         }
         for (int i = 0; i < nMapProp; i++) if (mapProp[i] != null) mapProp[i].SetActive(upperOn || !mapUpper[i]);

@@ -44,6 +44,10 @@ public static partial class LobbyBuilder
         if (dioMat == null) { dioMat = new Material(Shader.Find("PropHunt/Diorama")) { name = "Diorama" }; AssetDatabase.CreateAsset(dioMat, "Assets/Udon/Generated/Diorama.mat"); }
         dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.SetVector("_Box", new Vector4(-100000f, -100000f, 100000f, 100000f)); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
         mm.dioMat = dioMat;
+        var olMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/DioramaOutline.mat");
+        if (olMat == null) { olMat = new Material(Shader.Find("PropHunt/DioramaOutline")) { name = "DioramaOutline" }; AssetDatabase.CreateAsset(olMat, "Assets/Udon/Generated/DioramaOutline.mat"); }
+        olMat.shader = Shader.Find("PropHunt/DioramaOutline"); olMat.enableInstancing = false; EditorUtility.SetDirty(olMat);
+        mm.outlineMat = olMat;
         mm.dioWalls = Holder(model.transform, "Walls", dioMat);
         mm.dioGround = Holder(model.transform, "Ground", dioMat);   // (cut to the map's rectangle by the same material)
         mm.dioScenery = new MeshFilter[16];
