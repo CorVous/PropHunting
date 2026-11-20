@@ -20,6 +20,7 @@ public class PHGame : UdonSharpBehaviour
     public MapBuilderUdon builder;
     public PHSlot[] slots;
     public PHLocal local;
+    public bool leakHeal = true;   // PHSlot.CheckLeak asks a hider drawn in the open to sit again (off only to reproduce the leak in a test)
     public PHText text;                  // the world's text in the local language (PHText.Get / F1 / Prop; TextBaker wires it)
     public PHKnock[] knocks;            // the pool of synced prop knocks
     public PHSeed seedTool;             // seed codes (encode, decode)
