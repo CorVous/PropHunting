@@ -50,6 +50,9 @@ public class PHView : UdonSharpBehaviour
     public Transform casing;           // the screen device's body, drawn around the panel
     public Transform tauntButton, tauntCap;
     public MeshRenderer tauntCapRenderer;
+    public Transform[] tauntBolts;      // little yellow bolts that fly off the button when the local hider taunts
+    float boltsAt = -99f;
+    bool boltsOn;
     public Material capReady, capWait;
     // desktop: the controls, drawn as VRChat's own panels are (Cor): a picture for each state, bottom left, clear
     // of VRChat's rows (top left, top right)
@@ -955,6 +958,7 @@ public class PHView : UdonSharpBehaviour
         float capZ = deepest > CAP_FRONT ? Mathf.Clamp(deepest + 0.012f, CAP_REST, CAP_IN) : CAP_REST;
         if (Time.time < pressShownUntil) capZ = CAP_IN;
         tauntCap.localPosition = new Vector3(0f, 0f, capZ);
+        UpdateBolts();
         bool ready = local.TauntReady();
         if (ready != capIsReady) { capIsReady = ready; tauntCapRenderer.sharedMaterial = ready ? capReady : capWait; }
     }
@@ -967,6 +971,33 @@ public class PHView : UdonSharpBehaviour
         if (a.sqrMagnitude > 1e-6f && (a - at).sqrMagnitude < (best - at).sqrMagnitude) best = a;
         if (b.sqrMagnitude > 1e-6f && (b - at).sqrMagnitude < (best - at).sqrMagnitude) best = b;
         return best;
+    }
+
+    // a taunt of the local hider's own (the button, T, or a forced one: PHLocal.Taunt): bolts fly off the button
+    public void ShowTauntBolts() { boltsAt = Time.time; }
+
+    void UpdateBolts()
+    {
+        if (tauntBolts == null) return;
+        const float LIFE = 0.65f;
+        float t = Time.time - boltsAt;
+        bool on = t >= 0f && t < LIFE;
+        if (on != boltsOn)
+        {
+            boltsOn = on;
+            for (int i = 0; i < tauntBolts.Length; i++) if (tauntBolts[i] != null) tauntBolts[i].gameObject.SetActive(on);
+        }
+        if (!on) return;
+        float k = t < 0.1f ? t / 0.1f : 1f - (t - 0.1f) / (LIFE - 0.1f);   // pop in, then shrink away
+        float sz = 0.034f * (0.4f + 0.6f * k);
+        for (int i = 0; i < tauntBolts.Length; i++)
+        {
+            if (tauntBolts[i] == null) continue;
+            float side = i == 0 ? -1f : 1f;
+            tauntBolts[i].localPosition = new Vector3(side * (0.03f + 0.07f * t), 0.035f + 0.09f * t, -0.04f);
+            tauntBolts[i].localRotation = Quaternion.Euler(0f, 0f, -side * 22f);
+            tauntBolts[i].localScale = new Vector3(sz, sz, sz);
+        }
     }
 
     // the cap shows a press for PRESS_SHOW (also a trigger press at the button, PHLocal.TriggerButton)
