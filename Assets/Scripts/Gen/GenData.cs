@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 26;   // 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 27;   // 27: fewer mostly-outdoor plots, smaller warehouses (Cor: playtest); 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -45,7 +45,7 @@ public static partial class GenData
     // warehouse, or a house at S): every L and XL map had the same four or five plots.
     public static readonly string[] SizePlots = { "H*", "H*+", "H*++", "HH*++" };
     public static readonly int[] PlotPoolZone = { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE, Z_BARN, Z_PARK, Z_ZOO, Z_CABIN, Z_FAIR, Z_CHAPEL };   // revision 12: zoo, cabin, funfair, chapel
-    public static readonly int[] PlotPoolWeight = { 10, 9, 12, 10, 8, 9, 8, 8, 8, 7 };
+    public static readonly int[] PlotPoolWeight = { 13, 9, 15, 12, 4, 3, 3, 6, 4, 5 };   // generator 27 (Cor: indoors is more fun, fewer outdoor areas): the farm, park, zoo, funfair and chapel, mostly open ground, less often (were 8, 9, 8, 8, 8, 7)
     public const int PLOT_ANY_HOUSE = 350;                                // per mille: "*" is a house
     // cells of the new kinds' plans by size (least, most); a park's plot in outer cells along the lane and deep
     public static readonly int[] SizeShopCellsMin = { 4, 4, 4, 5 }, SizeShopCellsMax = { 9, 11, 13, 13 };
@@ -63,8 +63,8 @@ public static partial class GenData
     // the plans a plot may take, by their cells: houses, warehouses, diners (the least and the most)
     public static readonly int[] SizeHouseCellsMin = { 5, 6, 6, 7 };
     public static readonly int[] SizeHouseCellsMax = { 14, 18, 22, 24 };
-    public static readonly int[] SizeWarehouseCellsMin = { 6, 6, 8, 8 };
-    public static readonly int[] SizeWarehouseCellsMax = { 12, 14, 16, 16 };
+    public static readonly int[] SizeWarehouseCellsMin = { 6, 6, 6, 7 };   // generator 27 (Cor: the warehouse and its storerooms too big): were 6, 6, 8, 8 and 12, 14, 16, 16
+    public static readonly int[] SizeWarehouseCellsMax = { 8, 9, 10, 11 };
     public static readonly int[] SizeDinerCellsMax = { 10, 12, 14, 16 };
     // a house plot's gardens in cells: the front garden (and the chance of one more row), the back garden (and the
     // chance of one more row); a warehouse's forecourt and its chance of a yard two deep at the back; the chance of

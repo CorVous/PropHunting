@@ -132,7 +132,7 @@ public class PHLocal : UdonSharpBehaviour
                 {
                     // still themselves when the hunters come: a random prop, where they stand
                     if (s != null && s.def < 0 && !s.caught && !s.ghost) StartingDisguise();
-                    Say(T("say.released"), 3f);
+                    Say(T("say.released"), 5f);
                     nextForced = Time.time + ForcedInterval() * Random.Range(0.35f, 1f);
                     checkPos = me.GetPosition(); warned = false;
                 }
@@ -699,6 +699,7 @@ public class PHLocal : UdonSharpBehaviour
         UpdateTrigger();
         UpdatePropless();
         UpdateForcedTaunt();
+        UpdateReleaseCount();
         UpdateVoices();
         UpdateStrayStation();
         UpdateJoiner();
@@ -761,6 +762,19 @@ public class PHLocal : UdonSharpBehaviour
     {
         if (game.Endgame) return game.tauntInterval * 0.5f;
         return game.Participants() < 6 ? game.tauntInterval * 0.75f : game.tauntInterval;
+    }
+
+    // the last five seconds before the hunters come, counted out loud for everyone in the round (Cor: an indicator for
+    // when the hunters spawn in)
+    int releaseShown = -1;
+    void UpdateReleaseCount()
+    {
+        if (game.phase != PHGame.PH_HIDE || role == PHGame.ROLE_NONE) { releaseShown = -1; return; }
+        int n = Mathf.CeilToInt(game.Left);
+        if (n > 5 || n < 1 || n == releaseShown) return;
+        releaseShown = n;
+        sound.Play("tick_001", 0.8f);
+        Say(game.text.F1("say.releaseIn", n.ToString()), 1.2f);
     }
 
     void UpdateForcedTaunt()

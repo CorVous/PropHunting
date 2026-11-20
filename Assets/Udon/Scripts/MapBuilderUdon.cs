@@ -2936,7 +2936,10 @@ public class MapBuilderUdon : UdonSharpBehaviour
             int sb = StairBelow(c);
             if (sb >= 0) StairHole(sb, c, out hx0, out hx1, out hz0, out hz1);
             if (!top) rc = ceiling;
-            Slab(B_ROOFS, x0, x1, z * CELL, (z + 1) * CELL, h, t, hx0, hx1, hz0, hz1, rc, rc, ceiling);
+            // a slab with a level over it is that level's floor, not a roof: it goes with the walls, so the END reveal
+            // (which takes the roofs off) leaves it (Cor: floors lost their underside at round end)
+            int sbuf = top ? B_ROOFS : B_WALLS;
+            Slab(sbuf, x0, x1, z * CELL, (z + 1) * CELL, h, t, hx0, hx1, hz0, hz1, rc, rc, ceiling);
             // a basement's floor
             if (ci >= 0 && ci < instLevelB.Length && instLevelB[ci] < 0) Collider(new Vector3(x * CELL - WALL_HALF, -0.4f, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, 0f, (z + 1) * CELL + WALL_HALF));
             for (int side = -1; side <= 1; side += 2)
@@ -2946,7 +2949,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 float s0 = bw ? (Bld(x - 1, dz) ? x * CELL + WALL_HALF : x * CELL) : x * CELL - WALL_HALF;
                 float s1 = be ? (Bld(x + 1, dz) ? (x + 1) * CELL - WALL_HALF : (x + 1) * CELL) : (x + 1) * CELL + WALL_HALF;
                 float zz0 = side < 0 ? z * CELL - WALL_HALF : (z + 1) * CELL, zz1 = side < 0 ? z * CELL : (z + 1) * CELL + WALL_HALF;
-                Box3(B_ROOFS, new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, ceiling, FACE_ALL);
+                Box3(sbuf, new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, ceiling, FACE_ALL);
             }
             Slab(B_COLL, x * CELL - WALL_HALF, (x + 1) * CELL + WALL_HALF, z * CELL - WALL_HALF, (z + 1) * CELL + WALL_HALF, h, t, hx0, hx1, hz0, hz1, rc, rc, rc);
             // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider);
