@@ -411,7 +411,6 @@ public static class WorldSceneBuilder
         var casing = Empty(viewGo.transform, "ScreenCasing");
         Part(casing, PrimitiveType.Cube, "Back", new Vector3(0f, 0f, 0.014f), Vector3.zero, new Vector3(0.40f, 0.28f, 0.024f), dark);
         Part(casing, PrimitiveType.Cube, "Chin", new Vector3(0f, -0.175f, 0.004f), Vector3.zero, new Vector3(0.40f, 0.09f, 0.028f), mid);
-        Part(casing, PrimitiveType.Cube, "Handle", new Vector3(0f, 0.152f, 0.012f), Vector3.zero, new Vector3(0.14f, 0.024f, 0.02f), teal);
         for (int i = 0; i < 4; i++)
             Part(casing, PrimitiveType.Cube, "Slot" + i, new Vector3(0.07f + i * 0.022f, -0.175f, -0.0105f), Vector3.zero, new Vector3(0.008f, 0.04f, 0.002f), dark);
         view.casing = casing;
@@ -434,6 +433,15 @@ public static class WorldSceneBuilder
         var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
         view.tauntButton = button; view.tauntCap = cap.transform; view.tauntCapRenderer = cap.GetComponent<MeshRenderer>();
         view.capReady = red; view.capWait = grey;
+        // a speaker beside the button (Cor: so it is obvious what it does): a box, its cone, and three sound waves,
+        // light on the dark chin, just right of the button
+        var light = Flat("DeviceLight", new Color(0.88f, 0.90f, 0.92f));
+        var spk = Empty(casing, "Speaker");
+        spk.localPosition = new Vector3(-0.058f, -0.175f, -0.012f);
+        Part(spk, PrimitiveType.Cube, "Box", new Vector3(-0.012f, 0f, 0f), Vector3.zero, new Vector3(0.010f, 0.012f, 0.003f), light);
+        Part(spk, PrimitiveType.Cube, "Cone", new Vector3(-0.003f, 0f, 0f), Vector3.zero, new Vector3(0.008f, 0.026f, 0.003f), light);
+        for (int w = 0; w < 3; w++)
+            Part(spk, PrimitiveType.Cube, "Wave" + w, new Vector3(0.007f + w * 0.0065f, 0f, 0f), Vector3.zero, new Vector3(0.0025f, 0.012f + w * 0.009f, 0.003f), light);
 
         // the own prop's footprint on the ground (PHView sizes its edges to the prop)
         var outlineMat = Flat("OutlineTeal", new Color(0.30f, 0.95f, 0.85f));

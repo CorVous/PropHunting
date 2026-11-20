@@ -539,6 +539,13 @@ public class PHWeapons : UdonSharpBehaviour
         }
     }
 
+    // VR: how far the muzzle is in front of the selector's grip, in metres as it is drawn now
+    public float VrMuzzleLen()
+    {
+        if (vrSelectorModel == null) return selectorMuzzle;
+        return Muzzle(game.LocalSlot()) * vrSelectorModel.lossyScale.x;
+    }
+
     float Muzzle(PHSlot s) { int g = GunOf(s); return gunMuzzle != null && g < gunMuzzle.Length ? gunMuzzle[g] : selectorMuzzle; }
 
     void UpdateSelector(VRCPlayerApi me, int mine)
@@ -553,7 +560,8 @@ public class PHWeapons : UdonSharpBehaviour
         Vector3 kickPos = new Vector3(0f, 0.01f * k, -0.05f * k);
         Quaternion kickRot = Quaternion.Euler(-18f * k, 0f, 0f);
         if (vrSelectorModel != null) vrSelectorModel.localPosition = kickPos;
-        if (vrSelectorModel != null) vrSelectorModel.localRotation = Quaternion.Euler(vrGunEuler) * kickRot;
+        // (PHView lays the selector along the hand's bones, PHLocal.VrAimRot: the model's barrel is the aim, no turn of its own)
+        if (vrSelectorModel != null) vrSelectorModel.localRotation = kickRot;
         if (deskSelector == null) return;
         bool show = !me.IsUserInVR() && local.ShowsSelector();
         if (deskSelector.gameObject.activeSelf != show) deskSelector.gameObject.SetActive(show);
