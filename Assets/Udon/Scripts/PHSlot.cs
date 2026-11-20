@@ -672,6 +672,8 @@ public class PHSlot : UdonSharpBehaviour
     public override void OnStationEntered(VRCPlayerApi player)
     {
         if (player.isLocal) seated = true;
+        // (in the log: when each client hears each sit and stand, to tell later where a hider leaked)
+        if (Utilities.IsValid(player)) Debug.Log("[prophunt] station " + index + " enter " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
     }
 
     // ------------------------------------------------------------------ the leak check (Cor: hiders seen by hunters)
@@ -700,7 +702,7 @@ public class PHSlot : UdonSharpBehaviour
         leakAskAt = Time.time;
         leaksAsked++;
         Debug.Log("[prophunt] leak: slot " + index + " (" + p.displayName + ") drawn " + d.ToString("F1") + " m from its parked station; asking for a re-seat");
-        SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestReseat));
+        if (game.leakHeal) SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(RequestReseat));
     }
 
     // another client draws this hider in the open: sit again, so everyone gets a fresh enter event
@@ -717,6 +719,7 @@ public class PHSlot : UdonSharpBehaviour
 
     public override void OnStationExited(VRCPlayerApi player)
     {
+        if (Utilities.IsValid(player)) Debug.Log("[prophunt] station " + index + " exit " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
         if (Utilities.IsValid(player) && player.isLocal)
         {
             seated = false;

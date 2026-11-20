@@ -129,7 +129,8 @@ public class PHTestPilot : UdonSharpBehaviour
             VRCPlayerApi p = VRCPlayerApi.GetPlayerById(pid);
             Vector3 at = Utilities.IsValid(p) ? p.GetPosition() : Vector3.zero;
             s += " | S" + i + " P" + pid + " role=" + game.slotRole[i] + " zone=" + sl.inZone + " hiding=" + sl.hiding + " def=" + sl.def
-                + " prop=" + sl.propPos.ToString("F1") + " avatar=" + at.ToString("F1") + " hp=" + sl.health + "/" + sl.maxHealth + " caught=" + sl.caught
+                + " prop=" + sl.propPos.ToString("F1") + " avatar=" + at.ToString("F1") + " station=" + sl.station.transform.position.ToString("F1")
+                + " off=" + (Utilities.IsValid(p) ? Vector3.Distance(at, sl.station.transform.position).ToString("F1") : "-") + " asked=" + sl.leaksAsked + " hp=" + sl.health + "/" + sl.maxHealth + " caught=" + sl.caught
                 + " hunter=" + sl.hunterHealth + "/" + sl.hits + "/" + sl.wrongProps;
         }
         for (int k = 0; k < game.knocks.Length; k++)
