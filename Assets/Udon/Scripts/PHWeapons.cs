@@ -102,6 +102,7 @@ public class PHWeapons : UdonSharpBehaviour
     float[] shotAt;
     Vector3[] shotEnd;
     Vector3[] gunShown;
+    int[] hiderGunModel;   // the gun mesh each hider gun shows (-1 none yet)
     Vector3[] bFrom, bTo;
     float[] bStart, bTime, bTimeLast;
     int[] bHit;
@@ -123,6 +124,8 @@ public class PHWeapons : UdonSharpBehaviour
         for (int i = 0; i < n; i++) { held[i].gameObject.SetActive(false); heldTrail[i].emitting = false; }
         if (deskSelector != null) deskSelector.gameObject.SetActive(false);
         shotAt = new float[n]; shotEnd = new Vector3[n]; gunShown = new Vector3[n];
+        hiderGunModel = new int[n];
+        for (int i = 0; i < n; i++) hiderGunModel[i] = -1;
         for (int i = 0; i < n; i++) { shotAt[i] = -99f; if (hiderGun != null && i < hiderGun.Length) hiderGun[i].gameObject.SetActive(false); }
         int nb = bullets != null ? bullets.Length : 0;
         bFrom = new Vector3[nb]; bTo = new Vector3[nb]; bStart = new float[nb]; bTime = new float[nb]; bTimeLast = new float[nb]; bHit = new int[nb];
@@ -164,6 +167,8 @@ public class PHWeapons : UdonSharpBehaviour
         {
             PHSlot s = i < game.slots.Length ? game.slots[i] : null;
             int pid = game.slotPlayer[i];
+            // (Perf: an empty slot, most of the 32, once its weapon and gun are put away)
+            if (pid <= 0 && heldModel[i] == -1 && (hiderGun == null || i >= hiderGun.Length || !hiderGun[i].gameObject.activeSelf)) { heldOut[i] = false; continue; }
             bool show = round && s != null && pid > 0 && game.RoleOf(i) == PHGame.ROLE_HUNTER && s.round == game.round;
             VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
             if (p == null || !Utilities.IsValid(p)) show = false;
@@ -260,7 +265,8 @@ public class PHWeapons : UdonSharpBehaviour
             if (show) gunShown[i] = GunPlace(s);
         }
         if (!show) return;
-        if (g.childCount > 0) SetGunMesh(g.GetChild(0), GunOf(s));
+        int gi = GunOf(s);
+        if (hiderGunModel[i] != gi && g.childCount > 0) { hiderGunModel[i] = gi; SetGunMesh(g.GetChild(0), gi); }
         Vector3 want = GunPlace(s);
         gunShown[i] = (want - gunShown[i]).sqrMagnitude > 9f ? want : Vector3.Lerp(gunShown[i], want, Mathf.Min(1f, Time.deltaTime * 12f));
         Quaternion r = Quaternion.Euler(0f, s.propYaw, 0f);
@@ -329,6 +335,19 @@ public class PHWeapons : UdonSharpBehaviour
         if (model == null || gunMesh == null || gunMesh.Length == 0) return;
         MeshFilter f = model.GetComponent<MeshFilter>();
         if (f != null && f.sharedMesh != gunMesh[g]) f.sharedMesh = gunMesh[g];
+    }
+
+    // (Perf: the same, for the selectors every frame: their filters looked up once, a mesh set only on a change)
+    MeshFilter vrSelFilter, deskSelFilter;
+    int selGunShown = -1;
+    void SetSelectorGuns(int g)
+    {
+        if (g == selGunShown || gunMesh == null || gunMesh.Length == 0) return;
+        selGunShown = g;
+        if (vrSelFilter == null && vrSelectorModel != null) vrSelFilter = vrSelectorModel.GetComponent<MeshFilter>();
+        if (deskSelFilter == null && deskSelectorModel != null) deskSelFilter = deskSelectorModel.GetComponent<MeshFilter>();
+        if (vrSelFilter != null) vrSelFilter.sharedMesh = gunMesh[g];
+        if (deskSelFilter != null) deskSelFilter.sharedMesh = gunMesh[g];
     }
 
     // ------------------------------------------------------------------ the hand
@@ -640,8 +659,7 @@ public class PHWeapons : UdonSharpBehaviour
     {
         PHSlot ms = mine >= 0 && mine < game.slots.Length ? game.slots[mine] : null;
         int gm = GunOf(ms);
-        SetGunMesh(vrSelectorModel, gm);
-        SetGunMesh(deskSelectorModel, gm);
+        SetSelectorGuns(gm);
         // the kick: back and up at once, then home again over a quarter second
         float t = Time.time - kickAt;
         float k = t < 0.25f ? 1f - Smooth(t / 0.25f) : 0f;
