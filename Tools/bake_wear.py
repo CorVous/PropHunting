@@ -10,7 +10,8 @@ How the wear eats a weapon:
   - nibbles: a cell noise (7 cm cells, 3 cm on top) gives each region its own pace, so it is gnawed unevenly in
     angular bites instead of shrinking smoothly.
   - a point is eaten once wear * (1 - STICK) * (0.35 + 0.65 * nibble) passes its u.
-  - whatever no longer hangs on the grip (z < GRIP, never eaten) goes at the same moment.
+  - whatever no longer hangs on the grip (z < GRIP) goes at the same moment. The grip and a thin stick along the
+    axis are never eaten: that stick is what is left at the end.
 
     python Tools/bake_wear.py                      (after make_weapons.py; reads and writes Resources/PropHunt)
     python Tools/bake_wear.py --in X --out Y       (other files)
@@ -27,7 +28,7 @@ sys.path.insert(0, HERE)
 import quaternius_lib as q
 
 RES = 0.008          # finest voxel size (m); the shader samples the grid trilinearly
-MAXDIM = 48          # voxels along the longest side at most (a big weapon gets coarser voxels)
+MAXDIM = 64          # voxels along the longest side at most (a big weapon gets coarser voxels)
 GRIP = 0.10          # the grip in the hand is never eaten
 NIB = 0.07           # nibble cells (m)
 STICK = 0.12         # the deepest share that is left at the very end
@@ -66,6 +67,17 @@ def dilate(m):
     return o
 
 
+def grow2d(seed, within):
+    """grow within each z-slice only (x, y neighbours)"""
+    seed = seed & within
+    while True:
+        n = seed.copy()
+        n[1:] |= seed[:-1]; n[:-1] |= seed[1:]; n[:, 1:] |= seed[:, :-1]; n[:, :-1] |= seed[:, 1:]
+        n &= within
+        if n.sum() == seed.sum(): return seed
+        seed = n
+
+
 def grow(seed, within):
     seed = seed & within
     while True:
@@ -92,7 +104,14 @@ def bake(m):
         ij = np.floor((pts - lo) / RES).astype(int)
         surf[ij[:, 0], ij[:, 1], ij[:, 2]] = True
     border = np.zeros(shape, bool); border[0] = border[-1] = True; border[:, 0] = border[:, -1] = True; border[:, :, 0] = border[:, :, -1] = True
-    outside = grow(border & ~surf, ~surf)
+    # the outside, flooded in from the border; the surface is thickened by a voxel for this, so a small opening (an
+    # open-ended tube, a slit between parts) does not let the flood into the model's inside
+    wall = dilate(surf)
+    outside = dilate(grow(border & ~wall, ~wall)) & ~surf
+    # and each cross-section across the length is filled in: a hollow tube (a bat modelled as a shell with its ends
+    # open) is solid wood, as it is meant to look
+    side = np.zeros(shape, bool); side[0] = side[-1] = True; side[:, 0] = side[:, -1] = True
+    outside &= grow2d(side & outside, outside)
     solid = ~outside
     # depth from the surface (city-block steps of erosion)
     depth = np.zeros(shape); cur = solid.copy(); k = 0
@@ -107,7 +126,10 @@ def bake(m):
     u = np.where(solid, (depth + 0.5 * RES) / np.maximum(depth + 0.5 * RES + r, 1e-6), 0.0)
     nib = cellval(P, NIB, 0) * 0.8 + 0.2 * cellval(P, NIB * 0.45, 7)
     pace = (1 - STICK) * (0.35 + 0.65 * nib)          # eaten once wear * pace > u
-    grip = solid & (P[..., 2] < GRIP)
+    # never eaten: the grip in the hand, and a thin stick along the axis (so a thin weapon at a coarse grid is not cut
+    # through by one nibble, and the end is "a stick", Cor)
+    hand = solid & (P[..., 2] < GRIP)
+    grip = grow(hand, solid & ((P[..., 2] < GRIP) | (r < max(0.75 * RES, 0.012))))   # (only the stick still joined to the hand)
     gone = np.full(shape, 2.0)                         # the wear at which each voxel goes (2 = never)
     alive_prev = solid.copy()
     for s in range(1, STEPS + 1):

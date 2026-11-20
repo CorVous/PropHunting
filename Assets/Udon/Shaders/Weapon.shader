@@ -4,7 +4,7 @@
 // comes loose (r x 255/254; 1 and over = never: the grip). Where the model's surface is already eaten at the current
 // _Wear, the view ray is followed into the texture to where the weapon is still whole, and that point is drawn (a
 // solid gnawed face, its depth written), or nothing if the ray passes right through. _Wear 0 (or no texture) draws the
-// model as it is. Set per weapon by property block: _WearTex, _WearLo (the grid's corner, model space), _WearInv
+// model as it is. Set per weapon by property block: _WearTex, _WearLo (the grid's corner, model space; w = its voxel size), _WearInv
 // (1 / the grid's size in metres), _Wear.
 Shader "PropHunt/Weapon"
 {
@@ -91,7 +91,7 @@ Shader "PropHunt/Weapon"
                 float3 nWorld = normalize(UnityObjectToWorldNormal(nObj));
                 if (_Wear > 0.001)
                 {
-                    float cell = 1.0 / min(min(_WearInv.x, _WearInv.y), _WearInv.z) / 48.0;   // about a voxel (the grid is 48 along its longest side)
+                    float cell = _WearLo.w;   // the grid's voxel size
                     if (Gone(i.obj - nObj * cell * 0.5) <= _Wear)
                     {
                         // eaten here: follow the view ray in until the weapon is whole again

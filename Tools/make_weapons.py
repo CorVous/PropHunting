@@ -95,7 +95,7 @@ def load_gltf_any(loc):
 
 
 # models whose head the rules above get wrong, turned end for end (checked on a side-view sheet of the whole catalog)
-FLIP = {('quaternius-zombieapocalypsekit', 'Spear')}
+FLIP = {('quaternius-zombieapocalypsekit', 'Spear'), ('quaternius-low-poly-medieval-weapons', 'Katana')}
 
 
 def frame_melee(V, flip_end=False):
