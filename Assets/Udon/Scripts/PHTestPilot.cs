@@ -17,6 +17,7 @@ public class PHTestPilot : UdonSharpBehaviour
     public PHLocal local;
     public int players = 2;
     public int rounds = 2;
+    public float huntDelay = 0f;
 
     float nextAct, nextLog, zoneAt;
     int startedRounds, lastPhase = -1;
@@ -41,6 +42,8 @@ public class PHTestPilot : UdonSharpBehaviour
             lastPhase = phase;
             Log("PHASE " + phase + " round=" + game.round + " role=" + local.Role() + " seed=" + game.seed + " size=" + game.mapSize);
             nextAct = Time.time + 2f;
+            // (hunters hold off for a while, so a late joiner can come in while the hiders sit: the leak test)
+            if (phase == PHGame.PH_HUNT && local.Role() == PHGame.ROLE_HUNTER) nextAct = Time.time + huntDelay;
             wander = new Vector3(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f)).normalized * 1.5f;
         }
         if (phase == PHGame.PH_LOBBY)
