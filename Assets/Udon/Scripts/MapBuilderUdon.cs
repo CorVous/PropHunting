@@ -2368,6 +2368,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     // ---- review 3: one landmark per map, beyond the far end of the lane and taller than any roof, so every lane has
     // something on its skyline: a water tower on an ordinary map, a windmill in a medieval village, a mast on a space base
+    // (in the roofs' mesh, not the walls': the lobby's diorama shows the walls' mesh, and the landmark stood off its table)
     void Landmark()
     {
         float w = siteW * CELL, h = siteH * CELL;
@@ -2382,7 +2383,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             Prism(c, 1.2f, 0.7f, 0f, 3f, 8, C(110, 116, 128));
             Prism(c, 0.35f, 0.18f, 3f, 24f, 6, m);
             for (int k = 1; k <= 3; k++) Prism(c, 0.9f - k * 0.15f, 0.9f - k * 0.15f, 3f + k * 5f, 3.4f + k * 5f, 8, o);
-            Box(B_WALLS, c + new Vector3(-0.25f, 24f, -0.25f), c + new Vector3(0.25f, 24.5f, 0.25f), new Color32(255, 80, 60, 0), FACE_ALL & ~FACE_YN);   // a red beacon, glowing (no underside: it lay on the mast's top)
+            Box(B_ROOFS, c + new Vector3(-0.25f, 24f, -0.25f), c + new Vector3(0.25f, 24.5f, 0.25f), new Color32(255, 80, 60, 0), FACE_ALL & ~FACE_YN);   // a red beacon, glowing (no underside: it lay on the mast's top)
             PlaceDecor(DECOR_DISH, c + new Vector3(0f, 17f, 0f), Rand01(9103u) * 360f);
             return;
         }
@@ -2413,14 +2414,14 @@ public class MapBuilderUdon : UdonSharpBehaviour
         for (int k = 0; k < 4; k++)
         {
             float lx = (k & 1) == 0 ? -1.8f : 1.8f, lz = (k & 2) == 0 ? -1.8f : 1.8f;
-            Box(B_WALLS, c + new Vector3(lx - 0.15f, 0f, lz - 0.15f), c + new Vector3(lx + 0.15f, 13f, lz + 0.15f), leg, FACE_ALL & ~FACE_YN);
+            Box(B_ROOFS, c + new Vector3(lx - 0.15f, 0f, lz - 0.15f), c + new Vector3(lx + 0.15f, 13f, lz + 0.15f), leg, FACE_ALL & ~FACE_YN);
         }
         for (int y = 4; y <= 10; y += 6)
         {
-            Box(B_WALLS, c + new Vector3(-1.8f, y, -1.85f), c + new Vector3(1.8f, y + 0.15f, -1.75f), leg, FACE_ALL);
-            Box(B_WALLS, c + new Vector3(-1.8f, y, 1.75f), c + new Vector3(1.8f, y + 0.15f, 1.85f), leg, FACE_ALL);
-            Box(B_WALLS, c + new Vector3(-1.85f, y, -1.8f), c + new Vector3(-1.75f, y + 0.15f, 1.8f), leg, FACE_ALL);
-            Box(B_WALLS, c + new Vector3(1.75f, y, -1.8f), c + new Vector3(1.85f, y + 0.15f, 1.8f), leg, FACE_ALL);
+            Box(B_ROOFS, c + new Vector3(-1.8f, y, -1.85f), c + new Vector3(1.8f, y + 0.15f, -1.75f), leg, FACE_ALL);
+            Box(B_ROOFS, c + new Vector3(-1.8f, y, 1.75f), c + new Vector3(1.8f, y + 0.15f, 1.85f), leg, FACE_ALL);
+            Box(B_ROOFS, c + new Vector3(-1.85f, y, -1.8f), c + new Vector3(-1.75f, y + 0.15f, 1.8f), leg, FACE_ALL);
+            Box(B_ROOFS, c + new Vector3(1.75f, y, -1.8f), c + new Vector3(1.85f, y + 0.15f, 1.8f), leg, FACE_ALL);
         }
         Prism(c, 3.0f, 3.0f, 13f, 17.5f, 12, tank);
         Prism(c, 3.1f, 3.1f, 14.9f, 15.2f, 12, palTrim);

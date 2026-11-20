@@ -77,16 +77,7 @@ public static partial class LobbyBuilder
             mm.pins[i] = pin.transform; mm.pinLabel[i] = tmp;
         }
 
-        // the card on the table's near edge (its south side as built): the title, and who went how far
-        var cv = Canvas(table.transform, "Card", new Vector3(0f, top + 0.35f, -side / 2 - 0.08f), Quaternion.Euler(20f, 0f, 0f), new Vector2(1200f, 300f), 0.0021f, false);
-        var bg = cv.gameObject.AddComponent<Image>(); bg.color = Cream; bg.raycastTarget = false;
-        var title = Txt(cv, "Title", new Vector2(-330, 110), new Vector2(500, 50), "LAST ROUND", rocket, 40, Ink, TextAlignmentOptions.Left);
-        title.characterSpacing = 4f;
-        var waiting = Txt(cv, "Waiting", new Vector2(0, -20), new Vector2(1100, 60), "Play a round to see its map here", future, 30, Ink, TextAlignmentOptions.Center);
-        var list = Txt(cv, "List", new Vector2(0, -30), new Vector2(1120, 220), "", future, 22, Ink, TextAlignmentOptions.TopLeft);
-        list.enableWordWrapping = false; list.overflowMode = TextOverflowModes.Truncate; list.richText = true;
-        list.gameObject.SetActive(false);
-        mm.list = list; mm.title = title; mm.waiting = waiting;
+        // (no card: Cor, the names are on the pins)
         UdonSharpEditorUtility.CopyProxyToUdon(mm);
         return mm;
     }

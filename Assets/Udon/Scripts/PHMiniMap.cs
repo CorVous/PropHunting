@@ -94,6 +94,20 @@ public class PHMiniMap : UdonSharpBehaviour
         if (content.activeSelf != show) Show(show);
         // Perf: a path or a prop a frame (all at once was a hitch at END)
         if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; }
+        if (show) FaceLabels();
+    }
+
+    // the name tags turn to face the viewer (Cor: billboarded)
+    void FaceLabels()
+    {
+        Vector3 eye = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
+        for (int i = 0; i < pins.Length; i++)
+        {
+            if (!pins[i].gameObject.activeSelf) continue;
+            Transform t = pinLabel[i].transform;
+            Vector3 d = t.position - eye; d.y = 0f;
+            if (d.sqrMagnitude > 1e-4f) t.rotation = Quaternion.LookRotation(d, Vector3.up);
+        }
     }
 
     int drawNext = 9999;
@@ -189,17 +203,8 @@ public class PHMiniMap : UdonSharpBehaviour
         // (not the ground: its mesh runs hundreds of metres past the map. The table's felt is the ground)
         if (dioGround != null) dioGround.gameObject.SetActive(false);
         Place(dioWalls, builder.wallsFilter);
-        int n = builder.SceneryTileCount();
-        for (int i = 0; i < dioScenery.Length; i++)
-        {
-            GameObject tile = i < n ? builder.SceneryTile(i) : null;
-            MeshFilter f = tile != null ? tile.GetComponent<MeshFilter>() : null;
-            if (f == null || f.sharedMesh == null) { dioScenery[i].gameObject.SetActive(false); continue; }
-            // (only what lies on the map and just round it: the far tile (0), the hills and the woods outside stay out)
-            Vector3 mid = tile.transform.TransformPoint(f.sharedMesh.bounds.center) - origin;
-            if (i == 0 || Mathf.Abs(mid.x) > w * 0.5f || Mathf.Abs(mid.z) > d * 0.5f) { dioScenery[i].gameObject.SetActive(false); continue; }
-            Place(dioScenery[i], f);
-        }
+        // (no scenery tiles: they run past the map's edge, Cor: only the game area)
+        for (int i = 0; i < dioScenery.Length; i++) dioScenery[i].gameObject.SetActive(false);
     }
 
     void Place(MeshFilter dio, MeshFilter src)
@@ -238,7 +243,7 @@ public class PHMiniMap : UdonSharpBehaviour
         LineRenderer lr = paths[i];
         lr.positionCount = k;
         for (int j = 0; j < k; j++) lr.SetPosition(j, pts[i * MAXP + j] - origin + new Vector3(0f, 0.15f, 0f));
-        lr.widthMultiplier = 0.0025f / Mathf.Max(0.001f, model.localScale.x);
+        lr.widthMultiplier = 0.0012f / Mathf.Max(0.001f, model.localScale.x);   // (Cor: thinner)
         lr.startColor = c; lr.endColor = c;
         lr.gameObject.SetActive(true);
         if (roleOf[i] != PHGame.ROLE_HIDER) return;
@@ -283,7 +288,7 @@ public class PHMiniMap : UdonSharpBehaviour
             else line = game.text.F1("mini.survived", metres);
             text += "<color=#" + Hex(c) + ">" + Clean(nameOf[i]) + "</color>  <color=#6D5524>" + line + "</color>\n";
         }
-        list.text = text;
+        if (list != null) list.text = text;
     }
 
     string Hex(Color c)
