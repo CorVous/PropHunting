@@ -515,7 +515,9 @@ public class PHWeapons : UdonSharpBehaviour
                 whooshArmed = false;   // (a real swing; no sound for it any more, Cor's group playtest)
             }
             else if (speed < WHOOSH_REARM * sc) whooshArmed = true;
-            if (fast && Time.time >= nextVrHit && local.CanStrike())
+            // (not while a trigger slash chops the weapon in the hand: that one strikes by itself, and the chop's own
+            // speed would strike again, a hider hit twice)
+            if (fast && Time.time >= nextVrHit && Time.time - mySwingAt >= SWING_TIME && local.CanStrike())
             {
                 RaycastHit h;
                 bool any = Physics.SphereCast(prevTip, 0.06f * sc, d.normalized, out h, d.magnitude, MASK, QueryTriggerInteraction.Ignore);
