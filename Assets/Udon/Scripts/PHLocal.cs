@@ -579,6 +579,71 @@ public class PHLocal : UdonSharpBehaviour
 
     void UpdateTrigger() { if (body.turnHeld) body.turnHeld = false; }
 
+    // ------------------------------------------------------------------ the watchdog (Cor: hiders seen by hunters)
+    // A seated hider is drawn at this client's copy of their station only once this client has had their enter event
+    // (Station Lab), and only while that copy is parked (PHSlot.UpdateRemote). Two ways one viewer can see hiders for a
+    // whole session: their copy of a slot's behaviour stopped (an exception halts an UdonBehaviour for good, and it then
+    // never parks that station again), or this client missed or misordered an enter event (it then draws the hider at
+    // the last place it knew). Twice a second, from this behaviour, for every other player's slot:
+    //   - a slot whose behaviour stopped counting its frames is logged once (the reason is in the log just before)
+    //   - a hidden player's station (a hider; a ghost, unless this player is one too) is put back at its parking spot
+    //     if it is anywhere else
+    //   - a hidden player drawn far from that spot for two looks in a row: they are asked to sit again (a fresh enter
+    //     event for everyone), at most every WATCH_RETRY seconds, and it is logged
+    const float WATCH_EVERY = 0.5f, WATCH_LEAK = 3f, WATCH_RETRY = 4f;
+    float watchNext;
+    int[] watchBeat, watchLeak;
+    float[] watchBeatAt, watchAskAt;
+    bool[] watchDead, watchMoved;
+
+    void UpdateWatch()
+    {
+        if (Time.time < watchNext) return;
+        watchNext = Time.time + WATCH_EVERY;
+        int n = game.slots.Length;
+        if (watchBeat == null || watchBeat.Length != n)
+        {
+            watchBeat = new int[n]; watchLeak = new int[n]; watchBeatAt = new float[n]; watchAskAt = new float[n];
+            watchDead = new bool[n]; watchMoved = new bool[n];
+            for (int i = 0; i < n; i++) { watchBeatAt[i] = Time.time; watchAskAt[i] = -99f; }
+        }
+        int myId = Networking.LocalPlayer.playerId;
+        bool meGhost = IsGhost();
+        bool reveal = game.phase == PHGame.PH_END;
+        for (int i = 0; i < n; i++)
+        {
+            PHSlot s = game.slots[i];
+            if (s == null) continue;
+            int pid = game.slotPlayer[i];
+            if (s.beat != watchBeat[i]) { watchBeat[i] = s.beat; watchBeatAt[i] = Time.time; }
+            else if (!watchDead[i] && Time.time - watchBeatAt[i] > 3f)
+            {
+                watchDead[i] = true;
+                Debug.LogWarning("[prophunt] watch: slot " + i + " stopped running (halted?); its station is parked from here now");
+            }
+            if (pid == 0 || pid == myId) { watchLeak[i] = 0; continue; }
+            bool hidden = (s.hiding || (s.ghost && !meGhost)) && !reveal;
+            if (!hidden) { watchLeak[i] = 0; continue; }
+            Vector3 park = s.parkAt + new Vector3(i * 3f, 0f, 0f);
+            Transform st = s.station.transform;
+            if ((st.position - park).sqrMagnitude > 1f)
+            {
+                st.SetPositionAndRotation(park, Quaternion.identity);
+                if (!watchMoved[i]) { watchMoved[i] = true; Debug.LogWarning("[prophunt] watch: slot " + i + " station was not parked; parked it"); }
+            }
+            VRCPlayerApi p = VRCPlayerApi.GetPlayerById(pid);
+            if (p == null || !Utilities.IsValid(p)) { watchLeak[i] = 0; continue; }
+            float d = Vector3.Distance(p.GetPosition(), park);
+            if (d < WATCH_LEAK) { watchLeak[i] = 0; continue; }
+            watchLeak[i]++;
+            if (watchLeak[i] < 2 || Time.time - watchAskAt[i] < WATCH_RETRY) continue;
+            watchAskAt[i] = Time.time;
+            s.leaksAsked++;
+            Debug.LogWarning("[prophunt] leak: slot " + i + " (player " + pid + ") drawn " + d.ToString("F1") + " m from its parking spot; asking them to sit again");
+            if (game.leakHeal) s.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PHSlot.RequestReseat));
+        }
+    }
+
     // a hider still without a prop in the hunt (the phase change came before their slot, or the pick there failed)
     // gets the random one where they stand; looked at twice a second
     float nextPropless;
@@ -673,6 +738,7 @@ public class PHLocal : UdonSharpBehaviour
         }
         wasEndgame = eg;
         UpdateTrigger();
+        UpdateWatch();
         UpdatePropless();
         UpdateForcedTaunt();
         UpdateVoices();
