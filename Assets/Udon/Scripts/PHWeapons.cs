@@ -72,7 +72,7 @@ public class PHWeapons : UdonSharpBehaviour
 
     // ---- how weapons sit and move (tunable)
     public Vector3 handEuler = new Vector3(-50f, 0f, 0f);     // VR and remote players: the weapon against the hand's tracking
-    public Vector3 deskAt = new Vector3(0.36f, -0.50f, 0.74f); // desktop: in the view (metres at avatar size 1), low in the right corner
+    public Vector3 deskAt = new Vector3(0.30f, -0.38f, 0.62f); // desktop: in the view (metres at avatar size 1), low in the right corner
     public float deskScale = 0.75f;                             // desktop: drawn smaller (Cor: it hid too much of the view)
     public Vector3 deskEuler = new Vector3(-40f, -25f, 15f);
     public const float SWING_TIME = 0.42f, SWING_HIT_AT = 0.12f, SWING_SPEED = 3.0f, VR_COOLDOWN = 0.45f;
