@@ -45,6 +45,7 @@ public class PHPanel : UdonSharpBehaviour
     // 4 discard, 5 unused (Cor: no retire button), 6 the REPLAY card, 7 scrap vote, 8 undo (a vote; the host's is at once),
     // 9 and 10 the arrows beside REPLAY (older, newer)
     public TextMeshProUGUI replayCaption;
+    public GameObject replayBadge;   // "1.5x COINS!!" on the REPLAY card while a map can be replayed (Cor)
     public RectTransform[] hostButton;
     public Image[] hostButtonImage;
     public TextMeshProUGUI[] hostButtonText;
@@ -61,6 +62,11 @@ public class PHPanel : UdonSharpBehaviour
     int seenSize = -99, seenDensity = -1, seenRound = -1, seenTaunt = -1;
     float nextRefresh;
     int wobble = -99; float wobbleStart;
+    // the map code's feedback (Cor's playtest: entering a code said nothing): a local note for a moment after the
+    // field is used (a code typed by a guest, or one being checked), then the game's synced message, in colour, and a
+    // little pop whenever it changes
+    string localNote = ""; float localUntil; string lastStatus = ""; float statusPop = -9f; bool noteChecking; string statusAtNote = "";
+    public Color statusOk = new Color(0.62f, 0.86f, 0.55f), statusWarn = new Color(1f, 0.78f, 0.36f), statusPlain = new Color(0.79f, 0.85f, 0.79f);
     float diceStart = -10f;
 
     // queued sounds (sequences: crate drops, ticks, bells)
@@ -177,9 +183,16 @@ public class PHPanel : UdonSharpBehaviour
         if (t == null) return;
         t = t.Trim();
         if (t.Length == 0 || t == seedShown) return;
-        if (!CanEdit) { Deny(-4); return; }
+        if (!CanEdit) { Deny(-4); Note(Host ? "seed.lobbyOnly" : "seed.hostOnly"); return; }
         Queue(select, 0f, 1f);
-        game.SubmitSeed(t);
+        game.SubmitSeed(t);   // (the host owns the game: its message is set at once)
+        localUntil = 0f; lastStatus = ""; nextRefresh = 0f;   // show it now, with a pop even if it is the same as before
+    }
+
+    void Note(string key)
+    {
+        localNote = game.text.Get(key); localUntil = Time.time + 4f; nextRefresh = 0f;
+        noteChecking = key == "seed.checking"; statusAtNote = game.seedStatus;
     }
 
     void Deny(int i)
@@ -257,6 +270,11 @@ public class PHPanel : UdonSharpBehaviour
         // loads and the round is played, behind the veil, every two seconds; at once when the phase changes. The
         // panel shows no clock)
         bool busyPhase = game.phase == PHGame.PH_LOADING || game.phase == PHGame.PH_BRIEF || game.phase == PHGame.PH_HIDE || game.phase == PHGame.PH_HUNT;
+        if (seedStatusText != null && now - statusPop < 0.5f)
+        {
+            float pop = now - statusPop;
+            seedStatusText.transform.localScale = Vector3.one * (pop < 0.35f ? 1f + 0.18f * (1f - pop / 0.35f) : 1f);
+        }
         if (now >= nextRefresh) { nextRefresh = now + (busyPhase ? 2f : 0.25f); Refresh(); }
 
         // little animations: a refused press wobbles, START spins the die, the veil's hourglass turns
@@ -349,6 +367,7 @@ public class PHPanel : UdonSharpBehaviour
         rollCaption.color = go ? new Color(0.13f, 0.34f, 0.25f) : new Color(0.6f, 0.54f, 0.41f);
         bool again = go && game.CanReplay();
         if (replayCaption != null) replayCaption.color = again ? new Color(0.13f, 0.34f, 0.25f) : new Color(0.6f, 0.54f, 0.41f);
+        if (replayBadge != null && replayBadge.activeSelf != game.CanReplay()) replayBadge.SetActive(game.CanReplay());
         if (hostButtonImage.Length > 10) { Fade(6, again); Fade(9, CanEdit && game.CanReplay()); Fade(10, CanEdit && game.CanReplay()); }
         if (hostName != null)
         {
@@ -377,11 +396,21 @@ public class PHPanel : UdonSharpBehaviour
                 }
                 code = codeText;
             }
+            // a code the host entered for the next map shows in the field until that map is built (Cor: feedback)
+            if (lobby && game.pendingCode != null && game.pendingCode != "") code = game.pendingCode;
             seedShown = code;
             if (!seedEditing && seedInput.text != seedShown) seedInput.text = seedShown;
             bool confirm = game.seedNeedsConfirm && hostNow;
             if (confirmRoot.activeSelf != confirm) confirmRoot.SetActive(confirm);
-            seedStatusText.text = confirm ? "" : game.text.Coded(game.seedStatus);
+            string st = confirm ? "" : game.text.Coded(game.seedStatus);
+            // (a "checking" note gives way as soon as the game's answer comes)
+            bool noted = Time.time < localUntil && !(noteChecking && game.seedStatus != statusAtNote);
+            string show = noted ? localNote : st;
+            if (show != lastStatus) { lastStatus = show; statusPop = Time.time; }
+            seedStatusText.text = show;
+            string sk = game.seedStatus;
+            seedStatusText.color = noted ? statusWarn : (sk.StartsWith("seed.next") ? statusOk : (sk == "" ? statusPlain : statusWarn));
+
             if (!seedInputRoot.activeSelf) seedInputRoot.SetActive(true);
             bool anyPick = pk >= 0 && pk < game.rotRuns.Length && game.rotSeed[pk] != 0;
             runsText.text = anyPick ? game.text.F1("maps.played", game.rotRuns[pk].ToString()) : "";

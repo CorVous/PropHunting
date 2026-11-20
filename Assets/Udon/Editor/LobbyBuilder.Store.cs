@@ -65,7 +65,7 @@ public static partial class LobbyBuilder
         var root = new GameObject("Store").transform;
         root.SetParent(lobby, false);
         var store = root.gameObject.AddUdonSharpComponent<PHStore>();
-        store.game = game; store.sound = sound;
+        store.game = game; store.sound = sound; game.store = store;
         store.wId = new string[n]; store.wKind = new int[n]; store.wCat = new int[n]; store.wPrice = new int[n];
         store.wTrophy = new int[n]; store.wGameIdx = new int[n];
         for (int i = 0; i < n; i++)

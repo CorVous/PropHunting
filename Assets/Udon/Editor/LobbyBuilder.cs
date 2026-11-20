@@ -267,6 +267,13 @@ public static partial class LobbyBuilder
             panel.hostButton[6] = bimg.rectTransform;
             panel.hostButtonImage[6] = MapCard(bimg.transform, History, 12, Vector2.zero, 112f, false);
             hostTiles[6] = AddTile(bimg.gameObject, bt, -8);
+            // a map played again pays 1.5x the coins (Cor): a big sticker on the REPLAY card while there is one
+            var badge = Img(cv, "ReplayBonus", P(1128, 52), new Vector2(186, 66), sRound, C("d8473a"), 3f);
+            badge.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -10f);
+            Img(badge.transform, "Face", Vector2.zero, new Vector2(176, 56), sRound, C("f2c45a"), 3f);
+            var bt2 = Txt(badge.transform, "Text", new Vector2(0, 2), new Vector2(168, 50), "1.5x COINS!!", rocket, 26, C("d8473a"), TextAlignmentOptions.Center);
+            bt2.enableAutoSizing = true; bt2.fontSizeMin = 12f; bt2.fontSizeMax = 26f;
+            panel.replayBadge = badge.gameObject;
             for (int a = 0; a < 2; a++)
             {
                 var ab = Img(cv, a == 0 ? "Replay Older" : "Replay Newer", P(a == 0 ? 1029 : 1171, 104), new Vector2(24, 44), sRound, new Color(1f, 1f, 1f, 0.01f), 4f);
@@ -296,10 +303,15 @@ public static partial class LobbyBuilder
         var area = Rect(fieldBg.transform, "Text Area", Vector2.zero, new Vector2(264, 32));
         area.gameObject.AddComponent<RectMask2D>();
         var ph = Txt(area, "Placeholder", Vector2.zero, new Vector2(264, 32), "ENTER CODE", future, 14, C("6d5524", 0.55f), TextAlignmentOptions.Center);
-        var tx = Txt(area, "Text", Vector2.zero, new Vector2(264, 32), "", future, 15, C("1e190f"), TextAlignmentOptions.Center);
+        // the code in a plain sans (Liberation Sans, TextMesh Pro's own) whose 0 and 1 read as digits (Cor's playtest: the
+        // Kenney face's 0 looks like O and its 1 like l; codes have no O, I or L, and typing them is forgiven anyway)
+        var codeFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+        if (codeFont == null) codeFont = future;
+        var tx = Txt(area, "Text", Vector2.zero, new Vector2(264, 32), "", codeFont, 20, C("1e190f"), TextAlignmentOptions.Center);
+        tx.fontStyle = FontStyles.Bold; tx.characterSpacing = 4f;
         panel.seedCodeText = tx;
         var input = fieldBg.gameObject.AddComponent<TMP_InputField>();
-        input.textViewport = area; input.textComponent = tx; input.placeholder = ph; input.fontAsset = future;
+        input.textViewport = area; input.textComponent = tx; input.placeholder = ph; input.fontAsset = codeFont;
         input.characterLimit = 24; input.lineType = TMP_InputField.LineType.SingleLine; input.targetGraphic = fieldBg;
         var inav = input.navigation; inav.mode = Navigation.Mode.None; input.navigation = inav;
         panel.seedInput = input;
@@ -307,7 +319,8 @@ public static partial class LobbyBuilder
         var panelUdon = UdonSharpEditorUtility.GetBackingUdonBehaviour(panel);
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onSelect, panelUdon.SendCustomEvent, nameof(PHPanel.SeedSelected));
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(input.onEndEdit, panelUdon.SendCustomEvent, nameof(PHPanel.SeedEntered));
-        panel.seedStatusText = Txt(cv, "SeedStatus", P(612, 530), new Vector2(232, 40), "", future, 11, C("c9d8c9"), TextAlignmentOptions.Center);
+        panel.seedStatusText = Txt(cv, "SeedStatus", P(612, 530), new Vector2(232, 40), "", future, 13, C("c9d8c9"), TextAlignmentOptions.Center);
+        panel.seedStatusText.enableAutoSizing = true; panel.seedStatusText.fontSizeMin = 9f; panel.seedStatusText.fontSizeMax = 13f;
         panel.seedStatusText.enableWordWrapping = true;
         var confirm = Rect(cv, "SeedConfirm", P(600, 530), new Vector2(240, 40));
         panel.confirmRoot = confirm.gameObject;
@@ -627,35 +640,45 @@ public static partial class LobbyBuilder
         for (int i = 0; i < 24; i++)
         {
             int col = i / 8, r = i % 8;
-            var row = Rect(cols, "Hider" + i, S(120 + col * 285 + 135, 266 + r * 82 + 30), new Vector2(270, 72));
+            // (Cor's playtest: the hunters were cramped; the hider columns give them room, 245 each)
+            var row = Rect(cols, "Hider" + i, S(120 + col * 250 + 120, 266 + r * 82 + 30), new Vector2(240, 72));
             pad.hiderRow[i] = row.gameObject;
-            pad.hiderName[i] = Txt(row, "Name", new Vector2(-30, 14), new Vector2(210, 30), "Player", null, 24, ink, TextAlignmentOptions.Left);
+            pad.hiderName[i] = Txt(row, "Name", new Vector2(-5, 14), new Vector2(230, 30), "Player", null, 24, ink, TextAlignmentOptions.Left);
             pad.hiderName[i].fontStyle = FontStyles.Bold;
-            pad.hiderProp[i] = Txt(row, "Prop", new Vector2(-30, -16), new Vector2(210, 24), "", future, 15, C("8a7b5a"), TextAlignmentOptions.Left);
-            pad.hiderResult[i] = Txt(row, "Result", new Vector2(50, -16), new Vector2(170, 24), "", future, 15, C("2f7a3a"), TextAlignmentOptions.Right);
+            FitName(pad.hiderName[i]);
+            pad.hiderProp[i] = Txt(row, "Prop", new Vector2(-5, -16), new Vector2(230, 24), "", future, 15, C("8a7b5a"), TextAlignmentOptions.Left);
+            pad.hiderResult[i] = Txt(row, "Result", new Vector2(35, -16), new Vector2(150, 24), "", future, 15, C("2f7a3a"), TextAlignmentOptions.Right);
         }
-        float hx = 1000;
+        float hx = 880;   // the hunters' column, 500 wide: a name 270 wide, then three counts (Cor: long names ran into the scores)
         Img(cols, "HuntersIcon", S(hx + 20, 210), new Vector2(46, 46), hunt, Color.white);
         Txt(cols, "HuntersHead", S(hx + 170, 212), new Vector2(260, 36), "HUNTERS", rocket, 28, ink, TextAlignmentOptions.Left);
         string[] sub = { "HITS", "CATCHES", "WRONG" };
-        float[] sx = { hx + 190, hx + 270, hx + 350 };
-        for (int k = 0; k < 3; k++) Txt(cols, "Sub" + k, S(sx[k], 250), new Vector2(90, 20), sub[k], future, 13, C("8a7b5a"), TextAlignmentOptions.Center);
+        float[] sx = { hx + 325, hx + 400, hx + 475 };
+        for (int k = 0; k < 3; k++) Txt(cols, "Sub" + k, S(sx[k], 250), new Vector2(74, 20), sub[k], future, 13, C("8a7b5a"), TextAlignmentOptions.Center);
         pad.hunterRow = new GameObject[8]; pad.hunterName = new TextMeshProUGUI[8];
         pad.hunterHits = new TextMeshProUGUI[8]; pad.hunterCatches = new TextMeshProUGUI[8]; pad.hunterWrong = new TextMeshProUGUI[8];
         for (int i = 0; i < 8; i++)
         {
             float y = 286 + i * 60;
-            var row = Rect(cols, "Hunter" + i, S(hx + 190, y), new Vector2(380, 50));
+            var row = Rect(cols, "Hunter" + i, S(hx + 250, y), new Vector2(500, 50));
             pad.hunterRow[i] = row.gameObject;
-            pad.hunterName[i] = Txt(row, "Name", new Vector2(-95, 0), new Vector2(190, 40), "Player", null, 24, ink, TextAlignmentOptions.Left);
+            pad.hunterName[i] = Txt(row, "Name", new Vector2(-250 + 20 + 135, 0), new Vector2(270, 40), "Player", null, 24, ink, TextAlignmentOptions.Left);
             pad.hunterName[i].fontStyle = FontStyles.Bold;
-            pad.hunterHits[i] = Txt(row, "Hits", new Vector2(sx[0] - hx - 190, 0), new Vector2(70, 40), "0", future, 22, ink, TextAlignmentOptions.Center);
-            pad.hunterCatches[i] = Txt(row, "Catches", new Vector2(sx[1] - hx - 190, 0), new Vector2(70, 40), "0", future, 22, ink, TextAlignmentOptions.Center);
-            pad.hunterWrong[i] = Txt(row, "Wrong", new Vector2(sx[2] - hx - 190, 0), new Vector2(70, 40), "0", future, 22, ink, TextAlignmentOptions.Center);
+            FitName(pad.hunterName[i]);
+            pad.hunterHits[i] = Txt(row, "Hits", new Vector2(sx[0] - hx - 250, 0), new Vector2(66, 40), "0", future, 22, ink, TextAlignmentOptions.Center);
+            pad.hunterCatches[i] = Txt(row, "Catches", new Vector2(sx[1] - hx - 250, 0), new Vector2(66, 40), "0", future, 22, ink, TextAlignmentOptions.Center);
+            pad.hunterWrong[i] = Txt(row, "Wrong", new Vector2(sx[2] - hx - 250, 0), new Vector2(66, 40), "0", future, 22, ink, TextAlignmentOptions.Center);
         }
         wh.gameObject.SetActive(false); wt.gameObject.SetActive(false); share.gameObject.SetActive(false); cols.gameObject.SetActive(false);
         UdonSharpEditorUtility.CopyProxyToUdon(pad);
         return pad;
+    }
+
+    // a player's name on the score pad: shrinks a little for a long one, then ends in an ellipsis inside its box
+    static void FitName(TextMeshProUGUI t)
+    {
+        t.enableWordWrapping = false; t.overflowMode = TextOverflowModes.Ellipsis;
+        t.enableAutoSizing = true; t.fontSizeMin = 15f; t.fontSizeMax = t.fontSize;
     }
 
     // ------------------------------------------------------------------ the credits board (south wall)
@@ -984,7 +1007,7 @@ public static partial class LobbyBuilder
     static float RW, RD;
     static Vector3 L(float x, float y, float h = 0f) { return new Vector3(x - RW / 2, h, RD / 2 - y); }
 
-    public static void DressRoom(Transform lobby, float roomW, float roomD, float wallH, float zoneHalf)
+    public static void DressRoom(Transform lobby, float roomW, float roomD, float wallH, float zoneHalf, float zoneHalfX)
     {
         RW = roomW; RD = roomD;
         var root = new GameObject("Dressing").transform;
@@ -1007,11 +1030,11 @@ public static partial class LobbyBuilder
         // the PLAY space: a cream inset ring on the green zone floor, and the word
         var cream = Mat("LobbyCream", C("f3e7c9"));
         var zc = L(roomW / 2, 0.15f + zoneHalf);
-        float zi = zoneHalf - 0.45f;
-        Slab(root, "PlayRingN", zc + new Vector3(0, 0.012f, zi), new Vector3(2 * zi + 0.3f, 0.01f, 0.3f), cream);
-        Slab(root, "PlayRingS", zc + new Vector3(0, 0.012f, -zi), new Vector3(2 * zi + 0.3f, 0.01f, 0.3f), cream);
-        Slab(root, "PlayRingE", zc + new Vector3(zi, 0.012f, 0), new Vector3(0.3f, 0.01f, 2 * zi), cream);
-        Slab(root, "PlayRingW", zc + new Vector3(-zi, 0.012f, 0), new Vector3(0.3f, 0.01f, 2 * zi), cream);
+        float zi = zoneHalf - 0.45f, zx = zoneHalfX - 0.45f;
+        Slab(root, "PlayRingN", zc + new Vector3(0, 0.012f, zi), new Vector3(2 * zx + 0.3f, 0.01f, 0.3f), cream);
+        Slab(root, "PlayRingS", zc + new Vector3(0, 0.012f, -zi), new Vector3(2 * zx + 0.3f, 0.01f, 0.3f), cream);
+        Slab(root, "PlayRingE", zc + new Vector3(zx, 0.012f, 0), new Vector3(0.3f, 0.01f, 2 * zi), cream);
+        Slab(root, "PlayRingW", zc + new Vector3(-zx, 0.012f, 0), new Vector3(0.3f, 0.01f, 2 * zi), cream);
         var play = WorldText(root, "PLAY", zc + new Vector3(0, 0.02f, 0.6f), Quaternion.Euler(90f, 0f, 0f), "PLAY", 18f, C("e9f7df"), new Vector2(8f, 2.6f));
         play.characterSpacing = 4f;
         play.enableAutoSizing = true; play.fontSizeMin = 4f; play.fontSizeMax = 18f;   // stays inside the cream ring
@@ -1044,26 +1067,27 @@ public static partial class LobbyBuilder
 
         // (the east wall is the weapon wall: LobbyBuilder.Store.cs, built after the weapons)
 
-        // giant pieces (feet on the floor; sizes are the largest dimension in metres)
-        Piece(root, "board-game-bits/D6_A_red", L(19.6f, 2.6f), 2.3f, 20f, true);   // a step off the north wall (Cor), clear of the weapon wall's panel and the score pad
+        // giant pieces (feet on the floor; sizes are the largest dimension in metres), all off the ready area, which
+        // spans the room's north half from wall to wall (Cor)
+        Piece(root, "board-game-bits/D6_A_red", L(20.4f, 16.0f), 2.3f, 20f, true);   // south of the ready area, clear of the weapon wall's panel
         // the rest spread around the room's floor (Cor: not bunched up along the south wall), clear of the PLAY mat,
         // the track along the walls, the weapon wall's walkway and the spawn's path
         Piece(root, "board-game-bits/D20_blue", L(17.5f, 17.0f), 1.8f, -15f, true);
-        Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(4.2f, 9.2f), 1, 1.4f);
-        Piece(root, "furniture-bits/couch_pillows", L(0.95f, 15.0f), 2.6f, 90f, true);   // backs to the west wall, facing the room (Cor)
-        Piece(root, "furniture-bits/armchair", L(1.0f, 18.3f), 1.5f, 90f, true);
-        Piece(root, "furniture-bits/lamp_standing", L(0.7f, 16.75f), 2.4f, 0f, false);
+        Stack(root, L(4.0f, 13.4f), 3, 1.6f); Stack(root, L(5.8f, 15.2f), 2, 1.5f); Stack(root, L(7.4f, 17.6f), 1, 1.4f);
+        Piece(root, "furniture-bits/couch_pillows", L(0.95f, 17.76f), 2.6f, 90f, true);   // backs to the west wall, facing the room, where Cor placed them by hand
+        Piece(root, "furniture-bits/armchair", L(1.0f, 21.06f), 1.5f, 90f, true);
+        Piece(root, "furniture-bits/lamp_standing", L(0.7f, 19.51f), 2.4f, 0f, false);
         Piece(root, "board-game-bits/pawn_A_blue", L(8.6f, 12.8f), 2.4f, 0f, true);
         Piece(root, "board-game-bits/flag_A_red", L(16.2f, 14.2f), 2.6f, 200f, true);
         Piece(root, "board-game-bits/domino_tile_6-6", L(19.2f, 12.6f), 2.4f, 25f, true);
         Piece(root, "furniture-bits/cactus_medium_A", L(18.6f, 21.2f), 1.6f, 0f, true);
         Piece(root, "furniture-bits/lamp_standing", L(20.2f, 21.3f), 2.4f, 0f, false);
-        Piece(root, "board-game-bits/meeple_blue", L(18.8f, 6.6f), 1.7f, -30f, true);
+        Piece(root, "board-game-bits/meeple_blue", L(5.6f, 20.0f), 1.7f, -30f, true);
 
         // the two standing lamps light the room around them (Point Light Volumes: Cor, VRC Light Volumes); the shelf's
         // small lamps get a faint glow
         Color warm = new Color(1f, 0.82f, 0.58f);
-        LampBuilder.MakeLight(root, "LampLightCouch", L(0.7f, 16.75f, 2.05f), warm, 2.2f, 0.9f);
+        LampBuilder.MakeLight(root, "LampLightCouch", L(0.7f, 19.51f, 2.05f), warm, 2.2f, 0.9f);
         LampBuilder.MakeLight(root, "LampLightCorner", L(20.2f, 21.3f, 2.05f), warm, 2.2f, 0.9f);
 
         // the sun lights the room through the open box; the walls and the lid cast no shadows into it

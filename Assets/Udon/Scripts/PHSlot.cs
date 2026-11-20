@@ -230,6 +230,7 @@ public class PHSlot : UdonSharpBehaviour
         if (voice == null || game.local == null || game.local.sound == null) return;
         // (a taunt arriving late, after the hunt or the hider's catch, stays silent: taunts are sent only then)
         if (game.phase != PHGame.PH_HUNT || caught) return;
+        if (Networking.IsOwner(gameObject) && game.store != null) game.store.Taunted();   // (the taunt trophy, Cor)
         PHAudio a = game.local.sound;
         AudioClip c = a.Clip(a.Pick(a.taunts, pick));
         if (c == null) return;

@@ -324,16 +324,19 @@ public class PHGame : UdonSharpBehaviour
             int fits = RoundSize();
             if (st == PHSeed.OLDER) { seedStatus = "seed.older|" + seedTool.genVersion; seedNeedsConfirm = true; confirmCode = code; }
             else if (seedTool.size != fits) { seedStatus = "seed.size|" + sizeName[seedTool.size] + "|" + sizeName[fits]; seedNeedsConfirm = true; confirmCode = code; }
-            else { pendingCode = code; seedStatus = "seed.next|" + code; }
+            else { pendingCode = code; seedStatus = "seed.next|" + CodeFace(code); }
         }
         RequestSerialization();
     }
+
+    // a map code in the clear face of the code field (Cor: 0 and O, 1 and l alike in the Kenney face)
+    string CodeFace(string code) { return "<font=\"LiberationSans SDF\">" + code + "</font>"; }
 
     public void SeedPlayAnyway()
     {
         if (!IsHost || !seedNeedsConfirm) return;
         pendingCode = confirmCode; seedNeedsConfirm = false;
-        seedStatus = "seed.next|" + pendingCode;
+        seedStatus = "seed.next|" + CodeFace(pendingCode);
         RequestSerialization();
     }
 
@@ -627,6 +630,7 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public int failedRound = -1;
     [UdonSynced] public int failedAtMs;
     public GameObject failNotice;
+    public PHStore store;        // the weapon wall's coins and trophies (LobbyBuilder.BuildStore): taunts count there
     public Material revealMat;   // the END reveal's highlight of the hiders' props (PHSlot.MakeRevealCopy; WorldSceneBuilder)
     int failDismissed = -1;
     void FailNotice()

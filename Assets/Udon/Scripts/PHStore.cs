@@ -49,7 +49,7 @@ public class PHStore : UdonSharpBehaviour
 
     // the counters in st
     public const int S_CATCH = 0, S_HROUNDS = 1, S_PROUNDS = 2, S_SURV = 3, S_HWINS = 4, S_PWINS = 5, S_WRONG = 6,
-        S_EMPTY = 7, S_STREAK = 8, S_FIRST = 9, S_THEME_H = 10, S_THEME_P = 11, S_PROPS = 12, S_HOPS = 13, S_CLEAN = 14, STATS = 24;
+        S_EMPTY = 7, S_STREAK = 8, S_FIRST = 9, S_THEME_H = 10, S_THEME_P = 11, S_PROPS = 12, S_HOPS = 13, S_CLEAN = 14, S_TAUNTS = 15, STATS = 24;
 
     // the trophies by number (strings_store.tsv lists them in this order)
     const int T_FIRST_CATCH = 0, T_HAT_TRICK = 1, T_SHARP_EYE = 2, T_CLEAN_SWEEP = 3, T_QUICK_DRAW = 4, T_BUZZER = 5,
@@ -65,7 +65,7 @@ public class PHStore : UdonSharpBehaviour
         T_SPRAY = 58, T_FULL_HOUSE = 59, T_USUAL = 60, T_WALLFLOWER = 61,
         T_FIRST_HIDE = 62, T_THREE_SURV = 63, T_TWENTY_FIVE_SURV = 64, T_TEN_HIDES = 65, T_REG_HIDER = 66, T_WIN1_P = 67,
         T_WIN3_P = 68, T_ROYALTY = 69, T_MINUTE = 70, T_TWO_MINUTES = 71, T_TOWN_P = 72, T_VILLAGE_P = 73, T_STATION_P = 74,
-        T_TEN_PROPS = 75, T_HOPPY = 76, T_BACK_TO_BACK = 77, T_STAND = 78, T_FIVE_SURV = 79;
+        T_TEN_PROPS = 75, T_HOPPY = 76, T_BACK_TO_BACK = 77, T_STAND = 78, T_TAUNTS = 79;
 
     // coins (Cor approved): a round, a catch, surviving, every 20 s hidden before being caught, winning
     public const int COIN_ROUND = 10, COIN_CATCH = 15, COIN_SURVIVE = 25, COIN_WIN = 10, COIN_HIDDEN_MS = 20000;
@@ -74,7 +74,7 @@ public class PHStore : UdonSharpBehaviour
     int lastPhase = -1;
     bool inRound;
     int rRole, rCatches, rHiders, rPeople, rTheme, rSize;
-    bool rQuick, rBuzzer, rShave, rSplinter, rAlone, rMoved, rStand, rStandCatch, rPair, rStandHide;
+    bool rQuick, rBuzzer, rShave, rSplinter, rAlone, rMoved, rStand, rStandCatch, rPair, rStandHide, rReplay;
     int rEarly;
     Vector3 rStart;
     bool rStartSet;
@@ -290,6 +290,12 @@ public class PHStore : UdonSharpBehaviour
         rCatches = me.catches;
         rTheme = game.gen != null ? game.gen.mapTheme : 0;
         rSize = game.mapSize;
+        rReplay = game.mapVar > 0;   // (the map's runs before this one: played before, so it pays 1.5x)
+        if (rReplay && inRound && game.local != null)
+        {
+            game.local.SetProgramVariable("notice", game.text.Get("replay.banner"));
+            game.local.SetProgramVariable("noticeUntil", Time.time + 10f);
+        }
         rQuick = false; rBuzzer = false; rShave = false; rSplinter = false; rAlone = false; rMoved = false; rStand = false;
         rStandCatch = false; rPair = false; rStandHide = false; rEarly = 0;
         rStartSet = false;
@@ -351,11 +357,15 @@ public class PHStore : UdonSharpBehaviour
         bool hunter = rRole == PHGame.ROLE_HUNTER;
         bool won = hunter != game.hidersWin;
         int pay = COIN_ROUND + (won ? COIN_WIN : 0);
+        PHText tx = game.text;
+        string parts = tx.F1("pay.round", COIN_ROUND.ToString());
+        if (won) parts += "\n" + tx.F1("pay.win", COIN_WIN.ToString());
         int themeBit = 1 << Mathf.Clamp(rTheme, 0, 2);
         if (hunter)
         {
             int catches = me.catches, wrong = me.wrongProps;
             pay += COIN_CATCH * catches;
+            if (catches > 0) parts += "\n" + tx.F2("pay.catch", catches.ToString(), (COIN_CATCH * catches).ToString());
             st[S_HROUNDS]++; st[S_CATCH] += catches; st[S_WRONG] += wrong;
             if (won) st[S_HWINS]++;
             if (catches == 0) st[S_EMPTY]++;
@@ -387,8 +397,13 @@ public class PHStore : UdonSharpBehaviour
         else
         {
             bool survived = !me.caught;
-            if (survived) pay += COIN_SURVIVE;
-            else pay += Mathf.Max(0, me.survivedMs) / COIN_HIDDEN_MS;
+            if (survived) { pay += COIN_SURVIVE; parts += "\n" + tx.F1("pay.survive", COIN_SURVIVE.ToString()); }
+            else
+            {
+                int hid = Mathf.Max(0, me.survivedMs) / COIN_HIDDEN_MS;
+                pay += hid;
+                if (hid > 0) parts += "\n" + tx.F1("pay.hidden", hid.ToString());
+            }
             st[S_PROUNDS]++;
             if (won) st[S_PWINS]++;
             if (survived) { st[S_SURV]++; st[S_STREAK]++; st[S_THEME_P] |= themeBit; } else st[S_STREAK] = 0;
@@ -428,10 +443,27 @@ public class PHStore : UdonSharpBehaviour
         }
         if (rPeople >= 10) Earn(T_FULL_HOUSE);
         CheckCounts();
+        // a map played again pays half as much more (Cor: "1.5x coins!!", shown big in the lobby and the round)
+        if (rReplay) { pay = (pay * 3 + 1) / 2; parts += "\n" + tx.Get("pay.replay"); }
         coins += pay;
+        // what earned them, under the round's results for a while (Cor's playtest: feedback on what got you points)
+        if (game.local != null)
+        {
+            game.local.SetProgramVariable("notice", tx.F1("store.coins_earned", pay.ToString()) + "\n" + parts);
+            game.local.SetProgramVariable("noticeUntil", Time.time + 20f);
+        }
         Play("jingles_PIZZI00", 0.5f);
         Save();
         RefreshAll();
+    }
+
+    // a taunt from this player's own prop (PHSlot.PlayTaunt, on its owner): counted for Showboat (Cor's playtest)
+    public void Taunted()
+    {
+        if (!loaded) return;
+        st[S_TAUNTS]++;
+        if (st[S_TAUNTS] >= 100) Earn(T_TAUNTS);
+        else if (st[S_TAUNTS] % 10 == 0) Save();
     }
 
     // the trophies that count up across rounds
@@ -471,7 +503,7 @@ public class PHStore : UdonSharpBehaviour
         if (st[S_STREAK] >= 2) Earn(T_BACK_TO_BACK);
         if (st[S_HOPS] >= 50) Earn(T_HOPPY);
         if (st[S_CATCH] >= 3) Earn(T_THREE_CATCHES);
-        if (st[S_SURV] >= 5) Earn(T_FIVE_SURV);
+        if (st[S_TAUNTS] >= 100) Earn(T_TAUNTS);
     }
 
     // how far along a counted trophy is: x of n (n 0 for one done in one go)
@@ -484,7 +516,8 @@ public class PHStore : UdonSharpBehaviour
             case T_TEN_HUNTS: case T_REG_HUNTER: return st[S_HROUNDS];
             case T_FIFTY_BONKS: return st[S_WRONG];
             case T_STEADY: return st[S_CLEAN];
-            case T_THREE_SURV: case T_TWENTY_FIVE_SURV: case T_FIVE_SURV: return st[S_SURV];
+            case T_THREE_SURV: case T_TWENTY_FIVE_SURV: return st[S_SURV];
+            case T_TAUNTS: return st[S_TAUNTS];
             case T_TEN_HIDES: case T_REG_HIDER: return st[S_PROUNDS];
             case T_WIN3_P: case T_ROYALTY: return st[S_PWINS];
             case T_TEN_PROPS: return st[S_PROPS];
@@ -518,7 +551,7 @@ public class PHStore : UdonSharpBehaviour
             case T_REG_HUNTER: return 25; case T_WIN3_H: return 3; case T_TOP_DOG: return 25; case T_FIFTY_BONKS: return 50;
             case T_STEADY: return 5; case T_THREE_SURV: return 3; case T_TWENTY_FIVE_SURV: return 25; case T_TEN_HIDES: return 10;
             case T_REG_HIDER: return 25; case T_WIN3_P: return 3; case T_ROYALTY: return 25; case T_TEN_PROPS: return 10;
-            case T_BACK_TO_BACK: return 2; case T_HOPPY: return 50; case T_THREE_CATCHES: return 3; case T_FIVE_SURV: return 5;
+            case T_BACK_TO_BACK: return 2; case T_HOPPY: return 50; case T_THREE_CATCHES: return 3; case T_TAUNTS: return 100;
         }
         return 0;
     }

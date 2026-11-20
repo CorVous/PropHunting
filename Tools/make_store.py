@@ -103,7 +103,7 @@ HIDE = [
     ('hoppy', 'Hoppy', 'Hop 50 times as a prop.', 1, 3),
     ('back_to_back', 'Back to Back', 'Survive 2 rounds in a row as a hider.', 3, 10),
     ('stand_your_ground', 'Stand Your Ground', 'Still be hiding when the final stand begins.', 3, 10),
-    ('five_survivals', 'Five Survivals', 'Survive 5 rounds in total.', 6, 15),
+    ('taunt_100', 'Showboat', 'Taunt 100 times in total.', 15, 40),
 ]
 
 # Cor: plain weapons are quick to earn and cheap, the coolest take the longest and cost the most. The shop weapons

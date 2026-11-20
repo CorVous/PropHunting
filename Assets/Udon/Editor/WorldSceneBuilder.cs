@@ -107,17 +107,19 @@ public static class WorldSceneBuilder
         Box(lobby.transform, "AlcoveSouth", new Vector3(RoomW / 2 + al / 2 + 0.1f, WallH / 2, -oh - 0.1f), new Vector3(al, WallH, 0.2f), wallMat, true);
         Box(lobby.transform, "WallW", new Vector3(-RoomW / 2 - 0.1f, WallH / 2, 0), new Vector3(0.2f, WallH, RoomD), wallMat, true);
         Vector3 zoneCentre = new Vector3(0f, 0f, RoomD / 2 - 0.15f - ZoneHalf);
-        Box(lobby.transform, "ZoneFloor", zoneCentre + new Vector3(0, 0.005f, 0), new Vector3(ZoneHalf * 2, 0.01f, ZoneHalf * 2), zoneMat, false);
+        // the ready area spans the room from wall to wall (Cor's playtest), up to the coloured track along each side
+        float zoneHalfX = RoomW / 2 - 1.45f;
+        Box(lobby.transform, "ZoneFloor", zoneCentre + new Vector3(0, 0.005f, 0), new Vector3(zoneHalfX * 2, 0.01f, ZoneHalf * 2), zoneMat, false);
         var zone = new GameObject("Zone");
         zone.transform.SetParent(lobby.transform, false);
         zone.transform.localPosition = zoneCentre + new Vector3(0, 1.5f, 0);
         var zoneBox = zone.AddComponent<BoxCollider>();
-        zoneBox.isTrigger = true; zoneBox.size = new Vector3(ZoneHalf * 2, 3f, ZoneHalf * 2);
+        zoneBox.isTrigger = true; zoneBox.size = new Vector3(RoomW, 3f, ZoneHalf * 2);   // (to the walls themselves)
         zone.layer = 2;   // Ignore Raycast
         var spawn = new GameObject("Spawn");
         spawn.transform.SetParent(lobby.transform, false);
         spawn.transform.localPosition = new Vector3(0f, 0.05f, -RoomD / 2 + 2.3f);   // on the spawn disc
-        LobbyBuilder.DressRoom(lobby.transform, RoomW, RoomD, WallH, ZoneHalf);
+        LobbyBuilder.DressRoom(lobby.transform, RoomW, RoomD, WallH, ZoneHalf, zoneHalfX);
         // the lobby as seen from the map (Cor): one plain box round it, outside the lobby object so PHLobbyCull leaves
         // it drawn; unlit and unfogged so it shows that far off; invisible from inside (its faces point outwards)
         var shellMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/LobbyShell.mat");
@@ -237,6 +239,24 @@ public static class WorldSceneBuilder
             slots[i] = slot;
         }
         game.slots = slots;
+        // the reveal's amber beams on where each hider spent the most time (PHDwell, Cor's playtest)
+        {
+            var amber = Mat("BeaconAmber", new Color(1f, 0.72f, 0.2f));
+            var dwell = gameGo.AddUdonSharpComponent<PHDwell>();
+            dwell.game = game; dwell.beams = new GameObject[SLOTS];
+            for (int i = 0; i < SLOTS; i++)
+            {
+                var beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                beam.name = "Dwell" + i;
+                Object.DestroyImmediate(beam.GetComponent<Collider>());
+                beam.transform.SetParent(beaconsRoot, false);
+                beam.transform.localScale = new Vector3(0.16f, 15f, 0.16f);
+                var br = beam.GetComponent<MeshRenderer>(); br.sharedMaterial = amber; br.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                beam.SetActive(false);
+                dwell.beams[i] = beam;
+            }
+            UdonSharpEditorUtility.CopyProxyToUdon(dwell);
+        }
         game.revealMat = Mat2("Reveal", Shader.Find("PropHunt/Reveal"));   // the END reveal's striped highlight (PHSlot)
 
         var knocksRoot = new GameObject("Knocks");

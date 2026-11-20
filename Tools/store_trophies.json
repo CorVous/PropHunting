@@ -474,9 +474,9 @@
   "hi": 10
  },
  {
-  "key": "five_survivals",
+  "key": "taunt_100",
   "weapon": "gun:holiday-bits:snowball_cannon",
-  "lo": 6,
-  "hi": 15
+  "lo": 15,
+  "hi": 40
  }
 ]
