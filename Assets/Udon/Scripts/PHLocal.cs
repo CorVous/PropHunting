@@ -645,7 +645,13 @@ public class PHLocal : UdonSharpBehaviour
     public bool AimValid() { return hoverObj != null; }
     // VR: the way the selector points, from the right hand's tracking (the offset, in degrees, is for tuning)
     public Vector3 vrAimEuler = Vector3.zero;
-    public Quaternion AimRotation(Quaternion hand) { return hand * Quaternion.Euler(vrAimEuler); }
+    // (the gun as the avatar's hand holds it, PHWeapons.HandPose, so picks and shots go where the blaster points;
+    // the tracking angle only for an avatar without hand bones)
+    public Quaternion AimRotation(Quaternion hand)
+    {
+        if (weapons != null && weapons.HandPose(Networking.LocalPlayer)) return weapons.handGun;
+        return hand * Quaternion.Euler(vrAimEuler);
+    }
 
     void UpdateHover()
     {
