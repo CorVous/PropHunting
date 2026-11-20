@@ -75,6 +75,7 @@ public static partial class LobbyBuilder
             UdonSharpEditorUtility.CopyProxyToUdon(lt);
             var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(lt);
             UnityEditor.Events.UnityEventTools.AddStringPersistentListener(b.onClick, udon.SendCustomEvent, nameof(PHLangTile.Press));
+            LobbyBuilder.Pressy(tile.gameObject, b);
             tiles[slot] = lt;
         }
         var ring = Img(board.tiles[0], "VRChatPick", Vector2.zero, new Vector2(TW + 16, TH + 16), sDashed, C("b8892b"), 2f);

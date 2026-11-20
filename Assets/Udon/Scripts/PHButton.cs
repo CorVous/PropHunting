@@ -12,6 +12,7 @@ public class PHButton : UdonSharpBehaviour
     public UdonSharpBehaviour target;   // if set, the action is this script's (the profiler's buttons), not the game's
     public string action = "StartRound";
     public int arg;
+    public PHPress fx;                  // the button going down when hit (Cor), if it has one
 
     // from a UI button's OnClick (the host panel)
     public void Press() { Interact(); }
@@ -28,6 +29,7 @@ public class PHButton : UdonSharpBehaviour
 
     public override void Interact()
     {
+        if (fx != null) fx.Press();
         if (target != null) { target.SendCustomEvent(action); return; }
         if (game == null) return;
         game.panelArg = arg;

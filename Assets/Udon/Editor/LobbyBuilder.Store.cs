@@ -436,17 +436,22 @@ public static partial class LobbyBuilder
     {
         var key = new GameObject(action).transform;
         key.SetParent(panel, false); key.localPosition = at;
-        Oval(key, "Cap", new Vector3(0f, 0.03f, 0f), new Vector3(0.25f, 0.06f, 0.25f), Mat("StoreKey", C("e1cfa5")));
+        var top = new GameObject("Top").transform;   // the part that goes down when pressed (PHPress, Cor)
+        top.SetParent(key, false);
+        Oval(top, "Cap", new Vector3(0f, 0.03f, 0f), new Vector3(0.25f, 0.06f, 0.25f), Mat("StoreKey", C("e1cfa5")));
         var arrow = new GameObject("Arrow");
-        arrow.transform.SetParent(key, false);
+        arrow.transform.SetParent(top, false);
         arrow.transform.localPosition = new Vector3(0f, 0.062f, 0f);
         arrow.transform.localRotation = Quaternion.Euler(0f, up ? 180f : 0f, 0f);   // (the panel's -z is away from the player: up)
         arrow.transform.localScale = Vector3.one * 1.15f;
         arrow.AddComponent<MeshFilter>().sharedMesh = ArrowMesh();
         var ar = arrow.AddComponent<MeshRenderer>(); ar.sharedMaterial = Mat("StoreInk", C("1e190f"));
         ar.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        var fx = key.gameObject.AddUdonSharpComponent<PHPress>();
+        fx.cap = top; fx.travel = 0.035f;
+        UdonSharpEditorUtility.CopyProxyToUdon(fx);
         var btn = key.gameObject.AddUdonSharpComponent<PHButton>();
-        btn.target = shelf; btn.action = action;
+        btn.target = shelf; btn.action = action; btn.fx = fx;
         UdonSharpEditorUtility.CopyProxyToUdon(btn);
         var u = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
         u.proximity = 3f; u.interactText = up ? "Up" : "Down";
@@ -560,6 +565,7 @@ public static partial class LobbyBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(btn);
         var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, udon.SendCustomEvent, nameof(PHButton.Press));
+        Pressy(img.gameObject, bt);
         return img;
     }
 

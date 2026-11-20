@@ -464,6 +464,7 @@ public static partial class LobbyBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(ex);
         var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(ex);
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, udon.SendCustomEvent, nameof(PHExplore.Press));
+        Pressy(bimg.gameObject, bt);
         return ex;
     }
 
@@ -513,10 +514,20 @@ public static partial class LobbyBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(btn);
         var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, udon.SendCustomEvent, nameof(PHButton.Press));
+        Pressy(bimg.gameObject, bt);
         return text;
     }
 
     static AudioClip Clip(string n) { return AssetDatabase.LoadAssetAtPath<AudioClip>(Root + "Audio/" + n + ".ogg"); }
+
+    // a UI button that visibly goes down when hit (Cor): PHPress on it, called from its OnClick next to its own script
+    public static PHPress Pressy(GameObject go, Button b)
+    {
+        var p = go.AddUdonSharpComponent<PHPress>();
+        UdonSharpEditorUtility.CopyProxyToUdon(p);
+        UnityEditor.Events.UnityEventTools.AddStringPersistentListener(b.onClick, UdonSharpEditorUtility.GetBackingUdonBehaviour(p).SendCustomEvent, nameof(PHPress.Press));
+        return p;
+    }
 
     static PHPanelTile AddTile(GameObject go, Button b, int index)
     {
@@ -525,6 +536,7 @@ public static partial class LobbyBuilder
         UdonSharpEditorUtility.CopyProxyToUdon(tile);
         var udon = UdonSharpEditorUtility.GetBackingUdonBehaviour(tile);
         UnityEditor.Events.UnityEventTools.AddStringPersistentListener(b.onClick, udon.SendCustomEvent, nameof(PHPanelTile.Press));
+        Pressy(go, b);
         return tile;
     }
 
@@ -1033,8 +1045,8 @@ public static partial class LobbyBuilder
         // (the east wall is the weapon wall: LobbyBuilder.Store.cs, built after the weapons)
 
         // giant pieces (feet on the floor; sizes are the largest dimension in metres)
-        Piece(root, "board-game-bits/D6_A_red", L(20.0f, 1.0f), 2.3f, 20f, true);   // (clear of the weapon wall's panel and the score pad)
-        Piece(root, "board-game-bits/D20_blue", L(17.0f, 20.4f), 1.8f, -15f, true);   // (clear of the weapon wall)
+        Piece(root, "board-game-bits/D6_A_red", L(19.6f, 2.6f), 2.3f, 20f, true);   // a step off the north wall (Cor), clear of the weapon wall's panel and the score pad
+        Piece(root, "board-game-bits/D20_blue", L(17.3f, 19.4f), 1.8f, -15f, true);   // a step off the south wall (Cor)
         Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(2.4f, 5.0f), 1, 1.4f);
         Piece(root, "furniture-bits/couch_pillows", L(5.6f, 15.0f), 2.6f, 270f, true);   // facing the Trophies board
         Piece(root, "furniture-bits/armchair", L(5.6f, 18.3f), 1.5f, 270f, true);
@@ -1045,6 +1057,18 @@ public static partial class LobbyBuilder
         Piece(root, "furniture-bits/cactus_medium_A", L(18.6f, 21.2f), 1.6f, 0f, true);
         Piece(root, "furniture-bits/lamp_standing", L(20.2f, 21.3f), 2.4f, 0f, false);
         Piece(root, "board-game-bits/meeple_blue", L(18.8f, 9.0f), 1.7f, -30f, true);
+        // the old prop shelf's pieces, spread around the room on the floor (Cor): clear of the PLAY mat, the track
+        // along the walls, the weapon wall's walkway and the spawn's path
+        Piece(root, "kaykit-dungeon-pack/chest", L(6.0f, 6.6f), 1.1f, 25f, true);
+        Piece(root, "kaykit-dungeon-pack/barrel_small", L(3.4f, 6.2f), 0.9f, 0f, true);
+        Piece(root, "kaykit-dungeon-pack/box_small", L(5.0f, 9.5f), 0.8f, -20f, true);
+        Piece(root, "furniture-bits/chair_stool_wood", L(5.6f, 12.6f), 0.8f, 10f, true);
+        Piece(root, "furniture-bits/book_set", L(8.0f, 13.5f), 0.6f, 35f, true);
+        Piece(root, "furniture-bits/lamp_table", L(6.6f, 19.4f), 0.7f, 0f, true);
+        Piece(root, "furniture-bits/cactus_medium_A", L(19.5f, 13.0f), 1.0f, 0f, true);
+        Piece(root, "board-game-bits/coin_gold", L(20.6f, 14.0f), 1.0f, 30f, true);
+        Piece(root, "furniture-bits/armchair", L(19.8f, 15.6f), 0.9f, 90f, true);
+        Piece(root, "kaykit-dungeon-pack/barrel_small", L(15.6f, 15.2f), 0.9f, 0f, true);
 
         // the two standing lamps light the room around them (Point Light Volumes: Cor, VRC Light Volumes); the shelf's
         // small lamps get a faint glow
