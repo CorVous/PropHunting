@@ -74,7 +74,8 @@ public class PHStore : UdonSharpBehaviour
     int lastPhase = -1;
     bool inRound;
     int rRole, rCatches, rHiders, rPeople, rTheme, rSize;
-    bool rQuick, rBuzzer, rShave, rSplinter, rAlone, rMoved, rStand, rStandCatch, rPair, rStandHide, rReplay;
+    bool rQuick, rBuzzer, rShave, rSplinter, rAlone, rMoved, rStand, rStandCatch, rPair, rStandHide;
+    int rBonus;   // the round's map bonus (PHGame.roundBonus): 1 = 1.5x, 2 = 2x
     int rEarly;
     Vector3 rStart;
     bool rStartSet;
@@ -290,10 +291,10 @@ public class PHStore : UdonSharpBehaviour
         rCatches = me.catches;
         rTheme = game.gen != null ? game.gen.mapTheme : 0;
         rSize = game.mapSize;
-        rReplay = game.mapVar > 0;   // (the map's runs before this one: played before, so it pays 1.5x)
-        if (rReplay && inRound && game.local != null)
+        rBonus = game.roundBonus;   // (a map played once or twice, or one on offer: 1.5x; a new map on offer: 2x)
+        if (rBonus > 0 && inRound && game.local != null)
         {
-            game.local.SetProgramVariable("notice", game.text.Get("replay.banner"));
+            game.local.SetProgramVariable("notice", game.text.Get(rBonus == 2 ? "newmap.banner" : "replay.banner"));
             game.local.SetProgramVariable("noticeUntil", Time.time + 10f);
         }
         rQuick = false; rBuzzer = false; rShave = false; rSplinter = false; rAlone = false; rMoved = false; rStand = false;
@@ -443,8 +444,9 @@ public class PHStore : UdonSharpBehaviour
         }
         if (rPeople >= 10) Earn(T_FULL_HOUSE);
         CheckCounts();
-        // a map played again pays half as much more (Cor: "1.5x coins!!", shown big in the lobby and the round)
-        if (rReplay) { pay = (pay * 3 + 1) / 2; parts += "\n" + tx.Get("pay.replay"); }
+        // the map's bonus (Cor): 1.5x on a map played once or twice or one on offer, 2x on a new map on offer
+        if (rBonus == 2) { pay *= 2; parts += "\n" + tx.Get("pay.newmap"); }
+        else if (rBonus == 1) { pay = (pay * 3 + 1) / 2; parts += "\n" + tx.Get("pay.replay"); }
         coins += pay;
         // what earned them, under the round's results for a while (Cor's playtest: feedback on what got you points)
         if (game.local != null)

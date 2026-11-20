@@ -27,6 +27,7 @@ public class PHHistory : UdonSharpBehaviour
     public Image[] cardBlankIcon;
     public TextMeshProUGUI[] cardSize, cardRuns;
     public GameObject[] cardMarker;      // the red meeple: REPLAY plays this one
+    public GameObject[] cardBonus;       // the "1.5x" sticker: replaying this map pays it (PHGame.SlotBonus)
     public RectTransform[] cardRect;
     public Sprite[] sizeIcon;            // home, tavern, church, castle (the panel's MAP row)
 
@@ -36,7 +37,7 @@ public class PHHistory : UdonSharpBehaviour
     int snapSlot = -1; float snapAt; bool camOn;
     float fogStartWas, fogEndWas;
     int[] order = new int[12];
-    int[] shownSlot; int[] shownRuns; bool[] shownPhoto; bool[] shownPick; uint[] shownSeed;
+    int[] shownSlot; int[] shownRuns; bool[] shownPhoto; bool[] shownPick; uint[] shownSeed; bool[] shownBonus;
     float nextRefresh;
 
     // PHGame: this round's map is built; its photo is taken a moment later (the sun's shadows are baked first)
@@ -101,7 +102,7 @@ public class PHHistory : UdonSharpBehaviour
         int cards = cardFace.Length;
         if (shownSlot == null)
         {
-            shownSlot = new int[cards]; shownRuns = new int[cards]; shownPhoto = new bool[cards]; shownPick = new bool[cards]; shownSeed = new uint[cards];
+            shownSlot = new int[cards]; shownRuns = new int[cards]; shownPhoto = new bool[cards]; shownPick = new bool[cards]; shownSeed = new uint[cards]; shownBonus = new bool[cards];
             for (int i = 0; i < cards; i++) shownSlot[i] = -99;
         }
         int n = game.TrailOrder(order);
@@ -113,8 +114,9 @@ public class PHHistory : UdonSharpBehaviour
             int runs = slot >= 0 ? game.rotRuns[slot] : 0;
             bool photo = HasPhoto(slot);
             bool picked = slot >= 0 && slot == pick && i < 12;
-            if (slot == shownSlot[i] && seed == shownSeed[i] && runs == shownRuns[i] && photo == shownPhoto[i] && picked == shownPick[i]) continue;
-            shownSlot[i] = slot; shownSeed[i] = seed; shownRuns[i] = runs; shownPhoto[i] = photo; shownPick[i] = picked;
+            bool bonus = slot >= 0 && game.phase == PHGame.PH_LOBBY && game.SlotBonus(slot) > 0;
+            if (slot == shownSlot[i] && seed == shownSeed[i] && runs == shownRuns[i] && photo == shownPhoto[i] && picked == shownPick[i] && bonus == shownBonus[i]) continue;
+            shownSlot[i] = slot; shownSeed[i] = seed; shownRuns[i] = runs; shownPhoto[i] = photo; shownPick[i] = picked; shownBonus[i] = bonus;
             bool on = slot >= 0;
             if (cardFace[i].activeSelf != on) cardFace[i].SetActive(on);
             if (cardEmpty[i] != null && cardEmpty[i].activeSelf == on) cardEmpty[i].SetActive(!on);
@@ -122,6 +124,7 @@ public class PHHistory : UdonSharpBehaviour
             int size = Mathf.Clamp(game.rotSize[slot], 0, 3);
             cardSize[i].text = sizeCap[size];
             cardRuns[i].text = "x" + Mathf.Max(1, runs);
+            if (cardBonus != null && i < cardBonus.Length && cardBonus[i] != null && cardBonus[i].activeSelf != bonus) cardBonus[i].SetActive(bonus);
             if (cardPhoto[i].gameObject.activeSelf != photo) cardPhoto[i].gameObject.SetActive(photo);
             if (cardBlank[i].activeSelf == photo) cardBlank[i].SetActive(!photo);
             if (photo) cardPhoto[i].texture = shots[slot];

@@ -45,7 +45,8 @@ public class PHPanel : UdonSharpBehaviour
     // 4 discard, 5 unused (Cor: no retire button), 6 the REPLAY card, 7 scrap vote, 8 undo (a vote; the host's is at once),
     // 9 and 10 the arrows beside REPLAY (older, newer)
     public TextMeshProUGUI replayCaption;
-    public GameObject replayBadge;   // "1.5x COINS!!" on the REPLAY card while a map can be replayed (Cor)
+    public GameObject replayBadge;   // "1.5x COINS!!" on the REPLAY card while the picked map pays it (PHGame.SlotBonus)
+    public GameObject newBadge;      // "2x COINS!!" on the die while NEW MAP is on offer (PHGame.offerNew)
     public RectTransform[] hostButton;
     public Image[] hostButtonImage;
     public TextMeshProUGUI[] hostButtonText;
@@ -154,18 +155,6 @@ public class PHPanel : UdonSharpBehaviour
             if (!CanEdit || !game.CanReplay()) { Deny(-2 - k); return; }
             Queue(tick, 0f, k == 9 ? 0.9f : 1.1f);
             if (k == 9) game.PickOlder(); else game.PickNewer();
-        }
-        else if (k == 7)
-        {
-            if (!game.CanScrap()) { Deny(-9); return; }
-            Queue(select, 0f, 0.9f);
-            game.VoteScrap();
-        }
-        else if (k == 8)
-        {
-            if (!game.CanUndo()) { Deny(-10); return; }
-            Queue(select, 0f, 1.1f);
-            if (host) game.HostUndo(); else game.VoteUndo();
         }
         Refresh();
     }
@@ -367,7 +356,11 @@ public class PHPanel : UdonSharpBehaviour
         rollCaption.color = go ? new Color(0.13f, 0.34f, 0.25f) : new Color(0.6f, 0.54f, 0.41f);
         bool again = go && game.CanReplay();
         if (replayCaption != null) replayCaption.color = again ? new Color(0.13f, 0.34f, 0.25f) : new Color(0.6f, 0.54f, 0.41f);
-        if (replayBadge != null && replayBadge.activeSelf != game.CanReplay()) replayBadge.SetActive(game.CanReplay());
+        bool lobbyNow = game.phase == PHGame.PH_LOBBY;
+        bool b15 = lobbyNow && game.CanReplay() && game.SlotBonus(game.replayPick) > 0;
+        if (replayBadge != null && replayBadge.activeSelf != b15) replayBadge.SetActive(b15);
+        bool b2 = lobbyNow && game.offerNew;
+        if (newBadge != null && newBadge.activeSelf != b2) newBadge.SetActive(b2);
         if (hostButtonImage.Length > 10) { Fade(6, again); Fade(9, CanEdit && game.CanReplay()); Fade(10, CanEdit && game.CanReplay()); }
         if (hostName != null)
         {
@@ -414,10 +407,6 @@ public class PHPanel : UdonSharpBehaviour
             if (!seedInputRoot.activeSelf) seedInputRoot.SetActive(true);
             bool anyPick = pk >= 0 && pk < game.rotRuns.Length && game.rotSeed[pk] != 0;
             runsText.text = anyPick ? game.text.F1("maps.played", game.rotRuns[pk].ToString()) : "";
-            int need = game.VotesNeeded();
-            scrapText.text = game.text.F2("panel.scrapVotes", game.ScrapVotes().ToString(), need.ToString());
-            undoText.text = game.text.F2("panel.undoVotes", game.UndoVotes().ToString(), need.ToString());
-            Fade(7, game.CanScrap()); Fade(8, game.CanUndo());
         }
         bool lockOn = game.phase != PHGame.PH_LOBBY;
         if (veil.activeSelf != lockOn) veil.SetActive(lockOn);

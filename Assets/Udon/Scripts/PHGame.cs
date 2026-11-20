@@ -53,6 +53,39 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public uint undoSeed;
     [UdonSynced] public int undoRuns, undoDensity, undoSize, undoPlayed;
     public PHHistory history;                                 // the wall of played maps (takes the map's photo)
+    // ---- map bonuses (Cor, 2026-11-20; they replace the scrap and undo votes, whose code below is no longer
+    // called): coins for moving between maps and for going back to them. A map played once or twice always pays
+    // 1.5x. When a round ends the host rolls the next offer: one time in four NEW MAP pays 2x; otherwise up to three
+    // of the older maps (played three times or more) pay 1.5x. The panel and the wall show the offers; the round's
+    // own bonus is fixed when it starts (PHStore pays it).
+    [UdonSynced] public bool offerNew;                        // NEW MAP pays 2x
+    [UdonSynced] public int offerMask;                        // bit per trail slot: that map pays 1.5x
+    [UdonSynced] public int roundBonus;                       // this round: 0 none, 1 = 1.5x, 2 = 2x
+    public const float OFFER_NEW_CHANCE = 0.25f;
+
+    // what replaying the trail's map r pays: 1 (1.5x) or 0
+    public int SlotBonus(int r)
+    {
+        if (r < 0 || r >= TRAIL || rotSeed[r] == 0) return 0;
+        return rotRuns[r] == 1 || rotRuns[r] == 2 || ((offerMask >> r) & 1) != 0 ? 1 : 0;
+    }
+
+    void RollOffers()
+    {
+        offerMask = 0;
+        offerNew = Random.value < OFFER_NEW_CHANCE;
+        if (offerNew) return;
+        int[] old = new int[TRAIL];
+        int n = 0;
+        for (int r = 0; r < TRAIL; r++) if (rotSeed[r] != 0 && rotRuns[r] >= 3) old[n++] = r;
+        int want = Mathf.Min(n, Random.Range(1, 4));
+        for (int k = 0; k < want; k++)
+        {
+            int j = Random.Range(k, n);
+            int t = old[k]; old[k] = old[j]; old[j] = t;
+            offerMask |= 1 << old[k];
+        }
+    }
     [UdonSynced] public int voteId = 1;                       // votes count only for the current id (PHSlot.scrapVote/undoVote)
     public BoxCollider lobbyZone;
     public Transform lobbySpawn;
@@ -400,6 +433,7 @@ public class PHGame : UdonSharpBehaviour
     void Drop(int r)
     {
         rotSeed[r] = 0; rotRuns[r] = 0;
+        offerMask &= ~(1 << r);
         if (lastRot == r) lastRot = -1;
         if (replayPick == r)
         {
@@ -578,6 +612,7 @@ public class PHGame : UdonSharpBehaviour
         // THEME button's theme if one is chosen), into a slot of the trail; a code already on the trail is that map
         // again, with its runs.
         int r = -1;
+        bool fresh = false;   // a map nobody here has played (NEW MAP's 2x counts only for one)
         if (wantReplay && replayPick >= 0 && replayPick < TRAIL && rotSeed[replayPick] != 0) r = replayPick;
         else
         {
@@ -592,11 +627,16 @@ public class PHGame : UdonSharpBehaviour
             if (r < 0)
             {
                 r = FreeSlot();
+                offerMask &= ~(1 << r);   // (the slot's old map, if it was pushed off, takes its offer with it)
                 rotSeed[r] = s; rotRuns[r] = 0; rotDensity[r] = mapDensity; rotSize[r] = mapSize;
+                fresh = true;
             }
             pendingCode = ""; seedStatus = ""; seedNeedsConfirm = false;
         }
         wantReplay = false;
+        // the round's bonus, and the offers are spent (a debug round pays nothing and leaves them)
+        roundBonus = debugRound ? 0 : (fresh ? (offerNew ? 2 : 0) : SlotBonus(r));
+        if (!debugRound) { offerNew = false; offerMask = 0; }
         seed = rotSeed[r]; mapSize = rotSize[r]; mapDensity = rotDensity[r];
         mapEvo = EvoStep(rotRuns[r]); mapVar = rotRuns[r];
         lastRot = r; replayPick = r; rotPlayed[r] = round + 1;
@@ -836,7 +876,7 @@ public class PHGame : UdonSharpBehaviour
             PHSlot me = LocalSlot();
             if (me != null && me.readyRound != round && RoleOf(SlotOf(Networking.LocalPlayer.playerId)) != ROLE_NONE) me.ReportReady(round);
         }
-        if (IsHost) { HostSweep(); HostTick(); HostHandover(); HostVotes(); }
+        if (IsHost) { HostSweep(); HostTick(); HostHandover(); }   // (HostVotes: the scrap and undo votes are gone, Cor)
     }
 
     float nextReady;
@@ -886,8 +926,9 @@ public class PHGame : UdonSharpBehaviour
     void End(bool hiders, string why, bool clock)
     {
         hidersWin = hiders; endReason = why; timeUp = clock;
-        // the run counts (there is no cap: the host retires a map, or the players scrap it)
+        // the run counts (there is no cap), and the next round's bonus offer is rolled
         if (lastRot >= 0 && !debugRound) rotRuns[lastRot]++;
+        if (!debugRound) RollOffers();
         voteId++;
         SetPhase(PH_END, ROUND_END);
     }

@@ -275,6 +275,13 @@ public static partial class LobbyBuilder
             var bt2 = Txt(badge.transform, "Text", new Vector2(0, 1), new Vector2(116, 30), "1.5x COINS!!", rocket, 20, C("d8473a"), TextAlignmentOptions.Center);
             bt2.enableAutoSizing = true; bt2.fontSizeMin = 8f; bt2.fontSizeMax = 20f;
             panel.replayBadge = badge.gameObject;
+            // ...and now and then a new map pays 2x (Cor): the same sticker on the die's corner while it is on offer
+            var badge2 = Img(cv, "NewMapBonus", P(962, 46), new Vector2(120, 44), sRound, C("d8473a"), 3f);
+            badge2.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 8f);
+            Img(badge2.transform, "Face", Vector2.zero, new Vector2(112, 36), sRound, C("f2c45a"), 3f);
+            var bt3 = Txt(badge2.transform, "Text", new Vector2(0, 1), new Vector2(104, 30), "2x COINS!!", rocket, 20, C("d8473a"), TextAlignmentOptions.Center);
+            bt3.enableAutoSizing = true; bt3.fontSizeMin = 8f; bt3.fontSizeMax = 20f;
+            panel.newBadge = badge2.gameObject;
             for (int a = 0; a < 2; a++)
             {
                 var ab = Img(cv, a == 0 ? "Replay Older" : "Replay Newer", P(a == 0 ? 1029 : 1171, 104), new Vector2(24, 44), sRound, new Color(1f, 1f, 1f, 0.01f), 4f);
@@ -327,8 +334,7 @@ public static partial class LobbyBuilder
         panel.confirmRoot = confirm.gameObject;
         // the remaining bar buttons: k, label, centre x, width, colour, parent
         object[][] bar = {
-            new object[] { 3, "PLAY ANYWAY", 545f, 116f, C("9bd18a") }, new object[] { 4, "DISCARD", 662f, 104f, C("f19a8a") },
-            new object[] { 7, "SCRAP", 1002f, 124f, C("f19a8a") }, new object[] { 8, "UNDO", 1122f, 108f, C("7fb3e6") } };
+            new object[] { 3, "PLAY ANYWAY", 545f, 116f, C("9bd18a") }, new object[] { 4, "DISCARD", 662f, 104f, C("f19a8a") } };   // (SCRAP and UNDO are gone: Cor)
         foreach (var b in bar)
         {
             int k = (int)b[0]; float x = (float)b[2], w = (float)b[3];
@@ -343,8 +349,7 @@ public static partial class LobbyBuilder
             panel.hostButton[k] = bimg.rectTransform; panel.hostButtonImage[k] = face;
             hostTiles[k] = AddTile(bimg.gameObject, bt, -2 - k);
         }
-        panel.runsText = Txt(cv, "Runs", P(835, 530), new Vector2(110, 30), "", future, 13, Color.white, TextAlignmentOptions.Center);
-        panel.scrapText = panel.hostButtonText[7]; panel.undoText = panel.hostButtonText[8];
+        panel.runsText = Txt(cv, "Runs", P(1090, 530), new Vector2(160, 30), "", future, 13, Color.white, TextAlignmentOptions.Right);
         confirm.gameObject.SetActive(false);
 
         // sounds, for everyone near the panel
@@ -382,7 +387,7 @@ public static partial class LobbyBuilder
         int n = TrailCards + 1;
         h.cardFace = new GameObject[n]; h.cardEmpty = new GameObject[n]; h.cardPhoto = new RawImage[n]; h.cardBlank = new GameObject[n];
         h.cardBlankIcon = new Image[n]; h.cardSize = new TextMeshProUGUI[n]; h.cardRuns = new TextMeshProUGUI[n];
-        h.cardMarker = new GameObject[n]; h.cardRect = new RectTransform[n];
+        h.cardMarker = new GameObject[n]; h.cardRect = new RectTransform[n]; h.cardBonus = new GameObject[n];
         h.sizeIcon = new[] { Icon("home"), Icon("tavern"), Icon("church"), Icon("castle") };
         History = h;
         for (int i = 0; i < TrailCards; i++)
@@ -442,12 +447,22 @@ public static partial class LobbyBuilder
         var runs = Txt(card, "Runs", new Vector2(w / 2 - 9f * k - 30f * k, cy + 1f), new Vector2(60f * k, 22f * k), "x1", future, 15f * k, Ink, TextAlignmentOptions.Right);
         GameObject marker = null;
         if (onWall) marker = Img(card, "Marker", new Vector2(w / 2 - 10f, hgt / 2 + 6f), new Vector2(58, 58), Icon("meeple_hunt"), Color.white).gameObject;
+        // on the wall, a "1.5x" sticker on the corner of a map that pays it when replayed (the panel's card has the big one)
+        GameObject bonus = null;
+        if (onWall)
+        {
+            var bb = Img(card, "Bonus", new Vector2(-w / 2 + 30f, hgt / 2 - 2f), new Vector2(64, 28), sRound, C("d8473a"), 4f);
+            bb.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 8f);
+            Img(bb.transform, "Face", Vector2.zero, new Vector2(58, 22), sRound, C("f2c45a"), 4f);
+            Txt(bb.transform, "Text", new Vector2(0, 1), new Vector2(54, 20), "1.5x", rocket, 15, C("d8473a"), TextAlignmentOptions.Center);
+            bonus = bb.gameObject; bonus.SetActive(false);
+        }
         card.gameObject.SetActive(false); photo.gameObject.SetActive(false);
         if (marker != null) marker.SetActive(false);
         if (h != null)
         {
             h.cardFace[i] = card.gameObject; h.cardEmpty[i] = empty.gameObject; h.cardPhoto[i] = photo; h.cardBlank[i] = blank.gameObject;
-            h.cardBlankIcon[i] = icon; h.cardSize[i] = size; h.cardRuns[i] = runs; h.cardMarker[i] = marker; h.cardRect[i] = card;
+            h.cardBlankIcon[i] = icon; h.cardSize[i] = size; h.cardRuns[i] = runs; h.cardMarker[i] = marker; h.cardRect[i] = card; h.cardBonus[i] = bonus;
         }
         return face;
     }
