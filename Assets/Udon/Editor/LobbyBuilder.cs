@@ -1046,29 +1046,19 @@ public static partial class LobbyBuilder
 
         // giant pieces (feet on the floor; sizes are the largest dimension in metres)
         Piece(root, "board-game-bits/D6_A_red", L(19.6f, 2.6f), 2.3f, 20f, true);   // a step off the north wall (Cor), clear of the weapon wall's panel and the score pad
-        Piece(root, "board-game-bits/D20_blue", L(17.3f, 19.4f), 1.8f, -15f, true);   // a step off the south wall (Cor)
-        Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(2.4f, 5.0f), 1, 1.4f);
+        // the rest spread around the room's floor (Cor: not bunched up along the south wall), clear of the PLAY mat,
+        // the track along the walls, the weapon wall's walkway and the spawn's path
+        Piece(root, "board-game-bits/D20_blue", L(17.5f, 17.0f), 1.8f, -15f, true);
+        Stack(root, L(2.6f, 2.2f), 3, 1.6f); Stack(root, L(4.6f, 3.4f), 2, 1.5f); Stack(root, L(4.2f, 9.2f), 1, 1.4f);
         Piece(root, "furniture-bits/couch_pillows", L(5.6f, 15.0f), 2.6f, 270f, true);   // facing the Trophies board
         Piece(root, "furniture-bits/armchair", L(5.6f, 18.3f), 1.5f, 270f, true);
         Piece(root, "furniture-bits/lamp_standing", L(6.3f, 16.9f), 2.4f, 0f, false);
-        Piece(root, "board-game-bits/pawn_A_blue", L(9.2f, 20.3f), 2.4f, 0f, true);
-        Piece(root, "board-game-bits/flag_A_red", L(14.8f, 20.3f), 2.6f, 200f, true);
-        Piece(root, "board-game-bits/domino_tile_6-6", L(19.4f, 19.5f), 2.4f, 25f, true);
+        Piece(root, "board-game-bits/pawn_A_blue", L(8.6f, 12.8f), 2.4f, 0f, true);
+        Piece(root, "board-game-bits/flag_A_red", L(16.2f, 14.2f), 2.6f, 200f, true);
+        Piece(root, "board-game-bits/domino_tile_6-6", L(19.2f, 12.6f), 2.4f, 25f, true);
         Piece(root, "furniture-bits/cactus_medium_A", L(18.6f, 21.2f), 1.6f, 0f, true);
         Piece(root, "furniture-bits/lamp_standing", L(20.2f, 21.3f), 2.4f, 0f, false);
-        Piece(root, "board-game-bits/meeple_blue", L(18.8f, 9.0f), 1.7f, -30f, true);
-        // the old prop shelf's pieces, spread around the room on the floor (Cor): clear of the PLAY mat, the track
-        // along the walls, the weapon wall's walkway and the spawn's path
-        Piece(root, "kaykit-dungeon-pack/chest", L(6.0f, 6.6f), 1.1f, 25f, true);
-        Piece(root, "kaykit-dungeon-pack/barrel_small", L(3.4f, 6.2f), 0.9f, 0f, true);
-        Piece(root, "kaykit-dungeon-pack/box_small", L(5.0f, 9.5f), 0.8f, -20f, true);
-        Piece(root, "furniture-bits/chair_stool_wood", L(5.6f, 12.6f), 0.8f, 10f, true);
-        Piece(root, "furniture-bits/book_set", L(8.0f, 13.5f), 0.6f, 35f, true);
-        Piece(root, "furniture-bits/lamp_table", L(6.6f, 19.4f), 0.7f, 0f, true);
-        Piece(root, "furniture-bits/cactus_medium_A", L(19.5f, 13.0f), 1.0f, 0f, true);
-        Piece(root, "board-game-bits/coin_gold", L(20.6f, 14.0f), 1.0f, 30f, true);
-        Piece(root, "furniture-bits/armchair", L(19.8f, 15.6f), 0.9f, 90f, true);
-        Piece(root, "kaykit-dungeon-pack/barrel_small", L(15.6f, 15.2f), 0.9f, 0f, true);
+        Piece(root, "board-game-bits/meeple_blue", L(18.8f, 6.6f), 1.7f, -30f, true);
 
         // the two standing lamps light the room around them (Point Light Volumes: Cor, VRC Light Volumes); the shelf's
         // small lamps get a faint glow
