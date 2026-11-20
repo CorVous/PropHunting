@@ -104,7 +104,7 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int i = 0; i < pins.Length; i++)
         {
             if (!pins[i].gameObject.activeSelf) continue;
-            Transform t = pinLabel[i].transform;
+            Transform t = pins[i].GetChild(pins[i].childCount - 1);   // (the name: the pin's last child; a TextMeshPro's transform is not exposed to Udon)
             Vector3 d = t.position - eye; d.y = 0f;
             if (d.sqrMagnitude > 1e-4f) t.rotation = Quaternion.LookRotation(d, Vector3.up);
         }
