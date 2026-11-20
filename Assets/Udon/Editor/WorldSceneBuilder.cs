@@ -24,6 +24,8 @@ public static class WorldSceneBuilder
     // 5 cm up so its floor does not fight the map's ground plane, which reaches out under it
     static readonly Vector3 LobbyOrigin = new Vector3(-170f, 0.05f, -170f);
     const float RoomW = 24f, RoomD = 22f, WallH = 7f, ZoneHalf = 5.5f;
+    static readonly Vector3 MiniMapAt = new Vector3(6.8f, 0f, -6.0f);   // the LAST ROUND easel, lobby space (centre of the room at 0, north +z)
+    const float MiniMapYaw = 131f;                                         // its face turned towards the room's middle
     const int SLOTS = 32;
 
     // the credits board alone, after CREDITS.md changes (the open scene's lobby keeps everything else)
@@ -290,6 +292,8 @@ public static class WorldSceneBuilder
         BuildCredits(lobby.transform);
         // the language board: a lectern ahead and right of the spawn disc, turned towards it
         LobbyBuilder.BuildLanguageBoard(lobby.transform, game, new Vector3(2.7f, 0f, -RoomD / 2 + 3.6f), 28f);
+        // the LAST ROUND board (Cor, item 40: a mini map with paths and stats), a free-standing easel: move it here
+        LobbyBuilder.BuildMiniMap(lobby.transform, game, builder, MiniMapAt, MiniMapYaw);
 
         // the DEBUG plaque (explore a map, spawn as hunter / hider, end round, theme) and the profiler on a sign standing
         // left of the spawn, the language board's twin (Cor: no wall space for debug); the scripts the profiler watches:
