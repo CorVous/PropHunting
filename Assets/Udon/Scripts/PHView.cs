@@ -63,6 +63,9 @@ public class PHView : UdonSharpBehaviour
     Material outlineMat;               // ...and otherwise (the pieces' own, as built)
     public Transform grabRing;         // unit radius, flat; scaled to RING_R and put round the seat while hiding (VR)
     public Material ringIdle, ringHeld;
+    public Transform[] ringHands;       // the hand icons on the ring: they pulse until this player's first grab of it this session
+    Vector3[] ringHandScale;
+    bool ringGrabbedOnce;
     // the final stand (group playtest: hiders did not know when the gun shoots): the hider's own gun burns while it can
     // shoot, flames at its muzzle, VR and desktop; nobody else sees them
     public ParticleSystem gunFire;
@@ -136,6 +139,11 @@ public class PHView : UdonSharpBehaviour
         {
             ringRenderers = grabRing.GetComponentsInChildren<MeshRenderer>(true);
             grabRing.gameObject.SetActive(false);
+            if (ringHands != null)
+            {
+                ringHandScale = new Vector3[ringHands.Length];
+                for (int i = 0; i < ringHands.Length; i++) if (ringHands[i] != null) ringHandScale[i] = ringHands[i].localScale;
+            }
         }
         if (outlineParts != null)
         {
@@ -189,6 +197,7 @@ public class PHView : UdonSharpBehaviour
             if (b.NearRing(hand, AvatarScale(), me.GetAvatarEyeHeightAsMeters()))
             {
                 b.ringHand = h;
+                if (!ringGrabbedOnce) { ringGrabbedOnce = true; PulseRingHands(1f); }
                 me.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.06f, 0.7f, 120f);
             }
         }
@@ -863,6 +872,12 @@ public class PHView : UdonSharpBehaviour
         TauntButton(me, held, panelPos, panelRot, one, sc, lh, rh);
     }
 
+    void PulseRingHands(float k)
+    {
+        if (ringHands == null || ringHandScale == null) return;
+        for (int i = 0; i < ringHands.Length && i < ringHandScale.Length; i++) if (ringHands[i] != null) ringHands[i].localScale = ringHandScale[i] * k;
+    }
+
     // the grab ring round the seat (the station: the prop's place and the seat's lag), level, at hip height
     void PlaceRing(VRCPlayerApi me, float sc)
     {
@@ -871,6 +886,7 @@ public class PHView : UdonSharpBehaviour
         grabRing.SetPositionAndRotation(b.RingCentre(eye), Quaternion.Euler(0f, b.stationYaw, 0f));   // (its hand icons in front)
         grabRing.localScale = Vector3.one * (PHHiderBody.RING_R * sc);
         bool held = b.ringHand >= 0;
+        if (!ringGrabbedOnce) PulseRingHands(1f + 0.35f * (0.5f + 0.5f * Mathf.Sin(Time.time * 5f)));   // (a gentle beat: grab here)
         if (held != ringIsHeld && ringRenderers != null && ringIdle != null && ringHeld != null)
         {
             ringIsHeld = held;

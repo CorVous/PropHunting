@@ -492,10 +492,12 @@ public static class WorldSceneBuilder
         }
         // two hands on the ring in front (Cor: hand icons, so it is clear it is grabbed), left and right of straight
         // ahead, upright, facing in; built in the ring's own units (radius 1)
+        view.ringHands = new Transform[2];
         for (int side = -1; side <= 1; side += 2)
         {
             float a = side * 38f;
             var hand = Empty(ring, side < 0 ? "HandLeft" : "HandRight");
+            view.ringHands[side < 0 ? 0 : 1] = hand;   // (they pulse until the player's first grab: PHView)
             hand.localPosition = Quaternion.Euler(0f, a, 0f) * Vector3.forward + Vector3.up * 0.16f;
             hand.localRotation = Quaternion.Euler(0f, a, 0f);
             hand.localScale = new Vector3(-side, 1f, 1f);   // (mirrored: thumbs towards the middle)
