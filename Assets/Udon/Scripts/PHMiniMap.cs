@@ -201,7 +201,7 @@ public class PHMiniMap : UdonSharpBehaviour
             if (roleOf[i] == PHGame.ROLE_HUNTER) line = game.text.F2("mini.hunter", metres, catches[i].ToString());
             else if (caughtAt[i] >= 0f) line = game.text.F2("mini.caught", metres, Clock(caughtAt[i]));
             else line = game.text.F1("mini.survived", metres);
-            text += "<color=#" + hex + ">■</color> " + Clean(nameOf[i]) + "  <color=#B8AE98>" + line + "</color>\n";
+            text += "<color=#" + hex + ">" + Clean(nameOf[i]) + "</color>  <color=#B8AE98>" + line + "</color>\n";
         }
         list.text = text;
     }
