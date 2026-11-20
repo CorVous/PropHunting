@@ -10,7 +10,7 @@ Shader "PropHunt/ShelfWeapon"
         _Fade ("Dithered brightness", Range(0, 1)) = 0.8
         _Glow ("Glowing", Float) = 0
         _GlowColor ("Glow colour", Color) = (1, 0.82, 0.35, 1)
-        _Halo ("Halo width (m)", Float) = 0.012
+        _Halo ("Halo width (m)", Float) = 0.016
     }
     SubShader
     {
@@ -78,7 +78,7 @@ Shader "PropHunt/ShelfWeapon"
                 {
                     float rim = 1.0 - saturate(abs(dot(n, normalize(i.view))));
                     float pulse = 0.75 + 0.25 * sin(_Time.y * 3.0);
-                    col = col * 1.15 + _GlowColor.rgb * (0.12 + rim * rim * 1.1) * pulse;
+                    col = col * 1.2 + _GlowColor.rgb * (0.18 + rim * rim * 1.4) * pulse;
                 }
                 fixed4 o = fixed4(col, 1);
                 UNITY_APPLY_FOG(i.fogCoord, o);

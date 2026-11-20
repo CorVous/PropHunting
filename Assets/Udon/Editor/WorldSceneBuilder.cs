@@ -274,7 +274,7 @@ public static class WorldSceneBuilder
         // the DEBUG plaque (explore a map, spawn as hunter / hider, end round, theme) and the profiler on a sign standing
         // left of the spawn, the language board's twin (Cor: no wall space for debug); the scripts the profiler watches:
         // every one that runs each frame
-        var prof = LobbyBuilder.BuildDebugSign(lobby.transform, game, new Vector3(-2.9f, 0f, -RoomD / 2 + 3.6f), -28f);
+        var prof = LobbyBuilder.BuildDebugSign(lobby.transform, game, new Vector3(-3.0f, 0f, -RoomD / 2 + 4.4f), -28f);   // (clear of the blue pawn behind it)
         {
             string[] names = { "PHGame", "PHLocal", "PHSlot", "PHHiderBody", "PHKnock", "PHLamps", "PHLobbyCull", "PHPanel", "PHScorePad", "PHSun", "PHView", "PHDoors", "PHWeapons", "MapBuilderUdon" };
             var list = new System.Collections.Generic.List<UdonSharp.UdonSharpBehaviour>();

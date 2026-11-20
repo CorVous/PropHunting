@@ -28,6 +28,7 @@ public class PHShelf : UdonSharpBehaviour
     public MeshFilter[] itemMf;
     public MeshRenderer[] itemMr;
     public GameObject[] tagShop, tagCool, tagGoofy;
+    public GameObject[] glow;        // the warm pool of light under the carried weapon (with the shader's _Glow)
     public TextMeshPro[] price;
     public float baseY = 0.9f, rowH = 0.62f;
 
@@ -113,6 +114,7 @@ public class PHShelf : UdonSharpBehaviour
             bool shop = any && !own && !trophy && cat == PHStore.CAT_SHOP;
             tagShop[k].SetActive(shop);
             if (shop) price[k].text = store.wPrice[c].ToString();
+            glow[k].SetActive(m != null && store.Picked(c));
             tagCool[k].SetActive(trophy && cat != PHStore.CAT_GOOFY);
             tagGoofy[k].SetActive(trophy && cat == PHStore.CAT_GOOFY);
         }

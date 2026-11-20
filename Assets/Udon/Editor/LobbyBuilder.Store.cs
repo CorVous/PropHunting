@@ -206,7 +206,8 @@ public static partial class LobbyBuilder
         int slots = roots * Cols;
         shelf.items = new Transform[slots]; shelf.itemMf = new MeshFilter[slots]; shelf.itemMr = new MeshRenderer[slots];
         shelf.tagShop = new GameObject[slots]; shelf.tagCool = new GameObject[slots]; shelf.tagGoofy = new GameObject[slots];
-        shelf.price = new TextMeshPro[slots];
+        shelf.price = new TextMeshPro[slots]; shelf.glow = new GameObject[slots];
+        var glowMat = GlowPadMat();
         for (int r = 0; r < roots; r++)
         {
             var row = new GameObject("Row" + r).transform;
@@ -246,13 +247,21 @@ public static partial class LobbyBuilder
                 float lipZ = Depth / 2f + 0.005f;
                 var shop = new GameObject("PriceTag").transform; shop.SetParent(place, false);
                 Slab(shop, "Tag", new Vector3(0f, -0.03f, lipZ), new Vector3(0.22f, 0.075f, 0.012f), felt);
-                MapCoin(shop, new Vector3(-0.075f, -0.03f, lipZ + 0.012f), 0.06f, true);
-                var pt = WorldText(shop, "Price", new Vector3(0.025f, -0.03f, lipZ + 0.008f), Quaternion.Euler(0f, 180f, 0f), "200", 0.6f, C("f6d773"), new Vector2(0.16f, 0.07f));
+                MapCoin(shop, new Vector3(0.075f, -0.03f, lipZ + 0.012f), 0.06f, true);   // the coin first, as in the mock-up (+x: the player's left)
+                var pt = WorldText(shop, "Price", new Vector3(-0.025f, -0.03f, lipZ + 0.008f), Quaternion.Euler(0f, 180f, 0f), "200", 0.6f, C("f6d773"), new Vector2(0.16f, 0.07f));
                 pt.font = future;
                 shelf.tagShop[k] = shop.gameObject; shelf.price[k] = pt;
                 shelf.tagCool[k] = StarTag(place, "CoolTag", lipZ, yellow);
                 shelf.tagGoofy[k] = StarTag(place, "GoofyTag", lipZ, coral);
-                shop.gameObject.SetActive(false); shelf.tagCool[k].SetActive(false); shelf.tagGoofy[k].SetActive(false);
+                var pad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                pad.name = "Glow"; pad.transform.SetParent(place, false);
+                pad.transform.localPosition = new Vector3(0f, 0.004f, 0f); pad.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                pad.transform.localScale = new Vector3(SlotW + 0.1f, Depth - 0.1f, 1f);
+                Object.DestroyImmediate(pad.GetComponent<Collider>());
+                var pr = pad.GetComponent<MeshRenderer>(); pr.sharedMaterial = glowMat;
+                pr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; pr.receiveShadows = false;
+                shelf.glow[k] = pad;
+                shop.gameObject.SetActive(false); shelf.tagCool[k].SetActive(false); shelf.tagGoofy[k].SetActive(false); pad.SetActive(false);
             }
         }
 
@@ -487,6 +496,16 @@ public static partial class LobbyBuilder
         return m;
     }
 
+    static Material GlowPadMat()
+    {
+        const string path = "Assets/Udon/Generated/StoreGlow.mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        var sh = Shader.Find("PropHunt/GlowPad");
+        if (m == null) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
+        m.shader = sh; EditorUtility.SetDirty(m);
+        return m;
+    }
+
     static Material ShelfMat()
     {
         const string path = "Assets/Udon/Generated/ShelfWeapon.mat";
@@ -516,7 +535,7 @@ public static partial class LobbyBuilder
         Txt(buy.transform, "Question", new Vector2(-24, 44), new Vector2(300, 44), Get(text, "store.confirm"), future, 28, C("f6d773"), TextAlignmentOptions.Center);
         var bb = StoreButton(buy.transform, dlg, "BuyPress", new Vector2(0, -36), new Vector2(190, 76), C("d8473a"), "", Color.white);
         dlg.buyButton = bb;
-        Img(bb.transform, "Coin", new Vector2(-56, 2), new Vector2(36, 36), sRound, C("f2c45a"), 4f);
+        Img(bb.transform, "Coin", new Vector2(-56, 2), new Vector2(36, 36), sRound, C("f2c45a"), 0.7f);   // round
         dlg.priceText = Txt(bb.transform, "Price", new Vector2(16, 3), new Vector2(110, 50), "200", future, 34, Color.white, TextAlignmentOptions.Center);
 
         var tro = Rect(cv, "Trophy", Vector2.zero, new Vector2(380, 200)).gameObject;
