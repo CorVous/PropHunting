@@ -267,12 +267,13 @@ public static partial class LobbyBuilder
             panel.hostButton[6] = bimg.rectTransform;
             panel.hostButtonImage[6] = MapCard(bimg.transform, History, 12, Vector2.zero, 112f, false);
             hostTiles[6] = AddTile(bimg.gameObject, bt, -8);
-            // a map played again pays 1.5x the coins (Cor): a big sticker on the REPLAY card while there is one
-            var badge = Img(cv, "ReplayBonus", P(1112, 40), new Vector2(270, 92), sRound, C("d8473a"), 3f);
-            badge.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -10f);
-            Img(badge.transform, "Face", Vector2.zero, new Vector2(258, 80), sRound, C("f2c45a"), 3f);
-            var bt2 = Txt(badge.transform, "Text", new Vector2(0, 2), new Vector2(246, 72), "1.5x COINS!!", rocket, 40, C("d8473a"), TextAlignmentOptions.Center);
-            bt2.enableAutoSizing = true; bt2.fontSizeMin = 16f; bt2.fontSizeMax = 40f;
+            // a map played again pays 1.5x the coins (Cor): a sticker on the REPLAY card's corner while there is one (Cor:
+            // the first, 270 x 92, was too big: it covered the card and stuck out past the panel)
+            var badge = Img(cv, "ReplayBonus", P(1108, 46), new Vector2(132, 44), sRound, C("d8473a"), 3f);
+            badge.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -8f);
+            Img(badge.transform, "Face", Vector2.zero, new Vector2(124, 36), sRound, C("f2c45a"), 3f);
+            var bt2 = Txt(badge.transform, "Text", new Vector2(0, 1), new Vector2(116, 30), "1.5x COINS!!", rocket, 20, C("d8473a"), TextAlignmentOptions.Center);
+            bt2.enableAutoSizing = true; bt2.fontSizeMin = 8f; bt2.fontSizeMax = 20f;
             panel.replayBadge = badge.gameObject;
             for (int a = 0; a < 2; a++)
             {
