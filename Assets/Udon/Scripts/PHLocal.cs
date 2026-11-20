@@ -488,9 +488,7 @@ public class PHLocal : UdonSharpBehaviour
         if (vr && role == PHGame.ROLE_HIDER)
         {
             int h = args.handType == VRC.Udon.Common.HandType.LEFT ? 0 : 1;
-            // a trigger with the hand at the screen's button presses it (Cor: the button was hard to press); one at
-            // the grab ring takes hold of it (Cor: the ring with the trigger too)
-            // (the right hand on the ring only while its laser is on no prop it could pick: aimed at one, it picks)
+            // a trigger with the hand at the screen's button presses it (Cor: the button was hard to press)
             // (the ring only by a grip, PHView: Cor wants the trigger kept for shooting and picking)
             if (TriggerButton(h)) return;
             if (h == 1) TriggerDown();
@@ -511,12 +509,6 @@ public class PHLocal : UdonSharpBehaviour
         else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT && !vr && weapons != null) weapons.DesktopSwing();
     }
 
-    // ---- a VR hider's right trigger (Cor): a tap picks the prop aimed at (in the final stand, fires); held past
-    // HOLD_TIME it grabs the prop, which then turns with the hand and with the player until it is let go
-    // (PHHiderBody.turnHeld). With nothing aimed at (before the final stand), the press grabs at once.
-    public const float HOLD_TIME = 0.25f;
-    bool triggerDown, grabbing;
-    float triggerAt;
 
     bool[] ringByTrigger = new bool[2];
 
@@ -573,17 +565,9 @@ public class PHLocal : UdonSharpBehaviour
         return VrAimPos() + VrAimRot() * Vector3.forward * len;
     }
 
+    // the right trigger only picks and shoots, at once on the pull (Cor: turning is the grab ring's alone, by a grip)
     void TriggerDown()
     {
-        triggerDown = true; triggerAt = Time.time; grabbing = false;
-        if (!game.Endgame && hoverObj == null) StartGrab();
-    }
-
-    void TriggerUp()
-    {
-        if (!triggerDown) return;
-        triggerDown = false;
-        if (grabbing) { grabbing = false; body.turnHeld = false; return; }
         int phase = game.phase;
         if (role != PHGame.ROLE_HIDER || !(phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT)) return;
         if (game.Endgame) { HiderShoot(); return; }
@@ -591,18 +575,9 @@ public class PHLocal : UdonSharpBehaviour
         TryTakeDisguise();
     }
 
-    void StartGrab()
-    {
-        grabbing = true;
-        body.turnHeld = body.active;
-    }
+    void TriggerUp() { }
 
-    void UpdateTrigger()
-    {
-        if (!triggerDown) { if (body.turnHeld) body.turnHeld = false; return; }
-        if (!grabbing && Time.time - triggerAt >= HOLD_TIME) StartGrab();
-        if (grabbing) body.turnHeld = body.active;   // (a grab that began before there was a prop takes hold once there is one)
-    }
+    void UpdateTrigger() { if (body.turnHeld) body.turnHeld = false; }
 
     // a hider still without a prop in the hunt (the phase change came before their slot, or the pick there failed)
     // gets the random one where they stand; looked at twice a second
@@ -615,7 +590,6 @@ public class PHLocal : UdonSharpBehaviour
         if (s != null && s.def < 0 && !s.caught && !s.ghost) StartingDisguise();
     }
 
-    public bool Grabbing() { return grabbing && body.turnHeld; }
 
     // VR: the grips work doors (a hider taunts with the button on the screen device, PHView; desktop: T)
     public override void InputGrab(bool value, VRC.Udon.Common.UdonInputEventArgs args)
