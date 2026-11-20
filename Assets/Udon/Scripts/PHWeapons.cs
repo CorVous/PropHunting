@@ -404,12 +404,21 @@ public class PHWeapons : UdonSharpBehaviour
         held[i].localScale = Vector3.one * sc;
         if (me.IsUserInVR())
         {
-            if (HandPose(me)) held[i].SetPositionAndRotation(handPos, handMelee);
+            Vector3 vAt; Quaternion r;
+            if (HandPose(me)) { vAt = handPos; r = handMelee; }
             else
             {
                 VRCPlayerApi.TrackingData rh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);
-                held[i].SetPositionAndRotation(rh.position, rh.rotation * Quaternion.Euler(handEuler));
+                vAt = rh.position; r = rh.rotation * Quaternion.Euler(handEuler);
             }
+            // a trigger slash (DesktopSwing): the weapon chops in the hand, and strikes as it comes down
+            float tv = Time.time - mySwingAt;
+            if (tv >= 0f && tv < SWING_TIME)
+            {
+                r = r * Quaternion.Euler(Chop(tv), 0f, 0f);
+                if (!mySwingStruck && tv >= SWING_HIT_AT) { mySwingStruck = true; local.MeleeDesktopStrike(); }
+            }
+            held[i].SetPositionAndRotation(vAt, r);
             VrSwing(i, model, sc);
             return;
         }
@@ -462,7 +471,8 @@ public class PHWeapons : UdonSharpBehaviour
         mySwingStruck = false;
         int mine = game.SlotOf(Networking.LocalPlayer.playerId);
         if (mine >= 0) { trailUntil[mine] = Time.time + SWING_HIT_AT + 0.12f; }
-        return true;   // (no swing sound: Cor's group playtest, only hits are heard)
+        sound.Play(Random.Range(0, 2) == 0 ? "knifeSlice" : "knifeSlice2", 0.55f);   // (a clicked slash is heard, Cor; a VR hand swing is not)
+        return true;
     }
 
     // VR: the head of the weapon sweeps; a fast enough sweep strikes the first thing it passes through

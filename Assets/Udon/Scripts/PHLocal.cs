@@ -505,8 +505,10 @@ public class PHLocal : UdonSharpBehaviour
                 TryTakeDisguise();
             }
         }
-        // a hunter: desktop clicks to slash (PHWeapons strikes as the weapon comes across); VR swings the hand instead
-        else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT && !vr && weapons != null) weapons.DesktopSwing();
+        // a hunter: a click (desktop) or the right trigger (VR) slashes, and strikes what lies within reach in front of
+        // the eyes as the weapon comes across (Cor: in VR too, low things were hard to reach by swinging); VR can also
+        // swing the hand itself
+        else if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT && weapons != null) weapons.DesktopSwing();
     }
 
     // ---- a VR hider's right trigger (Cor): a tap picks the prop aimed at (in the final stand, fires); held past
