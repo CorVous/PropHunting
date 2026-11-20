@@ -51,7 +51,7 @@ public class PHMiniMap : UdonSharpBehaviour
     GameObject[] mapProp; bool[] mapUpper; int nMapProp, propNext = 99999;
     bool upperOn = true;
     int solo = -1;                       // the one player shown alone, -1 everyone
-    const float LONG_STAY = 15f, UPPER_Y = 2.0f, CLIP_Y = 2.9f;
+    const float LONG_STAY = 15f, UPPER_Y = 2.0f, CLIP_Y = 2.45f;   // (the cut under the slab between floors: the lowest walls stand 2.6 m)
     const int MAX_MAP_PROPS = 400;
     Color[] palette;
 
@@ -104,8 +104,9 @@ public class PHMiniMap : UdonSharpBehaviour
         if (show && shownRound != recRound) { shownRound = recRound; FillList(); drawNext = 0; ClearProps(); }
         if (content.activeSelf != show) Show(show);
         // Perf: a path or a prop a frame (all at once was a hitch at END)
-        if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; if (drawNext >= paths.Length) { propNext = 0; Apply(); } }
+        if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; if (drawNext >= paths.Length) { propNext = 0; fenceNext = 0; Apply(); } }
         else if (show && builder.objects != null && propNext < builder.objects.Length) PlaceMapProps();
+        else if (show && builder.fenceRoot != null && fenceNext < builder.fenceRoot.childCount) PlaceFences();
         if (show) FaceLabels();
     }
 
@@ -212,11 +213,24 @@ public class PHMiniMap : UdonSharpBehaviour
         origin = builder.transform.position + new Vector3(w * 0.5f, 0f, d * 0.5f);
         float k = tableSize / Mathf.Max(8f, Mathf.Max(w, d));
         model.localScale = new Vector3(k, k, k);
-        // (not the ground: its mesh runs hundreds of metres past the map. The table's felt is the ground)
-        if (dioGround != null) dioGround.gameObject.SetActive(false);
+        // the ground (floors indoors too): its mesh runs hundreds of metres past the map, so the diorama's material
+        // keeps only the map's rectangle (Cor: the floors)
+        Place(dioGround, builder.groundFilter);
+        siteW = w; siteD = d;
+        SetBox();
         Place(dioWalls, builder.wallsFilter);
         // (no scenery tiles: they run past the map's edge, Cor: only the game area)
         for (int i = 0; i < dioScenery.Length; i++) dioScenery[i].gameObject.SetActive(false);
+    }
+
+    float siteW, siteD;
+
+    void SetBox()
+    {
+        if (dioMat == null) return;
+        float k = model.localScale.x;
+        Vector3 c = model.position;
+        dioMat.SetVector("_Box", new Vector4(c.x - siteW * 0.5f * k, c.z - siteD * 0.5f * k, c.x + siteW * 0.5f * k, c.z + siteD * 0.5f * k));
     }
 
     void Place(MeshFilter dio, MeshFilter src)
@@ -236,6 +250,8 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int i = 0; i < shownProp.Length; i++) if (shownProp[i] != null) { Destroy(shownProp[i]); shownProp[i] = null; }
         for (int i = 0; i < nMapProp; i++) if (mapProp[i] != null) { Destroy(mapProp[i]); mapProp[i] = null; }
         nMapProp = 0; propNext = 99999; solo = -1;
+        for (int i = 0; i < nFence; i++) if (fence[i] != null) { Destroy(fence[i]); fence[i] = null; }
+        nFence = 0; fenceNext = 99999;
         for (int i = 0; i < pins.Length; i++) { pins[i].gameObject.SetActive(false); pinLabel[i].text = ""; }
         for (int i = 0; i < paths.Length; i++) paths[i].gameObject.SetActive(false);
     }
@@ -333,6 +349,47 @@ public class PHMiniMap : UdonSharpBehaviour
 #endif
     }
 
+    // the map's fences, as they stand (Cor: include the fences), a few a frame; only those on the map itself
+    GameObject[] fence = new GameObject[300];
+    int nFence, fenceNext = 99999;
+
+    void PlaceFences()
+    {
+        Transform root = builder.fenceRoot;
+        for (int n = 0; n < 8 && fenceNext < root.childCount; fenceNext++)
+        {
+            if (nFence >= FenceCap()) { fenceNext = root.childCount; break; }
+            Transform src = root.GetChild(fenceNext);
+            Vector3 at = src.position - origin;
+            if (Mathf.Abs(at.x) > siteW * 0.5f + 0.5f || Mathf.Abs(at.z) > siteD * 0.5f + 0.5f) continue;
+            GameObject go = Instantiate(src.gameObject);
+            Transform t = go.transform;
+            t.SetParent(model, false);
+            t.localPosition = at;
+            t.localRotation = src.rotation;
+            t.localScale = src.lossyScale;
+            Collider[] cols = go.GetComponentsInChildren<Collider>(true);
+            for (int q = 0; q < cols.Length; q++) cols[q].enabled = false;
+            // (the map's pieces have their renderers off: the merged scenery draws them)
+            MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
+            for (int q = 0; q < rs.Length; q++) rs[q].enabled = true;
+            Transform[] parts = go.GetComponentsInChildren<Transform>(true);
+            for (int q = 0; q < parts.Length; q++) parts[q].gameObject.layer = 0;
+            go.SetActive(true);
+            fence[nFence++] = go;
+            n++;
+        }
+    }
+
+    int FenceCap()
+    {
+#if UNITY_ANDROID
+        return 60;
+#else
+        return 300;
+#endif
+    }
+
     // the buttons: the upper floors on or off; everyone, or one player alone (each press the next one)
     public void ToggleUpper() { upperOn = !upperOn; Apply(); }
 
@@ -351,6 +408,7 @@ public class PHMiniMap : UdonSharpBehaviour
     void Apply()
     {
         if (dioMat != null) dioMat.SetFloat("_ClipY", upperOn ? 100000f : model.position.y + CLIP_Y * model.localScale.x);
+        SetBox();
         for (int i = 0; i < paths.Length; i++)
         {
             bool mine = solo < 0 || solo == i;

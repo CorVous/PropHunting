@@ -39,13 +39,13 @@ public static partial class LobbyBuilder
 
         // the map's meshes go into these (the builder's own material); the scenery tiles too
         Material mapMat = builder.wallsFilter != null ? builder.wallsFilter.GetComponent<MeshRenderer>().sharedMaterial : wood;
-        mm.dioGround = Holder(model.transform, "Ground", mapMat);
         // the walls in their own material (PropHunt/Diorama): cut above the ground floor when the upper floors are off
         var dioMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/Diorama.mat");
         if (dioMat == null) { dioMat = new Material(Shader.Find("PropHunt/Diorama")) { name = "Diorama" }; AssetDatabase.CreateAsset(dioMat, "Assets/Udon/Generated/Diorama.mat"); }
-        dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
+        dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.SetVector("_Box", new Vector4(-100000f, -100000f, 100000f, 100000f)); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
         mm.dioMat = dioMat;
         mm.dioWalls = Holder(model.transform, "Walls", dioMat);
+        mm.dioGround = Holder(model.transform, "Ground", dioMat);   // (cut to the map's rectangle by the same material)
         mm.dioScenery = new MeshFilter[16];
         for (int i = 0; i < mm.dioScenery.Length; i++) mm.dioScenery[i] = Holder(model.transform, "Scenery" + i, mapMat);
 
