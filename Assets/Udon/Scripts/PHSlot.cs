@@ -677,7 +677,7 @@ public class PHSlot : UdonSharpBehaviour
     int sitTries;
     public override void OnStationEntered(VRCPlayerApi player)
     {
-        if (player.isLocal) { seated = true; sitTries = 0; }
+        if (player.isLocal) { seated = true; sitTries = 0; enteredAt = Time.time; }
         // (in the log: when each client hears each sit and stand, to tell later where a hider leaked)
         if (Utilities.IsValid(player)) Debug.Log("[prophunt] station " + index + " enter " + player.playerId + (player.isLocal ? " (me)" : "") + " hiding=" + hiding + " ghost=" + ghost + " phase=" + game.phase);
     }
@@ -692,11 +692,14 @@ public class PHSlot : UdonSharpBehaviour
     {
         if (!IsMine || !(hiding || ghost) || game.phase == PHGame.PH_END) return;
         if (Time.time - reseatAt < 2f) return;   // (several clients asking at once: one re-seat)
+        // (just sat down: a viewer can ask before the enter event reached it; a re-seat now would only flash the hider
+        // to everyone. A viewer still missing it asks again in a few seconds, PHLocal.UpdateWatch)
+        if (seated && Time.time - enteredAt < 3f) return;
         reseatAt = Time.time;
         Debug.Log("[prophunt] re-seat asked by another client (seated=" + seated + ")");
         if (seated) Reseat(); else nextSit = 0f;
     }
-    float reseatAt = -99f;
+    float reseatAt = -99f, enteredAt = -99f;
 
     public override void OnStationExited(VRCPlayerApi player)
     {

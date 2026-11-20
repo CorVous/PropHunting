@@ -672,6 +672,7 @@ public class PHView : UdonSharpBehaviour
         if (profWatch == null) { PostLateBody(); UpdateFire(); RenderPip(); return; }
         double p0 = profWatch.Elapsed.TotalMilliseconds;
         PostLateBody();
+        UpdateFire();
         RenderPip();
         profMs += profWatch.Elapsed.TotalMilliseconds - p0;
     }
