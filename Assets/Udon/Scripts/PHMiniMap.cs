@@ -296,6 +296,8 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int q = 0; q < cols.Length; q++) cols[q].enabled = false;
         Transform[] parts = go.GetComponentsInChildren<Transform>(true);
         for (int q = 0; q < parts.Length; q++) parts[q].gameObject.layer = 0;
+        // (no dark patch under it: one draw less a prop)
+        if (t.childCount > 0 && t.GetChild(t.childCount - 1).name == "Shade") t.GetChild(t.childCount - 1).gameObject.SetActive(false);
         return go;
     }
 
@@ -307,7 +309,7 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int n = 0; n < 6 && propNext < objs.Length; propNext++)
         {
             GameObject src = objs[propNext];
-            if (src == null || nMapProp >= MAX_MAP_PROPS || propNext >= par.Length) continue;
+            if (src == null || nMapProp >= MapPropCap() || propNext >= par.Length) continue;
             if (par[propNext] >= 0 || (fl[ed[propNext]] & GenData.FL_DECOR) != 0) continue;
             int def = ed[propNext];
             if (def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
@@ -318,6 +320,17 @@ public class PHMiniMap : UdonSharpBehaviour
             mapProp[nMapProp++] = go;
             n++;
         }
+    }
+
+    // Perf: every copy is a draw of its own; a PC batches the small ones, Quest does not (dynamic batching off for
+    // Android), so it shows the first 120 only
+    int MapPropCap()
+    {
+#if UNITY_ANDROID
+        return 120;
+#else
+        return MAX_MAP_PROPS;
+#endif
     }
 
     // the buttons: the upper floors on or off; everyone, or one player alone (each press the next one)
