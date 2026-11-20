@@ -1,4 +1,5 @@
 using UdonSharp;
+using VRC.SDKBase;
 using UnityEngine;
 using VRC.Dynamics;
 
@@ -22,6 +23,10 @@ public class PHButton : UdonSharpBehaviour
     float lastTouch = -9f;
     public override void OnContactEnter(ContactEnterInfo contactInfo)
     {
+        // only this player's own hand (Cor's playtest: the weapon wall's arrows turned for everyone when anyone
+        // pressed them, as each client's receiver also felt the other players' fingers)
+        VRCPlayerApi who = contactInfo.contactSender.player;
+        if (!Utilities.IsValid(who) || !who.isLocal) return;
         if (Time.time - lastTouch < 0.4f) { lastTouch = Time.time; return; }
         lastTouch = Time.time;
         Interact();
