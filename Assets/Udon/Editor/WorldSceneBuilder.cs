@@ -58,6 +58,14 @@ public static class WorldSceneBuilder
         if (bench != null) Object.DestroyImmediate(bench.gameObject);
 
         var old = GameObject.Find("World");
+        // keep the uploaded world's id (the SDK writes it on the old PipelineManager): a rebuild must not make the
+        // next upload a new world
+        string blueprintId = null;
+        if (old != null)
+        {
+            var oldPm = old.GetComponentInChildren<VRC.Core.PipelineManager>(true);
+            if (oldPm != null && !string.IsNullOrEmpty(oldPm.blueprintId)) blueprintId = oldPm.blueprintId;
+        }
         if (old != null) Object.DestroyImmediate(old);
         var world = new GameObject("World");
 
@@ -151,7 +159,8 @@ public static class WorldSceneBuilder
         rc.nearClipPlane = 0.02f; rc.farClipPlane = 400f;
         rc.clearFlags = CameraClearFlags.Skybox;
         descriptor.ReferenceCamera = refCam;
-        vrcWorld.AddComponent<VRC.Core.PipelineManager>();
+        var pm = vrcWorld.AddComponent<VRC.Core.PipelineManager>();
+        if (blueprintId != null) { pm.blueprintId = blueprintId; Debug.Log("[prophunt] kept the world id " + blueprintId); }
 
         // ---- the game
         var gameGo = new GameObject("Game");
@@ -292,8 +301,10 @@ public static class WorldSceneBuilder
         BuildCredits(lobby.transform);
         // the language board: a lectern ahead and right of the spawn disc, turned towards it
         LobbyBuilder.BuildLanguageBoard(lobby.transform, game, new Vector3(2.7f, 0f, -RoomD / 2 + 3.6f), 28f);
-        // the how-to-play wall: three looping picture panels on the spawn wall at eye height, centred behind the spawn
-        LobbyBuilder.BuildHowTo(lobby.transform, new Vector3(0f, 1.6f, -RoomD / 2 + 0.03f), 0f);
+        // the how-to-play wall: three looping picture panels at eye height on the north wall right of the score pad
+        // (Cor): the pad ends at x 7.35 and the wall at 12, so 1.28 m panels (not 1.6) fit the 4.65 m with ~0.2 m
+        // clear of the pad and ~0.35 m of the corner (the gun shelf's floating panel passes in front of it)
+        LobbyBuilder.BuildHowTo(lobby.transform, new Vector3(9.6f, 1.6f, RoomD / 2 - 0.03f), 180f, 1.28f, 0.12f);
         // the LAST ROUND diorama (Cor, item 40: the last round in miniature on a table in the ready area): move it here
         LobbyBuilder.BuildMiniMap(lobby.transform, game, builder, MiniMapAt, MiniMapYaw);
 

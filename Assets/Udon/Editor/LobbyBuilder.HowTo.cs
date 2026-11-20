@@ -3,9 +3,8 @@ using UnityEngine;
 
 // The how-to-play wall (Cor, onboarding): three looping picture panels, hide / hunt / final stand, with no words. The
 // art is Tools/make_howto.py's flipbook atlases (Assets/Lobby/HowTo, 8 x 8 cells of 512 x 320, read left to right,
-// top to bottom); PropHunt/Flipbook plays them from _Time, so no Udon runs. They hang on the spawn wall (south) at
-// eye height, centred behind the spawn disc, under the PROPHUNT name: the stretch of wall left free between the
-// armchair and lamp (west end) and the cactus and lamp (east end).
+// top to bottom); PropHunt/Flipbook plays them from _Time, so no Udon runs. They hang at eye height on the north wall,
+// right of the score pad (Cor; WorldSceneBuilder places them).
 public static partial class LobbyBuilder
 {
     const string HowToDir = Root + "HowTo/";
