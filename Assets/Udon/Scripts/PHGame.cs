@@ -178,14 +178,9 @@ public class PHGame : UdonSharpBehaviour
     public override void OnPlayerJoined(VRCPlayerApi player)
     {
         if (IsHost) { AssignSlots(); RequestSerialization(); }
-        // seated hiders re-seat so the newcomer gets their station events (Station Lab, late joiners)
-        // (again later: a joiner loading the world can miss the first one. Each of their own clients also asks a hider
-        // it sees in the open to sit again, PHSlot.CheckLeak)
-        if (!player.isLocal && local != null)
-        {
-            SendCustomEventDelayedSeconds(nameof(ReseatLocal), 1.5f);
-            SendCustomEventDelayedSeconds(nameof(ReseatLocal), 12f);
-        }
+        // (No blanket re-seat of every hider on a join any more: each exit and enter goes to everyone, and a viewer that
+        // got the pair out of order drew the hiders in the open from then on. The newcomer's own watchdog asks exactly
+        // the hiders it sees in the open to sit again, PHLocal.UpdateWatch.)
     }
 
     public void ReseatLocal() { if (local != null) local.Reseat(); }
