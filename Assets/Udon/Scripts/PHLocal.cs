@@ -1008,13 +1008,16 @@ public class PHLocal : UdonSharpBehaviour
         return (me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head)).position;
     }
 
-    // a dart knocks a real prop (04 section 4.8): LIGHT and KNOCKABLE props fly, heavy ones only thud
+    // a blow knocks a real prop (04 section 4.8): light ones fly, heavy ones and trees are shoved (Cor: most things
+    // knockable, trees too); only the fixed dressing (kitchen units, fountains) rocks where it stands
     void KnockProp(int e, Vector3 dir, Vector3 point)
     {
         int fl = game.gen.defFlags[game.gen.emitDef[e]];
-        if ((fl & (GenData.FL_HEAVY | GenData.FL_FIXTURE | GenData.FL_SCENERY)) != 0)
+        GameObject[] objs = game.builder.objects;
+        bool body = objs != null && e < objs.Length && objs[e] != null && objs[e].GetComponent<Rigidbody>() != null;
+        if ((fl & GenData.FL_FIXTURE) != 0 || !body)
         {
-            // a heavy thing does not fly, but it rocks where it stands, for everyone (Cor: some props did not move
+            // a fixed thing does not move, but it rocks where it stands, for everyone (Cor: some props did not move
             // when hit)
             PHSlot s = Me();
             if (s != null) s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Rocked), e, dir);

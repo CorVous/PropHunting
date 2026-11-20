@@ -42,11 +42,12 @@ public partial class MapGen
                 case GenData.Z_BARN: return 200;
                 default: return 0;
             }
+        // (generator 26, Cor: no basements turned up in a playtest; they were on a quarter of the M maps)
         switch (zone)
         {
-            case GenData.Z_HOUSE: return 220;
-            case GenData.Z_WAREHOUSE: return 250;
-            case GenData.Z_DINER: return 200;
+            case GenData.Z_HOUSE: return 420;
+            case GenData.Z_WAREHOUSE: return 450;
+            case GenData.Z_DINER: return 400;
             default: return 0;
         }
     }

@@ -154,6 +154,9 @@ public class PHWeapons : UdonSharpBehaviour
         bool round = phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT || phase == PHGame.PH_END;
         VRCPlayerApi me = Networking.LocalPlayer;
         int mine = game.SlotOf(me.playerId);
+        // Perf (Cor's profile: about 1 ms every frame, the lobby too): between rounds nobody holds a weapon or a gun,
+        // so the slots are only looked over a few times a second (what a round left out is put away within 0.2 s)
+        if (!round && (Time.frameCount % 12) != 0) { UpdateSelector(me, mine); UpdateBullets(); return; }
         int model = ModelNow();
         for (int i = 0; i < held.Length; i++)
         {

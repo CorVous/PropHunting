@@ -12,7 +12,7 @@ public class PHKnock : UdonSharpBehaviour
 {
     public PHGame game;
     public const float SETTLE_TIME = 4f, SEND_INTERVAL = 0.12f;
-    public const float KNOCK_SPEED_LIGHT = 5.5f, KNOCK_SPEED = 3.2f;
+    public const float KNOCK_SPEED_LIGHT = 5.5f, KNOCK_SPEED = 3.2f, KNOCK_SPEED_HEAVY = 1.4f;
 
     [UdonSynced] public int emit = -1;
     [UdonSynced] public int round = -1;
@@ -39,12 +39,15 @@ public class PHKnock : UdonSharpBehaviour
         body = go.GetComponent<Rigidbody>();
         if (body == null) return;
         body.isKinematic = false;
-        bool light = (game.gen.defFlags[game.gen.emitDef[e]] & GenData.FL_LIGHT) != 0;
+        int fl = game.gen.defFlags[game.gen.emitDef[e]];
+        bool light = (fl & GenData.FL_LIGHT) != 0;
+        // heavy furniture and trees (Cor: most things knockable) are shoved, not thrown: slower, low, no spin
+        bool heavy = (fl & (GenData.FL_HEAVY | GenData.FL_SCENERY)) != 0;
         float mass = body.mass;
-        float speed = (light ? KNOCK_SPEED_LIGHT : KNOCK_SPEED) * Mathf.Clamp(8f / (mass + 4f), 0.5f, 1.2f);
-        Vector3 push = (dir.normalized + Vector3.up * 0.45f).normalized * speed;
+        float speed = heavy ? KNOCK_SPEED_HEAVY : (light ? KNOCK_SPEED_LIGHT : KNOCK_SPEED) * Mathf.Clamp(8f / (mass + 4f), 0.5f, 1.2f);
+        Vector3 push = (dir.normalized + Vector3.up * (heavy ? 0.12f : 0.45f)).normalized * speed;
         body.AddForceAtPosition(push * mass, point, ForceMode.Impulse);
-        body.AddTorque(Random.insideUnitSphere * mass * 0.4f, ForceMode.Impulse);
+        if (!heavy) body.AddTorque(Random.insideUnitSphere * mass * 0.4f, ForceMode.Impulse);
         knockedAt = Time.time;
         moving = true;
         KnockSound(point);
