@@ -829,6 +829,17 @@ public class PHLocal : UdonSharpBehaviour
         return game.Participants() < 6 ? game.tauntInterval * 0.75f : game.tauntInterval;
     }
 
+    // how far the forced taunt's clock has run for this hider: 0 just after a taunt (their own, or a forced one, or a
+    // skip for having moved) .. 1 as the forced one comes; -1 while there is none (not a hider in the hunt). PHView
+    // draws it as the ring round the taunt button (VR) and the small ring on the desktop HUD (hop playtest, Cor)
+    public float ForcedProgress(PHSlot s)
+    {
+        if (role != PHGame.ROLE_HIDER || game.phase != PHGame.PH_HUNT || nextForced < 0f || s == null || s.caught || s.ghost) return -1f;
+        float iv = ForcedInterval();
+        if (iv <= 0.01f) return -1f;
+        return Mathf.Clamp01(1f - (nextForced - Time.time) / iv);
+    }
+
     // the last five seconds before the hunters come, counted out loud for everyone in the round (Cor: an indicator for
     // when the hunters spawn in)
     int releaseShown = -1;
