@@ -965,7 +965,7 @@ public class PHLocal : UdonSharpBehaviour
     // right hand (VR); the hunters are found along it by their bodies' place (Udon cannot tell whose collider a ray
     // met), nearer than the first wall or prop.
     public const float SHOT_RANGE = 30f, SHOT_INTERVAL = 1.6f, SHOT_BODY = 0.35f;
-    public const int SHOT_WEAR = 5;
+    public const int SHOT_WEAR = 15;   // (Cor, hop playtest: 5 was too little)
     float nextShot;   // (Cor: a relatively low rate of fire)
 
     public bool CanShoot()
