@@ -60,7 +60,8 @@ public class PHMiniMap : UdonSharpBehaviour
     bool upperOn = true;
     int solo = -1;                       // the one player shown alone, -1 everyone
     const float LONG_STAY = 15f, UPPER_Y = 2.0f, CLIP_Y = 2.45f;   // (the cut under the slab between floors: the lowest walls stand 2.6 m)
-    const int MAX_MAP_PROPS = 400;
+    const int PROPS_A_FRAME = 6, SCAN_A_FRAME = 200;   // copies a frame, and emits looked at a frame (grass tufts skipped)
+    bool propsUpperOn = true;            // the upper floors' map props as Apply last left them
     Color[] palette;
 
     void Start()
@@ -72,7 +73,7 @@ public class PHMiniMap : UdonSharpBehaviour
         still = new float[n]; stillAt = new Vector3[n]; stillDef = new int[n]; stillYaw = new float[n];
         sDef = new int[n * MAXS]; nStay = new int[n]; longestStay = new int[n]; sPos = new Vector3[n * MAXS]; sYaw = new float[n * MAXS]; sDur = new float[n * MAXS];
         shownProp = new GameObject[n * MAXS]; shownOutline = new GameObject[n * MAXS];
-        mapProp = new GameObject[MAX_MAP_PROPS]; mapUpper = new bool[MAX_MAP_PROPS];
+        mapProp = new GameObject[0]; mapUpper = new bool[0];   // (sized to the map's objects when they are placed)
         palette = new Color[] {
             new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
             new Color(0.85f, 0.5f, 0.9f), new Color(1f, 0.62f, 0.2f), new Color(0.4f, 0.9f, 0.8f), new Color(0.95f, 0.55f, 0.7f) };
@@ -117,6 +118,7 @@ public class PHMiniMap : UdonSharpBehaviour
             FillList(); drawNext = 0; ClearProps();
         }
         if (content.activeSelf != show) Show(show);
+        if (!show && nMapProp > 0) DropSomeProps();
         // Perf: a path or a prop a frame (all at once was a hitch at END)
         if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; if (drawNext >= paths.Length) { propNext = 0; fenceNext = 0; Apply(); } }
         else if (show && builder.objects != null && propNext < builder.objects.Length) PlaceMapProps();
@@ -368,17 +370,22 @@ public class PHMiniMap : UdonSharpBehaviour
         return go;
     }
 
-    // the map's own props, true to scale, a few a frame (Cor: show all the props): those that stand on the floor
+    // the map's own props, true to scale, a few a frame (Cor: no cap, show all the props; the map is gone by then):
+    // every object the map placed, on the floor or standing on furniture, but the grass tufts (FL_DECOR: ground
+    // cover, not props). A dense map has a few thousand: at PROPS_A_FRAME they fill in over several seconds
     void PlaceMapProps()
     {
         GameObject[] objs = builder.objects;
-        int[] par = builder.gen.emitParent, ed = builder.gen.emitDef, fl = builder.gen.defFlags;
-        for (int n = 0; n < 6 && propNext < objs.Length; propNext++)
+        int[] ed = builder.gen.emitDef, fl = builder.gen.defFlags;
+        if (mapProp.Length < objs.Length) { mapProp = new GameObject[objs.Length]; mapUpper = new bool[objs.Length]; }
+        int scan = 0;
+        for (int n = 0; n < PROPS_A_FRAME && scan < SCAN_A_FRAME && propNext < objs.Length; propNext++)
         {
+            scan++;
             GameObject src = objs[propNext];
-            if (src == null || nMapProp >= MapPropCap() || propNext >= par.Length) continue;
-            if (par[propNext] >= 0 || (fl[ed[propNext]] & GenData.FL_DECOR) != 0) continue;
+            if (src == null || nMapProp >= mapProp.Length || propNext >= ed.Length) continue;
             int def = ed[propNext];
+            if (def < 0 || def >= fl.Length || (fl[def] & GenData.FL_DECOR) != 0) continue;
             if (def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
             Transform st = src.transform;
             GameObject go = Copy(builder.propPrefabs[def], st.position, st.eulerAngles.y, 1f);
@@ -389,9 +396,18 @@ public class PHMiniMap : UdonSharpBehaviour
         }
     }
 
-    // every copy is a draw of its own unless dynamic batching joins the small ones (on for Android too since Cor's
-    // go, 2026-11-20)
-    int MapPropCap() { return MAX_MAP_PROPS; }
+    // the last round's map props go a few a frame while the diorama is hidden (thousands destroyed at once at the
+    // next reveal would be a long frame); shown again before they are all gone, it is drawn afresh. (Every copy is
+    // a draw of its own unless dynamic batching joins the small ones: on for Android too since Cor's go, 2026-11-20)
+    void DropSomeProps()
+    {
+        shownRound = -1;
+        for (int n = 0; n < 4 && nMapProp > 0; n++)
+        {
+            nMapProp--;
+            if (mapProp[nMapProp] != null) { Destroy(mapProp[nMapProp]); mapProp[nMapProp] = null; }
+        }
+    }
 
     // the map's fences, as they stand (Cor: include the fences), a few a frame; only those on the map itself
     GameObject[] fence = new GameObject[300];
@@ -472,7 +488,12 @@ public class PHMiniMap : UdonSharpBehaviour
                 if (shownOutline[i * MAXS + j] != null) shownOutline[i * MAXS + j].SetActive(on);
             }
         }
-        for (int i = 0; i < nMapProp; i++) if (mapProp[i] != null) mapProp[i].SetActive(upperOn || !mapUpper[i]);
+        // (only when the upper floors switch: with every prop shown that is thousands of switches, not for a name tag)
+        if (propsUpperOn != upperOn)
+        {
+            propsUpperOn = upperOn;
+            for (int i = 0; i < nMapProp; i++) if (mapUpper[i] && mapProp[i] != null) mapProp[i].SetActive(upperOn);
+        }
         SetTitle();
     }
 
