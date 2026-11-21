@@ -35,10 +35,12 @@ public static partial class LobbyBuilder
         if (gunMat == null) gunMat = meleeMat;
         hand.showMelee = new Transform[ShowPool]; hand.showMeleeFilter = new MeshFilter[ShowPool];
         hand.showGun = new Transform[ShowPool]; hand.showGunFilter = new MeshFilter[ShowPool];
+        hand.showOff = new Transform[ShowPool]; hand.showOffFilter = new MeshFilter[ShowPool];
         for (int i = 0; i < ShowPool; i++)
         {
             ShownWeapon(root, "ShowMelee" + i, meleeMat, out hand.showMelee[i], out hand.showMeleeFilter[i]);
             ShownWeapon(root, "ShowGun" + i, gunMat, out hand.showGun[i], out hand.showGunFilter[i]);
+            ShownWeapon(root, "ShowOff" + i, meleeMat, out hand.showOff[i], out hand.showOffFilter[i]);
         }
 
         hand.values = new TextMeshProUGUI[2]; hand.stepText = new TextMeshProUGUI[2]; hand.handText = new TextMeshProUGUI[2];

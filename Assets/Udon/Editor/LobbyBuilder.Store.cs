@@ -176,7 +176,8 @@ public static partial class LobbyBuilder
         shelf.meshes = new Mesh[n]; shelf.itemPos = new Vector3[n]; shelf.itemScale = new float[n];
         foreach (int i in order)
         {
-            Mesh m; meshes.TryGetValue(cat[i].id.Replace(':', '_'), out m);
+            // (a drawn weapon stands on the shelf as drawn, both pieces facing the room: its "_shelf" mesh)
+            Mesh m; if (!meshes.TryGetValue(cat[i].id.Replace(':', '_') + "_shelf", out m)) meshes.TryGetValue(cat[i].id.Replace(':', '_'), out m);
             shelf.meshes[i] = m;
             if (m == null) continue;
             var b = m.bounds;
@@ -546,6 +547,7 @@ public static partial class LobbyBuilder
         var sh = Shader.Find("PropHunt/ShelfWeapon");
         if (m == null) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
         m.shader = sh; m.enableInstancing = true;
+        WeaponBuilder.CardTextures(m);   // (Cor's drawn weapons)
         EditorUtility.SetDirty(m);
         return m;
     }

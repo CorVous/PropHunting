@@ -1,5 +1,5 @@
 {
- "note": "Weapon catalog (Cor 2026-11-19). category: starter (free), cool / goofy (achievement unlocks), shop (buy with points). id = the weapons.bytes entry name made by Tools/make_weapons.py. thumb = path on the CC0 mirror.",
+ "note": "Weapon catalog (Cor 2026-11-19). category: starter (free), cool / goofy (achievement unlocks), shop (buy with points). id = the weapons.bytes entry name made by Tools/make_weapons.py. thumb = path on the CC0 mirror. pack \"cor\": Cor's own drawings, flat cards (Tools/make_card_weapons.py, 2026-11-21).",
  "weapons": [
   {
    "id": "melee:fantasy-weapons-bits:axe_A",
@@ -1611,6 +1611,60 @@
    "pack": "holiday-bits",
    "model": "snowball_cannon",
    "thumb": "index/thumbs/holiday-bits_snowball_cannon.png"
+  },
+  {
+   "id": "melee:cor:twin_daggers",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "twin_daggers",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:spoke_mace",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "spoke_mace",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:horn_club",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "horn_club",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:hook_dagger",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "hook_dagger",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:scimitar",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "scimitar",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:cleaver",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "cleaver",
+   "thumb": ""
   }
  ]
 }

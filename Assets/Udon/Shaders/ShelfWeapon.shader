@@ -11,6 +11,7 @@ Shader "PropHunt/ShelfWeapon"
         _Glow ("Glowing", Float) = 0
         _GlowColor ("Glow colour", Color) = (1, 0.82, 0.35, 1)
         _Halo ("Halo width (m)", Float) = 0.016
+        _CardTex ("Drawn weapons (atlas)", 2D) = "white" {}
     }
     SubShader
     {
@@ -29,14 +30,16 @@ Shader "PropHunt/ShelfWeapon"
 
             float _Dither, _Fade, _Glow;
             fixed4 _GlowColor;
+            sampler2D _CardTex;
 
-            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f
             {
                 float4 pos : SV_POSITION;
                 half3 normal : TEXCOORD0;
                 half3 albedo : TEXCOORD1;
                 float3 view : TEXCOORD3;
+                float3 card : TEXCOORD4;   // Cor's drawn weapons (PropHunt/Weapon): xy the atlas uv, z 1 on a card
                 UNITY_FOG_COORDS(2)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -54,6 +57,7 @@ Shader "PropHunt/ShelfWeapon"
                 a = GammaToLinearSpace(a);
                 #endif
                 o.albedo = a;
+                o.card = float3(v.uv, v.color.a < 0.5 ? 1 : 0);
                 UNITY_TRANSFER_FOG(o, o.pos);
                 return o;
             }
@@ -68,7 +72,18 @@ Shader "PropHunt/ShelfWeapon"
                     clip(fmod(p.x + p.y, 2.0) - 0.5);
                 }
                 float3 n = normalize(i.normal) * (facing < 0 ? -1.0 : 1.0);
-                float3 albedo = i.albedo * (_Dither > 0.5 ? _Fade : 1.0);
+                float3 albedo = i.albedo;
+                if (i.card.z > 0.5)
+                {
+                    fixed4 c = tex2D(_CardTex, i.card.xy);
+                    clip(c.a - 0.5);
+                    albedo = c.rgb;
+                    #ifndef UNITY_COLORSPACE_GAMMA
+                    albedo = GammaToLinearSpace(albedo);
+                    #endif
+                    n = normalize(i.view);   // (flat: lit as if facing whoever looks)
+                }
+                albedo *= (_Dither > 0.5 ? _Fade : 1.0);
                 float d = dot(n, _WorldSpaceLightPos0.xyz);
                 float3 amb = n.y >= 0 ? lerp(unity_AmbientEquator.rgb, unity_AmbientSky.rgb, n.y)
                                       : lerp(unity_AmbientEquator.rgb, unity_AmbientGround.rgb, -n.y * 0.5);
@@ -100,9 +115,10 @@ Shader "PropHunt/ShelfWeapon"
 
             float _Glow, _Halo;
             fixed4 _GlowColor;
+            sampler2D _CardTex;
 
-            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
-            struct v2f { float4 pos : SV_POSITION; UNITY_VERTEX_OUTPUT_STEREO };
+            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct v2f { float4 pos : SV_POSITION; float3 card : TEXCOORD0; UNITY_VERTEX_OUTPUT_STEREO };
 
             v2f vert (appdata v)
             {
@@ -111,11 +127,13 @@ Shader "PropHunt/ShelfWeapon"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 float3 w = mul(unity_ObjectToWorld, v.vertex).xyz + UnityObjectToWorldNormal(v.normal) * _Halo;
                 o.pos = _Glow > 0.5 ? UnityWorldToClipPos(w) : float4(0, 0, 0, 0);
+                o.card = float3(v.uv, v.color.a < 0.5 ? 1 : 0);
                 return o;
             }
 
             fixed4 frag (v2f i) : SV_Target
             {
+                if (i.card.z > 0.5) clip(tex2D(_CardTex, i.card.xy).a - 0.5);
                 float pulse = 0.85 + 0.15 * sin(_Time.y * 3.0);
                 return fixed4(_GlowColor.rgb * pulse, 1);
             }

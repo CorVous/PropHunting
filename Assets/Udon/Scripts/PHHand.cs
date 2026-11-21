@@ -27,6 +27,8 @@ public class PHHand : UdonSharpBehaviour
     public float zoneHalf = 10.6f;      // each half runs from z 0 to +-zoneHalf (melee south, guns north)
     public Transform[] showMelee;       // the shown weapons, a small pool (WeaponBuilder's materials)
     public MeshFilter[] showMeleeFilter;
+    public Transform[] showOff;         // a two-piece set's off-hand piece, beside showMelee's same entry (may be missing in an older scene)
+    public MeshFilter[] showOffFilter;
     public Transform[] showGun;
     public MeshFilter[] showGunFilter;
     public TextMeshProUGUI[] values;    // per board (0 hunter, 1 hider): the setting and the hand's diagnosis
@@ -107,6 +109,26 @@ public class PHHand : UdonSharpBehaviour
         holdPos += holdRot * (mv * weapons.AvatarScale(p));
         holdRot = holdRot * tq;
         holdSize = me ? mySize[k] : cSize[slot * 2 + k];
+    }
+
+    // the off hand's piece of a two-piece melee set (Cor's drawn weapons): the other hand, with the player's hunter
+    // setting mirrored (the hand's frame is mirrored between the hands: its x is the palm in the right hand and the back
+    // of the hand in the left, so a move's x and a turn's y and z flip). Fills holdPos / holdRot / holdSize
+    public void ApplyOff(VRCPlayerApi p, int slot)
+    {
+        if (p == null || !Utilities.IsValid(p)) return;
+        applyFrame = -1;   // (not the weapon hand's hold: Apply works its own out again)
+        bool me = p.isLocal;
+        bool ok = me || (slot >= 0 && slot < SLOTS && cPid[slot] == p.playerId);
+        bool left = me ? myLeft : ok && cLeft[slot];
+        holdBones = weapons.BasePose(p, !left, false);
+        holdPos = weapons.basePos; holdRot = weapons.baseRot; holdSize = 1f;
+        if (!ok) return;
+        Vector3 mv = me ? myMove[0] : cMove[slot * 2];
+        Quaternion tq = me ? myTurnQ[0] : cTurn[slot * 2];
+        holdPos += holdRot * (new Vector3(-mv.x, mv.y, mv.z) * weapons.AvatarScale(p));
+        holdRot = holdRot * new Quaternion(tq.x, -tq.y, -tq.z, tq.w);
+        holdSize = me ? mySize[0] : cSize[slot * 2];
     }
 
     // ------------------------------------------------------------------ kept (PlayerData)
@@ -248,6 +270,7 @@ public class PHHand : UdonSharpBehaviour
     {
         if (showMelee != null) for (int i = 0; i < showMelee.Length; i++) if (showMelee[i] != null) showMelee[i].gameObject.SetActive(false);
         if (showGun != null) for (int i = 0; i < showGun.Length; i++) if (showGun[i] != null) showGun[i].gameObject.SetActive(false);
+        if (showOff != null) for (int i = 0; i < showOff.Length; i++) if (showOff[i] != null) showOff[i].gameObject.SetActive(false);
         showing = false;
     }
 
@@ -290,6 +313,7 @@ public class PHHand : UdonSharpBehaviour
             else PlaceShown(p, i, s, true, ng++, false);
         }
         for (int k = nm; k < showMelee.Length; k++) if (showMelee[k].gameObject.activeSelf) showMelee[k].gameObject.SetActive(false);
+        if (showOff != null) for (int k = nm; k < showOff.Length; k++) if (showOff[k] != null && showOff[k].gameObject.activeSelf) showOff[k].gameObject.SetActive(false);
         for (int k = ng; k < showGun.Length; k++) if (showGun[k].gameObject.activeSelf) showGun[k].gameObject.SetActive(false);
         showing = nm + ng > 0;
     }
@@ -305,6 +329,7 @@ public class PHHand : UdonSharpBehaviour
         if (f.sharedMesh != meshes[m]) f.sharedMesh = meshes[m];
         if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
         float sc = weapons.AvatarScale(p);
+        if (!gun) PlaceShownOff(p, slot, m, n, mine, sc);
         if (mine && !p.IsUserInVR())
         {
             VRCPlayerApi.TrackingData head = p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
@@ -322,6 +347,30 @@ public class PHHand : UdonSharpBehaviour
         float size = mine ? mySize[gun ? 1 : 0] : holdSize;
         if (gun) weapons.PutGun(t, m, at, r, sc * size);
         else weapons.PutMelee(t, m, at, r, sc * size);
+    }
+
+    // a two-piece set's other piece, in the other hand (the local desktop player: the view's lower left)
+    void PlaceShownOff(VRCPlayerApi p, int slot, int m, int n, bool mine, float sc)
+    {
+        if (showOff == null || n >= showOff.Length || showOff[n] == null) return;
+        Transform t = showOff[n];
+        Mesh off = weapons.offMesh != null && m < weapons.offMesh.Length ? weapons.offMesh[m] : null;
+        if (off == null) { if (t.gameObject.activeSelf) t.gameObject.SetActive(false); return; }
+        if (showOffFilter[n].sharedMesh != off) showOffFilter[n].sharedMesh = off;
+        if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
+        Vector3 at; Quaternion r; float s;
+        if (mine && !p.IsUserInVR())
+        {
+            VRCPlayerApi.TrackingData head = p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+            Vector3 d = weapons.deskAt, e = weapons.deskEuler;
+            at = head.position + head.rotation * (new Vector3(-d.x, d.y, d.z) * sc);
+            r = head.rotation * Quaternion.Euler(e.x, -e.y, -e.z);
+            s = sc * weapons.deskScale * mySize[0];
+        }
+        else { ApplyOff(p, slot); at = holdPos; r = holdRot; s = sc * holdSize; }
+        s *= weapons.MeleeSize(m);
+        t.SetPositionAndRotation(at, r);
+        t.localScale = Vector3.one * s;
     }
 
     // VR: the other hand's grip takes the shown weapon (near it or the weapon hand), and lets it go where it is

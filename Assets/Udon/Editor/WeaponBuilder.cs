@@ -52,7 +52,132 @@ public static class WeaponBuilder
         return d;
     }
 
-    class Model { public string kind, name, id; public Mesh mesh; public float tip, head; public Vector3[] spots; public Color color; }
+    class Model { public string kind, name, id; public Mesh mesh; public float tip, head; public Vector3[] spots; public Color color;
+        public bool card; public Mesh off, shelf; public bool offShield; public float offTip, offHead; }
+
+    // ---- Cor's drawn weapons (Tools/make_card_weapons.py -> Tools/card_weapons.json and the atlas
+    // Assets/Udon/Textures/CardWeapons.png, with the wear in CardWeaponsWear.png): each piece a flat card, the drawing
+    // on both faces. Their vertices are white with alpha 0, which tells the weapon shaders to draw the atlas at their
+    // uv (and cut it out along its alpha). A two-piece set's other piece is the off hand's (PHWeapons.offMesh).
+    const string CARDS = "Tools/card_weapons.json";
+    public const string CARD_ATLAS = "Assets/Udon/Textures/CardWeapons.png", CARD_WEAR = "Assets/Udon/Textures/CardWeaponsWear.png";
+    [Serializable] class CardCorner { public float[] p; public float[] uv; }
+    [Serializable] class CardPiece { public string role, plane; public CardCorner[] corners; public float tip, head; public int[] color; public float[] spots; }   // spots: x y z, x y z, ...
+    [Serializable] class CardShelf { public CardCorner[] corners; }
+    [Serializable] class CardWeapon { public string id; public CardPiece[] pieces; public CardShelf[] shelf; }
+    [Serializable] class CardFile { public CardWeapon[] weapons; }
+
+    static Mesh SubMesh(string name, Dictionary<string, Mesh> keep, ref Mesh holder)
+    {
+        Mesh me;
+        if (!keep.TryGetValue(name, out me))
+        {
+            me = new Mesh { name = name };
+            if (holder == null) { AssetDatabase.CreateAsset(me, MESHES); holder = me; }
+            else AssetDatabase.AddObjectToAsset(me, MESHES);
+            keep[name] = me;
+        }
+        me.Clear();
+        return me;
+    }
+
+    // quads (corners: bottom-left, bottom-right, top-right, top-left of the picture) as cards: a front face and a back
+    // face a hair behind it, each facing out
+    static void CardMesh(Mesh me, List<CardCorner[]> quads)
+    {
+        var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+        foreach (var q in quads)
+        {
+            var p = new Vector3[4];
+            for (int k = 0; k < 4; k++) p[k] = new Vector3(q[k].p[0], q[k].p[1], q[k].p[2]);
+            Vector3 nf = Vector3.Cross(p[3] - p[0], p[2] - p[0]).normalized;   // towards whoever sees the drawing as drawn
+            for (int side = 0; side < 2; side++)
+            {
+                Vector3 nn = side == 0 ? nf : -nf;
+                int b = v.Count;
+                for (int k = 0; k < 4; k++) { v.Add(p[k] + nn * 0.0008f); n.Add(nn); uv.Add(new Vector2(q[k].uv[0], q[k].uv[1])); }
+                if (side == 0) t.AddRange(new[] { b, b + 3, b + 2, b, b + 2, b + 1 });
+                else t.AddRange(new[] { b, b + 1, b + 2, b, b + 2, b + 3 });
+            }
+        }
+        me.SetVertices(v); me.SetNormals(n); me.SetUVs(0, uv);
+        var c = new Color32[v.Count];
+        for (int i = 0; i < c.Length; i++) c[i] = new Color32(255, 255, 255, 0);
+        me.colors32 = c;
+        me.SetTriangles(t, 0);
+        me.RecalculateBounds();
+        EditorUtility.SetDirty(me);
+    }
+
+    static List<Model> LoadCards()
+    {
+        var list = new List<Model>();
+        string path = System.IO.Path.Combine(Application.dataPath, "..", CARDS);
+        if (!System.IO.File.Exists(path)) return list;
+        var root = JsonUtility.FromJson<CardFile>(System.IO.File.ReadAllText(path));
+        var keep = new Dictionary<string, Mesh>();
+        foreach (var o in AssetDatabase.LoadAllAssetsAtPath(MESHES)) if (o is Mesh mm) keep[mm.name] = mm;
+        Mesh holder = AssetDatabase.LoadAssetAtPath<Mesh>(MESHES);
+        foreach (var w in root.weapons)
+        {
+            string baseName = w.id.Replace(':', '_');
+            var mo = new Model { kind = "melee", id = w.id, card = true };
+            string[] parts = w.id.Split(':'); mo.name = parts[parts.Length - 1];
+            foreach (var p in w.pieces)
+            {
+                var quads = new List<CardCorner[]> { p.corners };
+                if (p.role == "main")
+                {
+                    mo.mesh = SubMesh(baseName, keep, ref holder); CardMesh(mo.mesh, quads);
+                    mo.tip = p.tip; mo.head = p.head;
+                    mo.color = new Color(p.color[0] / 255f, p.color[1] / 255f, p.color[2] / 255f);
+                    mo.spots = new Vector3[PHWeapons.SPOTS];
+                    for (int s = 0; s < mo.spots.Length; s++)
+                    {
+                        int ns = p.spots != null ? p.spots.Length / 3 : 0;
+                        mo.spots[s] = ns > 0 ? new Vector3(p.spots[(s % ns) * 3], p.spots[(s % ns) * 3 + 1], p.spots[(s % ns) * 3 + 2]) : new Vector3(0f, 0f, p.tip * 0.7f);
+                    }
+                }
+                else
+                {
+                    mo.off = SubMesh(baseName + "_off", keep, ref holder); CardMesh(mo.off, quads);
+                    mo.offShield = p.role == "shield"; mo.offTip = p.tip; mo.offHead = p.head;
+                }
+            }
+            if (w.shelf != null && w.shelf.Length > 0)
+            {
+                var sq = new List<CardCorner[]>();
+                foreach (var q in w.shelf) sq.Add(q.corners);
+                mo.shelf = SubMesh(baseName + "_shelf", keep, ref holder); CardMesh(mo.shelf, sq);
+            }
+            if (mo.mesh != null) list.Add(mo);
+        }
+        AssetDatabase.SaveAssets();
+        return list;
+    }
+
+    // the atlas and its wear onto a weapon material (the textures' import: the wear is data, not colour)
+    public static void CardTextures(Material m)
+    {
+        foreach (var path in new[] { CARD_ATLAS, CARD_WEAR })
+        {
+            var imp = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (imp == null) continue;
+            bool data = path == CARD_WEAR;
+            if (imp.sRGBTexture == !data && imp.alphaIsTransparency == !data && imp.textureCompression == TextureImporterCompression.Uncompressed
+                && imp.wrapMode == TextureWrapMode.Clamp && imp.mipmapEnabled == !data && imp.npotScale == TextureImporterNPOTScale.None) continue;
+            imp.sRGBTexture = !data; imp.alphaIsTransparency = !data;
+            imp.textureCompression = TextureImporterCompression.Uncompressed;
+            imp.wrapMode = TextureWrapMode.Clamp; imp.mipmapEnabled = !data; imp.npotScale = TextureImporterNPOTScale.None;
+            imp.filterMode = FilterMode.Bilinear;
+            imp.maxTextureSize = 2048;
+            if (data) imp.textureType = TextureImporterType.SingleChannel;
+            imp.SaveAndReimport();
+        }
+        m.SetTexture("_CardTex", AssetDatabase.LoadAssetAtPath<Texture2D>(CARD_ATLAS));
+        m.SetTexture("_CardWear", AssetDatabase.LoadAssetAtPath<Texture2D>(CARD_WEAR));
+        EditorUtility.SetDirty(m);
+    }
 
     static List<Model> Load()
     {
@@ -243,6 +368,7 @@ public static class WeaponBuilder
     {
         var models = Load();
         var melee = models.FindAll(m => m.kind == "melee");
+        melee.AddRange(LoadCards());   // (after the blob's: the picks' numbers of the others stay)
         var gun = models.Find(m => m.kind == "gun" && m.name == "blaster-b") ?? models.Find(m => m.kind == "gun");
         var root = new GameObject("Weapons");
         root.transform.SetParent(gameRoot, false);
@@ -282,6 +408,12 @@ public static class WeaponBuilder
         w.meleeHead = melee.ConvertAll(m => m.head).ToArray();
         w.meleeColor = melee.ConvertAll(m => m.color).ToArray();
         LoadWear(w, melee);
+        // the drawn ones: the atlas and the off hand's pieces
+        w.meleeCard = melee.ConvertAll(m => m.card).ToArray();
+        w.offMesh = melee.ConvertAll(m => m.off).ToArray();
+        w.offShield = melee.ConvertAll(m => m.offShield).ToArray();
+        w.offTip = melee.ConvertAll(m => m.offTip).ToArray();
+        w.offHead = melee.ConvertAll(m => m.offHead).ToArray();
         var spots = new List<Vector3>();
         foreach (var m in melee) spots.AddRange(m.spots);
         w.chipSpots = spots.ToArray();
@@ -291,9 +423,11 @@ public static class WeaponBuilder
         foreach (var m in melee) Debug.Log("[prophunt] weapon " + m.name + ": tip " + m.tip.ToString("0.00") + " head from " + m.head.ToString("0.00"));
 
         var weaponMat = Mat("Weapon", "PropHunt/Weapon");
+        CardTextures(weaponMat);
         var trailMat = FxMat("FxTrail", new Color(1f, 1f, 1f, 0.55f), true, false, true);
         int n = slots.Length;
         w.held = new Transform[n]; w.heldFilter = new MeshFilter[n]; w.heldRenderer = new MeshRenderer[n]; w.heldTrail = new TrailRenderer[n];
+        w.heldOff = new Transform[n]; w.heldOffFilter = new MeshFilter[n]; w.heldOffRenderer = new MeshRenderer[n];
         for (int i = 0; i < n; i++)
         {
             var go = new GameObject("Held" + i);
@@ -318,6 +452,15 @@ public static class WeaponBuilder
             tr.alignment = LineAlignment.View;
             go.SetActive(false);
             w.held[i] = go.transform; w.heldFilter[i] = mf; w.heldRenderer[i] = mr; w.heldTrail[i] = tr;
+            // the off hand's piece of a two-piece set (Cor's drawn weapons)
+            var off = new GameObject("HeldOff" + i);
+            off.transform.SetParent(root.transform, false);
+            var omf = off.AddComponent<MeshFilter>();
+            var omr = off.AddComponent<MeshRenderer>(); omr.sharedMaterial = weaponMat;
+            omr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; omr.receiveShadows = false;
+            omr.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off; omr.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            off.SetActive(false);
+            w.heldOff[i] = off.transform; w.heldOffFilter[i] = omf; w.heldOffRenderer[i] = omr;
             slots[i].weapons = w;
             UdonSharpEditorUtility.CopyProxyToUdon(slots[i]);
         }

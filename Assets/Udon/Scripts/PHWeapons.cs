@@ -47,6 +47,12 @@ public class PHWeapons : UdonSharpBehaviour
     public float[] meleeSize;
     public Vector3[] gunGrip, gunTurn;
     public float[] gunSize;
+    // Cor's drawn weapons (WeaponBuilder, Tools/make_card_weapons.py): flat cards that wear by the atlas, not a grid;
+    // a two-piece set's other piece in the off hand (null: none), which strikes too unless it is a shield. Per melee model.
+    public bool[] meleeCard;
+    public Mesh[] offMesh;
+    public bool[] offShield;
+    public float[] offTip, offHead;
     public int[] themeMelee = { 0, 2, 1 };   // the model by map theme (GenData.THEME_NONE, SPACE, MEDIEVAL)
     public const int SPOTS = 24;
 
@@ -55,6 +61,9 @@ public class PHWeapons : UdonSharpBehaviour
     public MeshFilter[] heldFilter;
     public MeshRenderer[] heldRenderer;
     public TrailRenderer[] heldTrail;  // at the tip; it draws only while the weapon swings
+    public Transform[] heldOff;        // the off hand's piece of a two-piece set, one per slot (may be missing in an older scene)
+    public MeshFilter[] heldOffFilter;
+    public MeshRenderer[] heldOffRenderer;
 
     // ---- effects (world space particle systems, moved where they are needed and told to emit)
     public ParticleSystem fxDust;      // a prop struck: a puff
@@ -96,6 +105,7 @@ public class PHWeapons : UdonSharpBehaviour
     public const int MASK = ~(1 << 9 | 1 << 10 | 1 << 18);    // as PHLocal.Aim: not players
 
     int[] heldModel;                   // the model each held weapon shows (-1 hidden)
+    int[] heldOffModel;                // the model whose off-hand piece heldOff shows (-1 hidden)
     int[] heldWear;                    // the condition it was last drawn with
     bool[] heldOut, heldBroke;
     float[] swingAt;                   // when its last slash began (desktop players, seen by everyone)
@@ -104,9 +114,10 @@ public class PHWeapons : UdonSharpBehaviour
     int idWear, idWearTex, idWearLo, idWearInv, idDither;
     bool ready;
 
-    // the local VR swing
-    Vector3 prevTip, prevMid, prevExt, prevGrip;
-    bool prevValid, whooshArmed = true;
+    // the local VR swing (per piece: 0 the weapon hand's, 1 the off hand's)
+    Vector3[] prevTip = new Vector3[2], prevMid = new Vector3[2], prevExt = new Vector3[2], prevGrip = new Vector3[2];
+    bool[] prevValid = new bool[2];
+    bool whooshArmed = true;
     float nextVrHit;
     // the local desktop slash
     float mySwingAt = -99f;
@@ -137,6 +148,8 @@ public class PHWeapons : UdonSharpBehaviour
         idWearLo = VRCShader.PropertyToID("_WearLo"); idWearInv = VRCShader.PropertyToID("_WearInv");
         idDither = VRCShader.PropertyToID("_Dither");
         for (int i = 0; i < n; i++) { held[i].gameObject.SetActive(false); heldTrail[i].emitting = false; }
+        heldOffModel = new int[n];
+        for (int i = 0; i < n; i++) { heldOffModel[i] = -1; if (HasOff(i)) heldOff[i].gameObject.SetActive(false); }
         if (deskSelector != null) deskSelector.gameObject.SetActive(false);
         shotAt = new float[n]; shotEnd = new Vector3[n]; gunShown = new Vector3[n];
         hiderGunModel = new int[n];
@@ -208,6 +221,7 @@ public class PHWeapons : UdonSharpBehaviour
             if (!show)
             {
                 if (heldModel[i] != -1) { heldModel[i] = -1; held[i].gameObject.SetActive(false); heldTrail[i].emitting = false; }
+                ShowOff(i, -1);
                 if (s == null || s.round != game.round) heldOut[i] = false;
                 continue;
             }
@@ -220,12 +234,14 @@ public class PHWeapons : UdonSharpBehaviour
                 held[i].gameObject.SetActive(true);
                 heldTrail[i].Clear();
             }
+            ShowOff(i, mm);
             int key = s.hunterHealth + (s.weaponRecovering ? 1000 : 0);
             if (key != heldWear[i])
             {
                 bool more = heldWear[i] >= 0 && heldWear[i] < 1000 && !s.weaponRecovering && s.hunterHealth < heldWear[i];
                 heldWear[i] = key;
-                SetWear(i, mm, s.hunterHealth, s.weaponRecovering);
+                SetWear(heldRenderer[i], mm, s.hunterHealth, s.weaponRecovering);
+                if (heldOffModel[i] >= 0) SetWear(heldOffRenderer[i], mm, s.hunterHealth, s.weaponRecovering);
                 if (more) ChipOff(i, s, mm);
             }
             if (i == mine) PlaceMine(i, p, mm);
@@ -529,6 +545,37 @@ public class PHWeapons : UdonSharpBehaviour
         t.localScale = Vector3.one * s;
     }
 
+    // ------------------------------------------------------------------ the off hand (two-piece sets)
+    bool HasOff(int i) { return heldOff != null && i < heldOff.Length && heldOff[i] != null; }
+
+    // the model's off-hand piece onto slot i's heldOff (m -1, or a model without one: hidden), only on a change
+    void ShowOff(int i, int m)
+    {
+        if (!HasOff(i)) return;
+        int want = m >= 0 && offMesh != null && m < offMesh.Length && offMesh[m] != null ? m : -1;
+        if (heldOffModel[i] == want) return;
+        heldOffModel[i] = want;
+        if (want >= 0) { heldOffFilter[i].sharedMesh = offMesh[want]; heldWear[i] = -1; }   // (its wear is set with the weapon's)
+        heldOff[i].gameObject.SetActive(want >= 0);
+    }
+
+    // where player p holds the off-hand piece: the other hand, with the player's own hold mirrored (PHHand.ApplyOff)
+    void HoldOff(VRCPlayerApi p, int slot)
+    {
+        if (hand != null) { hand.ApplyOff(p, slot); holdPos = hand.holdPos; holdRot = hand.holdRot; holdSize = hand.holdSize; return; }
+        BasePose(p, true, false);
+        holdPos = basePos; holdRot = baseRot; holdSize = 1f;
+    }
+
+    // the off-hand piece at the fist: its grip (the origin, as the drawing tool makes it) at 'at', at the weapon's size
+    void PutOff(int i, Vector3 at, Quaternion r, float sc)
+    {
+        int m = heldOffModel[i];
+        float s = sc * MeleeSize(m);
+        heldOff[i].SetPositionAndRotation(at, r);
+        heldOff[i].localScale = Vector3.one * s;
+    }
+
     // ------------------------------------------------------------------ placing
     public float AvatarScale(VRCPlayerApi p)
     {
@@ -545,6 +592,13 @@ public class PHWeapons : UdonSharpBehaviour
         if (t >= 0f && t < SWING_TIME) r = r * Quaternion.Euler(Chop(t), 0f, 0f);
         // (PHGame.layers: a hunter seen from another copy of the map holds it at their stand-in, PHLocal.UpdateStandIns)
         PutMelee(held[i], heldModel[i], game.SeenHere(i, at), r, AvatarScale(p) * size);
+        if (heldOffModel[i] >= 0)
+        {
+            HoldOff(p, i);
+            Quaternion ro = holdRot;
+            if (t >= 0f && t < SWING_TIME) ro = ro * Quaternion.Euler(Chop(t), 0f, 0f);
+            PutOff(i, game.SeenHere(i, holdPos), ro, AvatarScale(p) * holdSize);
+        }
     }
 
     // the chop seen on a remote desktop player: up, then down hard, then back (degrees about the hand's x)
@@ -572,7 +626,18 @@ public class PHWeapons : UdonSharpBehaviour
                 if (!mySwingStruck && tv >= SWING_HIT_AT) { mySwingStruck = true; local.MeleeDesktopStrike(); }
             }
             PutMelee(held[i], model, vAt, r, sc * size);
-            VrSwing(i, model, sc * size * MeleeSize(model));
+            VrSwing(0, held[i], meleeTip[model], meleeHead[model], i, sc * size * MeleeSize(model));
+            if (heldOffModel[i] >= 0)
+            {
+                HoldOff(me, i);
+                Quaternion ro = holdRot;
+                if (tv >= 0f && tv < SWING_TIME) ro = ro * Quaternion.Euler(Chop(tv), 0f, 0f);
+                PutOff(i, holdPos, ro, sc * holdSize);
+                // both pieces strike, but not a shield (Cor)
+                if (!offShield[model]) VrSwing(1, heldOff[i], offTip[model], offHead[model], i, sc * holdSize * MeleeSize(model));
+                else prevValid[1] = false;
+            }
+            else prevValid[1] = false;
             return;
         }
         VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
@@ -602,6 +667,10 @@ public class PHWeapons : UdonSharpBehaviour
             if (!mySwingStruck && t >= SWING_HIT_AT) { mySwingStruck = true; local.MeleeDesktopStrike(); }
         }
         PutMelee(held[i], model, head.position + head.rotation * (at * sc), head.rotation * rot, sc * deskScale);
+        // the off hand's piece: in the view's lower left, as the weapon at rest is in the right (mirrored), still
+        if (heldOffModel[i] >= 0)
+            PutOff(i, head.position + head.rotation * (new Vector3(-deskAt.x, deskAt.y, deskAt.z) * sc),
+                head.rotation * Quaternion.Euler(deskEuler.x, -deskEuler.y, -deskEuler.z), sc * deskScale);
         // sparks along the slash's arc
         if (t >= SWING_HIT_AT * 0.6f && t < SWING_HIT_AT + 0.08f && fxSpark != null)
         {
@@ -628,34 +697,33 @@ public class PHWeapons : UdonSharpBehaviour
     }
 
     // VR: the head of the weapon sweeps; a fast enough sweep strikes the first thing it passes through
-    void VrSwing(int i, int model, float sc)
+    void VrSwing(int pc, Transform w, float tipZ, float headZ, int i, float sc)
     {
-        Transform w = held[i];
-        Vector3 tip = w.position + w.rotation * (Vector3.forward * meleeTip[model] * sc);
-        Vector3 mid = w.position + w.rotation * (Vector3.forward * (meleeHead[model] + meleeTip[model]) * 0.5f * sc);
+        Vector3 tip = w.position + w.rotation * (Vector3.forward * tipZ * sc);
+        Vector3 mid = w.position + w.rotation * (Vector3.forward * (headZ + tipZ) * 0.5f * sc);
         // the reach beyond the tip, short of anything solid along the weapon (looked for from the hand, which never
         // sits inside a wall, so a tip stuck in one does not reach out of its far side)
         Vector3 fwd = w.rotation * Vector3.forward;
-        float tipLen = meleeTip[model] * sc, extra = SWING_EXTRA * sc;
+        float tipLen = tipZ * sc, extra = SWING_EXTRA * sc;
         RaycastHit eh;
         if (Physics.Raycast(w.position, fwd, out eh, tipLen + extra + SWING_RADIUS * sc, MASK, QueryTriggerInteraction.Ignore))
             extra = Mathf.Max(0f, eh.distance - tipLen - SWING_RADIUS * sc - 0.02f);
         Vector3 ext = tip + fwd * extra;
         float dt = Mathf.Max(Time.deltaTime, 0.004f);
-        if (prevValid)
+        if (prevValid[pc])
         {
-            Vector3 d = tip - prevTip;
+            Vector3 d = tip - prevTip[pc];
             float speed = d.magnitude / dt;
             bool fast = speed > SWING_SPEED * sc;
             if (fast) trailUntil[i] = Time.time + 0.12f;
             // the whoosh (Cor: it played whenever the weapon moved): only a real swing, and once for it; it is heard
             // again only after the hand has slowed right down
-            float handSpeed = (w.position - prevGrip).magnitude / dt;
-            if (whooshArmed && speed > WHOOSH_SPEED * sc && handSpeed > WHOOSH_HAND * sc)
+            float handSpeed = (w.position - prevGrip[pc]).magnitude / dt;
+            if (pc == 0 && whooshArmed && speed > WHOOSH_SPEED * sc && handSpeed > WHOOSH_HAND * sc)
             {
                 whooshArmed = false;   // (a real swing; no sound for it any more, Cor's group playtest)
             }
-            else if (speed < WHOOSH_REARM * sc) whooshArmed = true;
+            else if (pc == 0 && speed < WHOOSH_REARM * sc) whooshArmed = true;
             // (not while a trigger slash chops the weapon in the hand: that one strikes by itself, and the chop's own
             // speed would strike again, a hider hit twice)
             if (fast && Time.time >= nextVrHit && Time.time - mySwingAt >= SWING_TIME && local.CanStrike())
@@ -665,9 +733,9 @@ public class PHWeapons : UdonSharpBehaviour
                 // never reaches through a wall); a hider's prop beats a map prop, which beats a wall or the floor
                 float rad = SWING_RADIUS * sc;
                 strikeC = null; strikeK = 0;
-                SweepFor(prevTip, tip, rad);
-                SweepFor(prevMid, mid, rad);
-                SweepFor(prevExt, ext, rad);
+                SweepFor(prevTip[pc], tip, rad);
+                SweepFor(prevMid[pc], mid, rad);
+                SweepFor(prevExt[pc], ext, rad);
                 // the floor or a wall right by a low prop: the prop the swing was meant for (PHLocal.Assist)
                 if (strikeK == 1 && local.Assist(strikeP, strikeN, 0.25f * sc)) { strikeC = local.assistCol; strikeP = local.assistPoint; strikeK = 2; }
                 if (strikeC != null)
@@ -677,7 +745,7 @@ public class PHWeapons : UdonSharpBehaviour
                 }
             }
         }
-        prevTip = tip; prevMid = mid; prevExt = ext; prevGrip = w.position; prevValid = true;
+        prevTip[pc] = tip; prevMid[pc] = mid; prevExt[pc] = ext; prevGrip[pc] = w.position; prevValid[pc] = true;
     }
 
     // one sweep of the swing (from where a point of the weapon was last frame to where it is now): keeps the best
@@ -724,20 +792,21 @@ public class PHWeapons : UdonSharpBehaviour
 
     // ------------------------------------------------------------------ wear
     // the wear the shader draws: 0 whole .. 1 used up (the hunter's weapon condition, PHSlot.hunterHealth)
-    void SetWear(int i, int model, int condition, bool recovering)
+    void SetWear(MeshRenderer r, int model, int condition, bool recovering)
     {
         float lost = Mathf.Clamp01((PHLocal.HUNTER_HEALTH - condition) / (float)PHLocal.HUNTER_HEALTH);
-        heldRenderer[i].GetPropertyBlock(block);
+        r.GetPropertyBlock(block);
         bool grid = meleeWear != null && model < meleeWear.Length && meleeWear[model] != null;
+        bool card = meleeCard != null && model < meleeCard.Length && meleeCard[model];   // (worn by the atlas: CardWeaponsWear)
         if (grid)
         {
             block.SetTexture(idWearTex, meleeWear[model]);
             block.SetVector(idWearLo, meleeWearLo[model]);
             block.SetVector(idWearInv, meleeWearInv[model]);
         }
-        block.SetFloat(idWear, grid ? lost : 0f);
+        block.SetFloat(idWear, grid || card ? lost : 0f);
         block.SetFloat(idDither, recovering ? 1f : 0f);   // growing back: see-through dither (Cor)
-        heldRenderer[i].SetPropertyBlock(block);
+        r.SetPropertyBlock(block);
     }
 
     // the k-th bite's spot on a model, the same on every client for this slot and round
@@ -778,6 +847,7 @@ public class PHWeapons : UdonSharpBehaviour
         sound.PlayAt("impactMetal_heavy_000", held[i].position, 18f, 1f, 1f);
         held[i].gameObject.SetActive(false);
         heldModel[i] = -1;
+        ShowOff(i, -1);
     }
 
     // ------------------------------------------------------------------ the hider's selector

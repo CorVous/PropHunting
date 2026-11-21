@@ -6,6 +6,9 @@
 // solid gnawed face, its depth written), or nothing if the ray passes right through. _Wear 0 (or no texture) draws the
 // model as it is. Set per weapon by property block: _WearTex, _WearLo (the grid's corner, model space; w = its voxel size), _WearInv
 // (1 / the grid's size in metres), _Wear.
+// Cor's drawn weapons (Tools/make_card_weapons.py): flat cards whose vertices are white with alpha 0; they draw
+// _CardTex (the atlas) at their uv, cut out along its alpha, and wear by _CardWear (the same layout: the wear at which
+// each bit goes, 255 never) instead of the grid.
 Shader "PropHunt/Weapon"
 {
     Properties
@@ -16,6 +19,8 @@ Shader "PropHunt/Weapon"
         _WearInv ("1 / grid size", Vector) = (1,1,1,0)
         _Fresh ("Gnawed face tint", Color) = (0.82, 0.78, 0.72, 1)
         _Dither ("Dithered (growing back)", Float) = 0
+        _CardTex ("Drawn weapons (atlas)", 2D) = "white" {}
+        _CardWear ("Drawn weapons' wear", 2D) = "white" {}
     }
     SubShader
     {
@@ -37,14 +42,16 @@ Shader "PropHunt/Weapon"
             float4 _WearLo, _WearInv;
             fixed4 _Fresh;
             float _Dither;
+            sampler2D _CardTex, _CardWear;
 
-            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f
             {
                 float4 pos : SV_POSITION;
                 float3 obj : TEXCOORD0;
                 float3 objN : TEXCOORD1;
                 half3 albedo : TEXCOORD2;
+                float3 card : TEXCOORD4;   // xy the atlas uv, z 1 on a drawn weapon
                 UNITY_FOG_COORDS(3)
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -62,6 +69,7 @@ Shader "PropHunt/Weapon"
                 a = GammaToLinearSpace(a);
                 #endif
                 o.albedo = a;
+                o.card = float3(v.uv, v.color.a < 0.5 ? 1 : 0);
                 UNITY_TRANSFER_FOG(o, o.pos);
                 return o;
             }
@@ -93,6 +101,21 @@ Shader "PropHunt/Weapon"
                 float3 nObj = normalize(i.objN);
                 float3 albedo = i.albedo;
                 float3 nWorld = normalize(UnityObjectToWorldNormal(nObj));
+                if (i.card.z > 0.5)
+                {
+                    // a drawn weapon: the picture, cut out; worn away where its wear is reached (no grid)
+                    fixed4 c = tex2D(_CardTex, i.card.xy);
+                    clip(c.a - 0.5);
+                    if (_Wear > 0.001 && tex2D(_CardWear, i.card.xy).r * (255.0 / 254.0) <= _Wear) discard;
+                    float3 ca = c.rgb;
+                    #ifndef UNITY_COLORSPACE_GAMMA
+                    ca = GammaToLinearSpace(ca);
+                    #endif
+                    // (flat: lit mostly by the sky, so the drawing reads as drawn from either side)
+                    fixed4 oc = fixed4(ca * (0.75 + 0.35 * Light(1, nWorld)), 1);
+                    UNITY_APPLY_FOG(i.fogCoord, oc);
+                    return oc;
+                }
                 if (_Wear > 0.001)
                 {
                     float cell = _WearLo.w;   // the grid's voxel size
