@@ -15,7 +15,8 @@ public class PHPanel : UdonSharpBehaviour
 {
     public PHGame game;
 
-    // the tiles, in parallel arrays: kind 0 size, 1 props, 2 round, 3 taunt; arg is the PHGame.Panel* argument
+    // the tiles, in parallel arrays: kind 0 size, 1 props, 2 round, 3 taunt, 4 see hiders, 5 anti troll (layers); arg
+    // is the PHGame.Panel* argument (kinds 4 and 5 are switches: one tile each, arg 1, its meeple on while it is on)
     public int[] tileKind;
     public int[] tileArg;
     public GameObject[] tileMarker;      // the red meeple on the picked tile
@@ -23,6 +24,7 @@ public class PHPanel : UdonSharpBehaviour
     public RectTransform[] tileRect;
     public TextMeshProUGUI autoCaption;  // "Auto · M"
     public TextMeshProUGUI[] roundCaption;   // hunt time for Short, Normal, Long at the current size
+    public TextMeshProUGUI[] switchCaption;  // ON / OFF on the switch tiles (kinds 4, 5: index kind - 4)
 
     public TextMeshProUGUI benchText;    // "5 Props · 2 Hunters"
     public Image[] benchMeeples;
@@ -60,7 +62,7 @@ public class PHPanel : UdonSharpBehaviour
     readonly float[] roundFactor = { 0.75f, 1f, 1.5f };
 
     int seenPhase = -1; float spinStart = -10f; float spinFrom;
-    int seenSize = -99, seenDensity = -1, seenRound = -1, seenTaunt = -1;
+    int seenSize = -99, seenDensity = -1, seenRound = -1, seenTaunt = -1, seenSee = -1, seenLayers = -1;
     float nextRefresh;
     int wobble = -99; float wobbleStart;
     // the map code's feedback (Cor's playtest: entering a code said nothing): a local note for a moment after the
@@ -85,6 +87,8 @@ public class PHPanel : UdonSharpBehaviour
         if (kind == 0) return SizeValue;
         if (kind == 1) return game.densityChoice;
         if (kind == 2) return game.roundLength;
+        if (kind == 4) return game.seeHiders ? 1 : 0;
+        if (kind == 5) return game.layers ? 1 : 0;
         return game.tauntInterval;
     }
 
@@ -93,6 +97,14 @@ public class PHPanel : UdonSharpBehaviour
     {
         if (!CanEdit) { Deny(i); return; }
         int kind = tileKind[i], arg = tileArg[i];
+        if (kind >= 4)
+        {
+            // a switch: each press turns it over
+            game.panelArg = Value(kind) == 1 ? 0 : 1;
+            if (kind == 4) game.PanelSeeHiders(); else game.PanelLayers();
+            Refresh();
+            return;
+        }
         if (Value(kind) == arg) { OptionSound(kind, arg); return; }   // no change, so no change sound: play it here
         game.panelArg = arg;
         if (kind == 0) game.PanelSize();
@@ -215,6 +227,7 @@ public class PHPanel : UdonSharpBehaviour
             float gap = arg == 0 ? 0.14f : arg == 1 ? 0.26f : 0.4f;
             for (int k = 0; k < arg + 2; k++) Queue(tick, k * gap, 1f);
         }
+        else if (kind >= 4) { Queue(select, 0f, arg == 1 ? 1.25f : 0.85f); }   // a switch: up when on, down when off
         else
         {
             int n = arg <= 30 ? 3 : arg <= 40 ? 2 : 1;
@@ -254,6 +267,10 @@ public class PHPanel : UdonSharpBehaviour
         if (de != seenDensity) { seenDensity = de; OptionSound(1, de); Refresh(); }
         if (rl != seenRound) { seenRound = rl; OptionSound(2, rl); Refresh(); }
         if (ta != seenTaunt) { seenTaunt = ta; OptionSound(3, ta); Refresh(); }
+        int sh = Value(4), ly = Value(5);
+        if (seenSee < 0) { seenSee = sh; seenLayers = ly; }
+        if (sh != seenSee) { seenSee = sh; OptionSound(4, sh); Refresh(); }
+        if (ly != seenLayers) { seenLayers = ly; OptionSound(5, ly); Refresh(); }
 
         // (Perf: four times a second in the lobby and at a round's end, where the votes are counted; while a map
         // loads and the round is played, behind the veil, every two seconds; at once when the phase changes. The
@@ -326,6 +343,9 @@ public class PHPanel : UdonSharpBehaviour
             if (tileAuto[i].activeSelf != ap) tileAuto[i].SetActive(ap);
         }
         autoCaption.text = game.text.F1("panel.auto", sizeCap[auto]);
+        if (switchCaption != null)
+            for (int k = 0; k < switchCaption.Length; k++)
+                if (switchCaption[k] != null) switchCaption[k].text = game.text.Get(Value(4 + k) == 1 ? "panel.on" : "panel.off");
         int sizeNow = game.sizeAuto ? auto : game.sizeChoice;
         for (int r = 0; r < roundCaption.Length; r++)
         {

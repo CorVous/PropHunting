@@ -7,6 +7,8 @@ using VRC.SDKBase;
 // the prop to the synced pose. Updates go out only while the prop moves (about 8 a second); once it rests one
 // last update carries the final pose and nothing more is sent. The knock keeps that pose (late joiners get it)
 // until the pool reuses it for another prop or a new round starts (props go home, D11).
+// The pose is a place on the map (map-local: PHGame.layers puts each team's copy of the map somewhere else), so a knock
+// shows in every copy (the map's props are one map for everyone; only the avatars are kept apart).
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class PHKnock : UdonSharpBehaviour
 {
@@ -59,7 +61,7 @@ public class PHKnock : UdonSharpBehaviour
     void Capture()
     {
         Transform t = game.builder.objects[emit].transform;
-        pos = t.position; rot = t.rotation;
+        pos = game.builder.ToLocal(t.position); rot = t.rotation;
     }
 
     // stop simulating the old prop where it lies (only on the owner's client, which was running it)
@@ -113,10 +115,11 @@ public class PHKnock : UdonSharpBehaviour
         if (go == null) return;
         Transform g = go.transform;
         // (at rest: put once where it lies, not every frame; OnDeserialization puts it there too. Perf)
-        if (!moving) { if (restPut != go) { g.SetPositionAndRotation(pos, rot); restPut = go; } return; }
+        // (at rest it is a child of the map's root and moves with the copy: put once is enough)
+        if (!moving) { if (restPut != go) { g.SetPositionAndRotation(game.builder.ToWorld(pos), rot); restPut = go; } return; }
         restPut = null;
         float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
-        g.SetPositionAndRotation(Vector3.Lerp(g.position, pos, k), Quaternion.Slerp(g.rotation, rot, k));
+        g.SetPositionAndRotation(Vector3.Lerp(g.position, game.builder.ToWorld(pos), k), Quaternion.Slerp(g.rotation, rot, k));
     }
 
     bool wasMoving;
@@ -164,11 +167,11 @@ public class PHKnock : UdonSharpBehaviour
         restPut = null;
         // a knock that has just started: everyone hears it
         // (only on a built map: a late joiner still generating has no prop table yet, and a bad index halts this script)
-        if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0 && game.MapReady && emit < game.gen.emitDef.Length) KnockSound(pos);
+        if (moving && (!wasMoving || heardEmit != emit) && round == game.round && emit >= 0 && game.MapReady && emit < game.gen.emitDef.Length) KnockSound(game.builder.ToWorld(pos));
         wasMoving = moving; heardEmit = emit;
         // a knock of another prop took this one over: the old prop stays where it lay
         shownEmit = emit;
         if (!moving && emit >= 0 && round == game.round && game.builder.objects != null && emit < game.builder.objects.Length && game.builder.objects[emit] != null)
-            game.builder.objects[emit].transform.SetPositionAndRotation(pos, rot);
+            game.builder.objects[emit].transform.SetPositionAndRotation(game.builder.ToWorld(pos), rot);
     }
 }

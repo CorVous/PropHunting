@@ -341,7 +341,7 @@ public class PHView : UdonSharpBehaviour
         if (!pip && game.round != pipWarmRound && game.MapReady && (game.phase == PHGame.PH_LOADING || game.phase == PHGame.PH_BRIEF))
         {
             pipWarmRound = game.round;
-            Vector3 at = game.builder.ReleasePoint();
+            Vector3 at = game.builder.ToWorld(game.builder.ReleasePoint());
             pipCam.transform.SetPositionAndRotation(at + new Vector3(0f, 3f, 0f), Quaternion.Euler(30f, game.builder.ReleaseYaw(), 0f));
             pipWant = true;
         }
@@ -503,7 +503,7 @@ public class PHView : UdonSharpBehaviour
     void PlaceCamera(PHSlot s)
     {
         float h = game.gen.defSy[s.def] / 1000f;
-        Vector3 target = s.propPos + Vector3.up * (h * 0.6f);
+        Vector3 target = game.builder.ToWorld(s.propPos) + Vector3.up * (h * 0.6f);   // (propPos is map-local)
         Quaternion head = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation;
         Vector3 back = head * Vector3.back; back.y = 0f;
         if (back.sqrMagnitude < 1e-4f) back = Vector3.back;
@@ -544,6 +544,7 @@ public class PHView : UdonSharpBehaviour
             if (cutOn) { VRCShader.SetGlobalVector(cutId, Vector4.zero); cutOn = false; }
             return;
         }
+        if (fenceVer != game.builder.originVer) fenceDirty = true;   // (the map's copy moved: PHGame.layers)
         if (fenceDirty) LearnFences();
         UpdateHidden(s);
         cutAmt = Mathf.MoveTowards(cutAmt, cutWant ? 1f : 0f, Time.deltaTime / CUT_EASE);
@@ -556,9 +557,10 @@ public class PHView : UdonSharpBehaviour
         float sx = game.gen.defSx[s.def] / 1000f, sy = game.gen.defSy[s.def] / 1000f, sz = game.gen.defSz[s.def] / 1000f;
         float r = Mathf.Clamp(0.5f * Mathf.Sqrt(sx * sx + sy * sy + sz * sz) + 0.5f, 0.8f, 2.5f);
         r *= cutAmt * cutAmt * (3f - 2f * cutAmt);
-        Vector3 c = s.propPos + Vector3.up * (sy * 0.5f);
+        Vector3 pw = game.builder.ToWorld(s.propPos);
+        Vector3 c = pw + Vector3.up * (sy * 0.5f);
         VRCShader.SetGlobalVector(cutId, new Vector4(c.x, c.y, c.z, r));
-        VRCShader.SetGlobalVector(cutFloorId, new Vector4(s.propPos.y, 0f, 0f, 0f));
+        VRCShader.SetGlobalVector(cutFloorId, new Vector4(pw.y, 0f, 0f, 0f));
     }
 
     // a round of CUT_RAYS rays every CUT_EVERY seconds, CUT_PER_FRAME of them a frame; at the round's end the share
@@ -587,10 +589,11 @@ public class PHView : UdonSharpBehaviour
         }
         Vector3 cam = pipCam.transform.position;
         Quaternion q = Quaternion.Euler(0f, s.propYaw, 0f);
+        Vector3 pw = game.builder.ToWorld(s.propPos);
         int end = Mathf.Min(CUT_RAYS, cutRay + CUT_PER_FRAME);
         while (cutRay < end)
         {
-            if (Blocked(cam, s.propPos + q * CutPoint(cutRay))) cutBlocked++;
+            if (Blocked(cam, pw + q * CutPoint(cutRay))) cutBlocked++;
             cutRay++;
         }
         if (cutRay < CUT_RAYS) return;
@@ -658,9 +661,12 @@ public class PHView : UdonSharpBehaviour
     int fenceI0, fenceJ0, fenceNx, fenceNz;
     Collider fenceArch;
 
+    int fenceVer;
+
     void LearnFences()
     {
         fenceDirty = false;
+        fenceVer = game.builder.originVer;
         fenceX = null; fenceZ = null; fenceArch = null;
         MapBuilderUdon b = game.builder;
         if (b == null || b.fenceRoot == null || b.collisionCollider == null) return;

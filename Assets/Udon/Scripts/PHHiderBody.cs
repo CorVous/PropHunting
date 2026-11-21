@@ -86,6 +86,12 @@ public class PHHiderBody : UdonSharpBehaviour
     // floor). Nudges look for room around the seat, not the prop, so repeated ones do not walk the prop away.
     [HideInInspector] public Vector3 lag;
     const float LAG_MAX = 1.5f;
+
+    // the map's copy moved by d (PHGame.layers, PHLocal.ShiftLocal): every world place the body holds moves with it
+    public void MoveBy(Vector3 d)
+    {
+        pos += d; home += d; gapAt += d; liftFrom += d; liftTo += d; stillPos += d;
+    }
     void Shift(Vector3 to)
     {
         lag += pos - to;

@@ -31,6 +31,8 @@ public class PHSlot : UdonSharpBehaviour
     [UdonSynced] public int readyRound = -1;
     [UdonSynced] public int def = -1;                 // disguise, -1 = none
     [UdonSynced] public int lastDef = -1;             // the disguise worn last (for the reveal, after a catch)
+    // (propPos and walkPos are places on the map, map-local: with PHGame.layers each client's copy of the map stands
+    // somewhere else, MapBuilderUdon.ToWorld; with it off they are world places, as ever)
     [UdonSynced] public Vector3 propPos;
     [UdonSynced] public float propYaw;
     [UdonSynced] public bool airborne;                // the prop is off the ground (a hop, a fall): its stretch and squash (Squash)
@@ -116,8 +118,17 @@ public class PHSlot : UdonSharpBehaviour
         station.PlayerMobility = VRCStation.Mobility.Mobile;
         nextSit = Time.time + 0.3f;
         VRCPlayerApi me = Networking.LocalPlayer;
-        walkPos = me.GetPosition(); walkYaw = me.GetRotation().eulerAngles.y;
+        walkPos = game.builder.ToLocal(me.GetPosition()); walkYaw = me.GetRotation().eulerAngles.y;
         Send();
+    }
+
+    // out of the seat for a move to another copy of the map (PHLocal.ShiftLocal, PHGame.layers): a teleport does not
+    // take a seated player along; the seat is taken again a moment later (UpdateOwner)
+    public void LeaveSeatForMove()
+    {
+        if (seated) station.ExitStation(Networking.LocalPlayer);
+        seated = false;
+        nextSit = Time.time + 0.5f;
     }
 
     public void StopHiding()
@@ -234,7 +245,7 @@ public class PHSlot : UdonSharpBehaviour
         PHAudio a = game.local.sound;
         AudioClip c = a.Clip(a.Pick(a.taunts, pick));
         if (c == null) return;
-        voice.transform.position = proxy != null ? proxy.transform.position : propPos;
+        voice.transform.position = proxy != null ? proxy.transform.position : game.builder.ToWorld(propPos);
         voice.PlayOneShot(c, 1f);
     }
 
@@ -293,16 +304,18 @@ public class PHSlot : UdonSharpBehaviour
             // the hider's body moves the station (and the seated player with it)
             // (after a correction the seat stays where it was until the prop makes its way back: PHHiderBody.lag)
             station.transform.SetPositionAndRotation(body.pos + body.lag, Quaternion.Euler(0f, body.stationYaw, 0f));
-            if ((body.pos - propPos).sqrMagnitude > 0.0004f) { propPos = body.pos; Send(); }
+            Vector3 lp = game.builder.ToLocal(body.pos);
+            if ((lp - propPos).sqrMagnitude > 0.0004f) { propPos = lp; Send(); }
             if (Mathf.Abs(Mathf.DeltaAngle(body.yaw, propYaw)) > 1f) { propYaw = body.yaw; Send(); }
             if (body.grounded == airborne) { airborne = !body.grounded; Send(); }
         }
         // otherwise the station follows the player, so sitting down leaves them where they are
         else station.transform.SetPositionAndRotation(me.GetPosition(), me.GetRotation());
         SeatCheck(me);
-        if (ghost)
+        // (not while the player is being moved to another copy of the map, PHLocal.ShiftLocal: the place is in flux)
+        if (ghost && (game.local == null || Time.time >= game.local.moveUntil))
         {
-            Vector3 p = me.GetPosition();
+            Vector3 p = game.builder.ToLocal(me.GetPosition());
             float y = me.GetRotation().eulerAngles.y;
             if ((p - walkPos).sqrMagnitude > 0.0025f || Mathf.Abs(Mathf.DeltaAngle(y, walkYaw)) > 5f) { walkPos = p; walkYaw = y; Send(); }
         }
@@ -357,10 +370,10 @@ public class PHSlot : UdonSharpBehaviour
             // ghosts see ghosts; nobody else does (Cor: the dead see only the dead and the hunters)
             if (game.local != null && game.local.IsGhost())
             {
-                Vector3 at = station.transform.position;
-                if ((at - walkPos).sqrMagnitude > 25f) at = walkPos;
+                Vector3 at = station.transform.position, wp = game.builder.ToWorld(walkPos);
+                if ((at - wp).sqrMagnitude > 25f) at = wp;
                 float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
-                station.transform.SetPositionAndRotation(Vector3.Lerp(at, walkPos, k), Quaternion.Euler(0f, walkYaw, 0f));
+                station.transform.SetPositionAndRotation(Vector3.Lerp(at, wp, k), Quaternion.Euler(0f, walkYaw, 0f));
                 parked = false;
             }
             else Park();
@@ -418,8 +431,11 @@ public class PHSlot : UdonSharpBehaviour
         seated = false;
     }
 
+    Vector3 propWorld;   // propPos in this client's copy of the map (UpdateProxy, each frame)
+
     void UpdateProxy(bool mine)
     {
+        propWorld = game.builder.ToWorld(propPos);
         // (only a hider of this round: a slot handed to a newcomer still carries the last player's prop until the
         // newcomer's client takes it over, and that stray prop could be seen and shot)
         int want = (hiding && def >= 0 && game.slotPlayer[index] != 0 && game.slotRole[index] == PHGame.ROLE_HIDER) ? def : -1;
@@ -427,6 +443,7 @@ public class PHSlot : UdonSharpBehaviour
         {
             proxyDef = want;
             if (revealCopy != null) { Destroy(revealCopy); revealCopy = null; }
+            MateCageOff();   // (the fellow hider's cage is this slot's: kept for the next prop)
             if (proxy != null) { game.builder.Uncage(proxy); Destroy(proxy); }   // the cage is lent, not the prop's
             proxy = null;
             if (want >= 0 && game.builder.propPrefabs != null && want < game.builder.propPrefabs.Length && game.builder.propPrefabs[want] != null)
@@ -435,21 +452,21 @@ public class PHSlot : UdonSharpBehaviour
                 game.builder.TintProp(proxy, want);   // the map's foliage colour, as the props it hides among
                 if (squashRig != null)
                 {
-                    squashRig.SetPositionAndRotation(propPos, Quaternion.identity);
+                    squashRig.SetPositionAndRotation(propWorld, Quaternion.identity);
                     squashRig.localScale = Vector3.one;
                     proxy.transform.SetParent(squashRig, true);
                 }
                 else proxy.transform.SetParent(proxyRoot, true);
-                proxy.transform.position = propPos;
+                proxy.transform.position = propWorld;
                 proxy.name = "Hider" + index;
-                shownPos = propPos; shownYaw = propYaw;
+                shownPos = propWorld; shownYaw = propYaw;
                 // the squash through a doorway starts from the prefab's own scale
                 proxyScale = proxy.transform.localScale;
                 squashX = 1f; squashZ = 1f; squashVX = 0f; squashVZ = 0f; wantX = 1f; wantZ = 1f;
                 // the slots' looks spread over the 0.08 s between them, never all in one frame
                 squashNext = Time.time + (index % 32) * 0.0025f; gapMeasured = false;
                 squashY = 1f; squashVY = 0f; wantY = 1f;
-                hopS = 1f; hopV = 0f; wasAirborne = airborne; lastY = propPos.y; hopVY = 0f; hopFall = 0f; hopDipped = true;
+                hopS = 1f; hopV = 0f; wasAirborne = airborne; lastY = propWorld.y; hopVY = 0f; hopFall = 0f; hopDipped = true;
                 proxyHalf = new Vector3(game.gen.defSx[want], game.gen.defSy[want], game.gen.defSz[want]) / 2000f;
                 // its shade patch (the prefab's last child), shown only while it stands on a floor (ShadeCheck)
                 proxyShade = null; shadeNext = 0f;
@@ -476,6 +493,7 @@ public class PHSlot : UdonSharpBehaviour
             }
         }
         if (proxy == null) return;
+        UpdateMateCage(mine);
         // the END reveal (Cor): every hider's prop highlighted through walls, for everyone (a late joiner too)
         // (each slot a little after the one before: every hider's copy made in the one frame was part of the END hitch)
         if (game.phase == PHGame.PH_END) { if (revealAt < 0f) revealAt = Time.time + index * 0.05f; }
@@ -484,12 +502,12 @@ public class PHSlot : UdonSharpBehaviour
         if (reveal && revealCopy == null) MakeRevealCopy();
         else if (!reveal && revealCopy != null) { Destroy(revealCopy); revealCopy = null; }
         float k = mine ? 1f : 1f - Mathf.Exp(-14f * Time.deltaTime);
-        if ((propPos - shownPos).sqrMagnitude > 25f) k = 1f;
-        shownPos = Vector3.Lerp(shownPos, propPos, k);
+        if ((propWorld - shownPos).sqrMagnitude > 25f) k = 1f;
+        shownPos = Vector3.Lerp(shownPos, propWorld, k);
         shownYaw = Mathf.LerpAngle(shownYaw, propYaw, k);
         // Perf: the ease never quite arrives, so a still prop was moved every frame (its colliders with it). Within a
         // millimetre and a tenth of a degree it arrives, and a prop where it was put last frame is not put again.
-        if ((propPos - shownPos).sqrMagnitude < 1e-6f) shownPos = propPos;
+        if ((propWorld - shownPos).sqrMagnitude < 1e-6f) shownPos = propWorld;
         if (Mathf.Abs(Mathf.DeltaAngle(shownYaw, propYaw)) < 0.1f) shownYaw = propYaw;
         bool still = placedProxy == proxy && shownPos == placedPos && shownYaw == placedYaw;
         placedProxy = proxy; placedPos = shownPos; placedYaw = shownYaw;
@@ -503,6 +521,32 @@ public class PHSlot : UdonSharpBehaviour
         else if (!still) proxy.transform.SetPositionAndRotation(shownPos, Quaternion.Euler(0f, shownYaw, 0f));
         if (proxyShade != null && Time.time >= shadeNext) { shadeNext = Time.time + 0.15f; ShadeCheck(); }
         Squash();
+    }
+
+    // ---- a fellow hider's prop (PHGame.seeHiders, Cor: a host setting): while the local player is a hider or a ghost,
+    // every other hider's prop carries a copy of the edge cage the own prop shows in first person, in the hiders' green
+    // (MapBuilderUdon.MateCage), so hiders can see each other. Outline only, no names. The copy is this slot's own:
+    // made the first time, moved to the next prop, switched off otherwise.
+    GameObject mateCage;
+    GameObject mateOn;   // the prop it hangs on now (null: off)
+
+    void UpdateMateCage(bool mine)
+    {
+        bool want = !mine && game.local != null && game.local.seeMates && game.phase != PHGame.PH_END;
+        GameObject target = want ? proxy : null;
+        if (target == mateOn) return;
+        MateCageOff();
+        if (target == null) return;
+        mateCage = game.builder.MateCage(target, proxyDef, mateCage);
+        mateOn = target;   // (also where the model has no cage: not asked again every frame)
+    }
+
+    void MateCageOff()
+    {
+        mateOn = null;
+        if (mateCage == null) return;
+        mateCage.SetActive(false);
+        mateCage.transform.SetParent(proxyRoot, false);   // (not destroyed with the prop it hung on)
     }
 
     // A big prop squeezes through a doorway (PHHiderBody moves it as a narrower box there). What everyone sees (Cor:
@@ -550,13 +594,13 @@ public class PHSlot : UdonSharpBehaviour
         // (over the frame's real length: after a hitch dt is held to 0.033 and dy / dt read as a fast hop or fall)
         hopVY = Mathf.Lerp(hopVY, Mathf.Clamp(dy / Time.deltaTime, -12f, 12f), 1f - Mathf.Exp(-25f * dt));
         // (in the air until the shown prop is down too: elsewhere it follows the synced place a little behind)
-        bool air = airborne || shownPos.y - propPos.y > 0.015f;
+        bool air = airborne || shownPos.y - propWorld.y > 0.015f;
         if (air)
         {
             hopFall = Mathf.Max(hopFall, -hopVY);
             // the dip as it leaves the ground, once it is seen to rise (stepping off an edge has none); elsewhere
             // as soon as the synced place is above the shown one, while the shown prop is still on the ground
-            if (!hopDipped && (hopVY > 1.5f || propPos.y - shownPos.y > 0.05f)) { hopDipped = true; hopS = 1f - HOP_DIP; hopV = 0f; return; }
+            if (!hopDipped && (hopVY > 1.5f || propWorld.y - shownPos.y > 0.05f)) { hopDipped = true; hopS = 1f - HOP_DIP; hopV = 0f; return; }
         }
         if (air != wasAirborne)
         {

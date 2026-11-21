@@ -77,6 +77,7 @@ public class PHLocal : UdonSharpBehaviour
         role = game.RoleOf(slotIndex);
         game.Log("phase " + phase + " round " + game.round + " slot " + slotIndex + " role " + role);
         if (s != null) s.Claim();
+        UpdateOrigin();   // (first: the landing, the release and the reveal below are places in the team's copy of the map)
         switch (phase)
         {
             case PHGame.PH_LOBBY:
@@ -86,7 +87,7 @@ public class PHLocal : UdonSharpBehaviour
                 RestoreEye();
                 SetPropLayer(LAYER_PROPS_SOLID);
                 SetFrozen(false);
-                if (role == PHGame.ROLE_NONE && game.lobbySpawn != null && game.round > 0) me.TeleportTo(game.lobbySpawn.position, game.lobbySpawn.rotation);
+                if (role == PHGame.ROLE_NONE && game.lobbySpawn != null && game.round > 0) { movePending = false; me.TeleportTo(game.lobbySpawn.position, game.lobbySpawn.rotation); }
                 game.builder.ResetMood();   // the lobby's own light, not the last map's (Cor); UpdateMood keeps it right after
                 break;
             case PHGame.PH_LOADING:
@@ -129,7 +130,8 @@ public class PHLocal : UdonSharpBehaviour
                 hidersAtStart = game.HidersLeft(); oneLeftSaid = false;
                 if (role == PHGame.ROLE_HUNTER)
                 {
-                    me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+                    movePending = false;   // (an explicit move wins over a copy move still waiting, ShiftLocal)
+                    me.TeleportTo(game.builder.ToWorld(game.builder.ReleasePoint()) + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
                     game.builder.WriteMood();   // out of the lobby: the map's mood
                     SetFrozen(false);
                     Say(T("say.hunt"), 3f);
@@ -175,7 +177,8 @@ public class PHLocal : UdonSharpBehaviour
             at = game.builder.InnerWorld(c);   // upstairs or in a basement too
             facing = game.gen.SpawnFacing(c);
         }
-        Networking.LocalPlayer.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
+        movePending = false;
+        Networking.LocalPlayer.TeleportTo(game.builder.ToWorld(at) + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
     }
 
     // A respawn (VRChat's menu) during a round sent a hider to the lobby, where the hunt then made them a prop (Cor,
@@ -197,6 +200,7 @@ public class PHLocal : UdonSharpBehaviour
         if (s == null || s.caught || s.ghost) return;
         int r = game.RoleOf(slotIndex);
         VRCPlayerApi me = Networking.LocalPlayer;
+        movePending = false;   // (this move wins over a copy move still waiting, ShiftLocal)
         if (r == PHGame.ROLE_HIDER)
         {
             if (s.hiding && body.active) me.TeleportTo(body.pos + Vector3.up * 0.1f, Quaternion.Euler(0f, body.yaw, 0f));
@@ -205,7 +209,7 @@ public class PHLocal : UdonSharpBehaviour
         }
         else if (r == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT)
         {
-            me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+            me.TeleportTo(game.builder.ToWorld(game.builder.ReleasePoint()) + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
             game.Log("respawned in the hunt: back to the release");
         }
         else return;
@@ -230,7 +234,7 @@ public class PHLocal : UdonSharpBehaviour
         if (!Utilities.IsValid(me)) return;
         Vector3 p = me.GetPosition();
         Vector3 lobby = game.lobbySpawn != null ? game.lobbySpawn.position : (game.lobbyZone != null ? game.lobbyZone.bounds.center : Vector3.zero);
-        Vector3 map = new Vector3(b.SiteWidth() * 0.5f, 0f, b.SiteDepth() * 0.5f);
+        Vector3 map = b.ToWorld(new Vector3(b.SiteWidth() * 0.5f, 0f, b.SiteDepth() * 0.5f));   // (this client's copy)
         bool inLobby = !b.built || (p - lobby).sqrMagnitude < (p - map).sqrMagnitude;
         if (inLobby) { if (b.moodShown) b.ResetMood(); }
         else if (!b.moodShown) b.WriteMood();
@@ -289,8 +293,11 @@ public class PHLocal : UdonSharpBehaviour
         if (!game.MapReady) return;
         joinChecked = true;
         s.Claim();   // (first: the slot's takeover clearing, PHSlot.Fresh, must not wipe the ghost state written next)
-        Networking.LocalPlayer.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+        // a ghost first, so the release below is the one in the ghosts' copy of the map (PHGame.layers)
         s.StartGhost();
+        UpdateOrigin();
+        movePending = false;
+        Networking.LocalPlayer.TeleportTo(game.builder.ToWorld(game.builder.ReleasePoint()) + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
         Say(T("say.ghostJoin"), 5f);
     }
 
@@ -350,6 +357,11 @@ public class PHLocal : UdonSharpBehaviour
         }
         bool iHide = round && myRole == PHGame.ROLE_HIDER && me != null && me.hiding && !meGhost;
         bool iHunt = round && myRole == PHGame.ROLE_HUNTER && !meGhost;
+        // (PHGame.layers: a player of another team is on another copy of the map, LAYER_GAP away; their voice falls off
+        // by how far they are on the map instead, below)
+        bool layered = game.LayersOn();
+        int myTeam = me != null ? game.TeamOf(me.index) : PHGame.TEAM_SHARED;
+        Vector3 myPos = Networking.LocalPlayer.GetPosition(), myLocal = myPos - game.TeamOrigin(myTeam);
         for (int i = 0; i < n; i++)
         {
             VRCPlayerApi p = voicePlayers[i];
@@ -362,6 +374,17 @@ public class PHLocal : UdonSharpBehaviour
             bool theyHide = round && ps != null && game.RoleOf(slot) == PHGame.ROLE_HIDER && ps.hiding && !ps.ghost;
             // 1: VRChat's default, 2: a hunter does not hear a hider, 3: hiders hear each other like a radio
             int want = (iHunt && theyHide) ? 2 : ((iHide && theyHide) ? 3 : 1);
+            // another copy of the map (a hunter heard by a hider or a ghost): VRChat's fall-off over 25 m, begun as far
+            // out as the copies lie apart, so they sound as near as they are on the map (only the loudness: the way they
+            // are heard from is no guide; the wide volumetric radius keeps it from pointing at the other copy). Coded as
+            // 10 + the near distance in whole metres; one that comes out at 0 is VRChat's default
+            if (want == 1 && layered && slot >= 0 && game.TeamOf(slot) != myTeam)
+            {
+                Vector3 pp = p.GetPosition();
+                float dw = Vector3.Distance(pp, myPos), dl = Vector3.Distance(pp - game.SlotOrigin(slot), myLocal);
+                int nearM = Mathf.Clamp(Mathf.RoundToInt(dw - dl), 0, 999);
+                if (nearM > 0) want = 10 + nearM;
+            }
             // what was set for this player last (an open-addressed table keyed by player id; a full one starts over)
             int at = pid & (VOICE_HASH - 1), probes = 0;
             while (voiceSetId[at] != 0 && voiceSetId[at] != pid && probes < VOICE_HASH) { at = (at + 1) & (VOICE_HASH - 1); probes++; }
@@ -372,6 +395,7 @@ public class PHLocal : UdonSharpBehaviour
             bool lowpass = true;
             if (want == 2) gain = 0f;
             else if (want == 3) { gain = 9f; near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }   // (quieter: Cor's group playtest)
+            else if (want >= 10) { near = want - 10; far = near + 25f; radius = near; }
             p.SetVoiceGain(gain);
             p.SetVoiceDistanceNear(near);
             p.SetVoiceDistanceFar(far);
@@ -399,7 +423,7 @@ public class PHLocal : UdonSharpBehaviour
             bool show = on && game.slotPlayer[i] != 0 && game.slotRole[i] == PHGame.ROLE_HIDER;
             s.beacon.SetActive(show);
             if (!show) continue;
-            s.beacon.transform.position = new Vector3(s.propPos.x, 0f, s.propPos.z);
+            s.beacon.transform.position = game.builder.ToWorld(new Vector3(s.propPos.x, 0f, s.propPos.z));
             s.beaconRenderer.sharedMaterial = s.caught ? beaconRed : beaconGreen;
         }
         if (on && resultsText != null) resultsText.text = Results();
@@ -528,7 +552,7 @@ public class PHLocal : UdonSharpBehaviour
         if (s.maxHealth <= 0) { s.maxHealth = PHSlot.HIDER_HEALTH; s.health = PHSlot.HIDER_HEALTH; }
         s.def = d; s.lastDef = d;
         body.SetProp(d);
-        s.propPos = body.pos;
+        s.propPos = game.builder.ToLocal(body.pos);   // (map-local: PHSlot)
         s.propYaw = body.yaw;
         s.Send();
         float h = game.gen.defSy[d] / 1000f;
@@ -812,6 +836,9 @@ public class PHLocal : UdonSharpBehaviour
 
     void UpdateBody()
     {
+        UpdateOrigin();
+        UpdateSeeMates();
+        UpdateStandIns();
         UpdateWeaponRepair();
         if (Input.GetKeyDown(KeyCode.T)) Taunt();
         if (propLayer >= 0 && game.builder.built && (!layerDone || layerObjs != game.builder.objects)) SetPropLayer(propLayer);
@@ -1109,7 +1136,7 @@ public class PHLocal : UdonSharpBehaviour
             if (game.RoleOf(i) != PHGame.ROLE_HUNTER || game.slots[i].hunterOut) continue;
             VRCPlayerApi p = VRCPlayerApi.GetPlayerById(game.slotPlayer[i]);
             if (p == null || !Utilities.IsValid(p) || p.isLocal) continue;
-            Vector3 feet = p.GetPosition();
+            Vector3 feet = game.SeenHere(i, p.GetPosition());   // (where this client draws them: their stand-in, PHGame.layers)
             float top = Mathf.Max(0.5f, p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position.y - feet.y + 0.15f);
             float tAt = RayToUpright(o, dir, feet, top);
             if (tAt < 0f || tAt >= bestT) continue;
@@ -1121,7 +1148,7 @@ public class PHLocal : UdonSharpBehaviour
         if (!s.armed) { s.armed = true; s.Send(); Say(T("say.gunSeen"), 4f); }
         if (weapons != null) weapons.FireSelector();
         statShots++;
-        s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Shot), end, best);
+        s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Shot), game.builder.ToLocal(end), best);   // (map-local)
         if (best >= 0)
         {
             statShotHits++;
@@ -1242,7 +1269,7 @@ public class PHLocal : UdonSharpBehaviour
         float eye = Networking.LocalPlayer.GetAvatarEyeHeightAsMeters();
         float reach = Mathf.Max(MELEE_REACH * Mathf.Clamp(eye / 1.6f, 0.5f, 3f), eye + 0.6f);
         lastHitName = "nothing";
-        if (!Reach(reach)) { s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), Aim0(), 0); return; }
+        if (!Reach(reach)) { s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(Aim0()), 0); return; }
         Collider c = hit.collider; Vector3 at = hit.point;
         // the slash met the floor or a wall right by a low prop (the wide cast grazes the floor before the prop):
         // the prop it was meant for, if one is that close and in plain sight of the contact
@@ -1336,19 +1363,19 @@ public class PHLocal : UdonSharpBehaviour
             if (was > 0 && was - takes <= 0) s.catches++;
             s.Send();
             sound.Play("confirmation_002", 0.8f);
-            s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), point, 3);
+            s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(point), 3);   // (map-local)
             return;
         }
         int e = EmitOf(c.transform);
         if (e < 0)
         {
             // a wall or a door: nothing happens but sparks (a VR swing through the air never gets here)
-            s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), point, 1);
+            s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(point), 1);
             return;
         }
         KnockProp(e, dir, point);
         statPropHits++;
-        s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), point, 2);
+        s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(point), 2);
         // a real prop: it wears the weapon (G17), but the same prop again within 5 s costs nothing
         if (e == lastCharged && Time.time - lastChargedAt < WRONG_SAME_WINDOW) return;
         lastCharged = e; lastChargedAt = Time.time;
@@ -1510,6 +1537,127 @@ public class PHLocal : UdonSharpBehaviour
             SetFrozen(false);
         }
         else Say(game.text.F1("say.hitLeft", s.health.ToString()), 2.5f);
+    }
+
+    // ------------------------------------------------------------------ the team's copy of the map (PHGame.layers)
+    // Each frame (and at once on a phase change): the copy this player's team plays on (PHGame.TeamOf, TeamOrigin) is
+    // given to the builder, which moves the map there (at once if it stands, else once built). When the copy this
+    // player stands in moves (a hider caught, a hunter out, the END reveal back on the shared copy), everything this
+    // client holds as a world place moves with it (ShiftLocal), and the player too, when they are on the map.
+    Vector3 lastOrigin;          // the copy the player's place was last relative to
+    Vector3 moveTo;              // a move waiting for the seat to be left (ShiftLocal)
+    Quaternion moveRot;
+    bool movePending;
+    [System.NonSerialized] public float moveUntil;   // until then the player's place is in flux (PHSlot: no ghost walk sent)
+
+    void UpdateOrigin()
+    {
+        MapBuilderUdon b = game.builder;
+        PHSlot s = game.LocalSlot();
+        b.SetOrigin(game.TeamOrigin(game.TeamOf(s != null ? s.index : -1)));
+        if (b.origin == lastOrigin) return;
+        Vector3 was = lastOrigin;
+        lastOrigin = b.origin;
+        ShiftLocal(b.origin - was, was);
+    }
+
+    void ShiftLocal(Vector3 d, Vector3 was)
+    {
+        if (body.active) body.MoveBy(d);
+        checkPos += d;
+        ShiftRocks(d);
+        VRCPlayerApi me = Networking.LocalPlayer;
+        // (a move still waiting: from where it goes, so two moves close together end on the right copy)
+        Vector3 p = movePending ? moveTo : me.GetPosition(), at = p - was;
+        float w = game.builder.SiteWidth(), dp = game.builder.SiteDepth();
+        // (on the map: within its site and a margin; not in the lobby, not parked under it)
+        bool onMap = at.x > -80f && at.z > -80f && at.x < w + 80f && at.z < dp + 80f && at.y > -150f;
+        game.Log("map copy moved by " + d.x.ToString("F0") + " m" + (onMap ? ", the player with it" : ""));
+        if (!onMap) return;
+        PHSlot s = game.LocalSlot();
+        if (s != null)
+        {
+            Transform st = s.station.transform;
+            st.position = st.position + d;   // (a seat left now drops them where it is)
+            // hiding: the seat (an Immobilize station, at the moved body: PHSlot.UpdateOwner) carries them
+            if (s.seated && s.hiding && body.active) return;
+        }
+        if (!movePending) moveRot = me.GetRotation();
+        moveTo = p + d;
+        if (movePending) return;   // (the waiting move goes there instead)
+        // a teleport does not take a seated player: out of the seat first (a ghost's), the move two frames later
+        if (s != null && (s.seated || s.hiding || s.ghost))
+        {
+            s.LeaveSeatForMove();
+            movePending = true; moveUntil = Time.time + 1f;
+            SendCustomEventDelayedFrames(nameof(_ShiftMove), 2);
+        }
+        else me.TeleportTo(moveTo, moveRot);
+    }
+
+    public void _ShiftMove()
+    {
+        if (!movePending) return;
+        movePending = false;
+        moveUntil = Time.time + 0.2f;
+        Networking.LocalPlayer.TeleportTo(moveTo, moveRot);
+    }
+
+    void ShiftRocks(Vector3 d)
+    {
+        if (rockT == null) return;
+        for (int i = 0; i < ROCK_MAX; i++) if (rockT[i] != null) rockPos[i] = rockPos[i] + d;
+        for (int r = 0; r < riderT.Length; r++) if (riderT[r] != null) riderPos[r] = riderPos[r] + d;
+    }
+
+    // ---- hiders see each other (PHGame.seeHiders): the other hiders' props carry an edge cage (PHSlot.UpdateMateCage)
+    // while this player is a hider or a ghost in the round
+    [System.NonSerialized] public bool seeMates;
+
+    void UpdateSeeMates()
+    {
+        PHSlot s = game.LocalSlot();
+        int ph = game.phase;
+        seeMates = game.seeHiders && s != null && (ph == PHGame.PH_BRIEF || ph == PHGame.PH_HIDE || ph == PHGame.PH_HUNT)
+            && (s.ghost || game.RoleOf(s.index) == PHGame.ROLE_HIDER);
+    }
+
+    // ---- the hunters' stand-ins (PHGame.layers): a hider or a ghost plays on another copy of the map than the hunters,
+    // so the hunters' avatars are not there. Each hunter in the hunt is drawn there instead as a plain body of their
+    // height (one per slot, WorldSceneBuilder), where they stand on the map, facing their way; their weapon is drawn
+    // in the same place (PHWeapons.PlaceOther). No collider: nobody can be blocked by one.
+    public Transform[] standIns;
+    bool standInsOut;
+
+    void UpdateStandIns()
+    {
+        if (standIns == null || standIns.Length == 0) return;
+        PHSlot ms = game.LocalSlot();
+        bool on = game.phase == PHGame.PH_HUNT && game.LayersOn() && game.TeamOf(ms != null ? ms.index : -1) != PHGame.TEAM_SHARED;
+        if (!on)
+        {
+            if (!standInsOut) return;
+            standInsOut = false;
+            for (int i = 0; i < standIns.Length; i++) if (standIns[i] != null && standIns[i].gameObject.activeSelf) standIns[i].gameObject.SetActive(false);
+            return;
+        }
+        standInsOut = true;
+        int n = Mathf.Min(standIns.Length, game.slots.Length);
+        for (int i = 0; i < n; i++)
+        {
+            Transform t = standIns[i];
+            if (t == null) continue;
+            int pid = game.slotPlayer[i];
+            bool show = pid != 0 && game.slotRole[i] == PHGame.ROLE_HUNTER && !game.slots[i].hunterOut && game.TeamOf(i) == PHGame.TEAM_SHARED;
+            VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
+            if (show && (p == null || !Utilities.IsValid(p) || p.isLocal)) show = false;
+            if (t.gameObject.activeSelf != show) t.gameObject.SetActive(show);
+            if (!show) continue;
+            Vector3 feet = p.GetPosition();
+            float h = Mathf.Clamp(p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position.y - feet.y + 0.12f, 0.5f, 3f);
+            t.SetPositionAndRotation(game.SeenHere(i, feet) + Vector3.up * (h * 0.5f), Quaternion.Euler(0f, p.GetRotation().eulerAngles.y, 0f));
+            t.localScale = new Vector3(0.45f, h * 0.5f, 0.45f);
+        }
     }
 
     // ------------------------------------------------------------------ HUD

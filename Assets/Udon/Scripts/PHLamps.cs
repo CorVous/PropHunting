@@ -44,9 +44,11 @@ public class PHLamps : UdonSharpBehaviour
     {
         if (builder == null || pool == null) return;
         bool b = builder.built;
-        if (b && !wasBuilt) SendCustomEventDelayedFrames(nameof(Place), 3);
+        if (b && !wasBuilt) { placeQueued = true; SendCustomEventDelayedFrames(nameof(Place), 3); }
         if (!b && wasBuilt) Off();
         wasBuilt = b;
+        // the map's copy moved (PHGame.layers): the lamps go with it
+        if (b && !placeQueued && builder.originVer != placedVer) { placeQueued = true; SendCustomEventDelayedFrames(nameof(Place), 3); }
         if (!b || used == 0) return;
         followTimer += Time.deltaTime;
         if (followTimer < followSeconds) return;
@@ -75,11 +77,16 @@ public class PHLamps : UdonSharpBehaviour
     Vector3 PointWorld(int p)
     {
         Transform f = builder.lightFollow[p];
-        return f != null ? f.TransformPoint(builder.lightPos[p]) : builder.lightPos[p];
+        return f != null ? f.TransformPoint(builder.lightPos[p]) : builder.ToWorld(builder.lightPos[p]);   // (a fixed point is map-local)
     }
+
+    bool placeQueued;
+    int placedVer;
 
     public void Place()
     {
+        placeQueued = false;
+        placedVer = builder.originVer;
         Off();
         if (!builder.built) return;
         int n = builder.nLights;

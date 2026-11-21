@@ -48,9 +48,11 @@ public class PHSun : UdonSharpBehaviour
     {
         if (builder == null || spot == null) return;
         bool b = builder.built;
-        if (b && !wasBuilt) SendCustomEventDelayedFrames(nameof(Bake), 2);
+        if (b && !wasBuilt) { bakeQueued = true; SendCustomEventDelayedFrames(nameof(Bake), 2); }
         if (!b && wasBuilt) Off();
         wasBuilt = b;
+        // the map's copy moved (PHGame.layers: the player's team changed): the spot goes with it, and bakes again
+        if (b && !bakeQueued && builder.originVer != bakedVer) { bakeQueued = true; SendCustomEventDelayedFrames(nameof(Bake), 2); }
     }
 
     public void Off()
@@ -59,12 +61,17 @@ public class PHSun : UdonSharpBehaviour
         spot.gameObject.SetActive(false);
     }
 
+    bool bakeQueued;
+    int bakedVer;
+
     public void Bake()
     {
+        bakeQueued = false;
         if (!builder.built) return;
+        bakedVer = builder.originVer;
         MapGenUdon gen = builder.gen;
         float w = builder.SiteWidth(), h = builder.SiteDepth();   // the map without its upper floors and basements, laid out beside it in the generator
-        Vector3 centre = new Vector3(w * 0.5f, 0f, h * 0.5f);
+        Vector3 centre = builder.ToWorld(new Vector3(w * 0.5f, 0f, h * 0.5f));   // (this client's copy of the map)
         float radius = Mathf.Sqrt(w * w + h * h) * 0.5f + Mathf.Max(margin, 15f);   // covers PropLit's 10 m fade out to the corners
         float height = radius / Mathf.Tan(coneDeg * 0.5f * Mathf.Deg2Rad);
 

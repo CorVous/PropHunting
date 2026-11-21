@@ -167,7 +167,7 @@ public static partial class LobbyBuilder
         int[][] args = { new[] { -1, 4, 0, 1, 2, 3 }, new[] { 5, 3, 1, 0, 2, 4 }, new[] { 0, 1, 2 }, new[] { 30, 40, 60 } };
         string[][] caps = { new[] { "Auto · S", "XS", "S", "M", "L", "XL" }, new[] { "Minimal", "V. sparse", "Sparse", "Normal", "Dense", "V. dense" },
                             new[] { "2:15", "3:00", "4:30" }, new[] { "30 s", "40 s", "60 s" } };
-        int total = 0;
+        int total = 2;   // (and the two switches, SEE HIDERS and ANTI TROLL, below)
         for (int row = 0; row < args.Length; row++) total += args[row].Length;
         panel.tileKind = new int[total]; panel.tileArg = new int[total];
         panel.tileMarker = new GameObject[total]; panel.tileAuto = new GameObject[total]; panel.tileRect = new RectTransform[total];
@@ -179,7 +179,9 @@ public static partial class LobbyBuilder
         {
             float cy = 30 + row * 97 + 44.5f;
             Txt(cv, titles[row], P(80, cy), new Vector2(96, 30), titles[row], future, 17, Ink, TextAlignmentOptions.Right);
-            Img(cv, "Path" + row, P(508, cy), new Vector2(708, 10), sDash, C("dcc89e"), 2f);
+            // (the path as long as the row's tiles: ROUND and TAUNT have three, the switches sit beside them)
+            float pathEnd = 140 + args[row].Length * 120 + 2;
+            Img(cv, "Path" + row, P((154 + pathEnd) * 0.5f, cy), new Vector2(pathEnd - 154, 10), sDash, C("dcc89e"), 2f);
             for (int j = 0; j < args[row].Length; j++, t++)
             {
                 float cx = 140 + j * 120 + 55;
@@ -199,6 +201,41 @@ public static partial class LobbyBuilder
                 panel.tileMarker[t] = mk.gameObject; panel.tileAuto[t] = auto.gameObject; panel.tileRect[t] = tile.rectTransform;
                 tiles[t] = AddTile(tile.gameObject, b, t);
                 mk.gameObject.SetActive(false); auto.gameObject.SetActive(false);
+            }
+        }
+
+        // the two switches (hop playtest, Cor: host settings), right of the short ROUND and TAUNT rows: a tile each that
+        // turns over with every press (its meeple on and ON while it is on), its title, and a line on what it does.
+        // SEE HIDERS: hiders see each other's props as outlines (PHGame.seeHiders); ANTI TROLL: each team on its own
+        // copy of the map (PHGame.layers; Strelia's idea, Cor: with an explanation of what it hides)
+        {
+            var plain = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+            string[] swTitle = { "SEE HIDERS", "ANTI TROLL" };
+            string[] swTell = { "Hiders see each other's props as outlines.", "Each team plays in its own copy of the map: no one can stand on or mark another team's props." };
+            panel.switchCaption = new TextMeshProUGUI[2];
+            for (int k = 0; k < 2; k++, t++)
+            {
+                float cy = 30 + (2 + k) * 97 + 44.5f, cx = 575f;
+                var tile = Img(cv, "Tile " + swTitle[k], P(cx, cy), new Vector2(110, 88), sTile, RowColour[k == 0 ? 2 : 3], 2f);
+                tile.raycastTarget = true;
+                var b = tile.gameObject.AddComponent<Button>();
+                var nav = b.navigation; nav.mode = Navigation.Mode.None; b.navigation = nav;
+                b.targetGraphic = tile;
+                var cb = b.colors; cb.highlightedColor = new Color(1.06f, 1.06f, 1.06f); cb.pressedColor = new Color(0.85f, 0.85f, 0.85f); b.colors = cb;
+                var auto = Img(tile.transform, "AutoPick", Vector2.zero, new Vector2(126, 104), sDashed, C("b8892b"), 2f);   // (unused: Refresh wants one per tile)
+                // ON / OFF, set by PHPanel.Refresh (empty here: not a static label)
+                var cap = Txt(tile.transform, "Caption", new Vector2(0, -4), new Vector2(110, 40), "", future, 26, C("1e190f", 0.85f), TextAlignmentOptions.Center);
+                cap.enableAutoSizing = true; cap.fontSizeMin = 12f; cap.fontSizeMax = 26f;   // (LIGADO, DESLIGADO)
+                panel.switchCaption[k] = cap;
+                var mk = Img(tile.transform, "Marker", new Vector2(42, 47), new Vector2(54, 54), marker, Color.white);
+                panel.tileKind[t] = 4 + k; panel.tileArg[t] = 1;
+                panel.tileMarker[t] = mk.gameObject; panel.tileAuto[t] = auto.gameObject; panel.tileRect[t] = tile.rectTransform;
+                tiles[t] = AddTile(tile.gameObject, b, t);
+                mk.gameObject.SetActive(false); auto.gameObject.SetActive(false);
+                Txt(cv, "SwitchTitle " + swTitle[k], P(762, cy - 28), new Vector2(240, 26), swTitle[k], future, 17, Ink, TextAlignmentOptions.Left);
+                var tell = Txt(cv, "SwitchTell " + swTitle[k], P(762, cy + 10), new Vector2(240, 54), swTell[k], plain != null ? plain : future, 14, C("1e190f", 0.8f), TextAlignmentOptions.TopLeft);
+                tell.enableWordWrapping = true;
+                tell.enableAutoSizing = true; tell.fontSizeMin = 9f; tell.fontSizeMax = 14f;
             }
         }
 
