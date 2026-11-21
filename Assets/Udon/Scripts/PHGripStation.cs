@@ -3,6 +3,7 @@ using UnityEngine;
 using VRC.SDKBase;
 using VRC.Udon.Common;
 using TMPro;
+using VRC.SDK3.Persistence;
 
 // The grip station (Cor): a chair in the lobby, next to the debug sign, for lining up each weapon in the hand. Sitting
 // in it shows the chosen melee weapon or gun in the right hand exactly as the game holds it (PHWeapons.HandPose, then
@@ -10,7 +11,9 @@ using TMPro;
 //   VR: grab the weapon with the LEFT hand's grip, move and turn it, let go: the right hand keeps it as it was left.
 //   The board's buttons (desktop too): step through the weapons, switch melee / gun, nudge it (1 cm, 5 degrees),
 //   resize it (5 %), put it back as built, and save.
-// A change applies to this player's own game at once (until they rejoin). SAVE writes a log line per weapon changed
+// A change applies to this player's own game at once and is kept in their PlayerData (Cor: a persistent setting):
+// "ph.grips", one line per weapon they changed, "id|grip x|y|z (1/10000 m)|turn x|y|z (1/10 degree)|size (1/100)",
+// put back on join (OnPlayerRestored); RESET takes a weapon back to the world's own grip. SAVE TO LOG writes a log line per weapon changed
 // here ("[PHGrip] " + its Tools/weapon_grips.tsv line); Tools/import_grips.py copies them from VRChat's output log (or
 // the editor's log) into the file, and the next Build world scene bakes them in for everyone.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -24,6 +27,9 @@ public class PHGripStation : UdonSharpBehaviour
     public int buttonArg;                // set by PHButton before Nudge
 
     public const float STEP = 0.01f, TURN = 5f, GROW = 1.05f;
+    public const string SAVE_KEY = "ph.grips";
+    bool dirty;
+    float saveAt;
 
     bool seated, gun, dragging, ready;
     int index;
@@ -66,6 +72,7 @@ public class PHGripStation : UdonSharpBehaviour
     public override void OnStationExited(VRCPlayerApi player)
     {
         if (!player.isLocal) return;
+        if (dirty) { dirty = false; StoreGrips(); }
         seated = false; dragging = false;
         preview.gameObject.SetActive(false);
     }
@@ -91,6 +98,7 @@ public class PHGripStation : UdonSharpBehaviour
     {
         if (!seated) return;
         if (Time.time >= nextShow) { nextShow = Time.time + 0.5f; Show(); }
+        if (dirty && Time.time >= saveAt) { dirty = false; saveAt = Time.time + 1f; StoreGrips(); }
         VRCPlayerApi me = Networking.LocalPlayer;
         if (dragging)
         {
@@ -144,7 +152,7 @@ public class PHGripStation : UdonSharpBehaviour
         Vector3[] g = gun ? weapons.gunGrip : weapons.meleeGrip;
         Vector3[] t = gun ? weapons.gunTurn : weapons.meleeTurn;
         g[index] = grip; t[index] = turn;
-        Show();
+        dirty = true; Show();
     }
 
     // ---- the board's buttons
@@ -188,7 +196,7 @@ public class PHGripStation : UdonSharpBehaviour
             Vector3[] t = gun ? weapons.gunTurn : weapons.meleeTurn;
             t[index] = (Quaternion.Euler(t[index]) * Quaternion.AngleAxis(TURN * sign, d)).eulerAngles;
         }
-        Show();
+        dirty = true; Show();
     }
 
     public void Bigger() { Grow(GROW); }
@@ -199,7 +207,7 @@ public class PHGripStation : UdonSharpBehaviour
         Setup();
         float[] s = gun ? weapons.gunSize : weapons.meleeSize;
         s[index] = Mathf.Round(s[index] * k * 100f) / 100f;
-        Show();
+        dirty = true; Show();
     }
 
     public void ResetOne()
@@ -211,6 +219,63 @@ public class PHGripStation : UdonSharpBehaviour
         g[index] = gun ? gunGrip0[index] : meleeGrip0[index];
         t[index] = gun ? gunTurn0[index] : meleeTurn0[index];
         s[index] = gun ? gunSize0[index] : meleeSize0[index];
+        dirty = true; Show();
+    }
+
+    // ---- kept between visits (PlayerData)
+    void StoreGrips()
+    {
+        if (!ready) return;
+        string o = "";
+        for (int i = 0; i < weapons.meleeMesh.Length; i++) if (Changed(false, i)) o += Packed(false, i) + "\n";
+        for (int i = 0; i < weapons.gunMesh.Length; i++) if (Changed(true, i)) o += Packed(true, i) + "\n";
+        PlayerData.SetString(SAVE_KEY, o);
+    }
+
+    string Packed(bool g, int i)
+    {
+        Vector3 p = g ? weapons.gunGrip[i] : weapons.meleeGrip[i];
+        Vector3 t = g ? weapons.gunTurn[i] : weapons.meleeTurn[i];
+        float s = g ? weapons.gunSize[i] : weapons.meleeSize[i];
+        t = new Vector3(Mathf.Repeat(t.x + 180f, 360f) - 180f, Mathf.Repeat(t.y + 180f, 360f) - 180f, Mathf.Repeat(t.z + 180f, 360f) - 180f);
+        return (g ? weapons.gunId[i] : weapons.meleeId[i]) + "|" + Mathf.RoundToInt(p.x * 10000f) + "|" + Mathf.RoundToInt(p.y * 10000f) + "|" + Mathf.RoundToInt(p.z * 10000f)
+            + "|" + Mathf.RoundToInt(t.x * 10f) + "|" + Mathf.RoundToInt(t.y * 10f) + "|" + Mathf.RoundToInt(t.z * 10f) + "|" + Mathf.RoundToInt(s * 100f);
+    }
+
+    public override void OnPlayerRestored(VRCPlayerApi player)
+    {
+        if (!Utilities.IsValid(player) || !player.isLocal) return;
+        Setup();
+        if (!ready) return;
+        string o;
+        if (!PlayerData.TryGetString(player, SAVE_KEY, out o) || o == null) return;
+        string[] lines = o.Split('\n');
+        int n = 0;
+        for (int k = 0; k < lines.Length; k++)
+        {
+            string[] f = lines[k].Split('|');
+            if (f.Length != 8) continue;
+            bool g = f[0].StartsWith("gun:");
+            int i = g ? weapons.GunIndexOf(f[0]) : weapons.MeleeIndexOf(f[0]);
+            if (i < 0) continue;   // (a weapon no longer in the world)
+            int[] v = new int[7];
+            bool ok = true;
+            for (int j = 0; j < 7; j++)
+            {
+                int x;
+                if (int.TryParse(f[j + 1], out x)) v[j] = x; else ok = false;
+            }
+            if (!ok) continue;
+            Vector3 p = new Vector3(v[0], v[1], v[2]) / 10000f;
+            Vector3 t = new Vector3(v[3], v[4], v[5]) / 10f;
+            float s = Mathf.Clamp(v[6] / 100f, 0.1f, 10f);
+            Vector3[] ga = g ? weapons.gunGrip : weapons.meleeGrip;
+            Vector3[] ta = g ? weapons.gunTurn : weapons.meleeTurn;
+            float[] sa = g ? weapons.gunSize : weapons.meleeSize;
+            ga[i] = p; ta[i] = t; sa[i] = s;
+            n++;
+        }
+        Debug.Log("[PHGrip] restored " + n + " weapon grips from PlayerData");
         Show();
     }
 
@@ -270,7 +335,7 @@ public class PHGripStation : UdonSharpBehaviour
         Vector3 t = (gun ? weapons.GunTurn(index) : weapons.MeleeTurn(index)).eulerAngles;
         float s = gun ? weapons.GunSize(index) : weapons.MeleeSize(index);
         values.text = "Grip " + F(p.x) + "  " + F(p.y) + "  " + F(p.z) + "\nTurn " + A(t.x) + "  " + A(t.y) + "  " + A(t.z)
-            + "\nSize " + s.ToString("0.00") + (ready && Changed(gun, index) ? "  (changed)" : "") + "\nChanged here: " + changed
+            + "\nSize " + s.ToString("0.00") + (ready && Changed(gun, index) ? "  (changed)" : "") + "\nYour changed weapons: " + changed + " (kept on your account)"
             + (seated ? "\n" + HandLine() : "\nSit in the chair to hold it");
     }
 
