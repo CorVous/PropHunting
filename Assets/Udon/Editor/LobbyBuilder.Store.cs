@@ -627,6 +627,12 @@ public static partial class LobbyBuilder
             Img(cv, "Rule", new Vector2(cx, Hh / 2f - 54), new Vector2(HalfW, 4), sDash, C("c9a46a"), 2f);
             var count = Txt(cv, h == 0 ? "HunterCount" : "HiderCount", new Vector2(cx + HalfW / 2f - 60, Hh / 2f - 32), new Vector2(120, 30), "0 / 40", future, 20, C("6b5d40"), TextAlignmentOptions.Right);
             if (h == 0) board.countHunter = count; else board.countHider = count;
+            // the rows' numbers (hop playtest: players could not name a card to each other), at the board's outer
+            // edges, beside each half's first (left half) or last (right half) column
+            int rowsN = (PHStore.HUNTER_TROPHIES + BoardCols - 1) / BoardCols;
+            float rx = (h == 0 ? -1 : 1) * (halfShift / 2f + HalfW / 2f + 32f);
+            for (int r = 0; r < rowsN; r++)
+                Txt(cv, (h == 0 ? "HunterRow" : "HiderRow") + (r + 1), new Vector2(rx, y0 - r * (CardH + Gap)), new Vector2(50, CardH), (r + 1).ToString(), future, 34, C("8a7b5a"), TextAlignmentOptions.Center);
         }
 
         int T = PHStore.TROPHIES;
@@ -662,6 +668,9 @@ public static partial class LobbyBuilder
             Img(tick.transform, "A", new Vector2(-4, -2), new Vector2(9, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, -45f);
             Img(tick.transform, "B", new Vector2(2, 1), new Vector2(15, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, 50f);
             board.tick[t] = tick.gameObject;
+            // the trophy's own number, the same for everyone (the cards sort per player: "row 2" differs between
+            // players, "#14" does not), small in the bottom right corner
+            Txt(card, "Number", new Vector2(CardW / 2 - 26, -CardH / 2 + 14), new Vector2(44, 18), "#" + (t + 1), future, 12, C("8a7b5a"), TextAlignmentOptions.Right);
             tick.gameObject.SetActive(false); bar.SetActive(false);
         }
         UdonSharpEditorUtility.CopyProxyToUdon(board);
