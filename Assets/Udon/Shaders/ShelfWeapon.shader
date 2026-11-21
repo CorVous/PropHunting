@@ -77,10 +77,7 @@ Shader "PropHunt/ShelfWeapon"
                 {
                     fixed4 c = tex2D(_CardTex, i.card.xy);
                     clip(c.a - 0.5);
-                    albedo = c.rgb;
-                    #ifndef UNITY_COLORSPACE_GAMMA
-                    albedo = GammaToLinearSpace(albedo);
-                    #endif
+                    albedo = c.rgb;   // (the atlas is an sRGB texture: already linear here)
                     n = normalize(i.view);   // (flat: lit as if facing whoever looks)
                 }
                 albedo *= (_Dither > 0.5 ? _Fade : 1.0);

@@ -107,10 +107,7 @@ Shader "PropHunt/Weapon"
                     fixed4 c = tex2D(_CardTex, i.card.xy);
                     clip(c.a - 0.5);
                     if (_Wear > 0.001 && tex2D(_CardWear, i.card.xy).r * (255.0 / 254.0) <= _Wear) discard;
-                    float3 ca = c.rgb;
-                    #ifndef UNITY_COLORSPACE_GAMMA
-                    ca = GammaToLinearSpace(ca);
-                    #endif
+                    float3 ca = c.rgb;   // (the atlas is an sRGB texture: already linear here)
                     // (flat: lit mostly by the sky, so the drawing reads as drawn from either side)
                     fixed4 oc = fixed4(ca * (0.75 + 0.35 * Light(1, nWorld)), 1);
                     UNITY_APPLY_FOG(i.fogCoord, oc);
