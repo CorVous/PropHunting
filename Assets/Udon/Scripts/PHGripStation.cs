@@ -85,9 +85,12 @@ public class PHGripStation : UdonSharpBehaviour
         at = rh.position; r = rh.rotation * Quaternion.Euler(weapons.handEuler);
     }
 
+    float nextShow;
+
     public override void PostLateUpdate()
     {
         if (!seated) return;
+        if (Time.time >= nextShow) { nextShow = Time.time + 0.5f; Show(); }
         VRCPlayerApi me = Networking.LocalPlayer;
         if (dragging)
         {
@@ -268,7 +271,20 @@ public class PHGripStation : UdonSharpBehaviour
         float s = gun ? weapons.GunSize(index) : weapons.MeleeSize(index);
         values.text = "Grip " + F(p.x) + "  " + F(p.y) + "  " + F(p.z) + "\nTurn " + A(t.x) + "  " + A(t.y) + "  " + A(t.z)
             + "\nSize " + s.ToString("0.00") + (ready && Changed(gun, index) ? "  (changed)" : "") + "\nChanged here: " + changed
-            + (seated ? "" : "\nSit in the chair to hold it");
+            + (seated ? "\n" + HandLine() : "\nSit in the chair to hold it");
+    }
+
+    // which way the hand is found (Cor, VR: the weapon sat in the wrist): the avatar's bones, or the controller's point,
+    // and how far the grip is from the hand bone (the wrist) in cm
+    string HandLine()
+    {
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (me == null) return "";
+        bool bones = weapons.HandPose(me);
+        Vector3 wrist = me.GetBonePosition(HumanBodyBones.RightHand);
+        Vector3 at = bones ? weapons.handPos : me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
+        string d = wrist != Vector3.zero ? "  grip " + ((at - wrist).magnitude * 100f).ToString("0.0") + " cm from wrist" : "";
+        return (bones ? "Hand: avatar bones" : "Hand: CONTROLLER (" + weapons.handWhy + ")") + d;
     }
 
     // the model's name without its kind and pack
