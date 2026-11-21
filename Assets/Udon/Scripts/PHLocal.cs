@@ -53,6 +53,9 @@ public class PHLocal : UdonSharpBehaviour
     GameObject[] layerObjs;   // the map's objects the layer was last set on
     bool layerDone;           // ...and whether that map was finished then
     bool wasEndgame;
+    int hidersAtStart;        // uncaught hiders when the hunt began (the "one left" call)
+    bool oneLeftSaid;
+    float caughtAt = -100f;
     // forced taunts (6.4, G47): every hider's own clock from the release of the hunters; a hider that has moved
     // 4 m (straight line) since the last check skips it
     float nextForced = -1f;
@@ -91,7 +94,7 @@ public class PHLocal : UdonSharpBehaviour
                 Say(T(role == PHGame.ROLE_NONE ? "say.watching" : "say.building"), 5f);
                 break;
             case PHGame.PH_BRIEF:
-                sound.Play("ready", 0.8f);
+                sound.Play(sound.Voice("briefing", "ready"), 0.8f);   // (Cor's own voice, a random take)
                 if (role == PHGame.ROLE_HUNTER)
                 {
                     // hunters wait in the lobby while the hiders hide (Cor); the hunt brings them to the release
@@ -120,10 +123,11 @@ public class PHLocal : UdonSharpBehaviour
                 }
                 break;
             case PHGame.PH_HIDE:
-                if (role == PHGame.ROLE_HIDER) body.frozen = false;
+                if (role == PHGame.ROLE_HIDER) { body.frozen = false; sound.Play(sound.Voice("hiders_go", ""), 0.8f); }
                 break;
             case PHGame.PH_HUNT:
-                PlayThen("go", 0.8f, "jingles_PIZZI07", 0.5f);
+                PlayThen(sound.Voice("hunters_go", "go"), 0.8f, "jingles_PIZZI07", 0.5f);
+                hidersAtStart = game.HidersLeft(); oneLeftSaid = false;
                 if (role == PHGame.ROLE_HUNTER)
                 {
                     me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
@@ -142,7 +146,8 @@ public class PHLocal : UdonSharpBehaviour
             case PHGame.PH_END:
                 ShowReveal(true);
                 // "time over" only when the clock ended it, then the result once it has been said (Cor: they overlapped)
-                string result = role == PHGame.ROLE_NONE ? "" : ((role == PHGame.ROLE_HIDER) == game.hidersWin ? "you_win" : "game_over");
+                // everyone hears the winning side's line (Cor), whatever their own side
+                string result = game.hidersWin ? sound.Voice("hiders_win", "you_win") : sound.Voice("hunters_win", "game_over");
                 if (game.timeUp) PlayThen("time_over", 0.8f, result, 0.8f);
                 else if (result != "") sound.Play(result, 0.8f);
                 // the reveal (Cor): every hider's prop stays where it is, highlighted through walls (PHSlot), and
@@ -743,6 +748,13 @@ public class PHLocal : UdonSharpBehaviour
             if (nextForced > Time.time + iv) nextForced = Time.time + iv;
         }
         wasEndgame = eg;
+        // one hider left (Cor's "One left!" takes), once a round, when it began with two or more; not for the one
+        // just caught, who hears their own line
+        if (game.phase == PHGame.PH_HUNT && !oneLeftSaid && hidersAtStart >= 2 && game.HidersLeft() == 1)
+        {
+            oneLeftSaid = true;
+            if (Time.time - caughtAt > 3f) sound.Play(sound.Voice("one_left", ""), 0.8f);
+        }
         UpdateTrigger();
         UpdateWatch();
         UpdatePropless();
@@ -1323,7 +1335,8 @@ public class PHLocal : UdonSharpBehaviour
         if (nowCaught)
         {
             Say(T("say.caught"), 5f);
-            sound.Play("you_lose", 0.8f);
+            sound.Play(sound.Voice("caught", "you_lose"), 0.8f);
+            caughtAt = Time.time;
             s.def = -1; s.Send();
             body.End();
             RestoreEye();

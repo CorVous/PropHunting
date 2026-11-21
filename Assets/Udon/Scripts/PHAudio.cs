@@ -39,6 +39,25 @@ public class PHAudio : UdonSharpBehaviour
         return set[k < 0 ? k + set.Length : k];
     }
 
+    // one of Cor's recorded takes for a cue (Audio/Voice/vo_<cue>_<line>_<n>), picked at random; the fallback
+    // clip when the cue has none
+    public string Voice(string cue, string fallback)
+    {
+        if (names == null || clips == null) return fallback;
+        string p = "vo_" + cue + "_";
+        int n0 = Mathf.Min(names.Length, clips.Length), n = 0;
+        for (int i = 0; i < n0; i++) if (names[i] != null && names[i].StartsWith(p)) n++;
+        if (n == 0) return fallback;
+        int k = Random.Range(0, n);
+        for (int i = 0; i < n0; i++)
+        {
+            if (names[i] == null || !names[i].StartsWith(p)) continue;
+            if (k == 0) return names[i];
+            k--;
+        }
+        return fallback;
+    }
+
     // the local player's own cue, not placed in the world
     public void Play(string n, float volume)
     {

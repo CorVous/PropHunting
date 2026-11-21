@@ -142,6 +142,14 @@ public class PHGame : UdonSharpBehaviour
     public float Left { get { return phaseEndMs == 0 ? 0f : Mathf.Max(0f, (phaseEndMs - Now) / 1000f); } }
     public float HuntLength { get { return Mathf.Round(huntPhase[mapSize] * roundLengthFactor[roundLength]); } }
     public bool Endgame { get { return phase == PH_HUNT && Left <= ENDGAME_AT; } }
+    // hiders still in the round and not caught, from the synced slots (any client)
+    public int HidersLeft()
+    {
+        int n = 0;
+        for (int i = 0; i < slots.Length && i < slotPlayer.Length; i++)
+            if (slotPlayer[i] != 0 && slotRole[i] == ROLE_HIDER && slots[i] != null && !slots[i].caught) n++;
+        return n;
+    }
     public bool MapReady { get { return builtRound == round && !building; } }
 
     void Start()
