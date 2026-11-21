@@ -20,6 +20,8 @@ public class PHTestPilot : UdonSharpBehaviour
     public float huntDelay = 0f;
 
     float nextAct, nextLog, zoneAt;
+    float endAt = -1f, nextReplayLog;
+    int replayStep;
     int startedRounds, lastPhase = -1;
     Vector3 wander;
 
@@ -45,7 +47,9 @@ public class PHTestPilot : UdonSharpBehaviour
             // (hunters hold off for a while, so a late joiner can come in while the hiders sit: the leak test)
             if (phase == PHGame.PH_HUNT && local.Role() == PHGame.ROLE_HUNTER) nextAct = Time.time + huntDelay;
             wander = new Vector3(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f)).normalized * 1.5f;
+            if (phase == PHGame.PH_END) { endAt = Time.time; replayStep = 0; }
         }
+        if (endAt >= 0f) Replay();
         if (phase == PHGame.PH_LOBBY)
         {
             if (zoneAt > 0f && Time.time >= zoneAt && game.lobbyZone != null)
@@ -67,6 +71,36 @@ public class PHTestPilot : UdonSharpBehaviour
         if (role == PHGame.ROLE_HIDER && phase == PHGame.PH_HUNT && Time.time >= nextAct) { nextAct = Time.time + 12f; local.PilotTaunt(); Log("TAUNT"); }
         if (role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT && Time.time >= nextAct) { nextAct = Time.time + 4f; HunterAct(); }
         if (Time.time >= nextLog) { nextLog = Time.time + 2f; Snapshot(); }
+    }
+
+    // the diorama's replay after a round (shared playback): the host opens and pauses it, the other client seeks and
+    // resumes it, the host changes the speed; everyone logs what they see once a second for 40 s
+    void Replay()
+    {
+        PHReplay r = game.replay;
+        if (r == null) { endAt = -1f; return; }
+        float t = Time.time - endAt;
+        bool host = game.IsHost;
+        if (replayStep == 0 && t >= 6f) { replayStep = 1; if (host) { r.PlayPause(); Log("REPLAY PRESS play (host)"); } }
+        if (replayStep == 1 && t >= 11f) { replayStep = 2; if (!host) { r.buttonArg = 8; r.Seek(); Log("REPLAY PRESS seek 8 (guest)"); } }
+        if (replayStep == 2 && t >= 15f) { replayStep = 3; if (host) { r.PlayPause(); Log("REPLAY PRESS pause (host)"); } }
+        if (replayStep == 3 && t >= 19f) { replayStep = 4; if (!host) { r.PlayPause(); Log("REPLAY PRESS resume (guest)"); } }
+        if (replayStep == 4 && t >= 23f) { replayStep = 5; if (host) { r.Speed(); Log("REPLAY PRESS speed (host)"); } }
+        if (Time.time >= nextReplayLog)
+        {
+            nextReplayLog = Time.time + 1f;
+            string s = "REPLAY t=" + t.ToString("F0") + " bar=" + (r.bar != null && r.bar.activeSelf) + " open=" + r.open + " playing=" + r.playing + " view=" + r.viewRound
+                + " at=" + r.atSec.ToString("F1") + "@" + r.atMs + " speed=" + r.speed + " owner=" + Networking.GetOwner(r.gameObject).playerId
+                + " clock=" + (r.clock != null ? r.clock.text : "-") + " tracks:";
+            for (int i = 0; i < r.tracks.Length; i++)
+            {
+                PHReplayTrack tr = r.tracks[i];
+                if (tr.round < 0) continue;
+                s += " T" + i + " r" + tr.round + " " + tr.who + " bytes=" + (tr.data != null ? tr.data.Length : -1) + " pawn=" + r.pawns[i].gameObject.activeSelf;
+            }
+            Log(s);
+        }
+        if (t > 40f) endAt = -1f;
     }
 
     void HunterAct()
