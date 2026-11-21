@@ -90,11 +90,14 @@ public class PHLocal : UdonSharpBehaviour
                 break;
             case PHGame.PH_LOADING:
                 sound.Play("confirmation_001", 0.6f);
+                // "get ready" as the round starts, while the map is still being built (Cor)
+                sound.Play(sound.Voice("briefing", "ready"), 0.8f);   // (Cor's own voice, a random take)
                 if (s != null && role != PHGame.ROLE_NONE) s.ResetFor(game.round, role);
                 Say(T(role == PHGame.ROLE_NONE ? "say.watching" : "say.building"), 5f);
                 break;
             case PHGame.PH_BRIEF:
-                sound.Play(sound.Voice("briefing", "ready"), 0.8f);   // (Cor's own voice, a random take)
+                // "hide!" once the hiders land on the map (Cor), for everyone in the round
+                if (role != PHGame.ROLE_NONE) sound.Play(sound.Voice("hiders_go", ""), 0.8f);
                 if (role == PHGame.ROLE_HUNTER)
                 {
                     // hunters wait in the lobby while the hiders hide (Cor); the hunt brings them to the release
@@ -123,7 +126,7 @@ public class PHLocal : UdonSharpBehaviour
                 }
                 break;
             case PHGame.PH_HIDE:
-                if (role == PHGame.ROLE_HIDER) { body.frozen = false; sound.Play(sound.Voice("hiders_go", ""), 0.8f); }
+                if (role == PHGame.ROLE_HIDER) body.frozen = false;
                 break;
             case PHGame.PH_HUNT:
                 PlayThen(sound.Voice("hunters_go", "go"), 0.8f, "jingles_PIZZI07", 0.5f);
@@ -145,11 +148,10 @@ public class PHLocal : UdonSharpBehaviour
                 break;
             case PHGame.PH_END:
                 ShowReveal(true);
-                // "time over" only when the clock ended it, then the result once it has been said (Cor: they overlapped)
+                // the result line only (Cor: the old "time over" call before it is gone)
                 // everyone hears the winning side's line (Cor), whatever their own side
                 string result = game.hidersWin ? sound.Voice("hiders_win", "you_win") : sound.Voice("hunters_win", "game_over");
-                if (game.timeUp) PlayThen("time_over", 0.8f, result, 0.8f);
-                else if (result != "") sound.Play(result, 0.8f);
+                if (result != "") sound.Play(result, 0.8f);
                 // the reveal (Cor): every hider's prop stays where it is, highlighted through walls (PHSlot), and
                 // everyone is out of the seats, walking as themselves, until the lobby (PHGame.ROUND_END, 30 s)
                 if (body.active) body.frozen = true;
@@ -745,7 +747,7 @@ public class PHLocal : UdonSharpBehaviour
         bool eg = game.Endgame;
         if (eg && !wasEndgame && role != PHGame.ROLE_NONE)
         {
-            PlayThen("hurry_up", 0.8f, "jingles_HIT03", 0.6f);
+            sound.Play("jingles_HIT03", 0.6f);   // (the old synthesized "hurry up" is gone: Cor's takes only)
             Say(T("say.final"), 4f);
             float iv = game.tauntInterval * 0.5f;
             if (nextForced > Time.time + iv) nextForced = Time.time + iv;

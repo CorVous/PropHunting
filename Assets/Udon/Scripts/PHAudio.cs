@@ -132,6 +132,7 @@ public class PHAudio : UdonSharpBehaviour
         Apply();
         // a taste of the row's sounds at the new level (a muted row: the click alone, at the buttons' level)
         string n = heard >= 0 ? sample[heard] : "";
+        if (heard == C_ANNOUNCER) n = Voice("briefing", n);   // one of Cor's takes, not the old synthesized "ready"
         if (n == "") PlayKind("click_001", 0.5f, C_BUTTONS);
         else PlayKind(n, 0.8f, heard);
     }
