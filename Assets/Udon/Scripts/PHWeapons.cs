@@ -39,6 +39,13 @@ public class PHWeapons : UdonSharpBehaviour
     // where its grid starts in the model's space, and 1 / its size; the PropHunt/Weapon shader draws what is left
     public Texture[] meleeWear;
     public Vector4[] meleeWearLo, meleeWearInv;
+    // each model's grip (Tools/weapon_grips.tsv, set by WeaponBuilder; the grip station tunes them live, PHGripStation):
+    // the point of the model that sits in the middle of the closed fist (model space, metres), the model's turn about it
+    // (degrees, Quaternion.Euler) and its size (1 = as made). Missing (an older scene): the model's origin, no turn, 1.
+    public Vector3[] meleeGrip, meleeTurn;
+    public float[] meleeSize;
+    public Vector3[] gunGrip, gunTurn;
+    public float[] gunSize;
     public int[] themeMelee = { 0, 2, 1 };   // the model by map theme (GenData.THEME_NONE, SPACE, MEDIEVAL)
     public const int SPOTS = 24;
 
@@ -442,6 +449,34 @@ public class PHWeapons : UdonSharpBehaviour
         return true;
     }
 
+    // ------------------------------------------------------------------ grips
+    public Vector3 MeleeGrip(int m) { return meleeGrip != null && m >= 0 && m < meleeGrip.Length ? meleeGrip[m] : Vector3.zero; }
+    public Quaternion MeleeTurn(int m) { return meleeTurn != null && m >= 0 && m < meleeTurn.Length ? Quaternion.Euler(meleeTurn[m]) : Quaternion.identity; }
+    public float MeleeSize(int m) { return meleeSize != null && m >= 0 && m < meleeSize.Length && meleeSize[m] > 0.01f ? meleeSize[m] : 1f; }
+    public Vector3 GunGrip(int g) { return gunGrip != null && g >= 0 && g < gunGrip.Length ? gunGrip[g] : Vector3.zero; }
+    public Quaternion GunTurn(int g) { return gunTurn != null && g >= 0 && g < gunTurn.Length ? Quaternion.Euler(gunTurn[g]) : Quaternion.identity; }
+    public float GunSize(int g) { return gunSize != null && g >= 0 && g < gunSize.Length && gunSize[g] > 0.01f ? gunSize[g] : 1f; }
+
+    // a melee model put in a hand: its grip point at 'at', turned by r and then by its own turn, at sc times its size
+    public void PutMelee(Transform t, int m, Vector3 at, Quaternion r, float sc)
+    {
+        float s = sc * MeleeSize(m);
+        Quaternion q = r * MeleeTurn(m);
+        t.SetPositionAndRotation(at - q * (MeleeGrip(m) * s), q);
+        t.localScale = Vector3.one * s;
+    }
+
+    // a gun model under its holder (the selector's 'gun', which sits at the hand): its grip at the holder's origin (plus
+    // the kick), turned by its own turn, at its size
+    public void PutGunModel(Transform model, int g, Vector3 kickPos, Quaternion kickRot)
+    {
+        float s = GunSize(g);
+        Quaternion q = kickRot * GunTurn(g);
+        model.localPosition = kickPos - q * (GunGrip(g) * s);
+        model.localRotation = q;
+        model.localScale = Vector3.one * s;
+    }
+
     // ------------------------------------------------------------------ placing
     float AvatarScale(VRCPlayerApi p)
     {
@@ -462,8 +497,7 @@ public class PHWeapons : UdonSharpBehaviour
         float t = Time.time - swingAt[i];
         if (t >= 0f && t < SWING_TIME) r = r * Quaternion.Euler(Chop(t), 0f, 0f);
         // (PHGame.layers: a hunter seen from another copy of the map holds it at their stand-in, PHLocal.UpdateStandIns)
-        held[i].SetPositionAndRotation(game.SeenHere(i, at), r);
-        held[i].localScale = Vector3.one * AvatarScale(p);
+        PutMelee(held[i], heldModel[i], game.SeenHere(i, at), r, AvatarScale(p));
     }
 
     // the chop seen on a remote desktop player: up, then down hard, then back (degrees about the hand's x)
@@ -477,7 +511,6 @@ public class PHWeapons : UdonSharpBehaviour
     void PlaceMine(int i, VRCPlayerApi me, int model)
     {
         float sc = AvatarScale(me);
-        held[i].localScale = Vector3.one * sc;
         if (me.IsUserInVR())
         {
             Vector3 vAt; Quaternion r;
@@ -494,11 +527,10 @@ public class PHWeapons : UdonSharpBehaviour
                 r = r * Quaternion.Euler(Chop(tv), 0f, 0f);
                 if (!mySwingStruck && tv >= SWING_HIT_AT) { mySwingStruck = true; local.MeleeDesktopStrike(); }
             }
-            held[i].SetPositionAndRotation(vAt, r);
-            VrSwing(i, model, sc);
+            PutMelee(held[i], model, vAt, r, sc);
+            VrSwing(i, model, sc * MeleeSize(model));
             return;
         }
-        held[i].localScale = Vector3.one * (sc * deskScale);
         VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
         Vector3 at = deskAt;
         Quaternion rot = Quaternion.Euler(deskEuler);
@@ -525,11 +557,11 @@ public class PHWeapons : UdonSharpBehaviour
             }
             if (!mySwingStruck && t >= SWING_HIT_AT) { mySwingStruck = true; local.MeleeDesktopStrike(); }
         }
-        held[i].SetPositionAndRotation(head.position + head.rotation * (at * sc), head.rotation * rot);
+        PutMelee(held[i], model, head.position + head.rotation * (at * sc), head.rotation * rot, sc * deskScale);
         // sparks along the slash's arc
         if (t >= SWING_HIT_AT * 0.6f && t < SWING_HIT_AT + 0.08f && fxSpark != null)
         {
-            fxSpark.transform.position = held[i].position + held[i].rotation * (Vector3.forward * meleeTip[model] * sc * deskScale);
+            fxSpark.transform.position = held[i].position + held[i].rotation * (Vector3.forward * meleeTip[model] * held[i].localScale.x);
             fxSpark.Emit(2);
         }
     }
@@ -754,8 +786,7 @@ public class PHWeapons : UdonSharpBehaviour
         float k = t < 0.25f ? 1f - Smooth(t / 0.25f) : 0f;
         Vector3 kickPos = new Vector3(0f, 0.01f * k, -0.05f * k);
         Quaternion kickRot = Quaternion.Euler(-18f * k, 0f, 0f);
-        if (vrSelectorModel != null) vrSelectorModel.localPosition = kickPos;
-        if (vrSelectorModel != null) vrSelectorModel.localRotation = kickRot;
+        if (vrSelectorModel != null) PutGunModel(vrSelectorModel, gm, kickPos, kickRot);
         if (deskSelector == null) return;
         bool show = !me.IsUserInVR() && local.ShowsSelector();
         if (deskSelector.gameObject.activeSelf != show) deskSelector.gameObject.SetActive(show);
@@ -764,7 +795,6 @@ public class PHWeapons : UdonSharpBehaviour
         float sc = AvatarScale(me);
         deskSelector.SetPositionAndRotation(head.position + head.rotation * (deskSelectorAt * sc), head.rotation * Quaternion.Euler(deskSelectorEuler));
         deskSelector.localScale = Vector3.one * sc;
-        deskSelectorModel.localPosition = kickPos;
-        deskSelectorModel.localRotation = kickRot;
+        PutGunModel(deskSelectorModel, gm, kickPos, kickRot);
     }
 }

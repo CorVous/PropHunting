@@ -24,6 +24,8 @@ public static class WorldSceneBuilder
     // 5 cm up so its floor does not fight the map's ground plane, which reaches out under it
     static readonly Vector3 LobbyOrigin = new Vector3(-170f, 0.05f, -170f);
     const float RoomW = 24f, RoomD = 22f, WallH = 7f, ZoneHalf = 5.5f;
+    public static readonly Vector3 GripStationAt = new Vector3(-5.6f, 0f, -RoomD / 2 + 3.2f);
+    public const float GripStationYaw = 20f;
     static readonly Vector3 MiniMapAt = new Vector3(-7.0f, 0f, 4.0f);    // the LAST ROUND diorama table, lobby space (centre of the room at 0, north +z): in the ready area's west half
     const float MiniMapYaw = 0f;
     // the audio board (Cor): on the north wall over the how-to-play panels (x 7.56-11.64, top 2.0 m), 4.2 x 0.6 m,
@@ -351,6 +353,9 @@ public static class WorldSceneBuilder
             UdonSharpEditorUtility.CopyProxyToUdon(prof);
             Debug.Log("[prophunt] the profiler watches " + list.Count + " scripts");
         }
+
+        // the grip station (Cor): a chair left of the debug sign to line up each weapon in the hand (PHGripStation)
+        LobbyBuilder.BuildGripStation(lobby.transform, gameGo.GetComponentInChildren<PHWeapons>(true), GripStationAt, GripStationYaw);
 
         // the weapon wall (east wall) and the Trophies board (spawn wall): after the weapons, whose lists number the picks
         LobbyBuilder.BuildStore(lobby.transform, game, local.sound, RoomW, RoomD);
