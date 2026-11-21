@@ -159,7 +159,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
         seed = seedValue; size = sizeBucket;
         density = densityIndex < 0 || densityIndex >= DensityPercent.Length ? 0 : densityIndex;
         attempt = 0; done = false; failed = false; failReason = "";
-        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; ftmK = -1; tdK = -1; stRun = false;
+        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; dressTry = 0; statDressRetry = 0; statDressRetype = 0; statRetypeOf = new int[80]; statAltOf = new int[80]; ftmK = -1; tdK = -1; stRun = false;
         Alloc(SizeGrid[size], SizeGrid[size]);
         menu = new bool[nDefs]; defCopies = new int[nDefs];
         int roll = RngRange(Rng(ST_SCENERY, 9, 9), 1000);
@@ -305,7 +305,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
             failReason = "no valid map after 12 attempts (" + why + ")";
             return;
         }
-        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; ftmK = -1; tdK = -1; stRun = false;
+        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; dressTry = 0; statDressRetry = 0; statDressRetype = 0; statRetypeOf = new int[80]; statAltOf = new int[80]; ftmK = -1; tdK = -1; stRun = false;
     }
 
     // The layout stages draw from their own version, so the buildings of a seed survive a change of the prop
@@ -313,6 +313,7 @@ public partial class MapGenUdon : UdonSharp.UdonSharpBehaviour
     uint[] Rng(int st, int a, int b)
     {
         int version = (st == ST_LAYOUT || st == ST_EDGES) ? GenData.LAYOUT_VERSION : GenData.GEN_VERSION;
+        if (st == ST_ROOM && dressTry > 0) b += dressTry * 100003;   // a purpose area planned again (DressStep)
         return RngSub(seed, U32(version), st * 16 + attempt, a, b + size * 1000 + EvoSalt(st, a));
     }
 

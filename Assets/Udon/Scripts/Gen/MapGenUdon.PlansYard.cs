@@ -208,7 +208,7 @@ public partial class MapGenUdon
             int rule = RngRange(r, 3);
             int table = Dn("k_table"), bench = Dn("k_bench");
             int setD = Sz(table) + 2 * (60 + Sz(bench));
-            int want = 1 + AreaM2(room) / 14;
+            int want = 2 + AreaM2(room) / 14;   // revision 30: two sets at the least (a picnic ground, not a table)
             if (want > 6) want = 6;
             if (rule == 0) GridSpots(room, Sx(table), setD, 1300, 1100);
             else if (rule == 1) LineSpots(room, Sx(table), 40);
@@ -388,7 +388,7 @@ public partial class MapGenUdon
                     int e = WallPlace(rack, WM_FAR, yardGX, yardGZ, WIN_ANY, 0, r);
                     if (e >= 0)
                     {
-                        int prev = e, n = 1 + AreaM2(room) / 16;
+                        int prev = e, n = 2 + AreaM2(room) / 16;   // revision 30: a line of two racks at the least
                         for (int k = 1; k < n && k < 4; k++) { int f = Rel(rack, prev, Sx(rack) + 150, 0, 0, 0); if (f < 0) break; prev = f; }
                         Rel(basket, prev, Sx(rack) / 2 + 150 + Sx(basket) / 2, 0, RngRange(r, 4) * 90, 0);
                         if (Keep(first, false)) hq_Yard_got++;

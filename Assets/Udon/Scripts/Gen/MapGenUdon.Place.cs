@@ -481,6 +481,20 @@ public partial class MapGenUdon
         pRoom = room; looseUsed = 0; borderColour = 0;   // nothing carries over from the last room or the last map
         int type = roomType[room];
         if (type == GenData.R_RELEASE || FindTable(roomZone[room], type) < 0) return;
+        RoomNumbers(room);
+        int firstEmit = nEmit;
+        popFirst = firstEmit;
+        BuildSegs(room);
+        RoomWalkable(room);
+        planPhase = 0; planIter = 0; planBroken = false;
+        PhResetAll();
+    }
+
+    // the room's floor budget, minimum, top and cover caps from its type's range (PopulateRoom; again when a purpose
+    // area is retyped)
+    void RoomNumbers(int room)
+    {
+        int type = roomType[room];
         uint[] rng = Rng(ST_ROOM, room, 0);
         // the room's floor budget inside its type's range, for its floor area and the map's density
         int lo = PerArea(rangeFloorMin[type], room, true);
@@ -503,12 +517,6 @@ public partial class MapGenUdon
         roomTopCap[room] = PerArea(rangeTopMax[type], room, true);
         int cover = rangeCover[type] * DensityPercent[density] / 100;
         roomCoverMax[room] = roomCellCount[room] * (cover > 70 ? 70 : cover) / 100;
-        int firstEmit = nEmit;
-        popFirst = firstEmit;
-        BuildSegs(room);
-        RoomWalkable(room);
-        planPhase = 0; planIter = 0; planBroken = false;
-        PhResetAll();
     }
 
     // A plan in phases (Cor: build freezes). A plan that marks its parts with Ph(k) (once) and PhLoop(k, n) (n
@@ -676,10 +684,12 @@ public partial class MapGenUdon
         {
             popPhase = 10;
             if (type == GenData.R_RELEASE || FindTable(roomZone[room], type) < 0) return true;
+            dressTry = 0; dressAlt = 0; dressOrig = type;
             PopulateRoom(room);
             return false;
         }
-        if (popPhase == 10) { if (PlanStep(room)) popPhase = 1; return false; }
+        if (popPhase == 10) { if (PlanStep(room)) { if (IsPurpose(type)) popPhase = 11; else { popPhase = 1; dressTry = 0; } } return false; }
+        if (popPhase >= 11 && popPhase <= 14) { DressStep(room); return false; }
         if (popPhase == 1) { popPhase = 2; if (holiday != 0 && type != GenData.R_SCENERY) HolidayDecor(); return false; }
         if (popPhase == 2) { if (!(mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE && type != GenData.R_SCENERY && !SpaceKeepsOrdinary(room)) || ThemeDecorStep()) { popPhase = 3; tdK = -1; } return false; }
         if (popPhase == 3) { if (roomFloorMin[room] <= 0 || FillToMinimumStep()) { popPhase = 4; ftmK = -1; } return false; }
@@ -700,5 +710,117 @@ public partial class MapGenUdon
             guard++;
         }
         return popHost >= nEmit;
+    }
+
+    // ---- revision 30 (Cor: they don't really look like campsites and the like): a purpose area holds the pieces that
+    // make it what it is, or it is not that area. After its plan, a campsite needs two tents (one, on its last try,
+    // when only one fits) and its fire; a vegetable garden two rows of crops; a picnic ground two tables with their
+    // benches; a drying yard two racks; a fire pit its fire and three seats. An area short of them is cleared and
+    // planned again with fresh draws (twice), then becomes scenery ground (trees, bushes, rocks) rather than stay
+    // half dressed. The layout and the buildings never change.
+    public int dressTry;   // the room's try (0: the first; Rng salts the room's draws with it)
+    int dressCursor;
+    public int statDressRetry, statDressRetype;
+    [System.NonSerialized] public int[] statRetypeOf = new int[80], statAltOf = new int[80];   // areas made scenery ground / another purpose, by their first type
+    int dressAlt, dressOrig;
+    public const int DRESS_TRIES = 2;
+
+    bool IsPurpose(int t)
+    {
+        return t == GenData.R_CAMPSITE || t == GenData.R_GARDEN || t == GenData.R_PICNIC || t == GenData.R_DRYING || t == GenData.R_FIREPIT;
+    }
+
+    bool IsCrop(string id)
+    {
+        return id.StartsWith("n_crop") || id.StartsWith("n_lettuce") || id.StartsWith("n_corn") || id.StartsWith("n_wheat");
+    }
+
+    public bool Dressed(int room)
+    {
+        int t = roomType[room];
+        int tents = 0, fire = 0, crops = 0, sets = 0, racks = 0, seats = 0;
+        int rack = TwinIn(room, FindDef("ms_clothesRack")), log = TwinIn(room, FindDef("w_logA"));
+        // a village's fire basket stands in for the fire pit
+        int pit = TwinIn(room, FindDef("s_campfirePit")), ring = TwinIn(room, FindDef("n_campfire"));
+        for (int e = roomEmitStart[room]; e < nEmit; e++)
+        {
+            if (emitRoom[e] != room || (emitFlags[e] & EF_REMOVED) != 0) continue;
+            int d = emitDef[e], k = defKind[d];
+            if ((k & GenData.K_TENT) != 0) tents++;
+            if ((k & GenData.K_FIRE) != 0 || d == pit || d == ring) fire++;
+            if ((k & (GenData.K_SEAT | GenData.K_STUMP)) != 0 || (defTags[d] & GenData.I_SEAT_OUT) != 0 || d == log) seats++;
+            if ((emitFlags[e] & EF_BOOTH) != 0) sets++;
+            if (d == rack) racks++;
+            if (t == GenData.R_GARDEN && IsCrop(defId[d])) crops++;
+        }
+        if (t == GenData.R_CAMPSITE) return fire >= 1 && (tents >= 2 || (tents == 1 && dressTry >= DRESS_TRIES));
+        if (t == GenData.R_GARDEN) return crops >= 6;
+        if (t == GenData.R_PICNIC) return sets >= 2;
+        if (t == GenData.R_DRYING) return racks >= 2;
+        if (t == GenData.R_FIREPIT) return fire >= 1 && seats >= 3;
+        return true;
+    }
+
+    // a step of the check: 11 checks, 12 takes the plan's pieces back a few a step, 13 clears the beds' soil and
+    // retypes, 14 the walkway map again; then the plan runs again (popPhase 10)
+    void DressStep(int room)
+    {
+        if (popPhase == 11)
+        {
+            if (Dressed(room))
+            {
+                if (roomType[room] != dressOrig) statAltOf[dressOrig]++;
+                popPhase = 1; dressTry = 0;
+                return;
+            }
+            dressCursor = nEmit; popPhase = 12;
+            return;
+        }
+        if (popPhase == 12)
+        {
+            int n = 0;
+            while (dressCursor > popFirst && n < 6)
+            {
+                int e = --dressCursor;
+                if (emitParent[e] < 0 && (emitFlags[e] & EF_REMOVED) == 0) { Remove(e); n++; }
+            }
+            if (dressCursor <= popFirst) popPhase = 13;
+            return;
+        }
+        if (popPhase == 13)
+        {
+            for (int z = roomZ0[room]; z <= roomZ1[room]; z++)
+                for (int x = roomX0[room]; x <= roomX1[room]; x++)
+                {
+                    int i = z * IW + x;
+                    if (innerRoom[i] == room) tags[i] &= ~GenData.T_SOFT_GROUND;
+                }
+            // the same purpose with fresh draws; then a purpose that asks less room (a picnic ground, a drying yard);
+            // then scenery ground
+            int next = -1;
+            if (roomType[room] == dressOrig && dressTry < DRESS_TRIES) statDressRetry++;
+            else
+                while (dressAlt < 2 && next < 0)
+                {
+                    int alt = dressAlt == 0 ? GenData.R_PICNIC : GenData.R_DRYING;
+                    dressAlt++;
+                    if (alt != dressOrig) next = alt;
+                }
+            if (roomType[room] != dressOrig || dressTry >= DRESS_TRIES)
+            {
+                if (next < 0) { statRetypeOf[dressOrig]++; next = GenData.R_SCENERY; statDressRetype++; }
+                roomType[room] = next;
+                RoomNumbers(room);
+            }
+            dressTry++;
+            looseUsed = 0; borderColour = 0;
+            BuildSegs(room);
+            popPhase = 14;
+            return;
+        }
+        RoomWalkable(room);
+        planPhase = 0; planIter = 0; planBroken = false;
+        PhResetAll();
+        popPhase = 10;
     }
 }

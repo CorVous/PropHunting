@@ -93,6 +93,16 @@ public partial class MapGenUdon
     // ---- planting borders -------------------------------------------------------------------------------
     int borderColour;   // the flower colour of the last drift, so the next one differs
 
+    // revision 30 (Cor: gardens can just have veggies): a vegetable garden's bed takes a row of one crop, the next
+    // bed another
+     string[] CropRows = { "vegCarrot", "vegPumpkin", "vegMelon", "rowLettuce", "rowTurnip", "rowLettuceYoung", "rowCornYoung" };
+
+    int CropGroup(uint[] rng)
+    {
+        borderColour = (borderColour + 1 + RngRange(rng, 2)) % CropRows.Length;
+        return FindGrp(CropRows[borderColour]);
+    }
+
     int FlowerGroup(uint[] rng)
     {
         borderColour = (borderColour + 1 + RngRange(rng, 2)) % 3;
@@ -208,6 +218,7 @@ public partial class MapGenUdon
             if (kind == last && kind != 0) kind = 0;
             if (kind == 1 && !Fit(3)) kind = 0;
             if (kind == 2 && (!Fit(2) || !RocksAllowed())) kind = Fit(3) ? 1 : 0;
+            if (hq_Border_soil && roomType[pRoom] == GenData.R_GARDEN) kind = 1;   // revision 30: a vegetable garden's beds hold crop rows
             int first = nEmit;
             hq_Border_sel1 = 0;
             if (kind == 0) hq_Border_sel1 = 1;
@@ -292,7 +303,7 @@ public partial class MapGenUdon
                 int cursor = hq_Border_cursor;
                 int last = hq_Border_last;
                 int kind = hq_Border_kind;
-                int g = kind == 1 ? FlowerGroup(rng) : FindGrp("rocks");
+                int g = kind == 1 ? (hq_Border_soil && roomType[room] == GenData.R_GARDEN ? CropGroup(rng) : FlowerGroup(rng)) : FindGrp("rocks");
                 int n = kind == 1 ? RngBetween(rng, 3, Fit(5) ? 5 : 3) : RngBetween(rng, 2, Fit(3) ? 3 : 2);
                 if (ChooseMembers(g, room, n, rng) < 2) { cursor += 500; last = kind; { hq_Border_rng = rng; hq_Border_room = room; hq_Border_len = len; hq_Border_start = start; hq_Border_cursor = cursor; hq_Border_last = last; hq_Border_kind = kind; hq_Border_g = g; PhEnd(); return; } }
                 BuildFormation(grpLayout[g], grpGapMm[g], rng);
@@ -1555,8 +1566,10 @@ public partial class MapGenUdon
         {
             // the vegetable plot: a bed of soil in the open, two rows, one crop to a row
             uint[] r3 = SR(3);
-            hq_PlanGarden_sel9 = 0;
-            if (Fit(6) && RngChance(r3, 800)) hq_PlanGarden_sel9 = 1;
+            // revision 30 (Cor: gardens can just have veggies): a vegetable garden always has its plot, on top of
+            // the budget if the shed and the water point used it
+            hq_PlanGarden_sel9 = 1;
+            if (!Fit(6)) roomFloorTarget[room] = roomFloor[room] + 6;
             hq_PlanGarden_r3 = r3;
         }
         if (planPhase == 17 && PhLoop(17, 100000))
@@ -3321,6 +3334,7 @@ public partial class MapGenUdon
             if (fire < 0) { hq_FireSeats_fire = fire; hq_FireSeats_k = k; PhEnd(); return; }
             uint[] rng = SR(k);
             int n = RngBetween(rng, 2, 3);
+            if (roomType[pRoom] == GenData.R_FIREPIT) n = 3;   // revision 30: a fire pit seats three at the least
             int s = 0;
             hq_FireSeats_fire = fire;
             hq_FireSeats_k = k;
@@ -3335,7 +3349,7 @@ public partial class MapGenUdon
             if (!PhSubActive())
             {
                 int tries = planIter;
-                if (!(s < n && tries < 6 && Fit(1))) PhBreak();
+                if (!(s < n && tries < 9 && (Fit(1) || roomType[pRoom] == GenData.R_FIREPIT))) PhBreak();
                 else { hq_FireSeats_tries = tries; PhSubBegin(); }
             }
             hq_FireSeats_n = n;
