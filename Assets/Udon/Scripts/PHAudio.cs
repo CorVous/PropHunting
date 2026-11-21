@@ -12,7 +12,11 @@ using VRC.SDKBase;
 // ("ph.audio": one byte per kind, its level, +128 when muted) and applied when it is restored on join. Every clip
 // has its kind (cats, filled by the scene builder from its name or folder); the other sources the game plays
 // through (the host panel's and the explore button's clicks, the hiders' taunt voices) are listed in extra with
-// their kind and their own volume. Player voices and avatar sounds are scaled in PHLocal.UpdateVoices (Gain, ver).
+// their kind and their own volume.
+//
+// The music (Cor): Assets/Udon/Audio/Music (songs, filled by the scene builder), shuffled, one after another, in the
+// lobby and in rounds, on a 2D source of its own (local to each player, not synced); its row on the board starts
+// at half (MUSIC_START), the others at full.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHAudio : UdonSharpBehaviour
 {
@@ -26,11 +30,16 @@ public class PHAudio : UdonSharpBehaviour
     public int[] extraCat;
     public float[] extraBase;
     public PHAudioBoard board;
+    public AudioSource music;          // 2D, not looping: the next song starts when one ends (MusicTick)
+    public AudioClip[] songs;
+    public float musicBase = 0.9f;     // the music's own level under the player's (times master and Gain(C_MUSIC))
 
     // the kinds, in the order of the board's rows and of the saved bytes
-    public const int C_MASTER = 0, C_ANNOUNCER = 1, C_EFFECTS = 2, C_BUTTONS = 3, C_JINGLES = 4, C_TAUNTS = 5, C_VOICES = 6, C_AVATARS = 7;
-    public const int KINDS = 8, STEPS = 10;
-    public const string SAVE_KEY = "ph.audio";
+    public const int C_MASTER = 0, C_ANNOUNCER = 1, C_EFFECTS = 2, C_BUTTONS = 3, C_JINGLES = 4, C_TAUNTS = 5, C_MUSIC = 6;
+    public const int KINDS = 7, STEPS = 10, MUSIC_START = 5;
+    // (ph.audio was the first board's: Player voices and Avatar sounds at 6 and 7, both gone; its first six rows,
+    // the same kinds in the same order, are read when a player has no ph.audio2 yet)
+    public const string SAVE_KEY = "ph.audio2", OLD_SAVE_KEY = "ph.audio";
 
     [System.NonSerialized] public int[] level;      // 1..STEPS
     [System.NonSerialized] public bool[] muted;
@@ -42,17 +51,35 @@ public class PHAudio : UdonSharpBehaviour
     public readonly string[] softKnock = { "impactSoft_medium_000", "impactSoft_medium_001" };
     public readonly string[] thud = { "impactGeneric_light_000", "impactGeneric_light_001" };
     // what a row plays when its level changes, so the player hears it ("" = nothing of its own: a click)
-    readonly string[] sample = { "confirmation_001", "ready", "impactWood_medium_000", "click_001", "jingles_PIZZI07", "pepSound1", "", "" };
+    readonly string[] sample = { "confirmation_001", "ready", "impactWood_medium_000", "click_001", "jingles_PIZZI07", "pepSound1", "" };
 
     int next;
+    int song = -1;
+    float songAt = -10f;
 
-    void Start() { Init(); Apply(); }
+    void Start() { Init(); Apply(); MusicTick(); }
+
+    // every second: when the song has ended, a random other one (the music is the player's own: nothing synced)
+    public void MusicTick()
+    {
+        SendCustomEventDelayedSeconds(nameof(MusicTick), 1f);
+        if (music == null || songs == null || songs.Length == 0) return;
+        if (music.isPlaying || Time.time - songAt < 3f) return;
+        int k = Random.Range(0, songs.Length);
+        if (songs.Length > 1 && k == song) k = (k + 1 + Random.Range(0, songs.Length - 1)) % songs.Length;
+        song = k; songAt = Time.time;
+        if (songs[k] == null) return;
+        music.clip = songs[k];
+        music.volume = musicBase * master * Gain(C_MUSIC);
+        music.Play();
+    }
 
     void Init()
     {
         if (level != null) return;
         level = new int[KINDS]; muted = new bool[KINDS];
         for (int i = 0; i < KINDS; i++) level[i] = STEPS;
+        level[C_MUSIC] = MUSIC_START;
     }
 
     // ------------------------------------------------------------------ the player's levels
@@ -95,6 +122,7 @@ public class PHAudio : UdonSharpBehaviour
     {
         Init();
         for (int i = 0; i < KINDS; i++) { level[i] = STEPS; muted[i] = false; }
+        level[C_MUSIC] = MUSIC_START;
         Changed(C_MASTER);
     }
 
@@ -120,8 +148,15 @@ public class PHAudio : UdonSharpBehaviour
         if (!Utilities.IsValid(player) || !player.isLocal) return;
         Init();
         byte[] b;
-        if (PlayerData.TryGetBytes(player, SAVE_KEY, out b) && b != null)
-            for (int i = 0; i < KINDS && i < b.Length; i++)
+        int upto = KINDS;
+        if (!PlayerData.TryGetBytes(player, SAVE_KEY, out b) || b == null)
+        {
+            // the first board's levels: its first six rows only (its 7th was Player voices, not the music)
+            upto = C_MUSIC;
+            if (!PlayerData.TryGetBytes(player, OLD_SAVE_KEY, out b)) b = null;
+        }
+        if (b != null)
+            for (int i = 0; i < upto && i < b.Length; i++)
             {
                 int v = b[i];
                 muted[i] = v >= 128;
@@ -143,6 +178,7 @@ public class PHAudio : UdonSharpBehaviour
                 float b = extraBase != null && i < extraBase.Length ? extraBase[i] : 1f;
                 extra[i].volume = b * Gain(c);
             }
+        if (music != null) music.volume = musicBase * master * Gain(C_MUSIC);
         if (board != null) board.Show();
     }
 

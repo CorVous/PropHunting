@@ -853,7 +853,9 @@ public static class WorldSceneBuilder
         var go = new GameObject("Audio");
         go.transform.SetParent(parent, false);
         var a = go.AddUdonSharpComponent<PHAudio>();
-        var guids = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Udon/Audio" });
+        // (the songs under Audio/Music are not cues: the music source plays them, PHAudio.MusicTick)
+        var guids = System.Array.FindAll(AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Udon/Audio" }),
+            g => !AssetDatabase.GUIDToAssetPath(g).Contains("/Audio/Music/"));
         a.names = new string[guids.Length];
         a.clips = new AudioClip[guids.Length];
         a.cats = new int[guids.Length];
@@ -864,6 +866,13 @@ public static class WorldSceneBuilder
             a.clips[i] = c; a.names[i] = c.name;
             a.cats[i] = LobbyBuilder.AudioKind(c.name, path);   // its row on the audio board
         }
+        var songGuids = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Udon/Audio/Music" });
+        a.songs = new AudioClip[songGuids.Length];
+        for (int i = 0; i < songGuids.Length; i++) a.songs[i] = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(songGuids[i]));
+        var mgo = new GameObject("Music");
+        mgo.transform.SetParent(go.transform, false);
+        a.music = mgo.AddComponent<AudioSource>();
+        a.music.spatialBlend = 0f; a.music.playOnAwake = false; a.music.loop = false; a.music.priority = 32; a.music.volume = 0f;
         a.ui = go.AddComponent<AudioSource>();
         a.ui.spatialBlend = 0f; a.ui.playOnAwake = false;
         a.pool = new AudioSource[8];

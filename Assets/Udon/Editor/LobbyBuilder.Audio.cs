@@ -14,7 +14,7 @@ public static partial class LobbyBuilder
     static Vector2 AP(float x, float y) { return new Vector2(x - AW / 2, AH / 2 - y); }
 
     // the board's names, in PHAudio's kind order (rows audio.* in strings_audio.tsv hold them in every language)
-    public static readonly string[] AudioNames = { "Master", "Announcer", "Effects", "Buttons", "Jingles", "Taunts", "Player voices", "Avatar sounds" };
+    public static readonly string[] AudioNames = { "Master", "Announcer", "Effects", "Buttons", "Jingles", "Taunts", "Music" };
 
     // centre: the board's centre on the wall (lobby space), facing the room (-z)
     public static PHAudioBoard BuildAudioBoard(Transform lobby, PHAudio sound, Vector3 centre)
