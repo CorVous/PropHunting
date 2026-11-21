@@ -265,13 +265,18 @@ public class PHWeapons : UdonSharpBehaviour
     float watchUntil;
     public void WatchBreak(int slot) { watchSlot = slot; watchUntil = Time.time + 2.5f; }
 
-    // a hider's gun, at their prop: above its top, turned as the prop faces, or at what it last shot for a moment
+    // a hider's gun, at their prop: above its top, turned as the prop faces, or at what it last shot for a moment.
+    // The owner sees their own too (hop playtest: hiders did not know their gun gives them away), solid, from the
+    // moment the others do, but only in their third-person view (on PHSlot.HIDER_SELF: the first-person camera leaves
+    // it out; PHView's pip draws it)
+    int[] hiderGunLayer;
     void UpdateHiderGun(int i, PHSlot s, bool mine)
     {
         if (hiderGun == null || i >= hiderGun.Length) return;
-        bool show = s != null && !mine && s.armed && !s.caught && s.def >= 0 && game.phase == PHGame.PH_HUNT
+        bool show = s != null && s.armed && !s.caught && s.def >= 0 && game.phase == PHGame.PH_HUNT
             && game.RoleOf(i) == PHGame.ROLE_HIDER && s.round == game.round;
         Transform g = hiderGun[i];
+        if (show) SetGunLayer(i, mine ? PHSlot.HIDER_SELF : 0);
         if (g.gameObject.activeSelf != show)
         {
             g.gameObject.SetActive(show);
@@ -314,6 +319,21 @@ public class PHWeapons : UdonSharpBehaviour
         h.localScale = Vector3.one * sc;
     }
 
+    // the layer a hider gun is drawn on (and its model's), set only when it changes
+    void SetGunLayer(int i, int layer)
+    {
+        if (hiderGunLayer == null || hiderGunLayer.Length != hiderGun.Length)
+        {
+            hiderGunLayer = new int[hiderGun.Length];
+            for (int k = 0; k < hiderGunLayer.Length; k++) hiderGunLayer[k] = -1;
+        }
+        if (hiderGunLayer[i] == layer) return;
+        hiderGunLayer[i] = layer;
+        Transform g = hiderGun[i];
+        g.gameObject.layer = layer;
+        for (int k = 0; k < g.childCount; k++) g.GetChild(k).gameObject.layer = layer;
+    }
+
     Vector3 GunPlace(PHSlot s)
     {
         float h = s.def >= 0 && s.def < game.gen.defSy.Length ? game.gen.defSy[s.def] / 1000f : 1f;
@@ -337,7 +357,7 @@ public class PHWeapons : UdonSharpBehaviour
         else
         {
             PHSlot s = game.slots[slot];
-            if (hiderGun != null && !hiderGun[slot].gameObject.activeSelf) { hiderGun[slot].gameObject.SetActive(true); gunShown[slot] = GunPlace(s); }
+            if (hiderGun != null && !hiderGun[slot].gameObject.activeSelf) { SetGunLayer(slot, 0); hiderGun[slot].gameObject.SetActive(true); gunShown[slot] = GunPlace(s); }
             Vector3 g = gunShown[slot];
             Vector3 d = end - g;
             from = g + (d.sqrMagnitude > 1e-4f ? d.normalized : Vector3.forward) * (Muzzle(s) * GUN_SCALE);

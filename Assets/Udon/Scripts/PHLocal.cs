@@ -1006,7 +1006,9 @@ public class PHLocal : UdonSharpBehaviour
             best = i; bestT = tAt;
         }
         Vector3 end = o + dir * bestT;
-        if (!s.armed) { s.armed = true; s.Send(); }
+        // the first shot gives the hider away: their gun floats over their prop for everyone from now on (PHWeapons;
+        // they see it too, in their third-person view), and they are told so (hop playtest)
+        if (!s.armed) { s.armed = true; s.Send(); Say(T("say.gunSeen"), 4f); }
         if (weapons != null) weapons.FireSelector();
         statShots++;
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Shot), end, best);
