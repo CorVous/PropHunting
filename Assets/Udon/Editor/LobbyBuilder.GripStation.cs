@@ -59,7 +59,7 @@ public static partial class LobbyBuilder
         gs.preview = pv.transform; gs.previewFilter = mf;
 
         // the board: in front of the seat, a little to the left (the right hand holds the weapon), leaning back
-        var cv = Canvas(root, "GripBoard", new Vector3(-0.18f, 1.05f, 0.62f), Quaternion.Euler(20f, 0f, 0f), new Vector2(GW, GH), 0.0016f, true);
+        var cv = Canvas(root, "GripBoard", new Vector3(-0.18f, 1.05f, 0.78f), Quaternion.Euler(20f, 0f, 0f), new Vector2(GW, GH), 0.0016f, true);
         var bg = cv.gameObject.AddComponent<Image>(); bg.color = Felt; bg.raycastTarget = false;
         Txt(cv, "Label", new Vector2(0, 296), new Vector2(580, 30), "GRIP STATION", future, 18, C("e1cfa5"), TextAlignmentOptions.Center);
         gs.title = Txt(cv, "Title", new Vector2(0, 248), new Vector2(580, 60), "", future, 15, Color.white, TextAlignmentOptions.Center);

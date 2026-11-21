@@ -5,7 +5,8 @@ the newest VRChat output log (or the logs given) and puts each weapon's last sav
 keeping the file's order and comments (a weapon not in it yet goes at the end). Then Build world scene bakes them in.
 
     python Tools/import_grips.py                    (the newest output_log_*.txt of VRChat on this computer)
-    python Tools/import_grips.py <log> [<log>...]   (these logs, e.g. the Unity editor's Editor.log after ClientSim)
+    python Tools/import_grips.py <log> [<log>...]   (these logs, e.g. the editor's log after ClientSim: on CorDesk
+                                                     the editor runs with -logFile ~/claude-tools/logs/unity-PropHunting.log)
     --dry                                           (show what would change, write nothing)
 """
 import os, sys, glob, re

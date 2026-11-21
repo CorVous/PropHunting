@@ -4,7 +4,7 @@
 # First guesses: Tools/estimate_grips.py. Tuned at the lobby's grip station: Tools/import_grips.py.
 melee:kenney-survival-kit:tool-hammer	-0.0000 -0.0000 -0.0140	0.0 0.0 0.0	1.00
 melee:fantasy-weapons-bits:hammer_B	-0.0002 -0.0004 0.0740	0.0 0.0 0.0	1.00
-melee:kenney-survival-kit:tool-hammer-upgraded	0.0000 -0.0000 -0.0550	0.0 0.0 0.0	1.00
+melee:kenney-survival-kit:tool-hammer-upgraded	0.0000 0.0000 0.0900	0.0 0.0 0.0	1.00
 gun:kenney-blaster-kit:blaster-b	0.0000 -0.0410 -0.0052	0.0 0.0 0.0	1.60
 melee:fantasy-weapons-bits:axe_A	-0.0003 -0.0022 0.0940	0.0 0.0 0.0	1.00
 melee:fantasy-weapons-bits:axe_B	-0.0002 -0.0016 0.0540	0.0 0.0 0.0	1.00
