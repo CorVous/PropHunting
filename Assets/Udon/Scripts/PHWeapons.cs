@@ -313,6 +313,7 @@ public class PHWeapons : UdonSharpBehaviour
         float sc = AvatarScale(p);
         Vector3 head = p.GetBonePosition(HumanBodyBones.Head);
         if (head == Vector3.zero) head = p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
+        head = game.SeenHere(i, head);   // (PHGame.layers: in this client's copy of the map)
         // a slow bob and a slight tilt, turning, so it reads as floating
         h.SetPositionAndRotation(head + Vector3.up * (sc * (HALO_UP + 0.015f * Mathf.Sin(Time.time * 2f + i))),
             Quaternion.Euler(0f, Time.time * 30f + i * 40f, 0f) * Quaternion.Euler(8f, 0f, 0f));
@@ -337,13 +338,14 @@ public class PHWeapons : UdonSharpBehaviour
     Vector3 GunPlace(PHSlot s)
     {
         float h = s.def >= 0 && s.def < game.gen.defSy.Length ? game.gen.defSy[s.def] / 1000f : 1f;
-        return s.propPos + Vector3.up * (h + 0.25f);
+        return game.builder.ToWorld(s.propPos) + Vector3.up * (h + 0.25f);   // (propPos is map-local)
     }
 
     // a final-stand shot, on every client (PHSlot.Shot): the flash, and a bullet with a trail that sparks where it lands
     public void OnShot(int slot, Vector3 end, int hitSlot)
     {
         Setup();
+        end = game.builder.ToWorld(end);   // (sent map-local: PHLocal.HiderShoot)
         if (slot < 0 || slot >= held.Length) return;
         shotAt[slot] = Time.time; shotEnd[slot] = end;
         VRCPlayerApi p = VRCPlayerApi.GetPlayerById(game.slotPlayer[slot]);
@@ -459,7 +461,8 @@ public class PHWeapons : UdonSharpBehaviour
         // a desktop player's slash, seen from outside: a chop about the hand
         float t = Time.time - swingAt[i];
         if (t >= 0f && t < SWING_TIME) r = r * Quaternion.Euler(Chop(t), 0f, 0f);
-        held[i].SetPositionAndRotation(at, r);
+        // (PHGame.layers: a hunter seen from another copy of the map holds it at their stand-in, PHLocal.UpdateStandIns)
+        held[i].SetPositionAndRotation(game.SeenHere(i, at), r);
         held[i].localScale = Vector3.one * AvatarScale(p);
     }
 
@@ -623,6 +626,7 @@ public class PHWeapons : UdonSharpBehaviour
     public void OnSwung(int slot, Vector3 point, int kind)
     {
         Setup();
+        point = game.builder.ToWorld(point);   // (sent map-local: PHLocal.MeleeStrike)
         VRCPlayerApi p = slot >= 0 && slot < game.slotPlayer.Length ? VRCPlayerApi.GetPlayerById(game.slotPlayer[slot]) : null;
         bool mine = p != null && p.isLocal;
         if (!mine && p != null && Utilities.IsValid(p) && !p.IsUserInVR() && slot < swingAt.Length)

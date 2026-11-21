@@ -906,12 +906,47 @@ public class MapBuilderUdon : UdonSharpBehaviour
         indoorTex.SetPixels32(indoorPix);
         indoorTex.Apply(false);
         VRC.SDKBase.VRCShader.SetGlobalTexture(indoorId, indoorTex);
-        VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, new Vector4(1f / (tw * CELL), 1f / (th * CELL), 1f, 0f));
+        indoorArea = new Vector4(1f / (tw * CELL), 1f / (th * CELL), 1f, origin.x);
+        VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, indoorArea);
+    }
+    Vector4 indoorArea;
+
+    // ------------------------------------------------------------------ where this client's copy stands (PHGame.layers)
+    // The map is always built with its root ("Map", this object) at the world's origin, so every place the build works
+    // out is a place on the map (map-local). Once built it is moved to the local player's team's copy (PHGame.TeamOrigin,
+    // set by PHLocal.UpdateOrigin through SetOrigin); everything it made moves with it. What is not under the root works
+    // from the map-local places with ToWorld / ToLocal: the synced places (PHSlot, PHKnock, the swing and shot events),
+    // the light points (lightPos: PHLamps), the sun's spot (PHSun), the clouds' turning centre, the buildings' footprint
+    // texture for the shader (indoorArea.w: the copy's x, PropLit.cginc). With layers off the origin is always zero.
+    [System.NonSerialized] public Vector3 origin;      // where the copy stands now
+    [System.NonSerialized] public Vector3 wantOrigin;  // where it should stand (applied when built)
+    [System.NonSerialized] public int originVer;       // counts the moves (PHSun, PHLamps, PHView put their things again)
+
+    public Vector3 ToWorld(Vector3 local) { return local + origin; }
+    public Vector3 ToLocal(Vector3 world) { return world - origin; }
+
+    public void SetOrigin(Vector3 o)
+    {
+        wantOrigin = o;
+        if (built && origin != o) ApplyOrigin();
+    }
+
+    void ApplyOrigin()
+    {
+        if (origin == wantOrigin) return;
+        origin = wantOrigin;
+        transform.position = origin;
+        originVer++;
+        if (indoorAreaId != 0 && indoorArea.z > 0f) { indoorArea.w = origin.x; VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, indoorArea); }
+        Debug.Log("[MapBuilder] the map's copy moved to " + origin.ToString("F0"));
     }
 
     public void Clear()
     {
         if (indoorAreaId != 0) VRC.SDKBase.VRCShader.SetGlobalVector(indoorAreaId, Vector4.zero);
+        indoorArea = Vector4.zero;
+        // (the next map is built at the world's origin again: SetOrigin moves it once it stands)
+        if (origin != Vector3.zero) { origin = Vector3.zero; transform.position = Vector3.zero; originVer++; }
         // Perf: destroying the old map's objects all at once (an XL map: about 1,240 objects, 6,800 colliders) cost one
         // frame of about 850 ms in the editor, nearly all of it the engine's own destroying at the frame's end; and
         // switching them off one by one from Udon cost 265 ms. Instead each of the three roots is switched off whole
@@ -988,7 +1023,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             for (int i = 0; i < nClouds; i++)
             {
                 if (clouds[i] == null) continue;
-                clouds[i].position = skyCentre + q * (clouds[i].position - skyCentre);
+                clouds[i].position = skyCentre + origin + q * (clouds[i].position - skyCentre - origin);   // (skyCentre is map-local)
             }
         }
         if (!busy) return;
@@ -1017,7 +1052,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
         buildMs += watch.Elapsed.TotalMilliseconds;
         if (finished)
         {
-            busy = false; built = true;
+            busy = false;
+            ApplyOrigin();   // (the copy goes to its team's place before anything sees it built: PHSun, PHLamps, PHHistory)
+            built = true;
             if (perfLog) PerfSummary();
             Debug.Log("[MapBuilder] built in " + buildMs.ToString("0") + " ms of work: " + objects.Length + " props, ground " + nv[B_GROUND] + " verts, walls " + nv[B_WALLS] + ", roofs " + nv[B_ROOFS] + ", collision " + nv[B_COLL]);
         }
@@ -2038,6 +2075,44 @@ public class MapBuilderUdon : UdonSharpBehaviour
     {
         cageBlock.SetColor("_Core", cageTurning ? new Color(1.00f, 0.72f, 0.20f) : new Color(0.30f, 0.95f, 0.85f));
         cageBlock.SetColor("_Rim", cageTurning ? new Color(0.32f, 0.20f, 0.03f) : new Color(0.02f, 0.30f, 0.27f));
+    }
+
+    // A fellow hider's prop (PHGame.seeHiders, PHSlot.UpdateMateCage): a copy of the cage object hung under the prop's
+    // root, in the hiders' green, drawn whole: not faded near the eye nor cut above it (the own prop's cage is), still
+    // faint behind walls (the shader's second pass). 'reuse' is the slot's copy from before (null: one is made). Returns
+    // the copy, switched off where the model has no cage.
+    MaterialPropertyBlock mateBlock;
+
+    public GameObject MateCage(GameObject go, int def, GameObject reuse)
+    {
+        if (cage == null || go == null) return reuse;
+        Mesh m = cageMeshes != null && def >= 0 && def < cageMeshes.Length ? cageMeshes[def] : null;
+        if (m == null) { if (reuse != null) reuse.SetActive(false); return reuse; }
+        if (reuse == null)
+        {
+            reuse = Instantiate(cage);
+            reuse.name = "MateCage";
+        }
+        MeshFilter f = reuse.GetComponent<MeshFilter>();
+        MeshRenderer r = reuse.GetComponent<MeshRenderer>();
+        if (f == null || r == null) { reuse.SetActive(false); return reuse; }
+        f.sharedMesh = m;
+        if (mateBlock == null)
+        {
+            mateBlock = new MaterialPropertyBlock();
+            mateBlock.SetColor("_Core", new Color(0.55f, 1.00f, 0.35f));
+            mateBlock.SetColor("_Rim", new Color(0.08f, 0.30f, 0.04f));
+            mateBlock.SetFloat("_FadeNear", 0.3f);
+            mateBlock.SetFloat("_FadeFar", 0.8f);      // (the shader's Small() is 0 at 0.8: the lines' own width)
+            mateBlock.SetFloat("_EyeMargin", -10000f);  // nothing cut above the eye
+        }
+        r.SetPropertyBlock(mateBlock);
+        Transform t = reuse.transform;
+        t.SetParent(go.transform, false);
+        t.localPosition = Vector3.zero; t.localRotation = Quaternion.identity; t.localScale = Vector3.one;
+        reuse.layer = 0;
+        reuse.SetActive(true);
+        return reuse;
     }
 
     // takes the cage back from go (from anywhere when go is null)
@@ -3218,6 +3293,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     // ------------------------------------------------------------------ helpers for the game
     // an inner cell's centre in the world (a hider's spawn may be upstairs or in a basement)
+    // (map-local places, as all of these: ToWorld for the copy this client stands in)
     public Vector3 InnerWorld(int i) { return new Vector3((i % IW + 0.5f) * INNER, 0f, (i / IW + 0.5f) * INNER) + InnerOff(i); }
     public float SiteWidth() { return siteW * CELL; }
     public float SiteDepth() { return siteH * CELL; }

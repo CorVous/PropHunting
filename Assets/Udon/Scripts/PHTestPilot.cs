@@ -90,7 +90,7 @@ public class PHTestPilot : UdonSharpBehaviour
             PHSlot s = game.slots[i];
             if (game.slotPlayer[i] == 0 || game.slotRole[i] != PHGame.ROLE_HIDER || s.caught || !s.hiding || s.def < 0) continue;
             // the middle of the prop as this client draws it
-            Vector3 target = s.propPos + Vector3.up * 0.3f;
+            Vector3 target = game.builder.ToWorld(s.propPos) + Vector3.up * 0.3f;   // (propPos is map-local)
             Transform proxy = s.proxyRoot != null ? s.proxyRoot.Find("Hider" + i) : null;
             if (proxy != null)
             {
@@ -105,7 +105,7 @@ public class PHTestPilot : UdonSharpBehaviour
                 Vector3 c = target + new Vector3(Mathf.Sin(ang) * 1.5f, 0.4f, Mathf.Cos(ang) * 1.5f);
                 if (!Physics.Linecast(c, target + (c - target).normalized * 0.4f, 1 << 11, QueryTriggerInteraction.Ignore)) { from = c; break; }
             }
-            me.TeleportTo(new Vector3(from.x, s.propPos.y + 0.1f, from.z), Quaternion.identity);
+            me.TeleportTo(new Vector3(from.x, game.builder.ToWorld(s.propPos).y + 0.1f, from.z), Quaternion.identity);
             Shoot(from, target, "HIDER slot" + i);
             return;
         }

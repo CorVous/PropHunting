@@ -88,7 +88,7 @@ public class PHDwell : UdonSharpBehaviour
                     Vector3 end = game.slots[i].propPos;
                     if ((new Vector2(x - end.x, z - end.z)).sqrMagnitude > 4f)
                     {
-                        beams[i].transform.position = new Vector3(x, 0f, z);
+                        beams[i].transform.position = game.builder.ToWorld(new Vector3(x, 0f, z));   // (the squares are map-local, as propPos)
                         on = true;
                     }
                 }

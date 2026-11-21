@@ -171,7 +171,8 @@ public class PHMiniMap : UdonSharpBehaviour
     void Sample(bool hunt)
     {
         int n = Mathf.Min(paths.Length, game.slots.Length);
-        siteMin = builder.transform.position; siteMax = siteMin + new Vector3(builder.SiteWidth(), 0f, builder.SiteDepth());
+        // (places on the map, map-local: PHGame.layers puts each team on its own copy, PHGame.MapLocalOf)
+        siteMin = Vector3.zero; siteMax = siteMin + new Vector3(builder.SiteWidth(), 0f, builder.SiteDepth());
         for (int i = 0; i < n; i++)
         {
             int pid = game.slotPlayer[i];
@@ -184,14 +185,14 @@ public class PHMiniMap : UdonSharpBehaviour
             if (role == PHGame.ROLE_HIDER)
             {
                 if (s.caught) { if (caughtAt[i] < 0f) { caughtAt[i] = hunt ? Time.time - huntStart : 0f; EndStay(i); } continue; }
-                Vector3 at = s.def >= 0 ? s.propPos : p.GetPosition();
+                Vector3 at = s.def >= 0 ? s.propPos : game.MapLocalOf(i, p.GetPosition());
                 Add(i, at);
                 if (s.def >= 0) Dwell(i, s.def, at, s.propYaw);
             }
             else if (role == PHGame.ROLE_HUNTER && hunt)
             {
                 catches[i] = s.catches;
-                Add(i, p.GetPosition());
+                Add(i, game.MapLocalOf(i, p.GetPosition()));
             }
         }
     }
@@ -255,7 +256,8 @@ public class PHMiniMap : UdonSharpBehaviour
     void Snap()
     {
         float w = builder.SiteWidth(), d = builder.SiteDepth();
-        origin = builder.transform.position + new Vector3(w * 0.5f, 0f, d * 0.5f);
+        // (map-local, as the recorded paths: the map's own objects are taken back from this client's copy, ToLocal)
+        origin = new Vector3(w * 0.5f, 0f, d * 0.5f);
         float k = tableSize / Mathf.Max(8f, Mathf.Max(w, d));
         model.localScale = new Vector3(k, k, k);
         // the ground (floors indoors too): its mesh runs hundreds of metres past the map, so the diorama's material
@@ -284,7 +286,7 @@ public class PHMiniMap : UdonSharpBehaviour
         if (src == null || src.sharedMesh == null) { dio.gameObject.SetActive(false); return; }
         dio.sharedMesh = src.sharedMesh;
         Transform t = dio.transform;
-        t.localPosition = src.transform.position - origin;
+        t.localPosition = builder.ToLocal(src.transform.position) - origin;
         t.localRotation = src.transform.rotation;
         t.localScale = src.transform.lossyScale;
         dio.gameObject.SetActive(true);
@@ -435,7 +437,7 @@ public class PHMiniMap : UdonSharpBehaviour
             if (def < 0 || def >= fl.Length || (fl[def] & GenData.FL_DECOR) != 0) continue;
             if (def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
             Transform st = src.transform;
-            GameObject go = Copy(builder.propPrefabs[def], st.position, st.eulerAngles.y, 1f);
+            GameObject go = Copy(builder.propPrefabs[def], builder.ToLocal(st.position), st.eulerAngles.y, 1f);
             mapUpper[nMapProp] = st.position.y - origin.y > UPPER_Y;
             go.SetActive(upperOn || !mapUpper[nMapProp]);
             mapProp[nMapProp++] = go;
@@ -467,7 +469,7 @@ public class PHMiniMap : UdonSharpBehaviour
         {
             if (nFence >= FenceCap()) { fenceNext = root.childCount; break; }
             Transform src = root.GetChild(fenceNext);
-            Vector3 at = src.position - origin;
+            Vector3 at = builder.ToLocal(src.position) - origin;
             if (Mathf.Abs(at.x) > siteW * 0.5f + 0.5f || Mathf.Abs(at.z) > siteD * 0.5f + 0.5f) continue;
             GameObject go = Instantiate(src.gameObject);
             Transform t = go.transform;
