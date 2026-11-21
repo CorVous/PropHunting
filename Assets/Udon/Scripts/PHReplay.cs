@@ -497,7 +497,7 @@ public class PHReplay : UdonSharpBehaviour
     {
         if (game.text == null) return;
         if (playLabel != null) playLabel.text = game.text.Get(open && viewRound == game.round ? (playing ? "replay.pause" : "replay.play") : "replay.watch");
-        if (speedLabel != null) speedLabel.text = speed + "x";
+        if (speedLabel != null) speedLabel.text = game.text.F1("replay.speed", speed.ToString());   // (a string row, so the text bake gives the font its ×)
         if (summaryLabel != null) summaryLabel.text = game.text.Get("replay.summary");
     }
 

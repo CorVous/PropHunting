@@ -87,7 +87,7 @@ public static partial class LobbyBuilder
         ((RectTransform)bar.transform).sizeDelta = new Vector2(1400f, 80f);
         rp.bar = bar;
         rp.playLabel = ReplayButton(bar.transform, game, "Watch replay", new Vector2(-580f, 0f), new Vector2(220f, 64f), C("f2c45a"), rp, nameof(PHReplay.PlayPause), 0);
-        rp.speedLabel = ReplayButton(bar.transform, game, "1x", new Vector2(-415f, 0f), new Vector2(90f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Speed), 0);
+        rp.speedLabel = ReplayButton(bar.transform, game, "1×", new Vector2(-415f, 0f), new Vector2(90f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Speed), 0);
         var speedGo = rp.speedLabel.transform.parent.parent.gameObject;
         // the scrub bar: a track, the hunt's start on it, the playhead, and pressable pieces over it
         const float barW = 760f; const int segs = 20;
@@ -97,7 +97,7 @@ public static partial class LobbyBuilder
         for (int s = 0; s < segs; s++)
         {
             float x = -barW / 2 + barW * s / (segs - 1);
-            var piece = Img(track.transform, "Piece" + s, new Vector2(x, 0f), new Vector2(barW / (segs - 1), 64f), sTile, new Color(1f, 1f, 1f, 0.01f), 1f);
+            var piece = Img(track.transform, "Piece" + s, new Vector2(x, 0f), new Vector2(barW / (segs - 1), 64f), null, new Color(1f, 1f, 1f, 0f), 1f);   // (clear: still pressable, Cor saw faint circles at 0.01)
             piece.raycastTarget = true;
             var bt = piece.gameObject.AddComponent<Button>();
             var nav = bt.navigation; nav.mode = Navigation.Mode.None; bt.navigation = nav; bt.targetGraphic = piece;
