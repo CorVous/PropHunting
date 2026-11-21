@@ -263,6 +263,9 @@ public class PHLocal : UdonSharpBehaviour
         // hitch every 0.5 s. Now the slots go into a small table keyed by player id once a pass, and a player's
         // settings are set only when what they should be differs from what was set last. Every few seconds they are
         // all set again regardless (VRChat may reset a player's voice, e.g. on an avatar change).
+        // (the audio board changed a level: everyone's voice again, at the new gain)
+        if (sound != null && sound.ver != voiceVer) { voiceVer = sound.ver; voiceSet = null; }
+        float voiceGain = sound != null ? sound.Gain(PHAudio.C_VOICES) : 1f, avatarGain = sound != null ? sound.Gain(PHAudio.C_AVATARS) : 1f;
         if (Time.time >= voiceResetAt || voiceSet == null) { voiceResetAt = Time.time + VOICE_RESET; voiceSetId = new int[VOICE_HASH]; voiceSet = new int[VOICE_HASH]; }
         int[] slotOfKey = new int[VOICE_HASH], slotOfSlot = new int[VOICE_HASH];
         for (int s = 0; s < game.slotPlayer.Length; s++)
@@ -297,7 +300,8 @@ public class PHLocal : UdonSharpBehaviour
             bool lowpass = true;
             if (want == 2) gain = 0f;
             else if (want == 3) { gain = 9f; near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }   // (quieter: Cor's group playtest)
-            p.SetVoiceGain(gain);
+            p.SetVoiceGain(gain * voiceGain);
+            p.SetAvatarAudioGain(10f * avatarGain);   // (VRChat's default 10; the audio board's avatar sounds)
             p.SetVoiceDistanceNear(near);
             p.SetVoiceDistanceFar(far);
             p.SetVoiceVolumetricRadius(radius);
@@ -308,6 +312,7 @@ public class PHLocal : UdonSharpBehaviour
     const int VOICE_HASH = 128;     // a power of two, more than the 90 players an instance can hold
     const float VOICE_RESET = 5f;   // seconds between setting everyone's voice again regardless
     int[] voiceSetId, voiceSet;
+    int voiceVer = -1;
     float voiceResetAt;
 
     // ------------------------------------------------------------------ the reveal (prototype Round.EndRound)

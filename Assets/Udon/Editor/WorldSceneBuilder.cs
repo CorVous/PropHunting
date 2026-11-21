@@ -25,7 +25,10 @@ public static class WorldSceneBuilder
     static readonly Vector3 LobbyOrigin = new Vector3(-170f, 0.05f, -170f);
     const float RoomW = 24f, RoomD = 22f, WallH = 7f, ZoneHalf = 5.5f;
     static readonly Vector3 MiniMapAt = new Vector3(-7.0f, 0f, 4.0f);    // the LAST ROUND diorama table, lobby space (centre of the room at 0, north +z): in the ready area's west half
-    const float MiniMapYaw = 0f;                                             // its card on the south edge, towards the spawn
+    const float MiniMapYaw = 0f;
+    // the audio board (Cor): on the north wall over the how-to-play panels (x 7.56-11.64, top 2.0 m), 4.2 x 0.6 m,
+    // its bottom 8 cm over them, 0.15 m clear of the score pad (x 7.35) and 0.3 m of the north-east corner
+    public static readonly Vector3 AudioBoardAt = new Vector3(9.6f, 2.08f + 0.3f, RoomD / 2 - 0.06f);                                             // its card on the south edge, towards the spawn
     const int SLOTS = 32;
 
     // the credits board alone, after CREDITS.md changes (the open scene's lobby keeps everything else)
@@ -305,6 +308,8 @@ public static class WorldSceneBuilder
         // (Cor): the pad ends at x 7.35 and the wall at 12, so 1.28 m panels (not 1.6) fit the 4.65 m with ~0.2 m
         // clear of the pad and ~0.35 m of the corner (the gun shelf's floating panel passes in front of it)
         LobbyBuilder.BuildHowTo(lobby.transform, new Vector3(9.6f, 1.6f, RoomD / 2 - 0.03f), 180f, 1.28f, 0.12f);
+        // the audio board over them: each player's own volume per kind of sound (PHAudio)
+        LobbyBuilder.BuildAudioBoard(lobby.transform, local.sound, AudioBoardAt);
         // the LAST ROUND diorama (Cor, item 40: the last round in miniature on a table in the ready area): move it here
         LobbyBuilder.BuildMiniMap(lobby.transform, game, builder, MiniMapAt, MiniMapYaw);
 
@@ -331,6 +336,8 @@ public static class WorldSceneBuilder
         LobbyBuilder.BuildStore(lobby.transform, game, local.sound, RoomW, RoomD);
         // small pictographic plaques over the Trophies board (the weapon wall has word labels: BuildStore)
         LobbyBuilder.BuildPlaques(lobby.transform, RoomW, RoomD);
+        // the audio board's levels reach the sources outside PHAudio too (the panel's, the explore button's, the taunts')
+        LobbyBuilder.ListAudioSources(local.sound);
 
         UdonSharpEditorUtility.CopyProxyToUdon(local);
         UdonSharpEditorUtility.CopyProxyToUdon(game);
@@ -849,10 +856,13 @@ public static class WorldSceneBuilder
         var guids = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Udon/Audio" });
         a.names = new string[guids.Length];
         a.clips = new AudioClip[guids.Length];
+        a.cats = new int[guids.Length];
         for (int i = 0; i < guids.Length; i++)
         {
-            var c = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guids[i]));
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            var c = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
             a.clips[i] = c; a.names[i] = c.name;
+            a.cats[i] = LobbyBuilder.AudioKind(c.name, path);   // its row on the audio board
         }
         a.ui = go.AddComponent<AudioSource>();
         a.ui.spatialBlend = 0f; a.ui.playOnAwake = false;
