@@ -423,7 +423,7 @@ public class PHStore : UdonSharpBehaviour
             if (survived) Earn(T_SURVIVOR);
             if (survived && me.health >= me.maxHealth && me.maxHealth > 0) Earn(T_UNTOUCHED);
             if (survived && rAlone) Earn(T_LAST_PROP);
-            if (survived && rSize >= 2) Earn(T_LONG_HAUL);
+            if (survived && (rSize == 2 || rSize == 3)) Earn(T_LONG_HAUL);   // L or XL (4 is XS)
             if (!survived && me.survivedMs <= 10000) Earn(T_FOUND);
             if (survived && me.health > 0 && me.health <= 25) Earn(T_CLOSE_CALL);
             if (survived && !rMoved && rStartSet) Earn(T_WALLFLOWER);

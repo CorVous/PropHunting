@@ -31,7 +31,7 @@ public class PHHistory : UdonSharpBehaviour
     public RectTransform[] cardRect;
     public Sprite[] sizeIcon;            // home, tavern, church, castle (the panel's MAP row)
 
-    readonly string[] sizeCap = { "S", "M", "L", "XL" };
+    readonly string[] sizeCap = { "S", "M", "L", "XL", "XS" };
     uint[] shotSeed = new uint[12];      // what each slot's photo shows (0: none)
     int[] shotSize = new int[12];
     int snapSlot = -1; float snapAt; bool camOn;
@@ -121,14 +121,14 @@ public class PHHistory : UdonSharpBehaviour
             if (cardFace[i].activeSelf != on) cardFace[i].SetActive(on);
             if (cardEmpty[i] != null && cardEmpty[i].activeSelf == on) cardEmpty[i].SetActive(!on);
             if (!on) continue;
-            int size = Mathf.Clamp(game.rotSize[slot], 0, 3);
+            int size = Mathf.Clamp(game.rotSize[slot], 0, 4);   // (4: XS)
             cardSize[i].text = sizeCap[size];
             cardRuns[i].text = "x" + Mathf.Max(1, runs);
             if (cardBonus != null && i < cardBonus.Length && cardBonus[i] != null && cardBonus[i].activeSelf != bonus) cardBonus[i].SetActive(bonus);
             if (cardPhoto[i].gameObject.activeSelf != photo) cardPhoto[i].gameObject.SetActive(photo);
             if (cardBlank[i].activeSelf == photo) cardBlank[i].SetActive(!photo);
             if (photo) cardPhoto[i].texture = shots[slot];
-            else cardBlankIcon[i].sprite = sizeIcon[size];
+            else cardBlankIcon[i].sprite = sizeIcon[size < sizeIcon.Length ? size : 0];   // (XS: S's picture, if it has none)
             if (cardMarker[i] != null)
             {
                 if (cardMarker[i].activeSelf != picked) cardMarker[i].SetActive(picked);
