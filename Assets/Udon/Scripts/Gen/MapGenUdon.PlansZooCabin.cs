@@ -1242,7 +1242,7 @@ public partial class MapGenUdon
     {
         planMax = 8;
         int room = pRoom;
-        string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
+        string[] tents = { "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };   // revision 30: not the bare frame (s_tent)
         if (planPhase == 0)
         {
             uint[] r = SR(1);
