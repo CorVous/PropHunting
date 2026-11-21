@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: NotoSansTC SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 5272206281369475600}
+  material: {fileID: 2043199757809389682}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: 55b79a7c9dd03724298ad510763b1c80
@@ -5366,7 +5366,7 @@ MonoBehaviour:
     m_GlyphIndex: 6227
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: 6314845487419251266}
+  - {fileID: 6777202238053841007}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -7187,7 +7187,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!21 &5272206281369475600
+--- !u!21 &2043199757809389682
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -7211,7 +7211,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 6314845487419251266}
+        m_Texture: {fileID: 6777202238053841007}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -7253,7 +7253,7 @@ Material:
     - _OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     - _UnderlayColor: {r: 0, g: 0, b: 0, a: 0.5}
   m_BuildTextureStacks: []
---- !u!28 &6314845487419251266
+--- !u!28 &6777202238053841007
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

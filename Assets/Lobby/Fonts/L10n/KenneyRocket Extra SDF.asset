@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: KenneyRocket Extra SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 3673713529203678176}
+  material: {fileID: 1829131153567548677}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: 231a968a8ca89ff4db513b4d9ab6ed8e
@@ -1224,7 +1224,7 @@ MonoBehaviour:
     m_GlyphIndex: 201
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: 8297705488449805037}
+  - {fileID: 7811469149614809141}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -1669,7 +1669,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!21 &3673713529203678176
+--- !u!21 &1829131153567548677
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -1693,7 +1693,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 8297705488449805037}
+        m_Texture: {fileID: 7811469149614809141}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -1735,7 +1735,7 @@ Material:
     - _OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     - _UnderlayColor: {r: 0, g: 0, b: 0, a: 0.5}
   m_BuildTextureStacks: []
---- !u!28 &8297705488449805037
+--- !u!28 &7811469149614809141
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
