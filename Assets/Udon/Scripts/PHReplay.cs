@@ -41,21 +41,14 @@ public class PHReplay : UdonSharpBehaviour
     public LineRenderer[] tails;          // per slot: the last few seconds of the path behind them
     public Transform[] tags;              // per slot: their name over them
     public TextMeshPro[] tagLabel;
-    public GameObject bar;                // the controls under the diorama's buttons
-    public GameObject[] playingOnly;      // the controls shown only while the replay is open (speed, scrub, clock, summary)
-    public TextMeshProUGUI playLabel, speedLabel, clock, summaryLabel;
-    public Transform playhead, huntMark;  // on the scrub bar (canvas units, its middle at 0)
+    // the controls, a row on each side of the table (Cor: a seek bar on every side), index 0 the near edge's under
+    // the diorama's buttons
+    public GameObject[] bar;
+    public GameObject[] playingOnly;      // the controls shown only while the replay is open (speed, scrub, clock, summary; every side's)
+    public TextMeshProUGUI[] playLabel, speedLabel, clock, summaryLabel;
+    public Transform[] playhead, huntMark;   // on the scrub bars (canvas units, the middle at 0)
     public float barWidth = 760f;
     public int segments = 20;             // the scrub bar's pressable pieces
-    // the overhead seek bar (Cor: "a global seek bar"): a big timeline over the diorama's middle, turned to each
-    // viewer, so everyone round the table sees where the replay is and can press anywhere on it. Its pieces press
-    // Seek with buttonArg OVER_ARG + the piece + 1.
-    public Transform overhead;            // its canvas (shown while the replay is open)
-    public Transform overHead, overHunt;  // its playhead and the hunt's start
-    public TextMeshProUGUI overClock;
-    public float overWidth = 900f;
-    public int overSegments = 40;
-    public const int OVER_ARG = 100;
 
     public const int TICK_MS = 250;
     const float TICK_S = 0.25f;
@@ -72,7 +65,8 @@ public class PHReplay : UdonSharpBehaviour
     [UdonSynced] public float atSec;          // the replay's time at atMs (server ms)
     [UdonSynced] public int atMs;
     [UdonSynced] public int speed = 1;        // 1, 2, 4
-    [HideInInspector] public int buttonArg;   // PHButton: the scrub bar piece pressed + 1
+    [HideInInspector] public int buttonArg;   // PHButton: side * SIDE_ARG + the scrub bar piece pressed + 1
+    public const int SIDE_ARG = 100;
 
     // ---- recording (this player only)
     byte[] buf;
@@ -126,14 +120,13 @@ public class PHReplay : UdonSharpBehaviour
         for (int i = 0; i < dirty.Length; i++) if (dirty[i]) { dirty[i] = false; Decode(i); timeline = false; break; }
         if (!timeline) Timeline();
         bool avail = Available();
-        if (bar != null && bar.activeSelf != avail) bar.SetActive(avail);
+        for (int b = 0; b < bar.Length; b++) if (bar[b] != null && bar[b].activeSelf != avail) bar[b].SetActive(avail);
         bool on = avail && open && viewRound == game.round;
         if (on != shownOpen)
         {
             shownOpen = on;
             mini.SetReplay(on);
             for (int i = 0; i < playingOnly.Length; i++) if (playingOnly[i] != null) playingOnly[i].SetActive(on);
-            if (overhead != null) overhead.gameObject.SetActive(on);
             if (!on) HideMarkers();
             for (int i = 0; i < lastK.Length; i++) lastK[i] = -1;
             Labels();
@@ -285,12 +278,11 @@ public class PHReplay : UdonSharpBehaviour
         }
         if (!any) { originTick = 0; endTick = 0; }
         huntTick = Tick(game.huntStartMs);
-        if (huntMark != null)
+        if (huntMark.Length > 0)
         {
             float span = Mathf.Max(1, endTick - originTick);
             float u = Mathf.Clamp01((huntTick - originTick) / span);
-            huntMark.localPosition = new Vector3((u - 0.5f) * barWidth, 0f, 0f);
-            if (overHunt != null) overHunt.localPosition = new Vector3((u - 0.5f) * overWidth, 0f, 0f);
+            for (int b = 0; b < huntMark.Length; b++) if (huntMark[b] != null) huntMark[b].localPosition = new Vector3((u - 0.5f) * barWidth, 0f, 0f);
         }
     }
 
@@ -394,25 +386,18 @@ public class PHReplay : UdonSharpBehaviour
         }
         // the controls
         float dur = Duration();
-        if (playhead != null) playhead.localPosition = new Vector3((dur > 0f ? t / dur - 0.5f : -0.5f) * barWidth, 0f, 0f);
+        Vector3 hp = new Vector3((dur > 0f ? t / dur - 0.5f : -0.5f) * barWidth, 0f, 0f);
+        for (int b = 0; b < playhead.Length; b++) if (playhead[b] != null) playhead[b].localPosition = hp;
         int sec = Mathf.FloorToInt(t) * 10000 + Mathf.FloorToInt(dur);
-        float uu = dur > 0f ? t / dur - 0.5f : -0.5f;
-        if (overHead != null) overHead.localPosition = new Vector3(uu * overWidth, 0f, 0f);
-        if (overhead != null)
-        {
-            Vector3 dv = overhead.position - eye; dv.y = 0f;
-            if (dv.sqrMagnitude > 1e-4f) overhead.rotation = Quaternion.LookRotation(dv, Vector3.up);   // (turned to this viewer)
-        }
-        if (sec != clockShown)
+        if (sec != clockShown)   // (a text rebuild only when it changes)
         {
             clockShown = sec;
             string ct = Clock(t) + " / " + Clock(dur);
-            if (clock != null) clock.text = ct;
-            if (overClock != null) overClock.text = ct;
-        }   // (a text rebuild only when it changes)
+            for (int b = 0; b < clock.Length; b++) if (clock[b] != null) clock[b].text = ct;
+        }
         bool atEnd = t >= dur - 0.01f;
         string pl = game.text != null ? game.text.Get(playing && !atEnd ? "replay.pause" : "replay.play") : "";
-        if (playLabel != null && playLabel.text != pl) playLabel.text = pl;
+        for (int b = 0; b < playLabel.Length; b++) if (playLabel[b] != null && playLabel[b].text != pl) playLabel[b].text = pl;
     }
 
     // the events passed since the last sample shown (forward, a short way: a jump of the scrub bar shows none)
@@ -498,14 +483,12 @@ public class PHReplay : UdonSharpBehaviour
         Send();
     }
 
-    // a piece of the scrub bar (buttonArg = the piece + 1): the replay from there
+    // a piece of a scrub bar (buttonArg = side * SIDE_ARG + the piece + 1): the replay from there
     public void Seek()
     {
         if (!open) return;
         Take();
-        if (buttonArg > OVER_ARG) atSec = Duration() * Mathf.Clamp01((buttonArg - OVER_ARG - 1) / (float)Mathf.Max(1, overSegments - 1));
-        else atSec = Duration() * Mathf.Clamp01((buttonArg - 1) / (float)Mathf.Max(1, segments - 1));
-        atMs = game.Now;
+        atSec = Duration() * Mathf.Clamp01(((buttonArg - 1) % SIDE_ARG) / (float)Mathf.Max(1, segments - 1)); atMs = game.Now;
         Send();
     }
 
@@ -522,9 +505,12 @@ public class PHReplay : UdonSharpBehaviour
     void Labels()
     {
         if (game.text == null) return;
-        if (playLabel != null) playLabel.text = game.text.Get(open && viewRound == game.round ? (playing ? "replay.pause" : "replay.play") : "replay.watch");
-        if (speedLabel != null) speedLabel.text = game.text.F1("replay.speed", speed.ToString());   // (a string row, so the text bake gives the font its ×)
-        if (summaryLabel != null) summaryLabel.text = game.text.Get("replay.summary");
+        string pl = game.text.Get(open && viewRound == game.round ? (playing ? "replay.pause" : "replay.play") : "replay.watch");
+        string sp = game.text.F1("replay.speed", speed.ToString());   // (a string row, so the text bake gives the font its ×)
+        string su = game.text.Get("replay.summary");
+        for (int b = 0; b < playLabel.Length; b++) if (playLabel[b] != null) playLabel[b].text = pl;
+        for (int b = 0; b < speedLabel.Length; b++) if (speedLabel[b] != null) speedLabel[b].text = sp;
+        for (int b = 0; b < summaryLabel.Length; b++) if (summaryLabel[b] != null) summaryLabel[b].text = su;
     }
 
     string Clock(float t)

@@ -79,65 +79,55 @@ public static partial class LobbyBuilder
 
         // the controls: a row on the same slope as the diorama's buttons, just under them (BuildMiniMap's canvas is
         // at top + 0.12, 0.1 m past the near edge, 0.16 m tall, tipped back 35 degrees)
+        // (Cor: a seek bar on every side of the table) the same row on all four edges, each turned to its side; any
+        // row's press is shared (PHReplay), the near edge's is index 0
         float down = 0.18f, a = 35f * Mathf.Deg2Rad;
-        var cv = Canvas(table, "ReplayControls", new Vector3(0f, top + 0.12f - down * Mathf.Cos(a), -side / 2 - 0.1f - down * Mathf.Sin(a)),
-            Quaternion.Euler(35f, 0f, 0f), new Vector2(1400f, 80f), 0.002f, true);
-        var bar = new GameObject("Bar", typeof(RectTransform));
-        bar.transform.SetParent(cv, false);
-        ((RectTransform)bar.transform).sizeDelta = new Vector2(1400f, 80f);
-        rp.bar = bar;
-        rp.playLabel = ReplayButton(bar.transform, game, "Watch replay", new Vector2(-580f, 0f), new Vector2(220f, 64f), C("f2c45a"), rp, nameof(PHReplay.PlayPause), 0);
-        rp.speedLabel = ReplayButton(bar.transform, game, "1×", new Vector2(-415f, 0f), new Vector2(90f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Speed), 0);
-        var speedGo = rp.speedLabel.transform.parent.parent.gameObject;
-        // the scrub bar: a track, the hunt's start on it, the playhead, and pressable pieces over it
-        const float barW = 760f; const int segs = 20;
-        var track = Img(bar.transform, "Scrub", new Vector2(25f, 0f), new Vector2(barW, 18f), sRound, C("6d5524"), 2f);
-        var hunt = Img(track.transform, "Hunt", Vector2.zero, new Vector2(6f, 40f), sTile, C("eb3a2e"), 1f);
-        var head = Img(track.transform, "Head", new Vector2(-barW / 2, 0f), new Vector2(14f, 52f), sRound, C("f6ecd4"), 2f);
-        for (int s = 0; s < segs; s++)
+        const float barW = 760f; const int segs = 20; const int sides = 4;
+        rp.bar = new GameObject[sides];
+        rp.playLabel = new TextMeshProUGUI[sides]; rp.speedLabel = new TextMeshProUGUI[sides];
+        rp.clock = new TextMeshProUGUI[sides]; rp.summaryLabel = new TextMeshProUGUI[sides];
+        rp.playhead = new Transform[sides]; rp.huntMark = new Transform[sides];
+        var only = new System.Collections.Generic.List<GameObject>();
+        for (int sd = 0; sd < sides; sd++)
         {
-            float x = -barW / 2 + barW * s / (segs - 1);
-            var piece = Img(track.transform, "Piece" + s, new Vector2(x, 0f), new Vector2(barW / (segs - 1), 64f), null, new Color(1f, 1f, 1f, 0f), 1f);   // (clear: still pressable, Cor saw faint circles at 0.01)
-            piece.raycastTarget = true;
-            var bt = piece.gameObject.AddComponent<Button>();
-            var nav = bt.navigation; nav.mode = Navigation.Mode.None; bt.navigation = nav; bt.targetGraphic = piece;
-            var pb = piece.gameObject.AddUdonSharpComponent<PHButton>();
-            pb.game = game; pb.target = rp; pb.action = nameof(PHReplay.Seek); pb.arg = s + 1;
-            UdonSharpEditorUtility.CopyProxyToUdon(pb);
-            UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, UdonSharpEditorUtility.GetBackingUdonBehaviour(pb).SendCustomEvent, nameof(PHButton.Press));
+            var turn = Quaternion.Euler(0f, sd * 90f, 0f);
+            var near = new Vector3(0f, top + 0.12f - down * Mathf.Cos(a), -side / 2 - 0.1f - down * Mathf.Sin(a));
+            var cv = Canvas(table, "ReplayControls" + sd, turn * near, turn * Quaternion.Euler(35f, 0f, 0f), new Vector2(1400f, 80f), 0.002f, true);
+            var bar = new GameObject("Bar", typeof(RectTransform));
+            bar.transform.SetParent(cv, false);
+            ((RectTransform)bar.transform).sizeDelta = new Vector2(1400f, 80f);
+            rp.bar[sd] = bar;
+            rp.playLabel[sd] = ReplayButton(bar.transform, game, "Watch replay", new Vector2(-580f, 0f), new Vector2(220f, 64f), C("f2c45a"), rp, nameof(PHReplay.PlayPause), 0);
+            rp.speedLabel[sd] = ReplayButton(bar.transform, game, "1×", new Vector2(-415f, 0f), new Vector2(90f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Speed), 0);
+            only.Add(rp.speedLabel[sd].transform.parent.parent.gameObject);
+            // the scrub bar: a track, the hunt's start on it, the playhead, and pressable pieces over it
+            var track = Img(bar.transform, "Scrub", new Vector2(25f, 0f), new Vector2(barW, 18f), sRound, C("6d5524"), 2f);
+            var hunt = Img(track.transform, "Hunt", Vector2.zero, new Vector2(6f, 40f), sTile, C("eb3a2e"), 1f);
+            var head = Img(track.transform, "Head", new Vector2(-barW / 2, 0f), new Vector2(14f, 52f), sRound, C("f6ecd4"), 2f);
+            for (int s = 0; s < segs; s++)
+            {
+                float x = -barW / 2 + barW * s / (segs - 1);
+                var piece = Img(track.transform, "Piece" + s, new Vector2(x, 0f), new Vector2(barW / (segs - 1), 64f), null, new Color(1f, 1f, 1f, 0f), 1f);   // (clear: still pressable, Cor saw faint circles at 0.01)
+                piece.raycastTarget = true;
+                var bt = piece.gameObject.AddComponent<Button>();
+                var nav = bt.navigation; nav.mode = Navigation.Mode.None; bt.navigation = nav; bt.targetGraphic = piece;
+                var pb = piece.gameObject.AddUdonSharpComponent<PHButton>();
+                pb.game = game; pb.target = rp; pb.action = nameof(PHReplay.Seek); pb.arg = sd * PHReplay.SIDE_ARG + s + 1;
+                UdonSharpEditorUtility.CopyProxyToUdon(pb);
+                UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, UdonSharpEditorUtility.GetBackingUdonBehaviour(pb).SendCustomEvent, nameof(PHButton.Press));
+            }
+            rp.playhead[sd] = head.transform; rp.huntMark[sd] = hunt.transform;
+            head.transform.SetAsLastSibling();
+            only.Add(track.gameObject);
+            rp.clock[sd] = Txt(bar.transform, "Clock", new Vector2(470f, 3f), new Vector2(120f, 40f), "0:00 / 0:00", future, 16, C("f6ecd4"), TextAlignmentOptions.Center);
+            only.Add(rp.clock[sd].gameObject);
+            rp.summaryLabel[sd] = ReplayButton(bar.transform, game, "Summary", new Vector2(610f, 0f), new Vector2(160f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Close), 0);
+            only.Add(rp.summaryLabel[sd].transform.parent.parent.gameObject);
+            bar.SetActive(false);
         }
-        rp.barWidth = barW; rp.segments = segs; rp.playhead = head.transform; rp.huntMark = hunt.transform;
-        head.transform.SetAsLastSibling();
-        rp.clock = Txt(bar.transform, "Clock", new Vector2(470f, 3f), new Vector2(120f, 40f), "0:00 / 0:00", future, 16, C("f6ecd4"), TextAlignmentOptions.Center);
-        rp.summaryLabel = ReplayButton(bar.transform, game, "Summary", new Vector2(610f, 0f), new Vector2(160f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Close), 0);
-        var summaryGo = rp.summaryLabel.transform.parent.parent.gameObject;
-        rp.playingOnly = new GameObject[] { speedGo, track.gameObject, rp.clock.gameObject, summaryGo };
+        rp.barWidth = barW; rp.segments = segs;
+        rp.playingOnly = only.ToArray();
         foreach (var g in rp.playingOnly) g.SetActive(false);
-        bar.SetActive(false);
-
-        // the overhead seek bar (Cor: "a global seek bar"): a 1.8 m timeline 1.3 m over the diorama's middle, turned
-        // to each viewer by PHReplay, its 40 pieces pressable from any side of the table, the clock over it
-        const float overW = 900f; const int overSegs = 40;
-        var oc = Canvas(table, "ReplayOverhead", new Vector3(0f, top + 1.3f, 0f), Quaternion.identity, new Vector2(overW + 40f, 110f), 0.002f, true);
-        var otrack = Img(oc, "Scrub", new Vector2(0f, -15f), new Vector2(overW, 22f), sRound, C("6d5524"), 2f);
-        var ohunt = Img(otrack.transform, "Hunt", Vector2.zero, new Vector2(7f, 46f), sTile, C("eb3a2e"), 1f);
-        var ohead = Img(otrack.transform, "Head", new Vector2(-overW / 2, 0f), new Vector2(16f, 60f), sRound, C("f6ecd4"), 2f);
-        for (int s = 0; s < overSegs; s++)
-        {
-            float x = -overW / 2 + overW * s / (overSegs - 1);
-            var piece = Img(otrack.transform, "Piece" + s, new Vector2(x, 0f), new Vector2(overW / (overSegs - 1), 70f), null, new Color(1f, 1f, 1f, 0f), 1f);
-            piece.raycastTarget = true;
-            var bt = piece.gameObject.AddComponent<Button>();
-            var nav = bt.navigation; nav.mode = Navigation.Mode.None; bt.navigation = nav; bt.targetGraphic = piece;
-            var pb = piece.gameObject.AddUdonSharpComponent<PHButton>();
-            pb.game = game; pb.target = rp; pb.action = nameof(PHReplay.Seek); pb.arg = PHReplay.OVER_ARG + s + 1;
-            UdonSharpEditorUtility.CopyProxyToUdon(pb);
-            UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, UdonSharpEditorUtility.GetBackingUdonBehaviour(pb).SendCustomEvent, nameof(PHButton.Press));
-        }
-        ohead.transform.SetAsLastSibling();
-        rp.overClock = Txt(oc, "Clock", new Vector2(0f, 30f), new Vector2(300f, 40f), "0:00 / 0:00", future, 22, C("f6ecd4"), TextAlignmentOptions.Center);
-        rp.overhead = oc; rp.overHead = ohead.transform; rp.overHunt = ohunt.transform; rp.overWidth = overW; rp.overSegments = overSegs;
-        oc.gameObject.SetActive(false);
 
         UdonSharpEditorUtility.CopyProxyToUdon(rp);
         return rp;
