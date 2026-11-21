@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!28 &-1094915768075904013
+--- !u!28 &-3224996185657926252
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -61,7 +61,7 @@ MonoBehaviour:
   m_Name: Rubik SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 6296450893101406259}
+  material: {fileID: 8361784122308074113}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: 9636aac1ba48a9b46b4a5880688b3b4f
@@ -2811,7 +2811,7 @@ MonoBehaviour:
     m_GlyphIndex: 700
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: -1094915768075904013}
+  - {fileID: -3224996185657926252}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -3944,7 +3944,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!21 &6296450893101406259
+--- !u!21 &8361784122308074113
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -3968,7 +3968,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: -1094915768075904013}
+        m_Texture: {fileID: -3224996185657926252}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []

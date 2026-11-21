@@ -89,9 +89,9 @@ public class PHTestPilot : UdonSharpBehaviour
         if (Time.time >= nextReplayLog)
         {
             nextReplayLog = Time.time + 1f;
-            string s = "REPLAY t=" + t.ToString("F0") + " bar=" + (r.bar != null && r.bar.activeSelf) + " open=" + r.open + " playing=" + r.playing + " view=" + r.viewRound
+            string s = "REPLAY t=" + t.ToString("F0") + " bar=" + (r.bar != null && r.bar.Length > 0 && r.bar[0] != null && r.bar[0].activeSelf) + " open=" + r.open + " playing=" + r.playing + " view=" + r.viewRound
                 + " at=" + r.atSec.ToString("F1") + "@" + r.atMs + " speed=" + r.speed + " owner=" + Networking.GetOwner(r.gameObject).playerId
-                + " clock=" + (r.clock != null ? r.clock.text : "-") + " tracks:";
+                + " clock=" + (r.clock != null && r.clock.Length > 0 && r.clock[0] != null ? r.clock[0].text : "-") + " tracks:";
             for (int i = 0; i < r.tracks.Length; i++)
             {
                 PHReplayTrack tr = r.tracks[i];
