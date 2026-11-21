@@ -1239,7 +1239,7 @@ public partial class MapGen
     //   PITCHES   each tent with its own small fire and seat in front of it, at the same offset, in a grid
     void PlanCampsite()
     {
-        planMax = 7;
+        planMax = 8;
         int room = pRoom;
         string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
         if (planPhase == 0)
@@ -1291,7 +1291,11 @@ public partial class MapGen
                 GenRng r = hq_Yard_r;
                 if (planIter == 0) { hq_FireRing_minClr = 6; hq_FireRing_tx = RoomMidX(room); hq_FireRing_tz = RoomMidZ(room); hq_FireRing_soft = false; hq_FireRing_rng = r; PhSubReset(); }
                 PhPush(); FireRing_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) { r = hq_FireRing_rng; planA = hq_FireRing_ret; PhBreak(); }
+                if (fin)
+                {
+                    r = hq_FireRing_rng; planA = hq_FireRing_ret; PhBreak();
+                    if (planA < 0) planA = YardOne(Dn("s_campfirePit"), RoomMidX(room), RoomMidZ(room), 0);   // revision 30: a camp has its fire
+                }
                 hq_Yard_r = r;
             }
         }
@@ -1305,6 +1309,17 @@ public partial class MapGen
                 int b0 = (int)(System.Math.Atan2(fx - yardGX, fz - yardGZ) * 180 / System.Math.PI);
                 if (yardGX == fx && yardGZ == fz) b0 = r.Range(4) * 90;
                 int n = hq_Yard_want, spread = n <= 2 ? 70 : 50, rad = 2400 + Sz(hq_Yard_a) / 2;
+                // revision 30: in a small camp the ring comes in so the tents stay inside the fence (an arc of 3.2 m
+                // round a fire in the middle of an 8 m square put them over it)
+                int roomMin = (roomX0[room]) * GenData.INNER_MM, roomMax = (roomX1[room] + 1) * GenData.INNER_MM;
+                int room2Min = (roomZ0[room]) * GenData.INNER_MM, room2Max = (roomZ1[room] + 1) * GenData.INNER_MM;
+                int edge = fx - roomMin;
+                if (roomMax - fx < edge) edge = roomMax - fx;
+                if (fz - room2Min < edge) edge = fz - room2Min;
+                if (room2Max - fz < edge) edge = room2Max - fz;
+                int fit = edge - Sz(hq_Yard_a) / 2 - Sx(hq_Yard_a) / 2 - 200;
+                if (rad > fit) rad = fit;
+                if (rad < 1500 + Sz(hq_Yard_a) / 2) rad = 1500 + Sz(hq_Yard_a) / 2;
                 for (int k = 0; k < n; k++)
                 {
                     int a = Norm(b0 + spread * (2 * k - (n - 1)) / 2);
@@ -1346,7 +1361,28 @@ public partial class MapGen
                 else if (Keep(first, false)) { hq_Yard_got++; yardSet[i] = t; }
             }
         }
-        if (planPhase == 4)
+        // revision 30 (Cor: they don't really look like campsites): the tents the rule could not place go round the
+        // fire where there is room, so a camp has two at the least
+        if (planPhase == 4 && PhLoop(4, 100000))
+        {
+            if (!PhSubActive())
+            {
+                if (!(planIter < 6 && hq_Yard_got < 2 && planA >= 0 && hq_Yard_rule != 2)) PhBreak();
+                else
+                {
+                    hq_AroundFire_def = hq_Yard_a; hq_AroundFire_fire = planA; hq_AroundFire_relYaw = 180;
+                    hq_AroundFire_distMin = 1700 + Sz(hq_Yard_a) / 2; hq_AroundFire_distMax = 4200; hq_AroundFire_flags = 0;
+                    hq_AroundFire_must = false; hq_AroundFire_offGates = true; hq_AroundFire_rng = SR(30 + planIter);
+                    PhSubBegin();
+                }
+            }
+            if (PhSubActive())
+            {
+                PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { PhSubEnd(); if (hq_AroundFire_ret >= 0) hq_Yard_got++; } else PhStay();
+            }
+        }
+        if (planPhase == 5)
         {
             // ARC: log seats on the gate's side of the fire, along its ring
             if (hq_Yard_rule == 0 && planA >= 0)
@@ -1361,7 +1397,7 @@ public partial class MapGen
                 }
             }
         }
-        if (planPhase == 5 && PhLoop(5, 100000))
+        if (planPhase == 6 && PhLoop(6, 100000))
         {
             // the wood pile and the chopping block at the edge (not on PITCHES: each has its own fire)
             if (hq_Yard_rule == 2 || planA < 0) PhBreak();
@@ -1374,14 +1410,14 @@ public partial class MapGen
                 hq_Yard_r = r2;
             }
         }
-        if (planPhase == 6)
+        if (planPhase == 7)
         {
             string[] pool = { "n_canoe", "s_chest", "s_barrel" };
             GenRng r = SR(6);
             YardAccent(pool, false, ref r);
             ClearBans();
         }
-        if (planPhase == 7 && PhLoop(7, 100000))
+        if (planPhase == 8 && PhLoop(8, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 3; hq_Borders_soil = false; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();

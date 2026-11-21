@@ -153,7 +153,7 @@ public partial class MapGen
         seed = seedValue; size = sizeBucket;
         density = densityIndex < 0 || densityIndex >= GenData.DensityPercent.Length ? 0 : densityIndex;
         attempt = 0; done = false; failed = false; failReason = "";
-        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; ftmK = -1; tdK = -1; stRun = false;
+        stage = 0; cursor = 0; progressPermille = 0; statSteps = 0; popPhase = 0; dressTry = 0; statDressRetry = 0; statDressRetype = 0; statRetypeOf = new int[80]; statAltOf = new int[80]; ftmK = -1; tdK = -1; stRun = false;
         Alloc(GenData.SizeGrid[size], GenData.SizeGrid[size]);
         menu = new bool[GenData.nDefs]; defCopies = new int[GenData.nDefs];
         int roll = Rng(ST_SCENERY, 9, 9).Range(1000);
@@ -299,7 +299,7 @@ public partial class MapGen
             failReason = "no valid map after 12 attempts (" + why + ")";
             return;
         }
-        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; ftmK = -1; tdK = -1; stRun = false;
+        stage = 0; cursor = 0; progressPermille = 0; popPhase = 0; dressTry = 0; statDressRetry = 0; statDressRetype = 0; statRetypeOf = new int[80]; statAltOf = new int[80]; ftmK = -1; tdK = -1; stRun = false;
     }
 
     // The layout stages draw from their own version, so the buildings of a seed survive a change of the prop
@@ -307,6 +307,7 @@ public partial class MapGen
     GenRng Rng(int st, int a, int b)
     {
         int version = (st == ST_LAYOUT || st == ST_EDGES) ? GenData.LAYOUT_VERSION : GenData.GEN_VERSION;
+        if (st == ST_ROOM && dressTry > 0) b += dressTry * 100003;   // a purpose area planned again (DressStep)
         return GenRng.Sub(seed, (uint)version, st * 16 + attempt, a, b + size * 1000 + EvoSalt(st, a));
     }
 
