@@ -1601,7 +1601,7 @@ public static partial class GenData
         Grp("bugs", GL_CLUSTER, A_OUT_OPEN, 2, 3, 260, "z_bee", "z_caterpillar");
         Grp("shore", GL_CLUSTER, A_OUT_OPEN, 2, 3, 260, "z_crab", "z_fish");
         Grp("woodpile", GL_ROW, A_WALL, 2, 3, 60, "s_wood", "s_planks", "n_logStack");
-        Grp("tents", GL_ROW, A_OUT_OPEN, 2, 2, 600, "s_tent", "s_tentCanvas", "s_tentHalf");
+        Grp("tents", GL_ROW, A_OUT_OPEN, 2, 2, 600, "s_tentCanvas", "s_tentHalf");   // revision 30: not the bare frame (s_tent), it does not read as a tent
         Grp("queue", GL_ROW, A_OUT_OPEN, 2, 4, 0, "ck_queue");
         Grp("coasterCars", GL_ROW, A_OUT_OPEN, 2, 3, 150, "ck_trainFront", "ck_train", "ck_trainSafety");
         Grp("karts", GL_ROW, A_OUT_OPEN, 2, 3, 300, "c_kartA", "c_kartB", "c_kartC");
