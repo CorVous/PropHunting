@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: KenneyFuture Extra SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 5333074281106582999}
+  material: {fileID: 5447797335189835440}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: 722c3bdc9c2e9fd418295f5fce1c088e
@@ -1205,7 +1205,7 @@ MonoBehaviour:
     m_GlyphIndex: 202
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: 3044263449348442204}
+  - {fileID: 898768974835244150}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -1654,7 +1654,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!28 &3044263449348442204
+--- !u!28 &898768974835244150
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1702,7 +1702,7 @@ Texture2D:
     offset: 0
     size: 0
     path: 
---- !u!21 &5333074281106582999
+--- !u!21 &5447797335189835440
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -1726,7 +1726,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 3044263449348442204}
+        m_Texture: {fileID: 898768974835244150}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []

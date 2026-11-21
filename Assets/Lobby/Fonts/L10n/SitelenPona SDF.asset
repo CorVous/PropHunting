@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!21 &-5291690134293840465
+--- !u!21 &-7419141632071738717
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 6218508803142880076}
+        m_Texture: {fileID: 4302858525743369066}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -79,7 +79,7 @@ MonoBehaviour:
   m_Name: SitelenPona SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: -5291690134293840465}
+  material: {fileID: -7419141632071738717}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: 7bf3d95f42cf0dc40b20c164bdfd5884
@@ -2392,7 +2392,7 @@ MonoBehaviour:
     m_GlyphIndex: 121
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: 6218508803142880076}
+  - {fileID: 4302858525743369066}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -3381,7 +3381,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!28 &6218508803142880076
+--- !u!28 &4302858525743369066
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
