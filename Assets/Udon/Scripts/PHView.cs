@@ -53,7 +53,7 @@ public class PHView : UdonSharpBehaviour
     public Transform casing;           // the screen device's body, drawn around the panel
     public Transform tauntButton, tauntCap;
     public MeshRenderer tauntCapRenderer;
-    public Transform[] tauntBolts;      // little yellow bolts that fly off the button when the local hider taunts
+    public Transform[] tauntBolts;      // little yellow bolts that fly out of the casing's speaker grill (the chin's slots, under the screen) when the local hider taunts
     float boltsAt = -99f;
     bool boltsOn;
     public Material capReady, capWait;
@@ -1007,8 +1007,10 @@ public class PHView : UdonSharpBehaviour
         return best;
     }
 
-    // a taunt of the local hider's own (the button, T, or a forced one: PHLocal.Taunt): bolts fly off the button
+    // a taunt of the local hider's own (the button, T, or a forced one: PHLocal.Taunt): bolts fly out of the speaker grill
     public void ShowTauntBolts() { boltsAt = Time.time; }
+
+    const float GRILL_X = 0.103f, GRILL_Y = -0.175f;   // the speaker grill's centre on the casing (WorldSceneBuilder: Slot0..3)
 
     void UpdateBolts()
     {
@@ -1028,7 +1030,8 @@ public class PHView : UdonSharpBehaviour
         {
             if (tauntBolts[i] == null) continue;
             float side = i == 0 ? -1f : 1f;
-            tauntBolts[i].localPosition = new Vector3(side * (0.03f + 0.07f * t), 0.035f + 0.09f * t, -0.04f);
+            // out of the grill (its centre at GRILL_X, GRILL_Y on the chin), towards the viewer, one up-left, one up-right
+            tauntBolts[i].localPosition = new Vector3(GRILL_X + side * (0.012f + 0.05f * t) + 0.02f * t, GRILL_Y + 0.012f + 0.06f * t, -0.02f - 0.07f * t);
             tauntBolts[i].localRotation = Quaternion.Euler(0f, 0f, -side * 22f);
             tauntBolts[i].localScale = new Vector3(sz, sz, sz);
         }

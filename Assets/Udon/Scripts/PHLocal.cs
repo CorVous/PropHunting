@@ -1301,7 +1301,7 @@ public class PHLocal : UdonSharpBehaviour
         if (Time.time - lastTaunt < TAUNT_COOLDOWN) return;
         lastTaunt = Time.time;
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.PlayTaunt), Random.Range(0, 1000));
-        if (view != null) view.ShowTauntBolts();   // (VR: bolts fly off the screen device's button)
+        if (view != null) view.ShowTauntBolts();   // (VR: bolts fly out of the screen device's speaker grill)
         // a taunt of their own counts as the forced one (the warning says "or taunt now"): its clock starts again
         if (nextForced >= 0f) { nextForced = Time.time + ForcedInterval(); warned = false; checkPos = Networking.LocalPlayer.GetPosition(); }
     }

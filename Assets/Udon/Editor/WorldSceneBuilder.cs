@@ -474,17 +474,14 @@ public static class WorldSceneBuilder
         var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
         view.tauntButton = button; view.tauntCap = cap.transform; view.tauntCapRenderer = cap.GetComponent<MeshRenderer>();
         view.capReady = red; view.capWait = grey;
-        // the cap reads as a speaker grill (onboarding): dark slots across its face, on the cap so they press in with
-        // it (one mesh; the child undoes the cap's turn and squash so the grill is built in the button's metres)
-        var grill = Part(cap.transform, PrimitiveType.Quad, "Grill", new Vector3(0f, -1.06f, 0f), new Vector3(-90f, 0f, 0f), new Vector3(1f / 0.066f, 1f / 0.066f, 1f / 0.012f), Flat("GrillDark", new Color(0.16f, 0.07f, 0.07f)));
-        grill.GetComponent<MeshFilter>().sharedMesh = GrillMesh();
-        // little yellow lightning bolts that fly off the button when the local hider taunts (PHView.ShowTauntBolts)
+        // little yellow lightning bolts that fly out of the speaker grill under the screen (the chin's four slots, Cor)
+        // when the local hider taunts (PHView.ShowTauntBolts moves them, in the casing's metres)
         var boltMat = Flat("TauntBolt", new Color(1f, 0.85f, 0.2f));
         var boltMesh = BoltMesh();
         view.tauntBolts = new Transform[2];
         for (int i = 0; i < 2; i++)
         {
-            var bolt = Part(button, PrimitiveType.Quad, "Bolt" + i, new Vector3(0f, 0f, -0.04f), Vector3.zero, Vector3.one * 0.03f, boltMat);
+            var bolt = Part(casing, PrimitiveType.Quad, "Bolt" + i, new Vector3(0.103f, -0.175f, -0.02f), Vector3.zero, Vector3.one * 0.03f, boltMat);
             bolt.GetComponent<MeshFilter>().sharedMesh = boltMesh;
             bolt.SetActive(false);
             view.tauntBolts[i] = bolt.transform;
@@ -644,21 +641,6 @@ public static class WorldSceneBuilder
         ti.textureCompression = TextureImporterCompression.Uncompressed;
         ti.SaveAndReimport();
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-    }
-
-    // the taunt cap's grill: five slots across a circle of radius 27 mm, facing -z (the button's front)
-    static Mesh GrillMesh()
-    {
-        const string path = "Assets/Udon/Generated/TauntGrill.asset";
-        var v = new System.Collections.Generic.List<Vector3>(); var t = new System.Collections.Generic.List<int>();
-        for (int i = 0; i < 5; i++)
-        {
-            float y = (i - 2) * 0.0095f, h = 0.0019f, w = Mathf.Sqrt(0.027f * 0.027f - y * y) - 0.004f;
-            int b = v.Count;
-            v.Add(new Vector3(-w, y - h, 0f)); v.Add(new Vector3(-w, y + h, 0f)); v.Add(new Vector3(w, y + h, 0f)); v.Add(new Vector3(w, y - h, 0f));
-            t.AddRange(new[] { b, b + 1, b + 2, b, b + 2, b + 3 });
-        }
-        return SaveMesh(path, v, t);
     }
 
     // a lightning bolt one unit tall (two slanted wedges), both faces
