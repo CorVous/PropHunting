@@ -451,6 +451,11 @@ public partial class MapGenUdon
         if (planPhase == 0)
         {
             if (!Fit(1)) { hq_Island_ret = false; PhEnd(); return; }
+            // revision 29 (Cor: nothing loose in the middle): a house's lawn and its purposes plant along their
+            // fences only, never an island in the open
+            int it = roomType[pRoom];
+            if (it == GenData.R_LAWN_OPEN || it == GenData.R_FIREPIT || it == GenData.R_PICNIC || it == GenData.R_DRYING || it == GenData.R_CAMPSITE)
+            { hq_Island_ret = false; PhEnd(); return; }
         }
         if (planPhase == 1 && PhLoop(1, 100000))
         {
@@ -2365,6 +2370,7 @@ public partial class MapGenUdon
             bool firstRoom = InGrid(fx, fz) && cellRoom[fz * W + fx] == room;
             hq_PlanLane_sel1 = 0;
             if (firstRoom && Fit(1)) hq_PlanLane_sel1 = 1;
+            LaneVergePath(room);
             hq_PlanLane_rx = rx;
             hq_PlanLane_rz = rz;
             hq_PlanLane_r = r;
@@ -2461,9 +2467,40 @@ public partial class MapGenUdon
         }
         if (planPhase == 11 && PhLoop(11, 100000))
         {
-            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6; hq_Borders_soil = false; PhSubReset(); }
+            // revision 29: the verge along both sides of the lane (Cor: the lane was wide): more of it than before
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 6 + AreaM2(room) / 12; hq_Borders_soil = false; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) {  PhBreak(); }
+        }
+    }
+
+    // Revision 29 (Cor: the 4 m lane was wide): a clear path 2 m wide down the lane's middle is walkway, so nothing
+    // stands there and the verge the borders plant stays at the sides. A cell where the lane turns or meets
+    // another keeps its middle square clear both ways.
+    void LaneVergePath(int room)
+    {
+        for (int c = 0; c < W * H; c++)
+        {
+            if (cellRoom[c] != room || cellZone[c] == GenData.Z_NONE) continue;
+            int cx = c % W, cz = c / W;
+            bool alongZ = false, alongX = false;
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = cx + DX[d], nz = cz + DZ[d];
+                if (!InGrid(nx, nz)) continue;
+                int nr = cellRoom[nz * W + nx];
+                if (nr < 0 || roomType[nr] != GenData.R_LANE && roomType[nr] != GenData.R_RELEASE) continue;
+                if (d == 0 || d == 2) alongZ = true; else alongX = true;
+            }
+            if (!alongZ && !alongX) { alongZ = true; alongX = true; }
+            for (int lz = 0; lz < 8; lz++)
+                for (int lx = 0; lx < 8; lx++)
+                {
+                    bool mid = (alongZ && lx >= 2 && lx < 6) || (alongX && lz >= 2 && lz < 6);
+                    if (!mid) continue;
+                    int i = (cz * 8 + lz) * IW + cx * 8 + lx;
+                    if (innerRoom[i] == room && occ[i] == 0) tags[i] |= GenData.T_PATH;
+                }
         }
     }
 

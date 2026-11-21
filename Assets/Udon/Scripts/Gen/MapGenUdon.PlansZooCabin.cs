@@ -1232,122 +1232,162 @@ public partial class MapGenUdon
     // ============================================================================================ CAMPGROUND
     // The fire ring with its seats and wood pile, the spit and the fish stand by the fire, tents round it with
     // bedrolls in front, a camp cot, the chest, the canoe at the fence, a lantern post, buckets.
+    // Revision 29 (Cor: purposes outdoors): a campsite is laid out by one of three rules, its tents in a pattern a
+    // hunter can count (helpers in MapGenPlansYard.cs):
+    //   ARC       2 to 4 tents in an arc facing one fire, across it from the gate; log seats on the gate's side of
+    //             the fire; a lantern and a bedroll (or a cot) beside each tent; the wood pile and the block at the edge
+    //   TWO ROWS  tents in two rows facing across a path down the middle, the fire in the middle of the path
+    //   PITCHES   each tent with its own small fire and seat in front of it, at the same offset, in a grid
     void PlanCampsite()
     {
-        planMax = 8;
+        planMax = 7;
         int room = pRoom;
         string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
-        // a part a step (Cor: build freezes): the fire and what is round it, each tent, each of the pool
         if (planPhase == 0)
         {
             uint[] r = SR(1);
-            FindGates(room);   // AroundFire keeps the tents off the lines from the gates to the fire
-            hq_PlanCampsite_r = r;
+            YardAnchor(room, r);   // (FindGates too: the fire ring keeps its seats off the gates' lines)
+            hq_Yard_rule = RngRange(r, 3);
+            planB = RngRange(r, tents.Length);
+            int tent = Dn(tents[planB]);
+            hq_Yard_a = tent; hq_Yard_got = 0; planA = -1;
+            hq_Yard_want = 2 + AreaM2(room) / 24;
+            if (hq_Yard_want > 4) hq_Yard_want = 4;
+            yardN = 0;
+            if (hq_Yard_rule == 1)
+            {
+                // TWO ROWS along the room's long axis, facing the path down the middle
+                bool alongX = RoomLongAxis(room) == 0;
+                int a0 = alongX ? YardBox(room, 0, 700) : YardBox(room, 2, 700), a1 = alongX ? YardBox(room, 1, 700) : YardBox(room, 3, 700);
+                int m = alongX ? RoomMidZ(room) : RoomMidX(room), ma = (a0 + a1) / 2;
+                int p = Sx(tent) + 1300, n = (a1 - a0 - Sx(tent)) / p + 1, off = 1300 + Sz(tent) / 2;
+                if (n < 1) n = 1;
+                if (n > 4) n = 4;
+                for (int side = -1; side <= 1; side += 2)
+                    for (int j = 0; j < n; j++)
+                    {
+                        int a = ma + (2 * j - (n - 1)) * p / 2;
+                        yardX[yardN] = alongX ? a : m + side * off; yardZ[yardN] = alongX ? m + side * off : a;
+                        // facing the path: the tent's front (+z) towards the middle line
+                        yardYaw[yardN] = alongX ? (side > 0 ? 180 : 0) : (side > 0 ? 270 : 90);
+                        yardRow[yardN] = side < 0 ? 0 : 1; yardSet[yardN] = -1; yardN++;
+                    }
+                hq_Yard_want = yardN;
+            }
+            else if (hq_Yard_rule == 2)
+            {
+                // PITCHES: a tent, its fire and its seat in front, the same each time
+                GridSpots(room, Sx(tent) + 300, Sz(tent) + 2700, 1100, 900);
+            }
+            hq_Yard_r = r;
         }
         if (planPhase == 1 && PhLoop(1, 100000))
         {
-            uint[] r = hq_PlanCampsite_r;
-            if (planIter == 0) { hq_FireRing_minClr = 6; hq_FireRing_tx = RoomMidX(room); hq_FireRing_tz = RoomMidZ(room); hq_FireRing_soft = false; hq_FireRing_rng = r; PhSubReset(); }
-            PhPush(); FireRing_Body(); bool fin = PhAdvance(); PhPop();
-            if (fin) { r = hq_FireRing_rng; planA = hq_FireRing_ret; PhBreak(); }
-            hq_PlanCampsite_r = r;
+            // the fire: ARC rings it in the middle; TWO ROWS sets it in the path's middle
+            if (hq_Yard_rule == 2) PhBreak();
+            else if (hq_Yard_rule == 1) { planA = YardOne(Dn("s_campfirePit"), RoomMidX(room), RoomMidZ(room), 0); PhBreak(); }
+            else
+            {
+                uint[] r = hq_Yard_r;
+                if (planIter == 0) { hq_FireRing_minClr = 6; hq_FireRing_tx = RoomMidX(room); hq_FireRing_tz = RoomMidZ(room); hq_FireRing_soft = false; hq_FireRing_rng = r; PhSubReset(); }
+                PhPush(); FireRing_Body(); bool fin = PhAdvance(); PhPop();
+                if (fin) { r = hq_FireRing_rng; planA = hq_FireRing_ret; PhBreak(); }
+                hq_Yard_r = r;
+            }
         }
-        if (planPhase == 2 && PhLoop(2, 100000))
+        if (planPhase == 2)
         {
-            if (planIter == 0) { hq_FireSeats_fire = planA; hq_FireSeats_wood = false; hq_FireSeats_k = 7; PhSubReset(); }
-            PhPush(); FireSeats_Body(); bool fin = PhAdvance(); PhPop();
-            if (fin) {  PhBreak(); }
+            // ARC: the spots, across the fire from the gate
+            if (hq_Yard_rule == 0)
+            {
+                uint[] r = hq_Yard_r;
+                int fx = planA >= 0 ? emitX[planA] : RoomMidX(room), fz = planA >= 0 ? emitZ[planA] : RoomMidZ(room);
+                int b0 = (int)(System.Math.Atan2(fx - yardGX, fz - yardGZ) * 180 / System.Math.PI);
+                if (yardGX == fx && yardGZ == fz) b0 = RngRange(r, 4) * 90;
+                int n = hq_Yard_want, spread = n <= 2 ? 70 : 50, rad = 2400 + Sz(hq_Yard_a) / 2;
+                for (int k = 0; k < n; k++)
+                {
+                    int a = Norm(b0 + spread * (2 * k - (n - 1)) / 2);
+                    yardX[yardN] = fx + rad * sinTab[a] / 4096; yardZ[yardN] = fz + rad * sinTab[(a + 90) % 360] / 4096;
+                    yardYaw[yardN] = Norm(a + 180); yardRow[yardN] = 0; yardSet[yardN] = -1; yardN++;
+                }
+                hq_Yard_r = r;
+            }
         }
-        if (planPhase == 3)
+        // the tents, one a step, each with its own things beside it (or, PITCHES, its fire and its seat in front)
+        if (planPhase == 3 && PhLoop(3, 100000))
         {
-            int fire = planA;
-            hq_PlanCampsite_sel1 = 0;
-            if (fire >= 0) hq_PlanCampsite_sel1 = 1;
-            hq_PlanCampsite_fire = fire;
+            if (planIter >= yardN || hq_Yard_got >= hq_Yard_want) PhBreak();
+            else
+            {
+                int i = planIter, tent = hq_Yard_a, first = nEmit;
+                uint[] r = SR(10 + i);
+                int px = yardX[i], pz = yardZ[i], a = Norm(yardYaw[i]);
+                if (hq_Yard_rule == 2)
+                {
+                    // the tent at the back of its pitch
+                    int back = (Sz(tent) + 2700) / 2 - Sz(tent) / 2;
+                    px -= back * sinTab[a] / 4096; pz -= back * sinTab[(a + 90) % 360] / 4096;
+                }
+                int t = StampAt(tent, room, px, pz, a, 0, -1, H_FREE, true);
+                bool ok = t >= 0;
+                if (ok && hq_Yard_rule == 2)
+                {
+                    ok = Rel(Dn("s_campfirePit"), t, 0, Sz(tent) / 2 + 1100, 0, 0) >= 0;
+                    if (ok) ok = Rel(Dn("s_logSmall"), t, 0, Sz(tent) / 2 + 2100, 90, 0) >= 0;
+                }
+                else if (ok)
+                {
+                    // the lantern on one side, the bedroll (or a cot) on the other: the same sides at every tent
+                    RelBeside(Dn("hk_lantern"), t, -1, 150, 0, r);
+                    RelBeside(Dn(RngChance(r, 650) ? "s_bedroll" : "n_cot"), t, 1, 150, 0, r);
+                }
+                if (!ok) TakeBack(first);
+                else if (Keep(first, false)) { hq_Yard_got++; yardSet[i] = t; }
+            }
         }
         if (planPhase == 4)
         {
-            if (hq_PlanCampsite_sel1 == 1)
+            // ARC: log seats on the gate's side of the fire, along its ring
+            if (hq_Yard_rule == 0 && planA >= 0)
             {
-                uint[] r2 = SR(2);
-                hq_PlanCampsite_sel2 = 0;
-                if (RngChance(r2, 850)) hq_PlanCampsite_sel2 = 1;
-                hq_PlanCampsite_r2 = r2;
+                int fx = emitX[planA], fz = emitZ[planA];
+                int b0 = (int)(System.Math.Atan2(yardGX - fx, yardGZ - fz) * 180 / System.Math.PI);
+                int seat = Dn("s_logSmall");
+                for (int k = -1; k <= 1; k += 2)
+                {
+                    int a = Norm(b0 + 28 * k);
+                    YardOne(seat, fx + 1500 * sinTab[a] / 4096, fz + 1500 * sinTab[(a + 90) % 360] / 4096, Norm(a + 90));
+                }
             }
         }
         if (planPhase == 5 && PhLoop(5, 100000))
         {
-            if (!(hq_PlanCampsite_sel1 == 1 && hq_PlanCampsite_sel2 == 1)) PhBreak();
+            // the wood pile and the chopping block at the edge (not on PITCHES: each has its own fire)
+            if (hq_Yard_rule == 2 || planA < 0) PhBreak();
             else
             {
-                int fire = hq_PlanCampsite_fire;
-                uint[] r2 = hq_PlanCampsite_r2;
-                if (planIter == 0) { hq_WoodPile_fire = fire; hq_WoodPile_atEdge = true; hq_WoodPile_rng = r2; PhSubReset(); }
+                uint[] r2 = hq_Yard_r;
+                if (planIter == 0) { hq_WoodPile_fire = planA; hq_WoodPile_atEdge = true; hq_WoodPile_rng = r2; PhSubReset(); }
                 PhPush(); WoodPile_Body(); bool fin = PhAdvance(); PhPop();
                 if (fin) { r2 = hq_WoodPile_rng; PhBreak(); }
-                hq_PlanCampsite_fire = fire;
-                hq_PlanCampsite_r2 = r2;
+                hq_Yard_r = r2;
             }
         }
         if (planPhase == 6)
         {
-            if (hq_PlanCampsite_sel1 == 1)
-            {
-                int fire = hq_PlanCampsite_fire;
-                uint[] r3 = SR(3);
-                if (Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(r3, 500) ? "s_spit" : "s_fishStand"), fire, RngChance(r3, 500) ? 1 : -1, 200, 0, r3) >= 0) Keep(first, false); }
-                planR = SR(4);
-                planB = RngRange(planR, tents.Length);
-                hq_PlanCampsite_fire = fire;
-            }
+            string[] pool = { "n_canoe", "s_chest", "s_barrel" };
+            uint[] r = SR(6);
+            YardAccent(pool, false, r);
+            ClearBans();
         }
         if (planPhase == 7 && PhLoop(7, 100000))
         {
-            if (!PhSubActive())
-            {
-                int k = planIter;
-                if (!(k < (planA >= 0 ? 1 + AreaM2(room) / 24 : 0) && Fit(1))) PhBreak();
-                else { hq_PlanCampsite_k = k; PhSubBegin(); }
-            }
-            if (PhSubActive())
-            {
-                PhPush(); PlanCampsite_L1(); bool fin = PhAdvance(); PhPop();
-                if (fin) PhSubEnd(); else PhStay();
-                if (phBreak) { phBreak = false; PhBreak(); }
-                if (phReturn) { phReturn = false; PhEnd(); return; }
-            }
-        }
-        string[] pool = { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" };
-        if (planPhase == 8 && PhLoop(8, 100000))
-        {
-            if (planIter == 0) { hq_FillFromPool_k0 = 50; hq_FillFromPool_pool = pool; PhSubReset(); }
-            PhPush(); FillFromPool_Body(); bool fin = PhAdvance(); PhPop();
-            if (fin) {  PhBreak(); }
+            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 3; hq_Borders_soil = false; PhSubReset(); }
+            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
+            if (fin) PhBreak();
         }
     }
-    void PlanCampsite_L1()
-    {
-        int room = pRoom;
-        string[] tents = { "s_tent", "s_tentCanvas", "s_tentHalf", "n_tentBig", "n_tentSmallOpen" };
-        string[] pool = { "n_cot", "s_chest", "n_canoe", "hk_lantern", "s_barrel", "s_logSmall", "s_rockFlat", "n_paddle", "s_treeLog" };
-        planMax = 1;
-        if (planPhase == 0 && PhLoop(0, 100000))
-        {
-            int k = hq_PlanCampsite_k;
-            int tent = 0;
-            if (planIter == 0) { hq_AroundFire_def = Dn(tents[(planB + k) % tents.Length]); hq_AroundFire_fire = planA; hq_AroundFire_relYaw = 180; hq_AroundFire_distMin = 1800; hq_AroundFire_distMax = 3400; hq_AroundFire_flags = 0; hq_AroundFire_must = false; hq_AroundFire_offGates = true; hq_AroundFire_rng = planR; PhSubReset(); }
-            PhPush(); AroundFire_Body(); bool fin = PhAdvance(); PhPop();
-            if (fin) { planR = hq_AroundFire_rng; tent = hq_AroundFire_ret; PhBreak(); }
-            hq_PlanCampsite_tent = tent;
-        }
-        if (planPhase == 1)
-        {
-            int tent = hq_PlanCampsite_tent;
-            if (tent >= 0 && Fit(1)) { int first = nEmit; if (RelBeside(Dn(RngChance(planR, 500) ? "s_bedroll" : "s_bedrollFrame"), tent, RngChance(planR, 500) ? 1 : -1, 80, 0, planR) >= 0) Keep(first, false); }
-            hq_PlanCampsite_tent = tent;
-        }
-    }
-
 
     // phase state of the split plans (Tools: autophase2)
     int hp_PlanZooWalk_first;
@@ -1392,13 +1432,6 @@ public partial class MapGenUdon
     int hq_PlanCabinMain_stove;
     int hq_PlanCabinMain_sx;
     int hq_PlanCabinMain_sz;
-    int hq_PlanCampsite_fire;
-    int hq_PlanCampsite_k;
-    uint[] hq_PlanCampsite_r;
-    uint[] hq_PlanCampsite_r2;
-    int hq_PlanCampsite_sel1;
-    int hq_PlanCampsite_sel2;
-    int hq_PlanCampsite_tent;
     string[] hq_PlanEnclosure_big;
     int hq_PlanEnclosure_cell;
     int hq_PlanEnclosure_first;

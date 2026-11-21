@@ -44,6 +44,8 @@ public partial class MapGenUdon
             case GenData.R_DINER_KITCHEN: return GenData.TH_PRO_KITCHEN;
             case GenData.R_DINER_STORE: return GenData.TH_PANTRY;
             case GenData.R_PATIO: return GenData.TH_PATIO;
+            case GenData.R_PICNIC: return GenData.TH_PATIO | GenData.TH_GARDEN;
+            case GenData.R_DRYING: return GenData.TH_GARDEN | GenData.TH_STORE;
             case GenData.R_LAWN_OPEN: case GenData.R_GARDEN: case GenData.R_LANE: return GenData.TH_GARDEN;
             case GenData.R_FIREPIT: case GenData.R_FOREST_CLEARING: return GenData.TH_CAMP;
             case GenData.R_FOREST_DENSE: return GenData.TH_FOREST;

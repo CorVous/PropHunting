@@ -254,6 +254,7 @@ public partial class MapGenUdon
             if (cvZone == null) { cvZone = new int[CV * CV]; cvInst = new int[CV * CV]; cvRoom = new int[CV * CV]; cvPlace = new int[CV * CV]; cvPlot = new int[CV * CV]; }
             for (int i = 0; i < CV * CV; i++) { cvZone[i] = GenData.Z_NONE; cvInst[i] = -1; cvRoom[i] = -1; cvPlace[i] = PL_NONE; cvPlot[i] = -1; }
             nInst = 0; nSd = 0; nPlots = 0;
+            ydeckN = 0; ydeckDeals = 0;   // revision 29: a fresh deck of garden purposes for every try at a layout
 
             // the hunter release, where the lane begins
             int rel = NewInst(GenData.Z_RELEASE);
@@ -941,8 +942,8 @@ public partial class MapGenUdon
                     bool atBack = x == bx && y == by;
                     if (zone == GenData.Z_HOUSE)
                     {
+                        // revision 29: the garden beds are one of the purposes now (YardPurposes)
                         if (atBack) t = GenData.R_PATIO;
-                        else if (pl == PL_BACK && v == plotDepth[k] - 1 && plotBack[k] >= 2) t = GenData.R_GARDEN;
                         else t = GenData.R_LAWN_OPEN;
                     }
                     else if (zone == GenData.Z_DINER) t = pl == PL_FRONT ? GenData.R_PATIO : ((atBack || pl == PL_BACK) ? GenData.R_YARD : GenData.R_LAWN_OPEN);
@@ -972,15 +973,118 @@ public partial class MapGenUdon
                     int x, y;
                     PlotXY(k, u, v, out x, out y);
                     if (cvPlace[y * CV + x] != PL_BACK) continue;
+                    // (the back row the garden beds took until revision 29: counted as before, so the draw below is)
+                    if (v == plotDepth[k] - 1 && plotBack[k] >= 2) continue;
                     bool clear = true;
                     for (int dz = -1; dz <= 1 && clear; dz++)
                         for (int dx = -1; dx <= 1 && clear; dx++)
                             if (IsBuilding(CvZone(x + dx, y + dz))) clear = false;
                     if (clear) cand[2048 + n++] = u * 16 + v;
                 }
-            if (n > 0) type[cand[2048 + RngRange(rng, n)]] = GenData.R_FIREPIT;
+            // revision 29: the fire pit is one of the purposes now (YardPurposes); the draw stays, so the layout's
+            // stream (and every building after this plot) is as it was
+            if (n > 0) RngRange(rng, n);
         }
+        if (zone == GenData.Z_HOUSE) YardPurposes(k, type);
         LetterRooms(k, yi, type);
+    }
+
+    // ---- revision 29 (Cor: outdoors is just rocks; nothing had an order a hunter could check) ----------------------
+    // A house garden has a purpose: a picnic ground, a vegetable garden, a drying yard, a fire pit or a campsite.
+    // The map deals them from a shuffled deck and deals a fresh one when it is used up, so no purpose comes
+    // twice before every one has come. On each house plot the back and side lawn takes one (two on L and XL maps): a
+    // piece of the purpose's size grown from the cell that suits it best; the rest stays open lawn for getting about.
+    // The draws are the generator's (GEN_VERSION), not the layout's: a seed keeps its buildings.
+    int[] ydeck = new int[8];
+    int ydeckN, ydeckDeals;
+
+    void YardPurposes(int k, int[] type)
+    {
+        int want = (size == 2 || size == 3) ? 2 : 1;
+        uint[] pr = RngSub(seed, U32(GenData.GEN_VERSION), 9100 + attempt, k, size);
+        for (int w = 0; w < want; w++)
+        {
+            if (ydeckN == 0)
+            {
+                // (the park's pond was tried and left out: its water closed the way through a plot's lawn)
+                int[] all = { GenData.R_PICNIC, GenData.R_GARDEN, GenData.R_DRYING, GenData.R_FIREPIT, GenData.R_CAMPSITE };
+                for (int i = 0; i < all.Length; i++) ydeck[i] = all[i];
+                ydeckN = all.Length;
+                uint[] dr = RngSub(seed, U32(GenData.GEN_VERSION), 9200 + attempt, ydeckDeals++, size);
+                Shuffle(ydeck, ydeckN, dr);
+            }
+            // the first purpose of the deck that this plot's lawn can hold
+            bool done = false;
+            for (int i = 0; i < ydeckN && !done; i++)
+            {
+                if (!YardPurpose(k, type, ydeck[i], pr)) continue;
+                for (int j = i; j + 1 < ydeckN; j++) ydeck[j] = ydeck[j + 1];
+                ydeckN--;
+                done = true;
+            }
+            if (!done) return;
+        }
+    }
+
+    // one purpose on plot k's back and side lawn: the best seed cell for it, grown to the purpose's size
+    bool YardPurpose(int k, int[] type, int purpose, uint[] pr)
+    {
+        int minCells = 2, maxCells = 3;
+        if (purpose == GenData.R_GARDEN) minCells = 1;
+        else if (purpose == GenData.R_DRYING) { minCells = 1; maxCells = 2; }
+        else if (purpose == GenData.R_FIREPIT) { minCells = 1; maxCells = 1; }
+        // the candidate seeds, best first (scores at cand[3072 + i], cells at cand[3328 + i])
+        int n = 0;
+        for (int u = 0; u < plotAlong[k]; u++)
+            for (int v = 0; v < plotDepth[k]; v++)
+            {
+                if (type[u * 16 + v] != GenData.R_LAWN_OPEN) continue;
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                int c = y * CV + x;
+                if (cvInst[c] != plotInstY[k] || cvPlace[c] == PL_FRONT) continue;
+                int nearB = 0, nearB8 = 0;
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                        if (IsBuilding(CvZone(x + dx, y + dz))) { nearB8++; if (dx == 0 || dz == 0) nearB++; }
+                int score = RngRange(pr, 100);
+                if (purpose == GenData.R_GARDEN) { if (v != plotDepth[k] - 1) continue; }   // beds along the back fence (the site tests want a fence)
+                else if (purpose == GenData.R_FIREPIT) { if (nearB8 > 0) continue; }      // a fire stands clear of the house
+                else if (purpose == GenData.R_DRYING) score += nearB > 0 ? 300 : 0;        // the washing hangs near the house
+                else score += nearB == 0 ? 300 : 0;                                         // the rest away from the walls
+                cand[3072 + n] = score; cand[3328 + n] = u * 16 + v; n++;
+                if (n >= 200) break;
+            }
+        for (int tries = 0; tries < n; tries++)
+        {
+            int best = -1;
+            for (int i = 0; i < n; i++) if (cand[3072 + i] >= 0 && (best < 0 || cand[3072 + i] > cand[3072 + best])) best = i;
+            if (best < 0) return false;
+            cand[3072 + best] = -1;
+            // grow it over the plot's lawn (not the front), at most maxCells (cells at cand[3584 + i])
+            int got = 0, head = 0;
+            cand[3584 + got++] = cand[3328 + best];
+            type[cand[3328 + best]] = -purpose;
+            while (head < got && got < maxCells)
+            {
+                int uv = cand[3584 + head++], uu = uv / 16, vv = uv % 16;
+                for (int d = 0; d < 4 && got < maxCells; d++)
+                {
+                    int nu = uu + (d == 0 ? 1 : (d == 2 ? -1 : 0)), nv = vv + (d == 1 ? 1 : (d == 3 ? -1 : 0));
+                    if (nu < 0 || nv < 0 || nu >= plotAlong[k] || nv >= plotDepth[k] || type[nu * 16 + nv] != GenData.R_LAWN_OPEN) continue;
+                    int nx, ny;
+                    PlotXY(k, nu, nv, out nx, out ny);
+                    if (cvInst[ny * CV + nx] != plotInstY[k] || cvPlace[ny * CV + nx] == PL_FRONT) continue;
+                    if (purpose == GenData.R_GARDEN && nv != plotDepth[k] - 1) continue;   // the beds stay along the back fence
+                    type[nu * 16 + nv] = -purpose;
+                    cand[3584 + got++] = nu * 16 + nv;
+                }
+            }
+            bool ok = got >= minCells;
+            for (int i = 0; i < got; i++) type[cand[3584 + i]] = ok ? purpose : GenData.R_LAWN_OPEN;
+            if (ok) return true;
+        }
+        return false;
     }
 
     // connected pieces of one type: one room letter each
@@ -1124,7 +1228,11 @@ public partial class MapGenUdon
     {
         int wi = siteInstWood, n = 0, letters = 0;
         for (int i = 0; i < CV * CV; i++) if (cvInst[i] == wi) n++;
-        if (n >= 8 && RngChance(rng, 700))
+        // revision 29 (Cor: purposes outdoors): a wood of 5 to 7 cells has its camp too, a clearing of two cells, more
+        // often than not. Its draws are hashed on the generator's version, not taken from the layout's stream, so the
+        // layout after it is as it was.
+        bool small = n >= 5 && n < 8 && UMod(Hash32(seed, U32(GenData.GEN_VERSION), 9300u + U32(attempt), U32(size), 0), 1000u) < 650;
+        if ((n >= 8 && RngChance(rng, 700)) || small)
         {
             // the cell with the most wood around it
             int best = -1, bestN = -1;
@@ -1133,10 +1241,10 @@ public partial class MapGenUdon
                 if (cvInst[i] != wi) continue;
                 int x = i % CV, y = i / CV, m = 0;
                 for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) if (x + dx >= 0 && y + dz >= 0 && x + dx < CV && y + dz < CV && cvInst[(y + dz) * CV + x + dx] == wi) m++;
-                m = m * 8 + RngRange(rng, 8);
+                m = m * 8 + (small ? (int)(UMod(Hash32(seed, U32(GenData.GEN_VERSION), 9301u, U32(i), U32(size)), 8u)) : RngRange(rng, 8));
                 if (m > bestN) { bestN = m; best = i; }
             }
-            GrowRoom(best, wi, letters, 2 + RngRange(rng, 2));
+            GrowRoom(best, wi, letters, small ? 2 : 2 + RngRange(rng, 2));
             siteType[wi * 26 + letters] = GenData.R_FOREST_CLEARING; sitePlace[wi * 26 + letters] = PL_WOOD;
             letters++;
         }

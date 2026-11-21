@@ -157,7 +157,8 @@ public partial class MapGenUdon
                     int rg = groupRef[g0 + g], seen = 0, mirror = -1;
                     for (int j = 0; j < ns; j++)
                         if (slotGroup[s0 + j] == rg) { if (seen == k) { mirror = j; break; } seen++; }
-                    bool present = mirror >= 0 && SlotTaken(host, s0 + mirror);
+                    // a booth's (a picnic table's) seats are its benches: every place counts as taken (revision 29)
+                    bool present = (emitFlags[host] & EF_BOOTH) != 0 || (mirror >= 0 && SlotTaken(host, s0 + mirror));
                     p = !present ? 0 : (occasion < 450 ? 1000 : (occasion < 750 ? 500 : 0));
                 }
                 if (!adjacent) p = p * roomTopFactor[room] / 1000;

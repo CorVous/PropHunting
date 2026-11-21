@@ -606,6 +606,9 @@ public partial class MapGenUdon
             case GenData.R_VESTRY: PlanVestry(); break;
             case GenData.R_CHURCHYARD: PlanChurchyard(); break;
             case GenData.R_GRAVEYARD: PlanGraveyard(); break;
+            // revision 29
+            case GenData.R_PICNIC: PlanPicnic(); break;
+            case GenData.R_DRYING: PlanDrying(); break;
         }
         return PhAdvance();
     }
