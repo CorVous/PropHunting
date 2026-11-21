@@ -272,6 +272,24 @@ public static class WorldSceneBuilder
             UdonSharpEditorUtility.CopyProxyToUdon(dwell);
         }
         game.revealMat = Mat2("Reveal", Shader.Find("PropHunt/Reveal"));   // the END reveal's striped highlight (PHSlot)
+        // the hunters' stand-ins (PHGame.layers, PHLocal.UpdateStandIns): with the teams on copies of their own, a hider
+        // or a ghost sees each hunter as a plain body where they stand on the map. A capsule each, no collider, off
+        {
+            var standRoot = new GameObject("StandIns").transform;
+            standRoot.SetParent(gameGo.transform, false);
+            var standMat = Mat("StandInHunter", new Color(0.86f, 0.26f, 0.22f));
+            local.standIns = new Transform[SLOTS];
+            for (int i = 0; i < SLOTS; i++)
+            {
+                var c = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                c.name = "StandIn" + i;
+                Object.DestroyImmediate(c.GetComponent<Collider>());
+                c.transform.SetParent(standRoot, false);
+                var cr = c.GetComponent<MeshRenderer>(); cr.sharedMaterial = standMat; cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                c.SetActive(false);
+                local.standIns[i] = c.transform;
+            }
+        }
 
         var knocksRoot = new GameObject("Knocks");
         knocksRoot.transform.SetParent(gameGo.transform, false);

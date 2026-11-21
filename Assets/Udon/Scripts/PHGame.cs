@@ -126,6 +126,55 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public int roundLength = 1;           // Short, Normal, Long
     [UdonSynced] public int tauntInterval = 40;
     [UdonSynced] public int wrongPenalty = 10;
+    // (hop playtest, Cor: host settings, both off by default)
+    [UdonSynced] public bool seeHiders;   // hiders (and ghosts) see the other hiders' props as edge cages (PHSlot, MapBuilderUdon.MateCage)
+    [UdonSynced] public bool layers;      // "anti troll" (Strelia): each team plays on its own copy of the map (TeamOf)
+
+    // ---- the teams' copies of the map (layers). Every client builds one copy of the map; with layers on, where it
+    // stands depends on the local player's team: the hunters' copy at the world's origin (where it always stands), the
+    // hiders' LAYER_GAP to the east, the ghosts' (the caught, the hunters who are out, everyone not in the round) as far
+    // to the west. Avatars stay where their own client puts them, so a team never meets another team's avatars, and
+    // nobody can stand on, block or mark the props of a team they are not in. Everything synced that is a place on the
+    // map is map-local (PHSlot.propPos / walkPos, the Swung / Shot events, PHKnock): each client adds its own origin
+    // (MapBuilderUdon.ToWorld). A hider's prop is drawn in every copy, so a hunter strikes it in the hunters' copy.
+    // From LOADING to the hunt's end; the END reveal and the lobby are shared again (everyone back on the origin's copy).
+    // 900 m: past the far clip plane (400 m) and the map from any copy, far from the lobby (240 m from the origin), a
+    // whole number of the map's 4 m cells (the fence grid PHView keys by world position stays aligned), and close
+    // enough that the volumetric voice radius (at most 1000 m) still covers the way to the hunters' copy (UpdateVoices).
+    public const float LAYER_GAP = 900f;
+    public const int TEAM_SHARED = 0, TEAM_HIDERS = 1, TEAM_GHOSTS = 2;
+
+    public bool LayersOn()
+    {
+        int ph = phase;
+        return layers && (ph == PH_LOADING || ph == PH_BRIEF || ph == PH_HIDE || ph == PH_HUNT);
+    }
+
+    // the copy a slot's player plays on: TEAM_SHARED (the hunters, and everyone with layers off), TEAM_HIDERS, TEAM_GHOSTS
+    public int TeamOf(int slot)
+    {
+        if (!LayersOn() || slot < 0 || slot >= slotPlayer.Length || slot >= slots.Length || slotPlayer[slot] == 0) return TEAM_SHARED;
+        PHSlot s = slots[slot];
+        if (s != null && s.ghost) return TEAM_GHOSTS;
+        int r = slotRole[slot];
+        if (r == ROLE_HIDER) return TEAM_HIDERS;
+        if (r == ROLE_HUNTER) return TEAM_SHARED;
+        return TEAM_GHOSTS;   // in the lobby while a round is on (a watcher): never on the hunters' copy
+    }
+
+    public Vector3 TeamOrigin(int team)
+    {
+        if (team == TEAM_HIDERS) return new Vector3(LAYER_GAP, 0f, 0f);
+        if (team == TEAM_GHOSTS) return new Vector3(-LAYER_GAP, 0f, 0f);
+        return Vector3.zero;
+    }
+
+    public Vector3 SlotOrigin(int slot) { return TeamOrigin(TeamOf(slot)); }
+
+    // a place another player's client put them at (their avatar, their hand) as a place on the map, and as a place in
+    // this client's copy (the stand-ins, the hunters' weapons, a hider's shot at a hunter)
+    public Vector3 MapLocalOf(int slot, Vector3 world) { return world - SlotOrigin(slot); }
+    public Vector3 SeenHere(int slot, Vector3 world) { return builder.ToWorld(world - SlotOrigin(slot)); }
 
     // ---- balance (Balance.cs)
     readonly float[] hidePhase = { 35f, 40f, 45f, 50f, 30f };       // S, M, L, XL, XS (size 4: GenData.SIZE_XS)
@@ -329,6 +378,8 @@ public class PHGame : UdonSharpBehaviour
     public void PanelRoundLength() { SetRoundLength(panelArg); }
     public void PanelTaunt() { SetTauntInterval(panelArg); }
     public void PanelPenalty() { SetWrongPenalty(panelArg); }
+    public void PanelSeeHiders() { SetSeeHiders(panelArg != 0); }
+    public void PanelLayers() { SetLayers(panelArg != 0); }
 
     public readonly string[] sizeName = { "S", "M", "L", "XL", "XS" };   // (XS is 4: the codes and trail of S to XL keep their numbers)
     public readonly string[] densityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense", "Minimal" };
@@ -352,6 +403,8 @@ public class PHGame : UdonSharpBehaviour
     public void SetRoundLength(int v) { if (!IsHost || phase != PH_LOBBY) return; roundLength = Mathf.Clamp(v, 0, 2); RequestSerialization(); }
     public void SetTauntInterval(int v) { if (!IsHost || phase != PH_LOBBY) return; tauntInterval = v; RequestSerialization(); }
     public void SetWrongPenalty(int v) { if (!IsHost || phase != PH_LOBBY) return; wrongPenalty = v; RequestSerialization(); }
+    public void SetSeeHiders(bool v) { if (!IsHost || phase != PH_LOBBY) return; seeHiders = v; RequestSerialization(); }
+    public void SetLayers(bool v) { if (!IsHost || phase != PH_LOBBY) return; layers = v; RequestSerialization(); }
 
     // the host enters a seed code for the next map (the panel's text field)
     public void SubmitSeed(string text)

@@ -16,7 +16,7 @@ UNITY_INSTANCING_BUFFER_END(Props)
 // texture, one texel a cell, its red the height of the building's top in steps of 5 cm. Under a roof the
 // sky's ambient is dimmer and warmer and the lamps count for more.
 sampler2D _UdonPHIndoor;
-float4 _UdonPHIndoorArea;   // x, y: 1 / the texture's size in metres; z: 1 while a map is up
+float4 _UdonPHIndoorArea;   // x, y: 1 / the texture's size in metres; z: 1 while a map is up; w: the map copy's x (PHGame.layers)
 float _UdonPHSunSpot;   // 1 once the spot sun's shadows are baked (PHSun)
 float4 _UdonPHSunArea;
 float _Toon;
@@ -91,7 +91,7 @@ v2f vert (appdata v)
     float indoor = 0.0, roofTop = 0.0;
     if (_UdonPHIndoorArea.z > 0.5)
     {
-        float2 uv = o.worldPos.xz * _UdonPHIndoorArea.xy;
+        float2 uv = (o.worldPos.xz - float2(_UdonPHIndoorArea.w, 0.0)) * _UdonPHIndoorArea.xy;
         if (uv.x > 0.0 && uv.y > 0.0 && uv.x < 1.0 && uv.y < 1.0)
         {
             float top = tex2Dlod(_UdonPHIndoor, float4(uv, 0, 0)).r * 12.75;
