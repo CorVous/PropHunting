@@ -38,7 +38,7 @@ public class PHLocal : UdonSharpBehaviour
     // ---- balance (Balance.cs)
     public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 3f;   // (group playtest: a short cooldown, taunts back to back got annoying)
     public const int HIT_DAMAGE = 25, HUNTER_HEALTH = 100, HUNT_CHANGES = 3;   // HUNTER_HEALTH: a new weapon's condition
-    public const float HUNT_CHANGE_COOLDOWN = 5f;
+    public const float HUNT_CHANGE_COOLDOWN = SHOT_INTERVAL;   // a prop change in the hunt waits as long as a final stand shot (Cor; was 5 s)
     public const int LAYER_PROPS_SOLID = 11, LAYER_PROPS_WALKTHROUGH = 17;
 
     int role, slotIndex = -1;
@@ -1092,7 +1092,7 @@ public class PHLocal : UdonSharpBehaviour
 
     // a hider's selector shows (PHWeapons: desktop, in the view) while they can pick
     // desktop's selector in the corner: shown the whole time hiding, as VR keeps it in the hand (PHView); it used to
-    // show only while a pick was allowed, so it vanished for the 5 s after every prop change in the hunt (Cor)
+    // show only while a pick was allowed, so it vanished for the wait after every prop change in the hunt (Cor: never hide the gun)
     public bool ShowsSelector()
     {
         if (canPick || CanShoot()) return true;
