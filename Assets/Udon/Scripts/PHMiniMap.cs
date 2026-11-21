@@ -200,7 +200,7 @@ public class PHMiniMap : UdonSharpBehaviour
         if (k < 0) { if (free < 0) return; k = free; dDef[k] = def; dTime[k] = 0f; dBestStill[k] = 0f; dBestPos[k] = at; dBestYaw[k] = yaw; }
         dTime[k] += STEP;
         Vector3 d = at - stillAt[i];
-        if (stillDef[i] == def && new Vector2(d.x, d.z).magnitude < 0.5f) still[i] += STEP;
+        if (stillDef[i] == def && new Vector2(d.x, d.z).magnitude < 0.5f) { still[i] += STEP; stillYaw[i] = yaw; }   // (the facing they ended the stay in: a turn while standing still counts)
         else { EndStay(i); still[i] = STEP; stillAt[i] = at; stillDef[i] = def; stillYaw[i] = yaw; }
         if (still[i] >= dBestStill[k]) { dBestStill[k] = still[i]; dBestPos[k] = at; dBestYaw[k] = yaw; }
     }
@@ -213,7 +213,7 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int k = 0; k < nStay[i]; k++)
         {
             Vector3 d = sPos[b + k] - stillAt[i];
-            if (sDef[b + k] == stillDef[i] && new Vector2(d.x, d.z).magnitude < 0.5f) { sDur[b + k] += still[i]; still[i] = 0f; return; }
+            if (sDef[b + k] == stillDef[i] && new Vector2(d.x, d.z).magnitude < 0.5f) { sDur[b + k] += still[i]; sYaw[b + k] = stillYaw[i]; still[i] = 0f; return; }
         }
         if (nStay[i] < MAXS)
         {
