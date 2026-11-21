@@ -230,6 +230,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     [System.NonSerialized] public double[] stageMs = new double[32];
 
     const float CELL = 4f, INNER = 0.5f, WALL_HALF = 0.1f;
+    const float ROOF_CAP = 6f;   // the invisible wall on a building's roof (CellBody): no hop from anything reaches over it
     const int FACE_XN = 1, FACE_XP = 2, FACE_YN = 4, FACE_YP = 8, FACE_ZN = 16, FACE_ZP = 32, FACE_ALL = 63;
     const int B_GROUND = 0, B_WALLS = 1, B_ROOFS = 2, B_COLL = 3, B_SCENERY = 4;
 
@@ -397,6 +398,80 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     Color moodSun = Color.white, moodFog = Color.grey;   // ApplyMood's light and haze, for the clouds
 
+    // ---- where the mood shows (Cor, playtest 2026-11-20: the lobby kept the last map's dusk, night or space sky). The
+    // sun, the ambient light, the fog and the sky are global, so ApplyMood only works the map's values out (BeginBuild)
+    // and WriteMood puts them in the scene; ResetMood puts the lobby's back (the scene's own values, as
+    // WorldSceneBuilder sets them). PHLocal.UpdateMood picks by where the local player stands, and sets moodByZone;
+    // without it (a bench, a test scene) the mood is written at once as before. PHSun bakes from the map's values
+    // (moodSunRot, moodSunColor, moodSunIntensity), not from the light, which may be the lobby's at the time.
+    [System.NonSerialized] public bool moodByZone;      // PHLocal decides when the mood shows
+    [System.NonSerialized] public bool moodShown;       // the map's mood is in the scene now (false: the lobby's)
+    [System.NonSerialized] public Quaternion moodSunRot;   // (set by ApplyMood before anything reads it)
+    [System.NonSerialized] public Color moodSunColor = new Color(1f, 0.96f, 0.88f);
+    [System.NonSerialized] public float moodSunIntensity = 1f;
+    Color mAmbSky, mAmbEq, mAmbGr, mFog, mZen, mHorizon, mSkyGround;
+    float mFogStart, mFogEnd, mSunSize;
+    bool mSky, mReady;
+
+    // the map's mood into the scene (when its values have been worked out: a map was built since the start)
+    public void WriteMood()
+    {
+        if (!mReady) return;
+        moodShown = true;
+        if (sun != null)
+        {
+            sun.transform.rotation = moodSunRot;
+            sun.color = moodSunColor;
+            sun.intensity = moodSunIntensity;
+        }
+        RenderSettings.ambientSkyColor = mAmbSky;
+        RenderSettings.ambientEquatorColor = mAmbEq;
+        RenderSettings.ambientGroundColor = mAmbGr;
+        RenderSettings.fogColor = mFog;
+        RenderSettings.fogStartDistance = mFogStart;
+        RenderSettings.fogEndDistance = mFogEnd;
+        Material skyMat = RenderSettings.skybox;
+        if (skyMat != null && mSky)
+        {
+            skyMat.SetColor("_Zenith", mZen);
+            skyMat.SetColor("_Horizon", mHorizon);
+            skyMat.SetColor("_GroundColor", mSkyGround);
+            skyMat.SetColor("_SunColor", moodSunColor * 1.2f);
+            skyMat.SetFloat("_SunSize", mSunSize);
+            skyMat.SetFloat("_Exposure", 1f);
+        }
+    }
+
+    // the lobby's light: the scene's own values (WorldSceneBuilder: the sun at 52, 38 degrees, its colour, the trilight
+    // ambient, the fog) and the sky of an ordinary afternoon map under them (ApplyMood's defaults)
+    public void ResetMood()
+    {
+        moodShown = false;
+        Color sunCol = new Color(1f, 0.96f, 0.88f), fog = new Color(0.56f, 0.76f, 0.93f);
+        if (sun != null)
+        {
+            sun.transform.rotation = Quaternion.Euler(52f, 38f, 0f);
+            sun.color = sunCol;
+            sun.intensity = 1f;
+        }
+        RenderSettings.ambientSkyColor = new Color(0.62f, 0.66f, 0.72f);
+        RenderSettings.ambientEquatorColor = new Color(0.52f, 0.53f, 0.54f);
+        RenderSettings.ambientGroundColor = new Color(0.50f, 0.48f, 0.45f);
+        RenderSettings.fogColor = fog;
+        RenderSettings.fogStartDistance = 45f;
+        RenderSettings.fogEndDistance = 160f;
+        Material skyMat = RenderSettings.skybox;
+        if (skyMat != null)
+        {
+            skyMat.SetColor("_Zenith", new Color(0.36f, 0.54f, 0.84f));
+            skyMat.SetColor("_Horizon", Color.Lerp(fog, Color.white, 0.12f));
+            skyMat.SetColor("_GroundColor", fog * 0.92f);
+            skyMat.SetColor("_SunColor", sunCol * 1.2f);
+            skyMat.SetFloat("_SunSize", 0.035f);
+            skyMat.SetFloat("_Exposure", 1f);
+        }
+    }
+
     void ApplyMood()
     {
         float elev = 52f, intensity = 1f;
@@ -453,12 +528,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             else if (moodTime == 4) { zen = new Color(0.58f, 0.60f, 0.64f); sunSize = 0f; }   // overcast: grey, no sun disc
             else if (moodTime == 5) { zen = new Color(0.02f, 0.03f, 0.08f); horizon = fog * 1.3f; sunSize = 0f; }   // night: the moon is its own object
             if (gen.mapTheme == GenData.THEME_SPACE && moodTime != 5) { zen = Color.Lerp(zen, new Color(0.26f, 0.18f, 0.34f), 0.7f); horizon = Color.Lerp(horizon, new Color(0.70f, 0.42f, 0.36f), 0.5f); }
-            skyMat.SetColor("_Zenith", zen);
-            skyMat.SetColor("_Horizon", horizon);
-            skyMat.SetColor("_GroundColor", skyGround);
-            skyMat.SetColor("_SunColor", sunCol * 1.2f);
-            skyMat.SetFloat("_SunSize", sunSize);
-            skyMat.SetFloat("_Exposure", 1f);
+            mZen = zen; mHorizon = horizon; mSkyGround = skyGround; mSunSize = sunSize; mSky = true;   // (WriteMood)
             // the shadows take the sky's colour (Cor): the ambient from above takes the hue of the sky's zenith and the
             // ambient from the sides the hue of the horizon haze; each keeps the brightness the mood set
             Color zenith = zen;
@@ -468,18 +538,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (moodSeason == 3) { sky = Color.Lerp(sky, HueOf(new Color(1f, 0.98f, 0.95f), sky), 0.7f); eq = Color.Lerp(eq, HueOf(new Color(1f, 0.98f, 0.95f), eq), 0.6f); }
         }
         moodSun = sunCol; moodFog = fog;
-        if (sun != null)
-        {
-            sun.transform.rotation = Quaternion.Euler(elev, azim, 0f);
-            sun.color = sunCol;
-            sun.intensity = intensity;
-        }
-        RenderSettings.ambientSkyColor = sky;
-        RenderSettings.ambientEquatorColor = eq;
-        RenderSettings.ambientGroundColor = gr;
-        RenderSettings.fogColor = fog;
-        RenderSettings.fogStartDistance = fogStart;
-        RenderSettings.fogEndDistance = fogEnd;
+        moodSunRot = Quaternion.Euler(elev, azim, 0f); moodSunColor = sunCol; moodSunIntensity = intensity;
+        mAmbSky = sky; mAmbEq = eq; mAmbGr = gr; mFog = fog; mFogStart = fogStart; mFogEnd = fogEnd;
+        mReady = true;
+        // shown at once unless PHLocal places it, or while the local player is out on the map already
+        if (!moodByZone || moodShown) WriteMood();
     }
 
     Color32 Tinted(Color32 c) { return C(c.r * palWallTint.r / 255, c.g * palWallTint.g / 255, c.b * palWallTint.b / 255); }
@@ -1146,8 +1209,35 @@ public class MapBuilderUdon : UdonSharpBehaviour
             }
         }
         Track(land);
+        ReleasePad();
         groundFilter.sharedMesh = ToMesh(B_GROUND, "Ground");
         cellColour = null;
+    }
+
+    // Cor (playtest 2026-11-20): the hunters' start glows on the map, all round long. Two square frames of light on the
+    // release cell's floor, 3.4 and 2 m across, just over the ground (vertex alpha 0: PropLit draws them at full
+    // brightness, like a lamp's bulb). In the ground's mesh: no collider, and the END reveal leaves it.
+    void ReleasePad()
+    {
+        lv = Vector3.zero;
+        float cx = (gen.releaseX + 0.5f) * CELL, cz = (gen.releaseZ + 0.5f) * CELL;
+        Color32 hot = new Color32(255, 92, 60, 0), warm = new Color32(255, 156, 84, 0);
+        PadFrame(cx, cz, 1.7f, 0.2f, 0.014f, hot);
+        PadFrame(cx, cz, 1.0f, 0.08f, 0.014f, warm);
+    }
+
+    // a square frame of half size r and width w at height y round (cx, cz), facing up
+    void PadFrame(float cx, float cz, float r, float w, float y, Color32 col)
+    {
+        PadQuad(cx - r, cx + r, cz - r, cz - r + w, y, col);
+        PadQuad(cx - r, cx + r, cz + r - w, cz + r, y, col);
+        PadQuad(cx - r, cx - r + w, cz - r + w, cz + r - w, y, col);
+        PadQuad(cx + r - w, cx + r, cz - r + w, cz + r - w, y, col);
+    }
+
+    void PadQuad(float x0, float x1, float z0, float z1, float y, Color32 col)
+    {
+        Quad(B_GROUND, new Vector3(x0, y, z0), new Vector3(x0, y, z1), new Vector3(x1, y, z1), new Vector3(x1, y, z0), Vector3.up, col);
     }
 
     // the lane carries on past the release as a track into the country, fading into the grass (review 2: a way in)
@@ -2953,6 +3043,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Box3(sbuf, new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, ceiling, FACE_ALL);
             }
             Slab(B_COLL, x * CELL - WALL_HALF, (x + 1) * CELL + WALL_HALF, z * CELL - WALL_HALF, (z + 1) * CELL + WALL_HALF, h, t, hx0, hx1, hz0, hz1, rc, rc, rc);
+            // Cor (playtest 2026-11-20: hiders hopped from rocks and poles onto the roofs): a wall on top of the building
+            // instead of a ceiling over the map. In the collision mesh only, over the roof slab's footprint: its sides
+            // rise ROOF_CAP from the roof's outer edges (none toward the building's own cells) and its top is out of
+            // reach, so a prop can neither land on a roof nor get over it. Low furniture, crates and tables stay hoppable.
+            if (top) Box(B_COLL, new Vector3(x * CELL - WALL_HALF, t, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, t + ROOF_CAP, (z + 1) * CELL + WALL_HALF),
+                         new Color32(0, 0, 0, 255), FACE_YP | (bw ? 0 : FACE_XN) | (be ? 0 : FACE_XP) | (bs ? 0 : FACE_ZN) | (bn2 ? 0 : FACE_ZP));
             // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider);
             // a space base keeps its roofs flat, with an orange parapet round the edge
             if (theme == GenData.THEME_SPACE && top)

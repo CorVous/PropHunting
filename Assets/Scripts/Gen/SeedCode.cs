@@ -79,7 +79,7 @@ public static class SeedCode
         size = (int)((body >> 39) & 7);
         seed = (uint)((body >> 7) & 0xFFFFFFFFu);
         flags = (int)(body & 0x7F);
-        if (size > 3) return TYPO;
+        if (size > 4) return TYPO;   // 0 to 3: S to XL, 4: XS (Cor, 2026-11-20)
         if (genVersion > currentVersion) return NEWER;
         if (genVersion < currentVersion) return OLDER;
         return OK;

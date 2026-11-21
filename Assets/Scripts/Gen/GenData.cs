@@ -32,65 +32,69 @@ public static partial class GenData
     public const int DOOR_HEIGHT_MM = 2100;
 
     // ---- size buckets (04 section 4.7.7) ----
-    public static readonly string[] SizeName = { "S", "M", "L", "XL" };
+    // Index 4 is XS (Cor, playtest 2026-11-20: 9 players on Auto got an M map): one house and a small wood, for up
+    // to about 5 players. It comes last so the seed codes and trail entries of S to XL keep their size numbers.
+    public const int SIZE_XS = 4;
+    public static readonly string[] SizeName = { "S", "M", "L", "XL", "XS" };
     // Layout 2 (G32, G36): the map is a lane with plots on both sides and a wood, so its box follows the site; the
     // sizes give the plots, the ground cells the wood tops the map up to, and the wood's own minimum. Layout 1 (the
     // zone pieces) filled a fixed square of SizeGrid cells to 28, 52, 85 and 108 ground cells.
-    public static readonly int[] SizeGrid = { 7, 9, 12, 14 };            // layout 1: bounding box, outer cells per side
-    public static readonly int[] SizeGroundCells = { 0, 0, 0, 0 }; // ground cells the wood tops the map up to (layout 1: 28, 52, 85, 108; layout 2: 46, 80, 124, 164)
-    public static readonly int[] SizeWoodMin = { 3, 3, 4, 5 };        // the wood is never smaller than this (layout 2: 6, 10, 16, 22)
+    public static readonly int[] SizeGrid = { 7, 9, 12, 14, 6 };            // layout 1: bounding box, outer cells per side
+    public static readonly int[] SizeGroundCells = { 0, 0, 0, 0, 0 }; // ground cells the wood tops the map up to (layout 1: 28, 52, 85, 108; layout 2: 46, 80, 124, 164)
+    public static readonly int[] SizeWoodMin = { 3, 3, 4, 5, 3 };        // the wood is never smaller than this (layout 2: 6, 10, 16, 22)
     // Plots per map (G36 counts: 2, 3, 4, 5). Layout 4 (revision 9): H a house, * any kind of plot (a house more
     // often than not), + any plot that is not a house, never two of one kind on a map: a diner, a warehouse, a shop, a
     // garage, a farm or a park, by the weights below. Layout 2 and 3: "H+", "HH+", "HHDW", "HHHDW" (+ a diner or a
     // warehouse, or a house at S): every L and XL map had the same four or five plots.
-    public static readonly string[] SizePlots = { "H*", "H*+", "H*++", "HH*++" };
+    public static readonly string[] SizePlots = { "H*", "H*+", "H*++", "HH*++", "H" };
     public static readonly int[] PlotPoolZone = { Z_DINER, Z_WAREHOUSE, Z_SHOP, Z_GARAGE, Z_BARN, Z_PARK, Z_ZOO, Z_CABIN, Z_FAIR, Z_CHAPEL };   // revision 12: zoo, cabin, funfair, chapel
     public static readonly int[] PlotPoolWeight = { 13, 9, 15, 12, 4, 3, 3, 6, 4, 5 };   // generator 27 (Cor: indoors is more fun, fewer outdoor areas): the farm, park, zoo, funfair and chapel, mostly open ground, less often (were 8, 9, 8, 8, 8, 7)
     public const int PLOT_ANY_HOUSE = 350;                                // per mille: "*" is a house
     // cells of the new kinds' plans by size (least, most); a park's plot in outer cells along the lane and deep
-    public static readonly int[] SizeShopCellsMin = { 4, 4, 4, 5 }, SizeShopCellsMax = { 9, 11, 13, 13 };
-    public static readonly int[] SizeGarageCellsMin = { 4, 4, 5, 5 }, SizeGarageCellsMax = { 10, 12, 14, 16 };
+    public static readonly int[] SizeShopCellsMin = { 4, 4, 4, 5, 4 }, SizeShopCellsMax = { 9, 11, 13, 13, 8 };
+    public static readonly int[] SizeGarageCellsMin = { 4, 4, 5, 5, 4 }, SizeGarageCellsMax = { 10, 12, 14, 16, 8 };
     // revision 10: barns of 3 cells or more (room for the farm workshop), parks larger (a lawn and feature areas)
-    public static readonly int[] SizeBarnCellsMin = { 3, 3, 4, 4 }, SizeBarnCellsMax = { 8, 10, 12, 12 };   // revision 9: 2, 2, 3, 4 and 3, 4, 6, 6
-    public static readonly int[] SizeParkAlong = { 3, 4, 4, 5 }, SizeParkDeep = { 3, 3, 3, 3 };          // revision 9: 2, 2, 3, 3 and 2, 3, 3, 3
+    public static readonly int[] SizeBarnCellsMin = { 3, 3, 4, 4, 3 }, SizeBarnCellsMax = { 8, 10, 12, 12, 7 };   // revision 9: 2, 2, 3, 4 and 3, 4, 6, 6
+    public static readonly int[] SizeParkAlong = { 3, 4, 4, 5, 3 }, SizeParkDeep = { 3, 3, 3, 3, 3 };          // revision 9: 2, 2, 3, 3 and 2, 3, 3, 3
     // revision 12: the zoo is three cells along the lane (enclosures, the keepers' walk, enclosures) and 3 or 4 deep;
     // the log cabin's plans by size
-    public static readonly int[] SizeZooDeep = { 3, 3, 4, 4 };
-    public static readonly int[] SizeCabinCellsMin = { 2, 2, 3, 3 }, SizeCabinCellsMax = { 6, 8, 10, 10 };
-    public static readonly int[] SizeFairCellsMin = { 4, 4, 5, 5 }, SizeFairCellsMax = { 10, 12, 15, 15 };
-    public static readonly int[] SizeChapelCellsMin = { 3, 3, 3, 4 }, SizeChapelCellsMax = { 8, 10, 12, 12 };
-    public static readonly int[] SizeExtraHouse = { 0, 0, 0, 0 };        // chance (per mille) of one more house plot (layout 2: 0, 300, 400, 500)
+    public static readonly int[] SizeZooDeep = { 3, 3, 4, 4, 3 };
+    public static readonly int[] SizeCabinCellsMin = { 2, 2, 3, 3, 2 }, SizeCabinCellsMax = { 6, 8, 10, 10, 5 };
+    public static readonly int[] SizeFairCellsMin = { 4, 4, 5, 5, 4 }, SizeFairCellsMax = { 10, 12, 15, 15, 8 };
+    public static readonly int[] SizeChapelCellsMin = { 3, 3, 3, 4, 3 }, SizeChapelCellsMax = { 8, 10, 12, 12, 7 };
+    public static readonly int[] SizeExtraHouse = { 0, 0, 0, 0, 0 };        // chance (per mille) of one more house plot (layout 2: 0, 300, 400, 500)
     // the plans a plot may take, by their cells: houses, warehouses, diners (the least and the most)
-    public static readonly int[] SizeHouseCellsMin = { 5, 6, 6, 7 };
-    public static readonly int[] SizeHouseCellsMax = { 14, 18, 22, 24 };
-    public static readonly int[] SizeWarehouseCellsMin = { 6, 6, 6, 7 };   // generator 27 (Cor: the warehouse and its storerooms too big): were 6, 6, 8, 8 and 12, 14, 16, 16
-    public static readonly int[] SizeWarehouseCellsMax = { 8, 9, 10, 11 };
-    public static readonly int[] SizeDinerCellsMax = { 10, 12, 14, 16 };
+    public static readonly int[] SizeHouseCellsMin = { 5, 6, 6, 7, 6 };
+    public static readonly int[] SizeHouseCellsMax = { 14, 18, 22, 24, 12 };
+    public static readonly int[] SizeWarehouseCellsMin = { 6, 6, 6, 7, 6 };   // generator 27 (Cor: the warehouse and its storerooms too big): were 6, 6, 8, 8 and 12, 14, 16, 16
+    public static readonly int[] SizeWarehouseCellsMax = { 8, 9, 10, 11, 8 };
+    public static readonly int[] SizeDinerCellsMax = { 10, 12, 14, 16, 9 };
     // a house plot's gardens in cells: the front garden (and the chance of one more row), the back garden (and the
     // chance of one more row); a warehouse's forecourt and its chance of a yard two deep at the back; the chance of
     // a side yard. G36 "B" brought the maps down to about 40 to 60% above layout 1: at S the house's front door and
     // the warehouse's office door open straight onto the lane (report 16, 4.1: "S: 0 allowed"), no extra house plot,
     // smaller commercial plans at M and XL, a back garden one row deeper less often. Layout 2: front { 1, 1, 1, 1 }
     // and one more row 25% at L and XL, back extra { 300, 300, 350, 350 }, warehouse front 1 at every size.
-    public static readonly int[] SizeHouseFront = { 0, 0, 0, 0 };
-    public static readonly int[] SizeHouseFront2 = { 0, 0, 0, 0 };
-    public static readonly int[] SizeHouseBack = { 1, 1, 1, 1 };
-    public static readonly int[] SizeHouseBackExtra = { 0, 0, 0, 0 };
-    public static readonly int[] SizeWarehouseFront = { 0, 0, 0, 0 };
-    public static readonly int[] SizeWarehouseBack2 = { 0, 0, 0, 0 };
-    public static readonly int[] SizeSideYard = { 0, 0, 0, 0 };
-    public static readonly int[] SizeLevelsMax = { 1, 2, 2, 3 };      // generator 18: upper floors and basements per map at most
-    public static readonly int[] SizeLeaks = { 8, 11, 15, 18 };          // wrong-category spawns (04 section 4.3.5)
-    public static readonly int[] SizePlayers = { 8, 16, 24, 32 };
+    public static readonly int[] SizeHouseFront = { 0, 0, 0, 0, 0 };
+    public static readonly int[] SizeHouseFront2 = { 0, 0, 0, 0, 0 };
+    public static readonly int[] SizeHouseBack = { 1, 1, 1, 1, 1 };
+    public static readonly int[] SizeHouseBackExtra = { 0, 0, 0, 0, 0 };
+    public static readonly int[] SizeWarehouseFront = { 0, 0, 0, 0, 0 };
+    public static readonly int[] SizeWarehouseBack2 = { 0, 0, 0, 0, 0 };
+    public static readonly int[] SizeSideYard = { 0, 0, 0, 0, 0 };
+    public static readonly int[] SizeLevelsMax = { 1, 2, 2, 3, 1 };      // generator 18: upper floors and basements per map at most
+    public static readonly int[] SizeLeaks = { 8, 11, 15, 18, 6 };          // wrong-category spawns (04 section 4.3.5)
+    public static readonly int[] SizePlayers = { 8, 16, 24, 32, 5 };
     public const int LEAK_COMEDIC_PERMILLE = 300;                        // D10
     public const int MIXED_SET_PERMILLE = 150;                           // 04 section 4.3.6
     public const int HIDING_SOCKET_PERMILLE = 250;
 
     // ---- density setting (G24): scales the per-room ranges below. The index is stored in the seed code's flags,
-    // so 0 has to stay Normal. DensityOrder is the order on the start panel.
-    public static readonly string[] DensityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense" };
-    public static readonly int[] DensityPercent = { 100, 70, 135, 45, 200 };
-    public static readonly int[] DensityOrder = { 3, 1, 0, 2, 4 };
+    // so 0 has to stay Normal. DensityOrder is the order on the start panel. 5, Minimal (Cor, playtest 2026-11-20: Sparse is
+    // the default now, and one tier sparser than Very sparse).
+    public static readonly string[] DensityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense", "Minimal" };
+    public static readonly int[] DensityPercent = { 100, 70, 135, 45, 200, 25 };
+    public static readonly int[] DensityOrder = { 5, 3, 1, 0, 2, 4 };
 
     // ---- disguises: any prop on the map can be a disguise (G25: no copies rule, no quota pass). The only types
     // that are never a disguise are technical: fixed dressing (FL_FIXTURE), trees (FL_SCENERY), ground cover

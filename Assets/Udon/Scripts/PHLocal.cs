@@ -87,6 +87,7 @@ public class PHLocal : UdonSharpBehaviour
                 SetPropLayer(LAYER_PROPS_SOLID);
                 SetFrozen(false);
                 if (role == PHGame.ROLE_NONE && game.lobbySpawn != null && game.round > 0) me.TeleportTo(game.lobbySpawn.position, game.lobbySpawn.rotation);
+                game.builder.ResetMood();   // the lobby's own light, not the last map's (Cor); UpdateMood keeps it right after
                 break;
             case PHGame.PH_LOADING:
                 sound.Play("confirmation_001", 0.6f);
@@ -103,19 +104,14 @@ public class PHLocal : UdonSharpBehaviour
                     // hunters wait in the lobby while the hiders hide (Cor); the hunt brings them to the release
                     SetPropLayer(LAYER_PROPS_WALKTHROUGH);
                     SetFrozen(false);
+                    game.builder.ResetMood();   // (the map was built meanwhile: its mood stays off the lobby, Cor)
                     Say(T("say.youHunt"), 6f);
                 }
                 else if (role == PHGame.ROLE_HIDER)
                 {
                     SetPropLayer(LAYER_PROPS_SOLID);
-                    Vector3 at = game.builder.ReleasePoint();
-                    if (game.gen.nSpawns > 0)
-                    {
-                        int c = game.gen.spawnCell[Random.Range(0, game.gen.nSpawns)];
-                        at = game.builder.InnerWorld(c);   // upstairs or in a basement too
-                    }
-                    float facing = Random.Range(0, 24) * 15f;
-                    me.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
+                    LandHider();
+                    game.builder.WriteMood();
                     // they land as themselves (Cor), on their own feet, and move, pick and open doors at once; the
                     // first prop they pick seats them in it (SetDisguise). The hunters wait in the lobby until the
                     // hunt, so nobody who must not sees them meanwhile.
@@ -134,6 +130,7 @@ public class PHLocal : UdonSharpBehaviour
                 if (role == PHGame.ROLE_HUNTER)
                 {
                     me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+                    game.builder.WriteMood();   // out of the lobby: the map's mood
                     SetFrozen(false);
                     Say(T("say.hunt"), 3f);
                 }
@@ -164,6 +161,80 @@ public class PHLocal : UdonSharpBehaviour
     }
 
     public void OnSlotChanged(PHSlot s) { }
+
+    // ------------------------------------------------------------------ landing on the map (Cor, playtest 2026-11-20)
+    // A hider lands on one of the map's spawn cells (MapGenUdon: cells with room round them, off the walls), facing the
+    // longest clear way from it (MapGenUdon.SpawnFacing) instead of a random way that could look into a wall.
+    void LandHider()
+    {
+        Vector3 at = game.builder.ReleasePoint();
+        float facing = Random.Range(0, 24) * 15f;
+        if (game.gen.nSpawns > 0)
+        {
+            int c = game.gen.spawnCell[Random.Range(0, game.gen.nSpawns)];
+            at = game.builder.InnerWorld(c);   // upstairs or in a basement too
+            facing = game.gen.SpawnFacing(c);
+        }
+        Networking.LocalPlayer.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
+    }
+
+    // A respawn (VRChat's menu) during a round sent a hider to the lobby, where the hunt then made them a prop (Cor,
+    // playtest 2026-11-20). Now a hider goes back onto the map: to a spawn cell, or, hiding in a prop, to the prop (its
+    // seat takes them again, PHSlot). A hunter in the hunt goes back to the release. Ghosts, the caught and anyone
+    // between rounds respawn in the lobby as before. A frame later: the respawn's own move comes first.
+    public override void OnPlayerRespawn(VRCPlayerApi player)
+    {
+        if (!Utilities.IsValid(player) || !player.isLocal) return;
+        SendCustomEventDelayedFrames(nameof(BackOntoMap), 1);
+    }
+
+    public void BackOntoMap()
+    {
+        int phase = game.phase;
+        if (phase != PHGame.PH_BRIEF && phase != PHGame.PH_HIDE && phase != PHGame.PH_HUNT) return;
+        if (!game.MapReady) return;
+        PHSlot s = Me();
+        if (s == null || s.caught || s.ghost) return;
+        int r = game.RoleOf(slotIndex);
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (r == PHGame.ROLE_HIDER)
+        {
+            if (s.hiding && body.active) me.TeleportTo(body.pos + Vector3.up * 0.1f, Quaternion.Euler(0f, body.yaw, 0f));
+            else LandHider();
+            game.Log("respawned in the round: back onto the map");
+        }
+        else if (r == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT)
+        {
+            me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+            game.Log("respawned in the hunt: back to the release");
+        }
+        else return;
+        game.builder.WriteMood();
+    }
+
+    // ------------------------------------------------------------------ the light where the player stands (Cor, 2026-11-20)
+    // The sun, the ambient light, the fog and the sky are global, and the lobby kept the last map's dusk, night or space
+    // sky. Now the lobby has the scene's own light (MapBuilderUdon.ResetMood) and the map its mood (WriteMood), by
+    // which of the two the local player is nearer to (the lobby is some 400 m off the map): explore, a respawn, a
+    // hunter waiting in the lobby. Twice a second, written only on a change; the phases above also set it at once.
+    float nextMood;
+
+    void UpdateMood()
+    {
+        if (Time.time < nextMood) return;
+        nextMood = Time.time + 0.5f;
+        MapBuilderUdon b = game.builder;
+        if (b == null) return;
+        b.moodByZone = true;   // (from now on BeginBuild leaves the mood to this)
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (!Utilities.IsValid(me)) return;
+        Vector3 p = me.GetPosition();
+        Vector3 lobby = game.lobbySpawn != null ? game.lobbySpawn.position : (game.lobbyZone != null ? game.lobbyZone.bounds.center : Vector3.zero);
+        Vector3 map = new Vector3(b.SiteWidth() * 0.5f, 0f, b.SiteDepth() * 0.5f);
+        bool inLobby = !b.built || (p - lobby).sqrMagnitude < (p - map).sqrMagnitude;
+        if (inLobby) { if (b.moodShown) b.ResetMood(); }
+        else if (!b.moodShown) b.WriteMood();
+    }
 
     // ------------------------------------------------------------------ calls one after the other
     // A call and the one that follows it (Cor: "the time over and you win sounds overlap"): the second starts when
@@ -768,6 +839,7 @@ public class PHLocal : UdonSharpBehaviour
         UpdateVoices();
         UpdateStrayStation();
         UpdateJoiner();
+        UpdateMood();
         UpdateHud();
         UpdateHover();
         UpdateRocks();
