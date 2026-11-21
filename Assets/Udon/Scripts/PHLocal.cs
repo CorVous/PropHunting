@@ -1091,7 +1091,16 @@ public class PHLocal : UdonSharpBehaviour
     }
 
     // a hider's selector shows (PHWeapons: desktop, in the view) while they can pick
-    public bool ShowsSelector() { return canPick || CanShoot(); }
+    // desktop's selector in the corner: shown the whole time hiding, as VR keeps it in the hand (PHView); it used to
+    // show only while a pick was allowed, so it vanished for the 5 s after every prop change in the hunt (Cor)
+    public bool ShowsSelector()
+    {
+        if (canPick || CanShoot()) return true;
+        PHSlot s = Me();
+        int ph = game.phase;
+        return s != null && role == PHGame.ROLE_HIDER && s.hiding && !s.caught && !s.ghost && s.def >= 0
+            && (ph == PHGame.PH_BRIEF || ph == PHGame.PH_HIDE || ph == PHGame.PH_HUNT);
+    }
 
     // desktop: what lies within reach in front of the eyes, as the slash comes across
     public void MeleeDesktopStrike()
