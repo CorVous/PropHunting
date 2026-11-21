@@ -847,11 +847,16 @@ public static partial class LobbyBuilder
         const float side = 24f, pad = 26f, colGap = 34f;
         float boardW = CW - 2 * side, innerW = boardW - 2 * pad;
         var cv = Canvas(lobby, "Credits", localPos, rot, new Vector2(CW, 100f), scale, true);   // pointable: the lists scroll
+        // the long body text (Cor's intro, the fine print) in a plain sans, Liberation Sans (TextMesh Pro's own, as the
+        // map code on the panel): Cor, hop playtest: the Kenney face was hard to read in a paragraph. Headings, the
+        // makers and the list stay Kenney. TextBaker hangs the languages' fallback fonts under Liberation Sans too.
+        var body = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+        if (body == null) body = future;
         var noteTexts = new System.Collections.Generic.List<TextMeshProUGUI>();
         float notesH = 0f;
         foreach (var n in notes)
         {
-            var t = Txt(cv, "Note", Vector2.zero, new Vector2(innerW, 20), Clean(n, future), future, 14, C("6b5d40"), TextAlignmentOptions.Top);
+            var t = Txt(cv, "Note", Vector2.zero, new Vector2(innerW, 20), Clean(n, body), body, 15, C("6b5d40"), TextAlignmentOptions.Top);
             t.enableWordWrapping = true;
             float h = t.GetPreferredValues(t.text, innerW, 0f).y;
             t.rectTransform.sizeDelta = new Vector2(innerW, h);
@@ -859,8 +864,8 @@ public static partial class LobbyBuilder
         }
         // the title band: the heading and Cor's note, a little larger than the rest
         float introW = boardW - 160f;
-        var intro = Txt(cv, "Intro", Vector2.zero, new Vector2(introW, 20), Clean(CreditsIntro, future), future, 20, Cream, TextAlignmentOptions.Top);
-        intro.enableWordWrapping = true; intro.lineSpacing = 12f;
+        var intro = Txt(cv, "Intro", Vector2.zero, new Vector2(introW, 20), Clean(CreditsIntro, body), body, 25, Cream, TextAlignmentOptions.Top);
+        intro.enableWordWrapping = true; intro.lineSpacing = 6f;
         float introH = intro.GetPreferredValues(intro.text, introW, 0f).y;
         intro.rectTransform.sizeDelta = new Vector2(introW, introH);
         const float introTop = 168f;   // under the title and the source banner

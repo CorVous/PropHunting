@@ -260,6 +260,12 @@ public static class TextBaker
             if (future != null && future.HasCharacter(c, false)) { assigned.Add(c); continue; }
             if (kenneyCover.Contains(c)) { latin.Add(c); assigned.Add(c); }
         }
+        // the Latin extras the Kenney fonts' extra atlases hold go to Rubik as well when Liberation Sans lacks them
+        // (body text in Liberation Sans: the credits intro, the map code), since that extra atlas is not one of its
+        // fallbacks: Liberation Sans' chain finds them in Rubik's atlas, the Kenney fonts still in their own
+        if (lib != null)
+            foreach (char c in latin)
+                if (!lib.HasCharacter(c) && cover["Rubik"].Contains(c)) perFont["Rubik"].Add(c);
         foreach (var row in rows)
             for (int l = 0; l < row.Length; l++)
             {
