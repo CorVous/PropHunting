@@ -329,6 +329,7 @@ public partial class MapGenUdon
     uint fsHash;
     uint[] fsRng;
     bool fsLoose;              // the hider spawns' second pass, without SpawnRoomy
+    bool fsDense;              // revision 30: ... a pass that thins out half as much
     const int SPAWN_MIN = 8;   // spawn cells with room round them a map should have before the old test is used
 
     // A hider spawn cell with room round it (Cor: hiders landed inside or against walls): not on its outer cell's
@@ -408,7 +409,7 @@ public partial class MapGenUdon
             int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
             for (int i = fsCursor; i < e; i++) walk[i] = (byte)((tags[i] & GenData.T_FLOOR) == 0 ? 0 : (SolidAt(i) ? 2 : 1));
             fsCursor = e;
-            if (e >= n) { fsPhase = 5; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; fsLoose = false; }
+            if (e >= n) { fsPhase = 5; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; fsLoose = false; fsDense = false; }
             return false;
         }
         if (fsPhase == 5)
@@ -420,7 +421,7 @@ public partial class MapGenUdon
             int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
             for (int i = fsCursor; i < e; i++)
             {
-                bool keep = (RngNextU(fsRng) & 7) == 0;   // thin out evenly
+                bool keep = (RngNextU(fsRng) & (fsDense ? 3u : 7u)) == 0;   // thin out evenly (revision 30: half as thin on a map short of spawns)
                 if (reach[i] == 0 || occ[i] != 0 || solid[i] != 0 || !keep || fsNc >= cand.Length) continue;
                 if ((tags[i] & (GenData.T_NO_SPAWN | GenData.T_DOOR_CLEAR)) != 0) continue;
                 int dx = i % IW - rx, dz = i / IW - rz;
@@ -433,6 +434,8 @@ public partial class MapGenUdon
             {
                 // (the same stream again: the shuffle after it draws as it always did)
                 if (!fsLoose && fsNc < SPAWN_MIN) { fsLoose = true; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; }
+                // revision 30: the closed lawn took floor from the small maps: short of a full set, every fourth cell
+                else if (!fsDense && fsNc < spawnCell.Length) { fsDense = true; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; }
                 else fsPhase = 6;
             }
             return false;
