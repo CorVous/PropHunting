@@ -47,6 +47,15 @@ public class PHReplay : UdonSharpBehaviour
     public Transform playhead, huntMark;  // on the scrub bar (canvas units, its middle at 0)
     public float barWidth = 760f;
     public int segments = 20;             // the scrub bar's pressable pieces
+    // the overhead seek bar (Cor: "a global seek bar"): a big timeline over the diorama's middle, turned to each
+    // viewer, so everyone round the table sees where the replay is and can press anywhere on it. Its pieces press
+    // Seek with buttonArg OVER_ARG + the piece + 1.
+    public Transform overhead;            // its canvas (shown while the replay is open)
+    public Transform overHead, overHunt;  // its playhead and the hunt's start
+    public TextMeshProUGUI overClock;
+    public float overWidth = 900f;
+    public int overSegments = 40;
+    public const int OVER_ARG = 100;
 
     public const int TICK_MS = 250;
     const float TICK_S = 0.25f;
@@ -124,6 +133,7 @@ public class PHReplay : UdonSharpBehaviour
             shownOpen = on;
             mini.SetReplay(on);
             for (int i = 0; i < playingOnly.Length; i++) if (playingOnly[i] != null) playingOnly[i].SetActive(on);
+            if (overhead != null) overhead.gameObject.SetActive(on);
             if (!on) HideMarkers();
             for (int i = 0; i < lastK.Length; i++) lastK[i] = -1;
             Labels();
@@ -280,6 +290,7 @@ public class PHReplay : UdonSharpBehaviour
             float span = Mathf.Max(1, endTick - originTick);
             float u = Mathf.Clamp01((huntTick - originTick) / span);
             huntMark.localPosition = new Vector3((u - 0.5f) * barWidth, 0f, 0f);
+            if (overHunt != null) overHunt.localPosition = new Vector3((u - 0.5f) * overWidth, 0f, 0f);
         }
     }
 
@@ -367,7 +378,7 @@ public class PHReplay : UdonSharpBehaviour
                     for (int j = 0; j < TAIL; j++) tailBuf[j] = tPos[b + Mathf.Min(from + j, k)] + off + new Vector3(0f, 0.15f, 0f);
                     lr.positionCount = TAIL;
                     lr.SetPositions(tailBuf);
-                    lr.widthMultiplier = 0.0018f / Mathf.Max(0.001f, mini.model.localScale.x);
+                    lr.widthMultiplier = 0.00045f / Mathf.Max(0.001f, mini.model.localScale.x);   // (Cor: a quarter of the first width)
                     Color c0 = colour[i]; c0.a = 0f;
                     lr.startColor = c0; lr.endColor = colour[i];
                 }
@@ -385,7 +396,20 @@ public class PHReplay : UdonSharpBehaviour
         float dur = Duration();
         if (playhead != null) playhead.localPosition = new Vector3((dur > 0f ? t / dur - 0.5f : -0.5f) * barWidth, 0f, 0f);
         int sec = Mathf.FloorToInt(t) * 10000 + Mathf.FloorToInt(dur);
-        if (clock != null && sec != clockShown) { clockShown = sec; clock.text = Clock(t) + " / " + Clock(dur); }   // (a text rebuild only when it changes)
+        float uu = dur > 0f ? t / dur - 0.5f : -0.5f;
+        if (overHead != null) overHead.localPosition = new Vector3(uu * overWidth, 0f, 0f);
+        if (overhead != null)
+        {
+            Vector3 dv = overhead.position - eye; dv.y = 0f;
+            if (dv.sqrMagnitude > 1e-4f) overhead.rotation = Quaternion.LookRotation(dv, Vector3.up);   // (turned to this viewer)
+        }
+        if (sec != clockShown)
+        {
+            clockShown = sec;
+            string ct = Clock(t) + " / " + Clock(dur);
+            if (clock != null) clock.text = ct;
+            if (overClock != null) overClock.text = ct;
+        }   // (a text rebuild only when it changes)
         bool atEnd = t >= dur - 0.01f;
         string pl = game.text != null ? game.text.Get(playing && !atEnd ? "replay.pause" : "replay.play") : "";
         if (playLabel != null && playLabel.text != pl) playLabel.text = pl;
@@ -479,7 +503,9 @@ public class PHReplay : UdonSharpBehaviour
     {
         if (!open) return;
         Take();
-        atSec = Duration() * Mathf.Clamp01((buttonArg - 1) / (float)Mathf.Max(1, segments - 1)); atMs = game.Now;
+        if (buttonArg > OVER_ARG) atSec = Duration() * Mathf.Clamp01((buttonArg - OVER_ARG - 1) / (float)Mathf.Max(1, overSegments - 1));
+        else atSec = Duration() * Mathf.Clamp01((buttonArg - 1) / (float)Mathf.Max(1, segments - 1));
+        atMs = game.Now;
         Send();
     }
 

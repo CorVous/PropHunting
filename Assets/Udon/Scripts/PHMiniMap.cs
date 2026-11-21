@@ -329,7 +329,7 @@ public class PHMiniMap : UdonSharpBehaviour
             for (int j = a; j < b; j++) line[j - a] = pts[i * MAXP + j] + lift;
             lr.positionCount = b - a;
             lr.SetPositions(line);   // (one call: a point at a time was a call each)
-            lr.widthMultiplier = 0.0012f / Mathf.Max(0.001f, model.localScale.x);   // (Cor: thinner)
+            lr.widthMultiplier = 0.0003f / Mathf.Max(0.001f, model.localScale.x);   // (Cor: thinner, then a quarter of that, 2026-11-21)
             lr.startColor = c; lr.endColor = c;
             lr.gameObject.SetActive(true);
         }

@@ -115,6 +115,30 @@ public static partial class LobbyBuilder
         foreach (var g in rp.playingOnly) g.SetActive(false);
         bar.SetActive(false);
 
+        // the overhead seek bar (Cor: "a global seek bar"): a 1.8 m timeline 1.3 m over the diorama's middle, turned
+        // to each viewer by PHReplay, its 40 pieces pressable from any side of the table, the clock over it
+        const float overW = 900f; const int overSegs = 40;
+        var oc = Canvas(table, "ReplayOverhead", new Vector3(0f, top + 1.3f, 0f), Quaternion.identity, new Vector2(overW + 40f, 110f), 0.002f, true);
+        var otrack = Img(oc, "Scrub", new Vector2(0f, -15f), new Vector2(overW, 22f), sRound, C("6d5524"), 2f);
+        var ohunt = Img(otrack.transform, "Hunt", Vector2.zero, new Vector2(7f, 46f), sTile, C("eb3a2e"), 1f);
+        var ohead = Img(otrack.transform, "Head", new Vector2(-overW / 2, 0f), new Vector2(16f, 60f), sRound, C("f6ecd4"), 2f);
+        for (int s = 0; s < overSegs; s++)
+        {
+            float x = -overW / 2 + overW * s / (overSegs - 1);
+            var piece = Img(otrack.transform, "Piece" + s, new Vector2(x, 0f), new Vector2(overW / (overSegs - 1), 70f), null, new Color(1f, 1f, 1f, 0f), 1f);
+            piece.raycastTarget = true;
+            var bt = piece.gameObject.AddComponent<Button>();
+            var nav = bt.navigation; nav.mode = Navigation.Mode.None; bt.navigation = nav; bt.targetGraphic = piece;
+            var pb = piece.gameObject.AddUdonSharpComponent<PHButton>();
+            pb.game = game; pb.target = rp; pb.action = nameof(PHReplay.Seek); pb.arg = PHReplay.OVER_ARG + s + 1;
+            UdonSharpEditorUtility.CopyProxyToUdon(pb);
+            UnityEditor.Events.UnityEventTools.AddStringPersistentListener(bt.onClick, UdonSharpEditorUtility.GetBackingUdonBehaviour(pb).SendCustomEvent, nameof(PHButton.Press));
+        }
+        ohead.transform.SetAsLastSibling();
+        rp.overClock = Txt(oc, "Clock", new Vector2(0f, 30f), new Vector2(300f, 40f), "0:00 / 0:00", future, 22, C("f6ecd4"), TextAlignmentOptions.Center);
+        rp.overhead = oc; rp.overHead = ohead.transform; rp.overHunt = ohunt.transform; rp.overWidth = overW; rp.overSegments = overSegs;
+        oc.gameObject.SetActive(false);
+
         UdonSharpEditorUtility.CopyProxyToUdon(rp);
         return rp;
     }
