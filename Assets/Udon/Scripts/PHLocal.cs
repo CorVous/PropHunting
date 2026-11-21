@@ -582,14 +582,14 @@ public class PHLocal : UdonSharpBehaviour
             if (!Networking.LocalPlayer.IsUserInVR()) return;
             int h = args.handType == VRC.Udon.Common.HandType.LEFT ? 0 : 1;
             if (ringByTrigger[h]) { ringByTrigger[h] = false; if (body.ringHand == h) body.ringHand = -1; return; }
-            if (h == 1) TriggerUp();
+            if (h == GunHand()) TriggerUp();
             return;
         }
         int phase = game.phase;
         bool vr = Networking.LocalPlayer.IsUserInVR();
         // desktop: a click on a door within reach works it (C7), before anything else
         if (!vr && TryDoor()) return;
-        // VR: the left trigger does nothing (Cor: no left-hand device); a hider's right trigger is a tap or a hold,
+        // VR: the other hand's trigger does nothing (Cor: no left-hand device; left-handed players swap, PHHand); a hider's right trigger is a tap or a hold,
         // told apart while it is held and as it is let go (TriggerDown, UpdateTrigger, TriggerUp)
         if (vr && role == PHGame.ROLE_HIDER)
         {
@@ -597,10 +597,10 @@ public class PHLocal : UdonSharpBehaviour
             // a trigger with the hand at the screen's button presses it (Cor: the button was hard to press)
             // (the ring only by a grip, PHView: Cor wants the trigger kept for shooting and picking)
             if (TriggerButton(h)) return;
-            if (h == 1) TriggerDown();
+            if (h == GunHand()) TriggerDown();
             return;
         }
-        if (vr && args.handType == VRC.Udon.Common.HandType.LEFT) return;
+        if (vr && (args.handType == VRC.Udon.Common.HandType.LEFT ? 0 : 1) != GunHand()) return;
         if (role == PHGame.ROLE_HIDER && (phase == PHGame.PH_BRIEF || phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT))
         {
             // the final stand (Cor): no new disguises; the selector shoots hunters instead
@@ -657,14 +657,22 @@ public class PHLocal : UdonSharpBehaviour
     // ---- the gun in a VR hider's right hand (Cor: its grip was wrong, and the laser must come out of the gun): posed
     // from the avatar's own hand bones (PHWeapons.HandPose, shared with the hunters' weapons; tracking data for an
     // avatar without them). The pick and shot rays and the laser all start at its muzzle and run along its barrel.
-    public Quaternion VrAimRot() { return AimRotation(Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation); }
+    // (the player's own hold on top, PHHand: the hand it is in, its move and turn)
+    public Quaternion VrAimRot()
+    {
+        if (weapons != null && weapons.hand != null) { weapons.Hold(Networking.LocalPlayer, -1, true); return weapons.holdRot; }
+        return AimRotation(Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).rotation);
+    }
 
     public Vector3 VrAimPos()
     {
         VRCPlayerApi me = Networking.LocalPlayer;
-        if (weapons != null && weapons.HandPose(me)) return weapons.handPos;
+        if (weapons != null) { weapons.Hold(me, -1, true); return weapons.holdPos; }
         return me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
     }
+
+    // the hand that holds the weapon or the gun (0 left, 1 right): the right, unless the player chose left-handed (PHHand)
+    public int GunHand() { return weapons != null && weapons.hand != null && weapons.hand.myLeft ? 0 : 1; }
 
     public Vector3 VrMuzzle()
     {
@@ -888,7 +896,7 @@ public class PHLocal : UdonSharpBehaviour
     // the tracking angle only for an avatar without hand bones)
     public Quaternion AimRotation(Quaternion hand)
     {
-        if (weapons != null && weapons.HandPose(Networking.LocalPlayer)) return weapons.handGun;
+        if (weapons != null && weapons.HandPose(Networking.LocalPlayer, GunHand() == 0)) return weapons.handGun;
         return hand * Quaternion.Euler(vrAimEuler);
     }
 
@@ -1401,7 +1409,7 @@ public class PHLocal : UdonSharpBehaviour
     {
         if (aimOverride) return aimOrigin;
         VRCPlayerApi me = Networking.LocalPlayer;
-        return (me.IsUserInVR() ? me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head)).position;
+        return (me.IsUserInVR() ? me.GetTrackingData(GunHand() == 0 ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head)).position;
     }
 
     // a blow knocks a real prop (04 section 4.8): light ones fly, heavy ones and trees are shoved (Cor: most things
