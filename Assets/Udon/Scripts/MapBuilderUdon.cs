@@ -1095,7 +1095,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             case 21: Stairs(); Landmark(); stage = 22; break;
             case 22: wallsFilter.sharedMesh = ToMesh(B_WALLS, "Walls"); stage = 23; break;
             case 23: Canopies(); PitchedRoofs(); stage = 24; break;
-            case 24: Dressing(); stage = 25; break;
+            case 24: Dressing(); stage = 30; break;
+            case 30: ClosedPlanting(); stage = 25; break;   // revision 30: a step of its own
             case 25: roofsFilter.sharedMesh = ToMesh(B_ROOFS, "Roofs"); stage = 26; break;
             case 26: collMesh = ToMesh(B_COLL, "ArchCollision"); stage = 27; break;
             case 27:
@@ -2649,6 +2650,38 @@ public class MapBuilderUdon : UdonSharpBehaviour
             else { pz = h + out1; px = along * (w + 40f) - 20f; }
             int kind = k % 4 == 0 ? DECOR_CRATER : (k % 4 == 1 ? DECOR_CRATER_S : (k % 4 == 2 ? DECOR_METEOR : DECOR_CRYSTAL));
             PlaceDecor(kind, new Vector3(px, kind <= DECOR_CRATER_S ? -0.05f : 0f, pz), Rand01(U32(k + 3001)) * 360f);
+        }
+    }
+
+    // Revision 30: the lawn the generator closed (gen.closedX/Z: cells inside the site that left the map) is planted
+    // solid, bushes on the ground and rocks and crystals on a space base's plain, so it reads as planted, not as a
+    // gap. The keep-in wall stands round it already (Boundary: a closed cell counts as outside the map).
+    void ClosedPlanting()
+    {
+        lv = Vector3.zero;
+        int n = gen.nClosed;
+        string[] bush = { "n_bushLarge", "n_bush", "n_bushDetailed", "n_bushLarge" };
+        for (int k = 0; k < n; k++)
+        {
+            int cx = gen.closedX[k], cz = gen.closedZ[k];
+            if (cx < 0 || cz < 0 || cx >= siteW || cz >= siteH) continue;
+            float x0 = cx * CELL, z0 = cz * CELL;
+            if (theme == GenData.THEME_SPACE)
+            {
+                for (int q = 0; q < 2; q++)
+                {
+                    float px = x0 + 0.9f + Rand01(U32(k * 11 + q * 3 + 9601)) * (CELL - 1.8f), pz = z0 + 0.9f + Rand01(U32(k * 11 + q * 3 + 9602)) * (CELL - 1.8f);
+                    PlaceDecor(q == 0 ? DECOR_METEOR : DECOR_CRYSTAL, new Vector3(px, 0f, pz), Rand01(U32(k * 11 + q * 3 + 9603)) * 360f);
+                }
+                continue;
+            }
+            // a 2 x 2 of bushes, jittered, and one in the middle: planted solid
+            for (int q = 0; q < 5; q++)
+            {
+                float fx = q == 4 ? 0.5f : (q % 2 == 0 ? 0.27f : 0.73f), fz = q == 4 ? 0.5f : (q < 2 ? 0.27f : 0.73f);
+                float jx = (Rand01(U32(k * 23 + q * 3 + 9701)) - 0.5f) * 0.5f, jz = (Rand01(U32(k * 23 + q * 3 + 9702)) - 0.5f) * 0.5f;
+                PlaceScenery(bush[(k + q) % bush.Length], new Vector3(x0 + fx * CELL + jx, 0f, z0 + fz * CELL + jz), Rand01(U32(k * 23 + q * 3 + 9703)) * 360f, 1.5f + Rand01(U32(k * 23 + q + 9704)) * 0.6f);
+            }
         }
     }
 
