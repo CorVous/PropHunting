@@ -17,7 +17,7 @@ using VRC.SDKBase;
 // PACKING (PHReplayTrack.data): a header, then one sample per 0.25 s tick:
 //   header: 'R', version 1, role, first tick (int32, server ms / 250), sample count (uint16)            9 bytes
 //   sample: a flags byte, then by the flags
-//     F_ABS   x, y, z as int16 in 2 cm steps from the map builder's origin                          + 6
+//     F_ABS   x, y, z as int16 in 2 cm steps, map-local (PHGame.MapLocalOf)                          + 6
 //     F_DELTA dx, dy, dz as int8 in the same steps (a move of up to 2.5 m a tick)                   + 3
 //             (neither: the same place as the last sample)
 //     F_YAW   the facing, a byte (256 steps)                                                        + 1
@@ -179,7 +179,7 @@ public class PHReplay : UdonSharpBehaviour
         if (count == 0) bufLen = HDR;
         VRCPlayerApi me = Networking.LocalPlayer;
         int flags = pendFlags; pendFlags = 0;
-        Vector3 at = me.GetPosition();
+        Vector3 at = game.MapLocalOf(recSlot, me.GetPosition());   // (map-local: with ANTI TROLL each team plays on its own copy)
         float yaw = me.GetRotation().eulerAngles.y;
         int def = -1;
         if (recRole == PHGame.ROLE_HIDER)
@@ -198,7 +198,7 @@ public class PHReplay : UdonSharpBehaviour
             lastWrong = s.wrongProps; lastHits = s.hits; lastCatches = s.catches;
             if (s.hunterOut) flags |= F_END;
         }
-        Vector3 rel = at - builder.transform.position;
+        Vector3 rel = at;   // (propPos is map-local already)
         int x = Mathf.Clamp(Mathf.RoundToInt(rel.x / Q), -32767, 32767);
         int y = Mathf.Clamp(Mathf.RoundToInt(rel.y / Q), -32767, 32767);
         int z = Mathf.Clamp(Mathf.RoundToInt(rel.z / Q), -32767, 32767);
@@ -308,7 +308,7 @@ public class PHReplay : UdonSharpBehaviour
     {
         float t = Pos();
         float tickF = originTick + t / TICK_S;
-        Vector3 off = builder.transform.position - mini.Origin();
+        Vector3 off = -mini.Origin();   // (the tracks are map-local, as the diorama's model)
         bool upper = mini.UpperOn();
         Vector3 eye = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
         for (int i = 0; i < tracks.Length; i++)
@@ -323,7 +323,7 @@ public class PHReplay : UdonSharpBehaviour
             float frac = k < n - 1 ? Mathf.Clamp01(u - k) : 0f;
             Vector3 rel = k < n - 1 ? Vector3.Lerp(tPos[b + k], tPos[b + k + 1], frac) : tPos[b + k];
             Vector3 at = rel + off;
-            bool shown = upper || rel.y + builder.transform.position.y - mini.Origin().y <= UPPER_Y;
+            bool shown = upper || rel.y <= UPPER_Y;
             int def = tDef[b + k];
             bool asProp = tRole[i] == PHGame.ROLE_HIDER && def >= 0 && def < builder.propPrefabs.Length && builder.propPrefabs[def] != null;
             // the hider as their prop of the moment (a fresh copy when it changes)
