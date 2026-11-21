@@ -1644,7 +1644,7 @@ public static partial class GenData
         Range(R_GARDEN,            22,   34,        2,             40,      0,  2,    0,  0);
         Range(R_PATIO,             16,   26,        8,             36,      0,  2,    0,  0);
         Range(R_FIREPIT,           14,   22,        3,             34,      0,  2,    0,  0);
-        Range(R_LANE,               6,   10,        0,             16);
+        Range(R_LANE,              12,   18,        0,             24);   // revision 29: 6 to 10, room for the verge along both sides
         Range(R_YARD,              18,   28,        6,             36);
         Range(R_FOREST_DENSE,      16,   26,        2,             44,      9,  15,   8, 16);
         Range(R_FOREST_CLEARING,   16,   24,        5,             44,      4,  7,    4,  8);
