@@ -23,6 +23,7 @@ public class PHWeapons : UdonSharpBehaviour
     public PHGame game;
     public PHLocal local;
     public PHAudio sound;
+    public PHHand hand;                // each player's own hold: hand, move, turn and size for the melee weapon and the gun (PHHand)
 
     // ---- the models (WeaponBuilder, from Resources/PropHunt/weapons.bytes)
     public string[] meleeId;           // Tools/weapon_catalog.json ids ("melee:<pack>:<model>")
@@ -39,7 +40,7 @@ public class PHWeapons : UdonSharpBehaviour
     // where its grid starts in the model's space, and 1 / its size; the PropHunt/Weapon shader draws what is left
     public Texture[] meleeWear;
     public Vector4[] meleeWearLo, meleeWearInv;
-    // each model's grip (Tools/weapon_grips.tsv, set by WeaponBuilder; the grip station tunes them live, PHGripStation):
+    // each model's grip (Tools/weapon_grips.tsv, set by WeaponBuilder; each player's own hold goes on top of it, PHHand):
     // the point of the model that sits in the middle of the closed fist (model space, metres), the model's turn about it
     // (degrees, Quaternion.Euler) and its size (1 = as made). Missing (an older scene): the model's origin, no turn, 1.
     public Vector3[] meleeGrip, meleeTurn;
@@ -424,16 +425,23 @@ public class PHWeapons : UdonSharpBehaviour
     // HandPose fills handPos / handMelee / handGun and says whether the avatar has the bones (else: tracking data).
     [System.NonSerialized] public Vector3 handPos;
     [System.NonSerialized] public Quaternion handMelee, handGun;
-    public float gripLean = 0.35f;     // how far the handle leans towards the fingers (0 = straight across the fist)
+    public float gripLean = 0.35f;
+    [System.NonSerialized] public string handWhy = "";   // why HandPose last failed (the grip station shows it; logged once for this player in VR)
+    bool handWhyLogged;     // how far the handle leans towards the fingers (0 = straight across the fist)
 
-    public bool HandPose(VRCPlayerApi p)
+    public bool HandPose(VRCPlayerApi p, bool left)
     {
         if (p == null || !Utilities.IsValid(p)) return false;
-        Vector3 h = p.GetBonePosition(HumanBodyBones.RightHand);
-        Vector3 mid = p.GetBonePosition(HumanBodyBones.RightMiddleProximal);
-        Vector3 idx = p.GetBonePosition(HumanBodyBones.RightIndexProximal);
-        Vector3 lit = p.GetBonePosition(HumanBodyBones.RightLittleProximal);
-        if (h == Vector3.zero || mid == Vector3.zero || idx == Vector3.zero || lit == Vector3.zero) return false;
+        Vector3 h = p.GetBonePosition(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
+        Vector3 mid = p.GetBonePosition(left ? HumanBodyBones.LeftMiddleProximal : HumanBodyBones.RightMiddleProximal);
+        Vector3 idx = p.GetBonePosition(left ? HumanBodyBones.LeftIndexProximal : HumanBodyBones.RightIndexProximal);
+        Vector3 lit = p.GetBonePosition(left ? HumanBodyBones.LeftLittleProximal : HumanBodyBones.RightLittleProximal);
+        if (h == Vector3.zero || mid == Vector3.zero || idx == Vector3.zero || lit == Vector3.zero)
+        {
+            handWhy = h == Vector3.zero ? "no hand bone" : "missing finger bones:" + (idx == Vector3.zero ? " index" : "") + (mid == Vector3.zero ? " middle" : "") + (lit == Vector3.zero ? " little" : "");
+            return false;
+        }
+        handWhy = "";
         Vector3 fingers = mid - h, across = idx - lit;
         if (fingers.sqrMagnitude < 1e-6f || across.sqrMagnitude < 1e-6f) return false;
         float size = fingers.magnitude;
@@ -441,13 +449,48 @@ public class PHWeapons : UdonSharpBehaviour
         across = (across - fingers * Vector3.Dot(across, fingers));
         if (across.sqrMagnitude < 1e-6f) return false;
         across.Normalize();
-        Vector3 palm = Vector3.Cross(fingers, across);   // (right hand: the palm side)
+        Vector3 palm = Vector3.Cross(fingers, across);   // (right hand: the palm side; the left hand's is the other way)
+        if (left) palm = -palm;
         handPos = h + fingers * (size * 0.9f) + palm * (size * 0.45f);   // inside the closed fist
         Vector3 grip = (across + fingers * gripLean).normalized;
         handMelee = Quaternion.LookRotation(grip, fingers);
         handGun = Quaternion.LookRotation(fingers, across);
         return true;
     }
+
+    // the hold before the player's own setting: the fist from the bones, else the controller's point and angle.
+    // Fills basePos / baseRot; true when from the bones
+    [System.NonSerialized] public Vector3 basePos;
+    [System.NonSerialized] public Quaternion baseRot = Quaternion.identity;
+    public bool BasePose(VRCPlayerApi p, bool left, bool gun)
+    {
+        if (HandPose(p, left)) { basePos = handPos; baseRot = gun ? handGun : handMelee; return true; }
+        VRCPlayerApi.TrackingData t = p.GetTrackingData(left ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand);
+        basePos = t.position;
+        baseRot = t.rotation * Quaternion.Euler(gun ? (local != null ? local.vrAimEuler : Vector3.zero) : handEuler);
+        return false;
+    }
+
+    // the weapon (gun false: the melee weapon) in player p's hand, with their own setting (PHHand): holdPos, holdRot,
+    // holdSize (times the avatar's size); true when from the bones
+    [System.NonSerialized] public Vector3 holdPos;
+    [System.NonSerialized] public Quaternion holdRot = Quaternion.identity;
+    [System.NonSerialized] public float holdSize = 1f;
+    public bool Hold(VRCPlayerApi p, int slot, bool gun)
+    {
+        if (hand == null)
+        {
+            bool b = BasePose(p, false, gun);
+            holdPos = basePos; holdRot = baseRot; holdSize = 1f;
+            return b;
+        }
+        hand.Apply(p, slot, gun);
+        holdPos = hand.holdPos; holdRot = hand.holdRot; holdSize = hand.holdSize;
+        return hand.holdBones;
+    }
+
+    public int MeleeIndex(PHSlot s) { return s != null && s.meleeChoice >= 0 && s.meleeChoice < meleeMesh.Length ? s.meleeChoice : ModelNow(); }
+    public int GunIndex(PHSlot s) { return GunOf(s); }
 
     // ------------------------------------------------------------------ grips
     public Vector3 MeleeGrip(int m) { return meleeGrip != null && m >= 0 && m < meleeGrip.Length ? meleeGrip[m] : Vector3.zero; }
@@ -468,17 +511,26 @@ public class PHWeapons : UdonSharpBehaviour
 
     // a gun model under its holder (the selector's 'gun', which sits at the hand): its grip at the holder's origin (plus
     // the kick), turned by its own turn, at its size
-    public void PutGunModel(Transform model, int g, Vector3 kickPos, Quaternion kickRot)
+    public void PutGunModel(Transform model, int g, Vector3 kickPos, Quaternion kickRot, float mul)
     {
-        float s = GunSize(g);
+        float s = GunSize(g) * mul;
         Quaternion q = kickRot * GunTurn(g);
         model.localPosition = kickPos - q * (GunGrip(g) * s);
         model.localRotation = q;
         model.localScale = Vector3.one * s;
     }
 
+    // a gun model on its own in a hand (the store's show, PHHand): its grip at 'at', turned by r and its own turn
+    public void PutGun(Transform t, int g, Vector3 at, Quaternion r, float sc)
+    {
+        float s = sc * GunSize(g);
+        Quaternion q = r * GunTurn(g);
+        t.SetPositionAndRotation(at - q * (GunGrip(g) * s), q);
+        t.localScale = Vector3.one * s;
+    }
+
     // ------------------------------------------------------------------ placing
-    float AvatarScale(VRCPlayerApi p)
+    public float AvatarScale(VRCPlayerApi p)
     {
         float eye = p.GetAvatarEyeHeightAsMeters();
         return Mathf.Clamp(eye > 0.01f ? eye / 1.6f : 1f, 0.2f, 5f);
@@ -486,18 +538,13 @@ public class PHWeapons : UdonSharpBehaviour
 
     void PlaceOther(int i, VRCPlayerApi p)
     {
-        Vector3 at; Quaternion r;
-        if (HandPose(p)) { at = handPos; r = handMelee; }
-        else
-        {
-            VRCPlayerApi.TrackingData rh = p.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);
-            at = rh.position; r = rh.rotation * Quaternion.Euler(handEuler);
-        }
+        Hold(p, i, false);
+        Vector3 at = holdPos; Quaternion r = holdRot; float size = holdSize;
         // a desktop player's slash, seen from outside: a chop about the hand
         float t = Time.time - swingAt[i];
         if (t >= 0f && t < SWING_TIME) r = r * Quaternion.Euler(Chop(t), 0f, 0f);
         // (PHGame.layers: a hunter seen from another copy of the map holds it at their stand-in, PHLocal.UpdateStandIns)
-        PutMelee(held[i], heldModel[i], game.SeenHere(i, at), r, AvatarScale(p));
+        PutMelee(held[i], heldModel[i], game.SeenHere(i, at), r, AvatarScale(p) * size);
     }
 
     // the chop seen on a remote desktop player: up, then down hard, then back (degrees about the hand's x)
@@ -513,13 +560,10 @@ public class PHWeapons : UdonSharpBehaviour
         float sc = AvatarScale(me);
         if (me.IsUserInVR())
         {
-            Vector3 vAt; Quaternion r;
-            if (HandPose(me)) { vAt = handPos; r = handMelee; }
-            else
-            {
-                VRCPlayerApi.TrackingData rh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);
-                vAt = rh.position; r = rh.rotation * Quaternion.Euler(handEuler);
-            }
+            // (Cor, VR: the weapon sat in the wrist; at the controller's point, say why the bones were not used)
+            bool bones = Hold(me, i, false);
+            if (!bones && !handWhyLogged) { handWhyLogged = true; Debug.Log("[prophunt] VR weapon held at the controller, not the hand bones: " + handWhy); }
+            Vector3 vAt = holdPos; Quaternion r = holdRot; float size = holdSize;
             // a trigger slash (DesktopSwing): the weapon chops in the hand, and strikes as it comes down
             float tv = Time.time - mySwingAt;
             if (tv >= 0f && tv < SWING_TIME)
@@ -527,8 +571,8 @@ public class PHWeapons : UdonSharpBehaviour
                 r = r * Quaternion.Euler(Chop(tv), 0f, 0f);
                 if (!mySwingStruck && tv >= SWING_HIT_AT) { mySwingStruck = true; local.MeleeDesktopStrike(); }
             }
-            PutMelee(held[i], model, vAt, r, sc);
-            VrSwing(i, model, sc * MeleeSize(model));
+            PutMelee(held[i], model, vAt, r, sc * size);
+            VrSwing(i, model, sc * size * MeleeSize(model));
             return;
         }
         VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
@@ -786,7 +830,9 @@ public class PHWeapons : UdonSharpBehaviour
         float k = t < 0.25f ? 1f - Smooth(t / 0.25f) : 0f;
         Vector3 kickPos = new Vector3(0f, 0.01f * k, -0.05f * k);
         Quaternion kickRot = Quaternion.Euler(-18f * k, 0f, 0f);
-        if (vrSelectorModel != null) PutGunModel(vrSelectorModel, gm, kickPos, kickRot);
+        float mineSize = 1f;   // (VR: the player's own size for the gun, PHHand)
+        if (vrSelectorModel != null && hand != null && me.IsUserInVR()) { hand.Apply(me, mine, true); mineSize = hand.holdSize; }
+        if (vrSelectorModel != null) PutGunModel(vrSelectorModel, gm, kickPos, kickRot, mineSize);
         if (deskSelector == null) return;
         bool show = !me.IsUserInVR() && local.ShowsSelector();
         if (deskSelector.gameObject.activeSelf != show) deskSelector.gameObject.SetActive(show);
@@ -795,6 +841,6 @@ public class PHWeapons : UdonSharpBehaviour
         float sc = AvatarScale(me);
         deskSelector.SetPositionAndRotation(head.position + head.rotation * (deskSelectorAt * sc), head.rotation * Quaternion.Euler(deskSelectorEuler));
         deskSelector.localScale = Vector3.one * sc;
-        PutGunModel(deskSelectorModel, gm, kickPos, kickRot);
+        PutGunModel(deskSelectorModel, gm, kickPos, kickRot, 1f);
     }
 }

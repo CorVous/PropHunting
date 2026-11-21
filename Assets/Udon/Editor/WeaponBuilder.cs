@@ -268,7 +268,7 @@ public static class WeaponBuilder
             if (n > 0) sum /= n;
             return new Vector3(sum.x, sum.y, zMax);
         }).ToArray();
-        // each model's grip, turn and size (Tools/weapon_grips.tsv; the grip station's saves go there, Tools/import_grips.py)
+        // each model's grip, turn and size (Tools/weapon_grips.tsv; each player's own hold goes on top, PHHand)
         var grips = LoadGrips();
         Grip Gr(Model m) { Grip g; return grips.TryGetValue(m.id, out g) ? g : new Grip { size = 1f }; }
         w.meleeGrip = melee.ConvertAll(m => Gr(m).grip).ToArray();

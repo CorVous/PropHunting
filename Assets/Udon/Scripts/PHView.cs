@@ -896,7 +896,7 @@ public class PHView : UdonSharpBehaviour
             // eyes, turned to the player
             panelPlaced = true;
             Quaternion yawOnly = Quaternion.Euler(0f, headT.rotation.eulerAngles.y, 0f);
-            Vector3 p = headT.position + yawOnly * (new Vector3(-0.38f, -0.22f, 0.55f) * sc);
+            Vector3 p = headT.position + yawOnly * (new Vector3(local.GunHand() == 0 ? 0.38f : -0.38f, -0.22f, 0.55f) * sc);   // (left-handed: to the right)
             Quaternion r = Quaternion.LookRotation(p - headT.position + Vector3.up * (0.1f * sc), Vector3.up);
             panelLocal = inv * (p - origin.position) / sc;
             panelLocalRot = inv * r;
@@ -943,7 +943,7 @@ public class PHView : UdonSharpBehaviour
         }
     }
 
-    // ---- right hand: the selector and its beam, along the very ray that picks (PHLocal.Aim)
+    // ---- the gun hand (the right, or the left for a left-handed player): the selector and its beam, along the very ray that picks (PHLocal.Aim)
     VRCPlayerApi.TrackingData PlaceGun(VRCPlayerApi me, float sc)
     {
         VRCPlayerApi.TrackingData rh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);

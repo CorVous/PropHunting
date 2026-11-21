@@ -1,7 +1,7 @@
 """A first guess at each weapon's grip and size -> Tools/weapon_grips.tsv (the lines PHWeapons holds them by)
 
 For every model in Resources/PropHunt/weapons.bytes (make_weapons.py) without a line in weapon_grips.tsv yet, a line
-is added (lines already there are kept: they may have been tuned at the grip station, PHGripStation):
+is added (lines already there are kept: they may have been tuned by hand):
   melee: the model is cut into 1 cm slices along its length (+Z); the handle is the lowest run of thin slices at least
          7 cm long in the lower part (a pommel's tip and a guard are wider or shorter). A handle up to 22 cm is held in
          its middle (a sword's grip), a longer one 7 cm from its end (an axe, a hammer); a pole a metre or longer
@@ -28,7 +28,7 @@ STEP = 0.01
 HEADER = """# Each weapon's grip in the hand (PHWeapons; WeaponBuilder reads this file at Build world scene):
 #   id <TAB> grip x y z (the point of the model in the middle of the closed fist, metres in the model's own space)
 #      <TAB> turn x y z (degrees about that point, Unity Euler) <TAB> size (1 = as make_weapons.py made it)
-# First guesses: Tools/estimate_grips.py. Tuned at the lobby's grip station: Tools/import_grips.py."""
+# First guesses: Tools/estimate_grips.py. Tuned by hand in this file."""
 
 
 def slice_pts(V, T, axis, val):

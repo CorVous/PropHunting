@@ -1,7 +1,7 @@
 # Each weapon's grip in the hand (PHWeapons; WeaponBuilder reads this file at Build world scene):
 #   id <TAB> grip x y z (the point of the model in the middle of the closed fist, metres in the model's own space)
 #      <TAB> turn x y z (degrees about that point, Unity Euler) <TAB> size (1 = as make_weapons.py made it)
-# First guesses: Tools/estimate_grips.py. Tuned at the lobby's grip station: Tools/import_grips.py.
+# First guesses: Tools/estimate_grips.py. Tuned by hand in this file; each player's own hold goes on top (PHHand).
 melee:kenney-survival-kit:tool-hammer	-0.0000 -0.0000 -0.0140	0.0 0.0 0.0	1.00
 melee:fantasy-weapons-bits:hammer_B	-0.0002 -0.0004 0.0740	0.0 0.0 0.0	1.00
 melee:kenney-survival-kit:tool-hammer-upgraded	0.0000 0.0000 0.0900	0.0 0.0 0.0	1.00
