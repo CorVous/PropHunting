@@ -243,7 +243,7 @@ public partial class MapGen
                 PhPush(); ValidateSite_Body(); stFin = PhAdvance(); PhPop();
                 if (!stFin) break;
                 stRun = false;
-                if (!hq_ValidateSite_ret) { Retry("layout tests"); break; }
+                if (!hq_ValidateSite_ret) { Retry("layout tests " + hq_ValidateSite_fail); break; }
                 stage = 12; progressPermille = 120; btPhase = 0; btCursor = 0;
                 break;
             case 12:
@@ -266,7 +266,7 @@ public partial class MapGen
                 break;
             case 5:
                 if (!ValidateStep()) break;
-                if (vFailed) { Retry("unreachable rooms"); break; }
+                if (vFailed) { Retry("unreachable rooms (type " + vBadType + ")"); break; }
                 stage = 6; progressPermille = 940;
                 break;
             case 6:

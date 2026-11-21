@@ -86,6 +86,7 @@ public partial class MapGen
     // vFailed when the seed must be re-rolled.
     int vPhase, vRepair, vRoom, vK, vFree, vOk;
     bool vFailed;
+    int vBadType;   // the type of the room that could not be made reachable (the console tools' retry reason)
 
     bool ValidateStep()
     {
@@ -112,7 +113,7 @@ public partial class MapGen
         }
         if (bad < 0 && vRoom < nRooms) return false;
         if (bad < 0) return true;
-        if (vRepair >= 10 || !RepairRoom(bad)) { vFailed = true; return true; }
+        if (vRepair >= 10 || !RepairRoom(bad)) { vFailed = true; vBadType = roomType[bad]; return true; }
         vRepair++; vPhase = 0;
         return false;
     }
@@ -1084,6 +1085,7 @@ public partial class MapGen
         if (rt == GenData.R_ZOO_PLAZA || rt == GenData.R_KEEPER || rt == GenData.R_MIDWAY || rt == GenData.R_RIDES) return GR_PAVING;
         if (rt == GenData.R_ZOO_WALK || rt == GenData.R_ENC_SAVANNA || rt == GenData.R_WOODYARD) return GR_TRACK;
         if (rt == GenData.R_PORCH) return GR_DECK;
+        if (rt == GenData.R_DRYING) return GR_PAVING;   // revision 29: the drying yard is a paved standing
         if ((t & GenData.T_EARTH) != 0) return GR_TRACK;                 // trodden earth around a fire
         if (zone == GenData.Z_FOREST) return (t & GenData.T_PATH) != 0 ? GR_TRACK : GR_FOREST;
         if ((t & GenData.T_COVERED) != 0) return GR_PAVING;

@@ -34,7 +34,7 @@ public partial class MapGen
                 int first = nEmit;
                 if (WallPlace(Dn("hk_nutcracker"), WM_NEAR, dx, dz, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
             }
-            else if (t == GenData.R_LAWN_OPEN || t == GenData.R_PARK || t == GenData.R_GARDEN || t == GenData.R_FARMYARD || t == GenData.R_CAMPSITE || t == GenData.R_PADDOCK)
+            else if (t == GenData.R_LAWN_OPEN || t == GenData.R_PARK || t == GenData.R_GARDEN || t == GenData.R_FARMYARD || t == GenData.R_CAMPSITE || t == GenData.R_PADDOCK || t == GenData.R_PICNIC || t == GenData.R_DRYING)
             {
                 string[] pool = { "hk_snowman", "hb_snowman", "hk_reindeer", "hk_candyCane" };
                 int k0 = r.Range(pool.Length);
