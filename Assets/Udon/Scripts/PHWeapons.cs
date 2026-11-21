@@ -424,7 +424,9 @@ public class PHWeapons : UdonSharpBehaviour
     // HandPose fills handPos / handMelee / handGun and says whether the avatar has the bones (else: tracking data).
     [System.NonSerialized] public Vector3 handPos;
     [System.NonSerialized] public Quaternion handMelee, handGun;
-    public float gripLean = 0.35f;     // how far the handle leans towards the fingers (0 = straight across the fist)
+    public float gripLean = 0.35f;
+    [System.NonSerialized] public string handWhy = "";   // why HandPose last failed (the grip station shows it; logged once for this player in VR)
+    bool handWhyLogged;     // how far the handle leans towards the fingers (0 = straight across the fist)
 
     public bool HandPose(VRCPlayerApi p)
     {
@@ -433,7 +435,12 @@ public class PHWeapons : UdonSharpBehaviour
         Vector3 mid = p.GetBonePosition(HumanBodyBones.RightMiddleProximal);
         Vector3 idx = p.GetBonePosition(HumanBodyBones.RightIndexProximal);
         Vector3 lit = p.GetBonePosition(HumanBodyBones.RightLittleProximal);
-        if (h == Vector3.zero || mid == Vector3.zero || idx == Vector3.zero || lit == Vector3.zero) return false;
+        if (h == Vector3.zero || mid == Vector3.zero || idx == Vector3.zero || lit == Vector3.zero)
+        {
+            handWhy = h == Vector3.zero ? "no right hand bone" : "missing finger bones:" + (idx == Vector3.zero ? " index" : "") + (mid == Vector3.zero ? " middle" : "") + (lit == Vector3.zero ? " little" : "");
+            return false;
+        }
+        handWhy = "";
         Vector3 fingers = mid - h, across = idx - lit;
         if (fingers.sqrMagnitude < 1e-6f || across.sqrMagnitude < 1e-6f) return false;
         float size = fingers.magnitude;
@@ -517,6 +524,8 @@ public class PHWeapons : UdonSharpBehaviour
             if (HandPose(me)) { vAt = handPos; r = handMelee; }
             else
             {
+                // (Cor, VR: the weapon sat in the wrist; this is the controller's point, so say why the bones were not used)
+                if (!handWhyLogged) { handWhyLogged = true; Debug.Log("[prophunt] VR weapon held at the controller, not the hand bones: " + handWhy); }
                 VRCPlayerApi.TrackingData rh = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand);
                 vAt = rh.position; r = rh.rotation * Quaternion.Euler(handEuler);
             }
