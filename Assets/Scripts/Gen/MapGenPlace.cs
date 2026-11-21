@@ -680,7 +680,7 @@ public partial class MapGen
         }
         if (popPhase == 10) { if (PlanStep(room)) popPhase = 1; return false; }
         if (popPhase == 1) { popPhase = 2; if (holiday != 0 && type != GenData.R_SCENERY) HolidayDecor(); return false; }
-        if (popPhase == 2) { if (!(mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE && type != GenData.R_SCENERY) || ThemeDecorStep()) { popPhase = 3; tdK = -1; } return false; }
+        if (popPhase == 2) { if (!(mapTheme != GenData.THEME_NONE && type != GenData.R_RELEASE && type != GenData.R_LANE && type != GenData.R_SCENERY && !SpaceKeepsOrdinary(room)) || ThemeDecorStep()) { popPhase = 3; tdK = -1; } return false; }
         if (popPhase == 3) { if (roomFloorMin[room] <= 0 || FillToMinimumStep()) { popPhase = 4; ftmK = -1; } return false; }
         if (popPhase == 4)
         {

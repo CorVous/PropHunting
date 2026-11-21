@@ -65,8 +65,18 @@ public partial class MapGen
     }
 
 
+    // a space base's campsite, vegetable garden, picnic ground, drying yard and fire pit keep the ordinary pieces
+    // (Cor: space campsites can just look like normal campsites, gardens can just have veggies)
+    bool SpaceKeepsOrdinary(int room)
+    {
+        if (mapTheme != GenData.THEME_SPACE || room < 0) return false;
+        int t = roomType[room];
+        return t == GenData.R_CAMPSITE || t == GenData.R_GARDEN || t == GenData.R_PICNIC || t == GenData.R_DRYING || t == GenData.R_FIREPIT;
+    }
+
     int TwinIn(int room, int d)
     {
+        if (d >= 0 && SpaceKeepsOrdinary(room)) return d;
         if (d >= 0 && mapTheme != GenData.THEME_NONE) { int t = GenData.defThemeTwin[d * 3 + mapTheme]; return t >= 0 ? t : d; }   // a themed map (revision 12)
         if (d < 0 || room < 0 || GenData.defTwin[d] < 0 || !KayHouse(roomInst[room])) return d;
         return GenData.defTwin[d];
