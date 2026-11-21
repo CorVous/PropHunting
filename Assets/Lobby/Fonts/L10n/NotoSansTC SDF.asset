@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: NotoSansTC SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 6024208658221464245}
+  material: {fileID: 7071349723467963784}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: 55b79a7c9dd03724298ad510763b1c80
@@ -5328,7 +5328,7 @@ MonoBehaviour:
     m_GlyphIndex: 6227
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: 4571559855785009244}
+  - {fileID: 3538758455830595564}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -7133,7 +7133,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!28 &4571559855785009244
+--- !u!28 &3538758455830595564
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -7181,7 +7181,7 @@ Texture2D:
     offset: 0
     size: 0
     path: 
---- !u!21 &6024208658221464245
+--- !u!21 &7071349723467963784
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -7205,7 +7205,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 4571559855785009244}
+        m_Texture: {fileID: 3538758455830595564}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []

@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!28 &-851387390023462314
+--- !u!28 &-1267969512028410892
 Texture2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -61,7 +61,7 @@ MonoBehaviour:
   m_Name: NotoSansKR SDF
   m_EditorClassIdentifier: 
   hashCode: 0
-  material: {fileID: 3487003808747191580}
+  material: {fileID: 7360253377430432957}
   materialHashCode: -2006316128
   m_Version: 1.1.0
   m_SourceFontFileGUID: aea74f37f9149884eaaec68bd0672199
@@ -9005,7 +9005,7 @@ MonoBehaviour:
     m_GlyphIndex: 3787
     m_Scale: 1
   m_AtlasTextures:
-  - {fileID: -851387390023462314}
+  - {fileID: -1267969512028410892}
   m_AtlasTextureIndex: 0
   m_IsMultiAtlasTexturesEnabled: 0
   m_ClearDynamicDataOnBuild: 0
@@ -12334,7 +12334,7 @@ MonoBehaviour:
   boldSpacing: 7
   italicStyle: 35
   tabSize: 10
---- !u!21 &3487003808747191580
+--- !u!21 &7360253377430432957
 Material:
   serializedVersion: 8
   m_ObjectHideFlags: 0
@@ -12358,7 +12358,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: -851387390023462314}
+        m_Texture: {fileID: -1267969512028410892}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []

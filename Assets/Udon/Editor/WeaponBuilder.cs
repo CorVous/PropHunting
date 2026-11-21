@@ -29,6 +29,29 @@ public static class WeaponBuilder
         EditorSceneManager.MarkSceneDirty(game.gameObject.scene);
     }
 
+    // Tools/weapon_grips.tsv: one line per weapon id: id, the grip point (x y z, metres in the model's own space), the
+    // turn about it (x y z degrees), the size (1 = as made); # starts a comment
+    const string GRIPS = "Tools/weapon_grips.tsv";
+    struct Grip { public Vector3 grip, turn; public float size; }
+
+    static Dictionary<string, Grip> LoadGrips()
+    {
+        var d = new Dictionary<string, Grip>();
+        string path = System.IO.Path.Combine(Application.dataPath, "..", GRIPS);
+        if (!System.IO.File.Exists(path)) { Debug.LogWarning("[prophunt] " + GRIPS + " is missing: every weapon held at its origin"); return d; }
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        foreach (var raw in System.IO.File.ReadAllLines(path))
+        {
+            string line = raw.Trim();
+            if (line.Length == 0 || line[0] == '#') continue;
+            var f = line.Split('\t');
+            if (f.Length < 4) { Debug.LogWarning("[prophunt] " + GRIPS + ": bad line " + line); continue; }
+            Vector3 V3(string t) { var c = t.Trim().Split(' '); return new Vector3(float.Parse(c[0], inv), float.Parse(c[1], inv), float.Parse(c[2], inv)); }
+            d[f[0].Trim()] = new Grip { grip = V3(f[1]), turn = V3(f[2]), size = float.Parse(f[3].Trim(), inv) };
+        }
+        return d;
+    }
+
     class Model { public string kind, name, id; public Mesh mesh; public float tip, head; public Vector3[] spots; public Color color; }
 
     static List<Model> Load()
@@ -245,6 +268,16 @@ public static class WeaponBuilder
             if (n > 0) sum /= n;
             return new Vector3(sum.x, sum.y, zMax);
         }).ToArray();
+        // each model's grip, turn and size (Tools/weapon_grips.tsv; the grip station's saves go there, Tools/import_grips.py)
+        var grips = LoadGrips();
+        Grip Gr(Model m) { Grip g; return grips.TryGetValue(m.id, out g) ? g : new Grip { size = 1f }; }
+        w.meleeGrip = melee.ConvertAll(m => Gr(m).grip).ToArray();
+        w.meleeTurn = melee.ConvertAll(m => Gr(m).turn).ToArray();
+        w.meleeSize = melee.ConvertAll(m => Gr(m).size).ToArray();
+        w.gunGrip = guns.ConvertAll(m => Gr(m).grip).ToArray();
+        w.gunTurn = guns.ConvertAll(m => Gr(m).turn).ToArray();
+        w.gunSize = guns.ConvertAll(m => Gr(m).size).ToArray();
+        Debug.Log("[prophunt] weapon grips: " + grips.Count + " from " + GRIPS);
         w.meleeTip = melee.ConvertAll(m => m.tip).ToArray();
         w.meleeHead = melee.ConvertAll(m => m.head).ToArray();
         w.meleeColor = melee.ConvertAll(m => m.color).ToArray();
