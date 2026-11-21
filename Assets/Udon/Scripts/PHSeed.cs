@@ -95,7 +95,7 @@ public class PHSeed : UdonSharpBehaviour
         size = (int)Get(10, 3);
         seed = Get(13, 32);
         flags = (int)Get(45, 7);
-        if (size > 3) return TYPO;
+        if (size > 4) return TYPO;   // 0 to 3: S to XL, 4: XS (Cor, 2026-11-20)
         if (genVersion > currentVersion) return NEWER;
         if (genVersion < currentVersion) return OLDER;
         return OK;

@@ -393,10 +393,71 @@ public static class WeaponBuilder
                 w.bullets[b2] = pellet.transform; w.bulletTrails[b2] = trail;
             }
         }
+        // ---- the halos over the dead (one per slot; an unlit gold ring on the default layer)
+        {
+            var haloMesh = HaloMesh();
+            var haloMat = Mat("Halo", "Unlit/Color");
+            haloMat.SetColor("_Color", new Color(1f, 0.86f, 0.42f, 1f));
+            EditorUtility.SetDirty(haloMat);
+            var haloRoot = new GameObject("Halos").transform;
+            haloRoot.SetParent(root.transform, false);
+            w.halo = new Transform[n];
+            for (int i = 0; i < n; i++)
+            {
+                var hg = new GameObject("Halo" + i);
+                hg.transform.SetParent(haloRoot, false);
+                hg.AddComponent<MeshFilter>().sharedMesh = haloMesh;
+                var hr = hg.AddComponent<MeshRenderer>(); hr.sharedMaterial = haloMat;
+                hr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; hr.receiveShadows = false;
+                hr.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off; hr.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+                hg.SetActive(false);
+                w.halo[i] = hg.transform;
+            }
+        }
         UdonSharpEditorUtility.CopyProxyToUdon(w);
         local.weapons = w;
         Debug.Log("[prophunt] weapons: " + melee.Count + " melee, selector " + (gun != null ? gun.name : "none"));
         return w;
+    }
+
+    // a flat torus in the xz plane (a halo: 0.26 m across the ring's middle, 0.036 m thick), kept in Weapons.asset
+    static Mesh HaloMesh()
+    {
+        Mesh me = null;
+        foreach (var o in AssetDatabase.LoadAllAssetsAtPath(MESHES)) if (o is Mesh mm && mm.name == "Halo") me = mm;
+        if (me == null)
+        {
+            me = new Mesh { name = "Halo" };
+            if (AssetDatabase.LoadAssetAtPath<Mesh>(MESHES) == null) AssetDatabase.CreateAsset(me, MESHES);
+            else AssetDatabase.AddObjectToAsset(me, MESHES);
+        }
+        const int SEG = 32, SIDES = 8;
+        const float R = 0.13f, r = 0.018f;
+        var verts = new Vector3[SEG * SIDES]; var norms = new Vector3[SEG * SIDES];
+        var tris = new int[SEG * SIDES * 6];
+        int t = 0;
+        for (int i = 0; i < SEG; i++)
+        {
+            float a = i * Mathf.PI * 2f / SEG;
+            Vector3 out1 = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            for (int j = 0; j < SIDES; j++)
+            {
+                float b = j * Mathf.PI * 2f / SIDES;
+                Vector3 nrm = out1 * Mathf.Cos(b) + Vector3.up * Mathf.Sin(b);
+                verts[i * SIDES + j] = out1 * R + nrm * r;
+                norms[i * SIDES + j] = nrm;
+                int i2 = (i + 1) % SEG, j2 = (j + 1) % SIDES;
+                int v00 = i * SIDES + j, v10 = i2 * SIDES + j, v01 = i * SIDES + j2, v11 = i2 * SIDES + j2;
+                tris[t++] = v00; tris[t++] = v01; tris[t++] = v10;
+                tris[t++] = v10; tris[t++] = v01; tris[t++] = v11;
+            }
+        }
+        me.Clear();
+        me.vertices = verts; me.normals = norms; me.triangles = tris;
+        me.RecalculateBounds();
+        EditorUtility.SetDirty(me);
+        AssetDatabase.SaveAssets();
+        return me;
     }
 
     static Transform GunModel(Transform parent, Mesh mesh, Material mat)

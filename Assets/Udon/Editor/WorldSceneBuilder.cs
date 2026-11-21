@@ -416,6 +416,42 @@ public static class WorldSceneBuilder
         prt.anchoredPosition = new Vector2(-24f, 24f); prt.sizeDelta = new Vector2(420f, 280f);   // a margin inside the screen's edge; clear of the health bar (centre, 140 each side) down to 4:3 (Cor: bigger)
         view.desktopPip = pip;
         view.desktopRoot = desk.transform;
+        // the forced taunt's clock on the desktop (PHView.UpdateTauntRing): a small round icon left of the health bar,
+        // a speaker in a dark disc, with 24 amber pieces round it that fill clockwise from the top
+        {
+            var tr = new GameObject("TauntClock");
+            tr.transform.SetParent(desk.transform, false);
+            tr.layer = 5;
+            var trt = tr.AddComponent<RectTransform>();
+            trt.anchoredPosition = new Vector2(-188f, -404f); trt.sizeDelta = new Vector2(56f, 56f);
+            var disc = new GameObject("Track");
+            disc.transform.SetParent(tr.transform, false);
+            disc.layer = 5;
+            var di = disc.AddComponent<Image>();
+            di.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+            di.color = new Color(0f, 0f, 0f, 0.55f); di.raycastTarget = false; di.material = hudMat;
+            disc.GetComponent<RectTransform>().sizeDelta = new Vector2(56f, 56f);
+            // the speaker (as on the VR screen device's chin): a box, its cone, two waves
+            Color ic = new Color(0.88f, 0.90f, 0.92f, 0.95f);
+            HudRect(tr.transform, "Box", new Vector2(-9f, 0f), new Vector2(6f, 8f), 0f, ic);
+            HudRect(tr.transform, "Cone", new Vector2(-3.5f, 0f), new Vector2(5f, 16f), 0f, ic);
+            HudRect(tr.transform, "Wave0", new Vector2(4f, 0f), new Vector2(2.5f, 9f), 0f, ic);
+            HudRect(tr.transform, "Wave1", new Vector2(9f, 0f), new Vector2(2.5f, 15f), 0f, ic);
+            const int dn = 24;
+            const float dr = 23f;
+            view.deskTauntSegs = new GameObject[dn];
+            float dseg = 2f * Mathf.PI * dr / dn * 0.8f;
+            for (int i = 0; i < dn; i++)
+            {
+                float a = (i + 0.5f) * 360f / dn;   // clockwise from the top
+                var p = new Vector2(Mathf.Sin(a * Mathf.Deg2Rad), Mathf.Cos(a * Mathf.Deg2Rad)) * dr;
+                var sg = HudRect(tr.transform, "Clock" + i, p, new Vector2(dseg, 5f), -a, new Color(1f, 0.72f, 0.2f, 1f));
+                sg.SetActive(false);
+                view.deskTauntSegs[i] = sg;
+            }
+            tr.SetActive(false);
+            view.deskTauntRing = tr;
+        }
 
         // VR: the third-person panel, grabbable
         var panel = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -481,6 +517,21 @@ public static class WorldSceneBuilder
         var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
         view.tauntButton = button; view.tauntCap = cap.transform; view.tauntCapRenderer = cap.GetComponent<MeshRenderer>();
         view.capReady = red; view.capWait = grey;
+        // the forced taunt's clock round the cap (PHView.UpdateTauntRing): 24 short amber pieces on a circle just
+        // outside the button's base (radius 0.041), in front of it, the first at the top, going clockwise as the
+        // player sees it (the button faces -z: the player's right is +x)
+        const int tauntRingN = 24;
+        const float tauntRingR = 0.0445f;
+        view.tauntRingSegs = new GameObject[tauntRingN];
+        float tSeg = 2f * Mathf.PI * tauntRingR / tauntRingN * 0.8f;
+        for (int i = 0; i < tauntRingN; i++)
+        {
+            float a = (i + 0.5f) * 360f / tauntRingN;   // degrees clockwise from the top, seen from the front (-z)
+            Vector3 at = new Vector3(Mathf.Sin(a * Mathf.Deg2Rad), Mathf.Cos(a * Mathf.Deg2Rad), 0f) * tauntRingR + new Vector3(0f, 0f, -0.008f);
+            var segGo = Part(button, PrimitiveType.Cube, "Clock" + i, at, new Vector3(0f, 0f, -a), new Vector3(tSeg, 0.005f, 0.004f), amber);
+            segGo.SetActive(false);
+            view.tauntRingSegs[i] = segGo;
+        }
         // little yellow lightning bolts that fly out of the speaker grill under the screen (the chin's four slots, Cor)
         // when the local hider taunts (PHView.ShowTauntBolts moves them, in the casing's metres)
         var boltMat = Flat("TauntBolt", new Color(1f, 0.85f, 0.2f));
@@ -712,6 +763,18 @@ public static class WorldSceneBuilder
     }
 
     static Material hudMat;
+
+    // a plain rectangle on the desktop HUD (centred at 'at', turned by 'deg' degrees)
+    static GameObject HudRect(Transform parent, string name, Vector2 at, Vector2 size, float deg, Color c)
+    {
+        var g = new GameObject(name);
+        g.transform.SetParent(parent, false);
+        g.layer = 5;
+        var img = g.AddComponent<Image>(); img.sprite = null; img.color = c; img.raycastTarget = false; img.material = hudMat;
+        var rt = g.GetComponent<RectTransform>();
+        rt.anchoredPosition = at; rt.sizeDelta = size; rt.localRotation = Quaternion.Euler(0f, 0f, deg);
+        return g;
+    }
 
     static void HealthBar(Transform parent, Sprite sprite, Vector2 at, Vector2 size, out GameObject bar, out Image fill)
     {

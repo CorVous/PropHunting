@@ -122,14 +122,14 @@ public class PHGame : UdonSharpBehaviour
     // ---- synced: the host's settings (G14, G44)
     [UdonSynced] public bool sizeAuto = true;
     [UdonSynced] public int sizeChoice = 1;
-    [UdonSynced] public int densityChoice;
+    [UdonSynced] public int densityChoice = 1;          // Sparse (Cor, playtest 2026-11-20: the default now)
     [UdonSynced] public int roundLength = 1;           // Short, Normal, Long
     [UdonSynced] public int tauntInterval = 40;
     [UdonSynced] public int wrongPenalty = 10;
 
     // ---- balance (Balance.cs)
-    readonly float[] hidePhase = { 35f, 40f, 45f, 50f };
-    readonly float[] huntPhase = { 180f, 210f, 240f, 270f };
+    readonly float[] hidePhase = { 35f, 40f, 45f, 50f, 30f };       // S, M, L, XL, XS (size 4: GenData.SIZE_XS)
+    readonly float[] huntPhase = { 180f, 210f, 240f, 270f, 150f };
     readonly float[] roundLengthFactor = { 0.75f, 1f, 1.5f };
     public const float BRIEF = 8f, ROUND_END = 30f, ENDGAME_AT = 45f, LOADING_TIMEOUT = 120f;
 
@@ -330,10 +330,10 @@ public class PHGame : UdonSharpBehaviour
     public void PanelTaunt() { SetTauntInterval(panelArg); }
     public void PanelPenalty() { SetWrongPenalty(panelArg); }
 
-    public readonly string[] sizeName = { "S", "M", "L", "XL" };
-    public readonly string[] densityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense" };
+    public readonly string[] sizeName = { "S", "M", "L", "XL", "XS" };   // (XS is 4: the codes and trail of S to XL keep their numbers)
+    public readonly string[] densityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense", "Minimal" };
     public readonly string[] roundLengthName = { "Short", "Normal", "Long" };
-    readonly string[] densityKey = { "dens.normal", "dens.sparse", "dens.dense", "dens.vsparse", "dens.vdense" };   // PHText rows
+    readonly string[] densityKey = { "dens.normal", "dens.sparse", "dens.dense", "dens.vsparse", "dens.vdense", "dens.minimal" };   // PHText rows
     readonly string[] roundLengthKey = { "len.short", "len.normal", "len.long" };
 
     public string SettingsText()
@@ -347,8 +347,8 @@ public class PHGame : UdonSharpBehaviour
     }
 
     public void SetSizeAuto(bool v) { if (!IsHost || phase != PH_LOBBY) return; sizeAuto = v; RequestSerialization(); }
-    public void SetSize(int v) { if (!IsHost || phase != PH_LOBBY) return; sizeChoice = Mathf.Clamp(v, 0, 3); sizeAuto = false; RequestSerialization(); }
-    public void SetDensity(int v) { if (!IsHost || phase != PH_LOBBY) return; densityChoice = Mathf.Clamp(v, 0, 4); RequestSerialization(); }
+    public void SetSize(int v) { if (!IsHost || phase != PH_LOBBY) return; sizeChoice = Mathf.Clamp(v, 0, 4); sizeAuto = false; RequestSerialization(); }
+    public void SetDensity(int v) { if (!IsHost || phase != PH_LOBBY) return; densityChoice = Mathf.Clamp(v, 0, 5); RequestSerialization(); }
     public void SetRoundLength(int v) { if (!IsHost || phase != PH_LOBBY) return; roundLength = Mathf.Clamp(v, 0, 2); RequestSerialization(); }
     public void SetTauntInterval(int v) { if (!IsHost || phase != PH_LOBBY) return; tauntInterval = v; RequestSerialization(); }
     public void SetWrongPenalty(int v) { if (!IsHost || phase != PH_LOBBY) return; wrongPenalty = v; RequestSerialization(); }
@@ -516,8 +516,12 @@ public class PHGame : UdonSharpBehaviour
         return n;
     }
 
-    // Auto size (G44): S up to 8 players, M up to 16, L up to 24, XL up to 32
-    public int RoundSize() { int n = Participants(); return sizeAuto ? (n <= 8 ? 0 : (n <= 16 ? 1 : (n <= 24 ? 2 : 3))) : sizeChoice; }
+    // Auto size (G44; Cor, playtest 2026-11-20: 9 players on Auto got an M map, too big): XS up to 5 players, S up to 10,
+    // M up to 18, L up to 26, XL beyond. About 10 to 15 of the site's 4 m cells per hider at the top of each band (a
+    // quarter of the players hunt: XS ~39 cells for 4 hiders, S ~92 for 7, M ~143 for 13, L ~203 for 19, XL ~257 for
+    // 24); the old bands gave 9 players an M map, 20 cells each. PHPanel shows the same pick (AutoSize).
+    public int AutoSize(int n) { return n <= 5 ? 4 : (n <= 10 ? 0 : (n <= 18 ? 1 : (n <= 26 ? 2 : 3))); }
+    public int RoundSize() { return sizeAuto ? AutoSize(Participants()) : sizeChoice; }
 
     public static int Hunters(int participants) { int h = (participants + 2) / 4; return h < 1 ? 1 : h; }
 
@@ -628,7 +632,7 @@ public class PHGame : UdonSharpBehaviour
             if (pendingCode != "" && seedTool != null)
             {
                 int st = seedTool.Decode(pendingCode, GenData.GEN_VERSION);
-                if (st == PHSeed.OK || st == PHSeed.OLDER) { s = seedTool.seed; mapSize = seedTool.size; mapDensity = seedTool.flags & 7; if (mapDensity > 4) mapDensity = 0; }
+                if (st == PHSeed.OK || st == PHSeed.OLDER) { s = seedTool.seed; mapSize = seedTool.size; mapDensity = seedTool.flags & 7; if (mapDensity > 5) mapDensity = 0; }
             }
             if (s == 0) s = debugTheme >= 0 ? ThemedSeed() : (uint)Random.Range(1, int.MaxValue);
             r = FindMap(s, mapSize, mapDensity);

@@ -87,6 +87,7 @@ public class PHLocal : UdonSharpBehaviour
                 SetPropLayer(LAYER_PROPS_SOLID);
                 SetFrozen(false);
                 if (role == PHGame.ROLE_NONE && game.lobbySpawn != null && game.round > 0) me.TeleportTo(game.lobbySpawn.position, game.lobbySpawn.rotation);
+                game.builder.ResetMood();   // the lobby's own light, not the last map's (Cor); UpdateMood keeps it right after
                 break;
             case PHGame.PH_LOADING:
                 sound.Play("confirmation_001", 0.6f);
@@ -103,19 +104,14 @@ public class PHLocal : UdonSharpBehaviour
                     // hunters wait in the lobby while the hiders hide (Cor); the hunt brings them to the release
                     SetPropLayer(LAYER_PROPS_WALKTHROUGH);
                     SetFrozen(false);
+                    game.builder.ResetMood();   // (the map was built meanwhile: its mood stays off the lobby, Cor)
                     Say(T("say.youHunt"), 6f);
                 }
                 else if (role == PHGame.ROLE_HIDER)
                 {
                     SetPropLayer(LAYER_PROPS_SOLID);
-                    Vector3 at = game.builder.ReleasePoint();
-                    if (game.gen.nSpawns > 0)
-                    {
-                        int c = game.gen.spawnCell[Random.Range(0, game.gen.nSpawns)];
-                        at = game.builder.InnerWorld(c);   // upstairs or in a basement too
-                    }
-                    float facing = Random.Range(0, 24) * 15f;
-                    me.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
+                    LandHider();
+                    game.builder.WriteMood();
                     // they land as themselves (Cor), on their own feet, and move, pick and open doors at once; the
                     // first prop they pick seats them in it (SetDisguise). The hunters wait in the lobby until the
                     // hunt, so nobody who must not sees them meanwhile.
@@ -134,6 +130,7 @@ public class PHLocal : UdonSharpBehaviour
                 if (role == PHGame.ROLE_HUNTER)
                 {
                     me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+                    game.builder.WriteMood();   // out of the lobby: the map's mood
                     SetFrozen(false);
                     Say(T("say.hunt"), 3f);
                 }
@@ -164,6 +161,80 @@ public class PHLocal : UdonSharpBehaviour
     }
 
     public void OnSlotChanged(PHSlot s) { }
+
+    // ------------------------------------------------------------------ landing on the map (Cor, playtest 2026-11-20)
+    // A hider lands on one of the map's spawn cells (MapGenUdon: cells with room round them, off the walls), facing the
+    // longest clear way from it (MapGenUdon.SpawnFacing) instead of a random way that could look into a wall.
+    void LandHider()
+    {
+        Vector3 at = game.builder.ReleasePoint();
+        float facing = Random.Range(0, 24) * 15f;
+        if (game.gen.nSpawns > 0)
+        {
+            int c = game.gen.spawnCell[Random.Range(0, game.gen.nSpawns)];
+            at = game.builder.InnerWorld(c);   // upstairs or in a basement too
+            facing = game.gen.SpawnFacing(c);
+        }
+        Networking.LocalPlayer.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
+    }
+
+    // A respawn (VRChat's menu) during a round sent a hider to the lobby, where the hunt then made them a prop (Cor,
+    // playtest 2026-11-20). Now a hider goes back onto the map: to a spawn cell, or, hiding in a prop, to the prop (its
+    // seat takes them again, PHSlot). A hunter in the hunt goes back to the release. Ghosts, the caught and anyone
+    // between rounds respawn in the lobby as before. A frame later: the respawn's own move comes first.
+    public override void OnPlayerRespawn(VRCPlayerApi player)
+    {
+        if (!Utilities.IsValid(player) || !player.isLocal) return;
+        SendCustomEventDelayedFrames(nameof(BackOntoMap), 1);
+    }
+
+    public void BackOntoMap()
+    {
+        int phase = game.phase;
+        if (phase != PHGame.PH_BRIEF && phase != PHGame.PH_HIDE && phase != PHGame.PH_HUNT) return;
+        if (!game.MapReady) return;
+        PHSlot s = Me();
+        if (s == null || s.caught || s.ghost) return;
+        int r = game.RoleOf(slotIndex);
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (r == PHGame.ROLE_HIDER)
+        {
+            if (s.hiding && body.active) me.TeleportTo(body.pos + Vector3.up * 0.1f, Quaternion.Euler(0f, body.yaw, 0f));
+            else LandHider();
+            game.Log("respawned in the round: back onto the map");
+        }
+        else if (r == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT)
+        {
+            me.TeleportTo(game.builder.ReleasePoint() + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+            game.Log("respawned in the hunt: back to the release");
+        }
+        else return;
+        game.builder.WriteMood();
+    }
+
+    // ------------------------------------------------------------------ the light where the player stands (Cor, 2026-11-20)
+    // The sun, the ambient light, the fog and the sky are global, and the lobby kept the last map's dusk, night or space
+    // sky. Now the lobby has the scene's own light (MapBuilderUdon.ResetMood) and the map its mood (WriteMood), by
+    // which of the two the local player is nearer to (the lobby is some 400 m off the map): explore, a respawn, a
+    // hunter waiting in the lobby. Twice a second, written only on a change; the phases above also set it at once.
+    float nextMood;
+
+    void UpdateMood()
+    {
+        if (Time.time < nextMood) return;
+        nextMood = Time.time + 0.5f;
+        MapBuilderUdon b = game.builder;
+        if (b == null) return;
+        b.moodByZone = true;   // (from now on BeginBuild leaves the mood to this)
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (!Utilities.IsValid(me)) return;
+        Vector3 p = me.GetPosition();
+        Vector3 lobby = game.lobbySpawn != null ? game.lobbySpawn.position : (game.lobbyZone != null ? game.lobbyZone.bounds.center : Vector3.zero);
+        Vector3 map = new Vector3(b.SiteWidth() * 0.5f, 0f, b.SiteDepth() * 0.5f);
+        bool inLobby = !b.built || (p - lobby).sqrMagnitude < (p - map).sqrMagnitude;
+        if (inLobby) { if (b.moodShown) b.ResetMood(); }
+        else if (!b.moodShown) b.WriteMood();
+    }
 
     // ------------------------------------------------------------------ calls one after the other
     // A call and the one that follows it (Cor: "the time over and you win sounds overlap"): the second starts when
@@ -768,6 +839,7 @@ public class PHLocal : UdonSharpBehaviour
         UpdateVoices();
         UpdateStrayStation();
         UpdateJoiner();
+        UpdateMood();
         UpdateHud();
         UpdateHover();
         UpdateRocks();
@@ -815,6 +887,12 @@ public class PHLocal : UdonSharpBehaviour
                 d = game.gen.emitDef[e];
                 if (game.gen.defDisguise[d] > 0) o = game.builder.objects[e];
             }
+            else
+            {
+                // another hider's prop: its disguise can be copied (TryTakeDisguise); it glows the same way
+                int h = CopyFrom(c);
+                if (h >= 0 && game.slots[h].squashRig != null) { o = game.slots[h].squashRig.gameObject; d = game.slots[h].def; }
+            }
         }
         if (o == hoverObj) return;
         if (hoverObj != null) game.builder.Hover(hoverObj, hoverDef, false);
@@ -827,6 +905,17 @@ public class PHLocal : UdonSharpBehaviour
     {
         if (game.Endgame) return game.tauntInterval * 0.5f;
         return game.Participants() < 6 ? game.tauntInterval * 0.75f : game.tauntInterval;
+    }
+
+    // how far the forced taunt's clock has run for this hider: 0 just after a taunt (their own, or a forced one, or a
+    // skip for having moved) .. 1 as the forced one comes; -1 while there is none (not a hider in the hunt). PHView
+    // draws it as the ring round the taunt button (VR) and the small ring on the desktop HUD (hop playtest, Cor)
+    public float ForcedProgress(PHSlot s)
+    {
+        if (role != PHGame.ROLE_HIDER || game.phase != PHGame.PH_HUNT || nextForced < 0f || s == null || s.caught || s.ghost) return -1f;
+        float iv = ForcedInterval();
+        if (iv <= 0.01f) return -1f;
+        return Mathf.Clamp01(1f - (nextForced - Time.time) / iv);
     }
 
     // the last five seconds before the hunters come, counted out loud for everyone in the round (Cor: an indicator for
@@ -923,6 +1012,18 @@ public class PHLocal : UdonSharpBehaviour
     int[] emitHint;          // emit index by the prop's place among propRoot's children (EmitOf)
     GameObject[] emitHintOf; // the objects array it is for (a new map, a new table)
 
+    // another hider whose disguise this hider can copy, from a collider of their prop: a hider of this round, hiding,
+    // not caught, wearing a prop that can be a disguise; -1 if not
+    int CopyFrom(Collider c)
+    {
+        if (c == null) return -1;
+        int h = HiderOf(c.transform);
+        if (h < 0 || h >= game.slots.Length || h == slotIndex || game.RoleOf(h) != PHGame.ROLE_HIDER) return -1;
+        PHSlot o = game.slots[h];
+        if (o == null || !o.hiding || o.caught || o.ghost || o.def < 0 || o.def >= game.gen.defDisguise.Length || game.gen.defDisguise[o.def] <= 0) return -1;
+        return h;
+    }
+
     // the slot whose hider prop was hit, or -1
     int HiderOf(Transform t)
     {
@@ -942,8 +1043,17 @@ public class PHLocal : UdonSharpBehaviour
         if (game.Endgame) return;   // the final stand: the disguise is kept to the end (Cor)
         if (!Aim(TAKE_RANGE)) return;
         int e = EmitOf(hit.collider.transform);
-        if (e < 0) return;
-        int d = game.gen.emitDef[e];
+        int d;
+        if (e >= 0) d = game.gen.emitDef[e];
+        else
+        {
+            // another hider's prop (Cor, hop playtest: "copy disguise"): the same pick copies their disguise; they keep
+            // theirs, and nothing is asked of them
+            int h = CopyFrom(hit.collider);
+            if (h < 0) return;
+            d = game.slots[h].def;
+            if (d == s.def) { sound.Play("error_004", 0.5f); return; }
+        }
         // a prop that cannot be taken says so, and a change that took has its own cue; both heard only by the hider (Cor)
         if (game.gen.defDisguise[d] <= 0) { sound.Play("error_004", 0.5f); Say(T("say.notDisguise"), 2f); return; }
         if (game.phase == PHGame.PH_HUNT)
@@ -965,7 +1075,7 @@ public class PHLocal : UdonSharpBehaviour
     // right hand (VR); the hunters are found along it by their bodies' place (Udon cannot tell whose collider a ray
     // met), nearer than the first wall or prop.
     public const float SHOT_RANGE = 30f, SHOT_INTERVAL = 1.6f, SHOT_BODY = 0.35f;
-    public const int SHOT_WEAR = 5;
+    public const int SHOT_WEAR = 15;   // (Cor, hop playtest: 5 was too little)
     float nextShot;   // (Cor: a relatively low rate of fire)
 
     public bool CanShoot()
@@ -1006,7 +1116,9 @@ public class PHLocal : UdonSharpBehaviour
             best = i; bestT = tAt;
         }
         Vector3 end = o + dir * bestT;
-        if (!s.armed) { s.armed = true; s.Send(); }
+        // the first shot gives the hider away: their gun floats over their prop for everyone from now on (PHWeapons;
+        // they see it too, in their third-person view), and they are told so (hop playtest)
+        if (!s.armed) { s.armed = true; s.Send(); Say(T("say.gunSeen"), 4f); }
         if (weapons != null) weapons.FireSelector();
         statShots++;
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Shot), end, best);
@@ -1124,10 +1236,59 @@ public class PHLocal : UdonSharpBehaviour
     {
         PHSlot s = Me();
         if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut) return;
-        float reach = MELEE_REACH * Mathf.Clamp(Networking.LocalPlayer.GetAvatarEyeHeightAsMeters() / 1.6f, 0.5f, 2f);
+        // (hop playtest, Cor: low props were hard to hit): the reach always gets past the player's own feet, whatever
+        // the avatar's eye height (a tall avatar's slash ended above the floor), looking down at a prop on the floor
+        // about half a metre in front of them
+        float eye = Networking.LocalPlayer.GetAvatarEyeHeightAsMeters();
+        float reach = Mathf.Max(MELEE_REACH * Mathf.Clamp(eye / 1.6f, 0.5f, 3f), eye + 0.6f);
         lastHitName = "nothing";
         if (!Reach(reach)) { s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), Aim0(), 0); return; }
-        MeleeStrike(hit.collider, hit.point, hit.point - Aim0(), false);
+        Collider c = hit.collider; Vector3 at = hit.point;
+        // the slash met the floor or a wall right by a low prop (the wide cast grazes the floor before the prop):
+        // the prop it was meant for, if one is that close and in plain sight of the contact
+        if (StrikeKind(c) == 1 && Assist(hit.point, hit.normal, 0.3f * AvatarScale())) { c = assistCol; at = assistPoint; }
+        MeleeStrike(c, at, at - Aim0(), false);
+    }
+
+    // what a strike would meet: 3 a hider's prop, 2 a map prop, 1 anything else (a wall, the floor), 0 nothing
+    public int StrikeKind(Collider c)
+    {
+        if (c == null) return 0;
+        if (HiderOf(c.transform) >= 0) return 3;
+        if (EmitOf(c.transform) >= 0) return 2;
+        return 1;
+    }
+
+    // a strike that met the floor or a wall at 'point': the nearest hider's prop (else map prop) within 'radius' of it
+    // that the contact can see (nothing solid in between, so never through a wall). Sets assistCol / assistPoint.
+    [System.NonSerialized] public Collider assistCol;
+    [System.NonSerialized] public Vector3 assistPoint;
+
+    public bool Assist(Vector3 point, Vector3 normal, float radius)
+    {
+        assistCol = null;
+        Vector3 from = point + normal * 0.05f;
+        Collider[] near = Physics.OverlapSphere(from, radius, ~(1 << 9 | 1 << 10 | 1 << 18 | 1 << 13), QueryTriggerInteraction.Ignore);
+        if (near == null) return false;
+        int bestK = 1; float bestD = 1e9f;
+        for (int i = 0; i < near.Length; i++)
+        {
+            Collider c = near[i];
+            if (c == null) continue;
+            int k = StrikeKind(c);
+            if (k < 2) continue;
+            Vector3 to = c.bounds.center;
+            float d = (to - from).sqrMagnitude;
+            if (k < bestK || (k == bestK && d >= bestD)) continue;
+            // in plain sight of the contact: the first thing on the way there is this prop itself
+            RaycastHit r;
+            Vector3 way = to - from;
+            float len = way.magnitude;
+            if (len > 1e-3f && Physics.Raycast(from, way / len, out r, len, ~(1 << 9 | 1 << 10 | 1 << 18 | 1 << 13), QueryTriggerInteraction.Ignore) && StrikeKind(r.collider) < 2) continue;
+            bestK = k; bestD = d; assistCol = c;
+            assistPoint = Vector3.Lerp(from, to, 0.5f);
+        }
+        return assistCol != null;
     }
 
     // a wide, short sphere cast from the eyes (a slash is easier to land than a dart)

@@ -163,10 +163,12 @@ public static partial class LobbyBuilder
         panel.spinner = Spinner;
 
         string[] titles = { "MAP", "PROPS", "ROUND", "TAUNT" };
-        int[][] args = { new[] { -1, 0, 1, 2, 3 }, new[] { 3, 1, 0, 2, 4 }, new[] { 0, 1, 2 }, new[] { 30, 40, 60 } };
-        string[][] caps = { new[] { "Auto · S", "S", "M", "L", "XL" }, new[] { "V. sparse", "Sparse", "Normal", "Dense", "V. dense" },
+        // MAP: Auto, then XS (size 4, Cor 2026-11-20) to XL; PROPS: Minimal (density 5, Cor 2026-11-20) to V. dense
+        int[][] args = { new[] { -1, 4, 0, 1, 2, 3 }, new[] { 5, 3, 1, 0, 2, 4 }, new[] { 0, 1, 2 }, new[] { 30, 40, 60 } };
+        string[][] caps = { new[] { "Auto · S", "XS", "S", "M", "L", "XL" }, new[] { "Minimal", "V. sparse", "Sparse", "Normal", "Dense", "V. dense" },
                             new[] { "2:15", "3:00", "4:30" }, new[] { "30 s", "40 s", "60 s" } };
-        int total = 16;
+        int total = 0;
+        for (int row = 0; row < args.Length; row++) total += args[row].Length;
         panel.tileKind = new int[total]; panel.tileArg = new int[total];
         panel.tileMarker = new GameObject[total]; panel.tileAuto = new GameObject[total]; panel.tileRect = new RectTransform[total];
         panel.roundCaption = new TextMeshProUGUI[3];
@@ -388,7 +390,7 @@ public static partial class LobbyBuilder
         h.cardFace = new GameObject[n]; h.cardEmpty = new GameObject[n]; h.cardPhoto = new RawImage[n]; h.cardBlank = new GameObject[n];
         h.cardBlankIcon = new Image[n]; h.cardSize = new TextMeshProUGUI[n]; h.cardRuns = new TextMeshProUGUI[n];
         h.cardMarker = new GameObject[n]; h.cardRect = new RectTransform[n]; h.cardBonus = new GameObject[n];
-        h.sizeIcon = new[] { Icon("home"), Icon("tavern"), Icon("church"), Icon("castle") };
+        h.sizeIcon = new[] { Icon("home"), Icon("tavern"), Icon("church"), Icon("castle"), Icon("home") };   // S, M, L, XL, XS
         History = h;
         for (int i = 0; i < TrailCards; i++)
         {
@@ -624,14 +626,20 @@ public static partial class LobbyBuilder
                 Img(ic, "M3", new Vector2(19, -9), new Vector2(34, 34), hide, Color.white);
                 return;
             }
-            string[] b = { "home", "tavern", "church", "castle" };
-            float[] s = { 0.72f, 0.86f, 1f, 1.18f };
+            string[] b = { "home", "home", "tavern", "church", "castle" };   // XS, S, M, L, XL
+            float[] s = { 0.56f, 0.72f, 0.86f, 1f, 1.18f };
             float h = 58 * s[j - 1];
             Img(ic, "Building", new Vector2(0, -28 + h / 2), new Vector2(h, h), Icon(b[j - 1]), Color.white);
         }
         else if (row == 1)
         {
-            int n = new[] { 1, 2, 3, 4, 5 }[j];
+            if (j == 0)
+            {
+                // Minimal: one small crate on the floor of the icon
+                Img(ic, "Crate0", new Vector2(0, -17), new Vector2(22, 22), Icon("crate"), Color.white);
+                return;
+            }
+            int n = new[] { 1, 1, 2, 3, 4, 5 }[j];
             var p = Pile[n - 1];
             for (int k = 0; k < n; k++)
                 Img(ic, "Crate" + k, new Vector2(-35 + p[2 * k] + 16, 28 - p[2 * k + 1] - 16), new Vector2(32, 32), Icon("crate"), Color.white);

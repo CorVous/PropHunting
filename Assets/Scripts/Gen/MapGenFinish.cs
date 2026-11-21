@@ -327,6 +327,56 @@ public partial class MapGen
     int fsPhase, fsCursor, fsNc;
     uint fsHash;
     GenRng fsRng;
+    bool fsLoose;              // the hider spawns' second pass, without SpawnRoomy
+    const int SPAWN_MIN = 8;   // spawn cells with room round them a map should have before the old test is used
+
+    // A hider spawn cell with room round it (Cor: hiders landed inside or against walls): not on its outer cell's
+    // edge rows, where the walls stand (so the cell's centre is at least 0.65 m from a wall's face), and its eight
+    // neighbours reachable and free of props. (They lie in the same outer cell, so no wall stands between.)
+    bool SpawnRoomy(int i)
+    {
+        int lx = (i % IW) & 7, lz = (i / IW) & 7;
+        if (lx == 0 || lx == 7 || lz == 0 || lz == 7) return false;
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int j = i + dz * IW + dx;
+                if (reach[j] == 0 || solid[j] != 0 || occ[j] != 0) return false;
+            }
+        return true;
+    }
+
+    // The way a hider faces on landing at inner cell i (Cor: some landed looking into a wall): along the longest clear
+    // line from the cell of the eight compass ways, up to 8 m (walls, props and the floor's end stop it). Degrees
+    // about y, 0 along +z, as Quaternion.Euler(0, yaw, 0). Called once per landing (PHLocal), not in the build.
+    static readonly int[] SpawnYaw8 = { 0, 90, 180, 270, 45, 135, 225, 315 };   // DX8, DZ8's ways
+
+    public int SpawnFacing(int i)
+    {
+        if (i < 0 || i >= IW * IH) return 0;
+        int ix0 = i % IW, iz0 = i / IW, best = 0, bestLen = -1;
+        for (int k = 0; k < 8; k++)
+        {
+            int d = (k + (i & 7)) & 7;   // (where the look starts varies, so ties do not all face one way)
+            int dx = DX8[d], dz = DZ8[d];
+            int x = ix0, z = iz0, steps = 0;
+            while (steps < 16 && RayStep(x, z, dx, dz)) { x += dx; z += dz; steps++; }
+            int len = (dx != 0 && dz != 0) ? steps * 14 : steps * 10;
+            if (len > bestLen) { bestLen = len; best = d; }
+        }
+        return SpawnYaw8[best];
+    }
+
+    // one cell along a ray from (x, z): no wall in the way (a diagonal step needs both of its corners' ways open) and
+    // no prop in the next cell
+    bool RayStep(int x, int z, int dx, int dz)
+    {
+        int dirX = dx > 0 ? 1 : 3, dirZ = dz > 0 ? 0 : 2;
+        if (dx == 0) { if (!CanStep(x, z, dirZ)) return false; }
+        else if (dz == 0) { if (!CanStep(x, z, dirX)) return false; }
+        else if (!CanStep(x, z, dirX) || !CanStep(x + dx, z, dirZ) || !CanStep(x, z, dirZ) || !CanStep(x, z + dz, dirX)) return false;
+        return solid[(z + dz) * IW + x + dx] == 0;
+    }
     const int FS_CHUNK = 1200;   // cells a step (Cor: under 60 ms a frame on a Quest too)
 
     bool FinishStep()
@@ -357,12 +407,14 @@ public partial class MapGen
             int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
             for (int i = fsCursor; i < e; i++) walk[i] = (byte)((tags[i] & GenData.T_FLOOR) == 0 ? 0 : (SolidAt(i) ? 2 : 1));
             fsCursor = e;
-            if (e >= n) { fsPhase = 5; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; }
+            if (e >= n) { fsPhase = 5; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; fsLoose = false; }
             return false;
         }
         if (fsPhase == 5)
         {
-            // hider spawn points: reachable free cells at least 6 m from the release, spread over the map
+            // hider spawn points: reachable free cells at least 6 m from the release, spread over the map. With room
+            // round them (Cor, playtest 2026-11-20: hiders landed inside and against walls): SpawnRoomy. A map with
+            // fewer than SPAWN_MIN such cells goes over the cells again with the old test only (fsLoose).
             int rx = releaseX * 8 + 4, rz = releaseZ * 8 + 4;
             int e = fsCursor + FS_CHUNK < n ? fsCursor + FS_CHUNK : n;
             for (int i = fsCursor; i < e; i++)
@@ -372,10 +424,16 @@ public partial class MapGen
                 if ((tags[i] & (GenData.T_NO_SPAWN | GenData.T_DOOR_CLEAR)) != 0) continue;
                 int dx = i % IW - rx, dz = i / IW - rz;
                 if (dx * dx + dz * dz < 12 * 12) continue;
+                if (!fsLoose && !SpawnRoomy(i)) continue;
                 cand[fsNc++] = i;
             }
             fsCursor = e;
-            if (e >= n) fsPhase = 6;
+            if (e >= n)
+            {
+                // (the same stream again: the shuffle after it draws as it always did)
+                if (!fsLoose && fsNc < SPAWN_MIN) { fsLoose = true; fsCursor = 0; fsRng = Rng(ST_SPAWN, 0, 0); fsNc = 0; }
+                else fsPhase = 6;
+            }
             return false;
         }
         if (fsPhase == 6)

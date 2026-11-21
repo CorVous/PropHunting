@@ -70,6 +70,11 @@ public class PHWeapons : UdonSharpBehaviour
     public Transform[] bullets;
     public TrailRenderer[] bulletTrails;
     public const float GUN_SCALE = 1.8f, BULLET_SPEED = 120f, BULLET_TRAIL = 1.5f;   // the trail's time is set on the TrailRenderers (WeaponBuilder)
+    // the halo (Cor, hop playtest): a glowing ring over the head of a caught hider or a hunter who is out, seen only by
+    // those who can see the dead (the other ghosts during the round; everyone in the END reveal); one per slot
+    // (WeaponBuilder), put over the avatar's head bone each frame
+    public Transform[] halo;
+    public const float HALO_UP = 0.3f;   // above the head bone, metres at avatar size 1
 
     // ---- how weapons sit and move (tunable)
     public Vector3 handEuler = new Vector3(-50f, 0f, 0f);     // VR and remote players: the weapon against the hand's tracking
@@ -78,6 +83,7 @@ public class PHWeapons : UdonSharpBehaviour
     public Vector3 deskEuler = new Vector3(-40f, -25f, 15f);
     public const float SWING_TIME = 0.42f, SWING_HIT_AT = 0.12f, SWING_SPEED = 3.0f, VR_COOLDOWN = 0.45f;
     public const float WHOOSH_SPEED = 7.0f, WHOOSH_HAND = 2.5f, WHOOSH_REARM = 1.0f;   // VR: the swing sound needs the tip AND the hand moving fast; it re-arms once the tip is nearly still
+    public const float SWING_RADIUS = 0.08f, SWING_EXTRA = 0.5f;   // VR: the sweeps' radius (was 0.06) and the reach beyond the tip (hop playtest)
     public const float REACH = 2.2f;   // desktop: how far in front of the eyes a slash strikes (metres at avatar size 1)
     public const int MASK = ~(1 << 9 | 1 << 10 | 1 << 18);    // as PHLocal.Aim: not players
 
@@ -91,7 +97,7 @@ public class PHWeapons : UdonSharpBehaviour
     bool ready;
 
     // the local VR swing
-    Vector3 prevTip, prevMid, prevGrip;
+    Vector3 prevTip, prevMid, prevExt, prevGrip;
     bool prevValid, whooshArmed = true;
     float nextVrHit;
     // the local desktop slash
@@ -131,6 +137,7 @@ public class PHWeapons : UdonSharpBehaviour
         int nb = bullets != null ? bullets.Length : 0;
         bFrom = new Vector3[nb]; bTo = new Vector3[nb]; bStart = new float[nb]; bTime = new float[nb]; bTimeLast = new float[nb]; bHit = new int[nb];
         for (int b = 0; b < nb; b++) { bullets[b].gameObject.SetActive(false); bTime[b] = -1f; }
+        if (halo != null) for (int i = 0; i < halo.Length; i++) halo[i].gameObject.SetActive(false);
     }
 
     // profiling (PHProfiler)
@@ -164,12 +171,16 @@ public class PHWeapons : UdonSharpBehaviour
         // so the slots are only looked over a few times a second (what a round left out is put away within 0.2 s)
         if (!round && (Time.frameCount % 12) != 0) { UpdateSelector(me, mine); UpdateBullets(); return; }
         int model = ModelNow();
+        // who sees the dead: a ghost of this round, and everyone in the reveal
+        PHSlot meS = mine >= 0 && mine < game.slots.Length ? game.slots[mine] : null;
+        bool seeDead = round && (phase == PHGame.PH_END || (meS != null && meS.ghost));
         for (int i = 0; i < held.Length; i++)
         {
             PHSlot s = i < game.slots.Length ? game.slots[i] : null;
             int pid = game.slotPlayer[i];
             // (Perf: an empty slot, most of the 32, once its weapon and gun are put away)
-            if (pid <= 0 && heldModel[i] == -1 && (hiderGun == null || i >= hiderGun.Length || !hiderGun[i].gameObject.activeSelf)) { heldOut[i] = false; continue; }
+            if (pid <= 0 && heldModel[i] == -1 && (hiderGun == null || i >= hiderGun.Length || !hiderGun[i].gameObject.activeSelf)
+                && (halo == null || i >= halo.Length || !halo[i].gameObject.activeSelf)) { heldOut[i] = false; continue; }
             bool show = round && s != null && pid > 0 && game.RoleOf(i) == PHGame.ROLE_HUNTER && s.round == game.round;
             VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
             if (p == null || !Utilities.IsValid(p)) show = false;
@@ -184,6 +195,7 @@ public class PHWeapons : UdonSharpBehaviour
                 if (s.hunterOut && i == watchSlot && Time.time < watchUntil) { local.statWeaponsBroken++; watchSlot = -1; }
             }
             UpdateHiderGun(i, s, i == mine);
+            UpdateHalo(i, s, pid, i == mine, seeDead);
             if (show && s.hunterOut) show = false;
             if (!show)
             {
@@ -253,13 +265,18 @@ public class PHWeapons : UdonSharpBehaviour
     float watchUntil;
     public void WatchBreak(int slot) { watchSlot = slot; watchUntil = Time.time + 2.5f; }
 
-    // a hider's gun, at their prop: above its top, turned as the prop faces, or at what it last shot for a moment
+    // a hider's gun, at their prop: above its top, turned as the prop faces, or at what it last shot for a moment.
+    // The owner sees their own too (hop playtest: hiders did not know their gun gives them away), solid, from the
+    // moment the others do, but only in their third-person view (on PHSlot.HIDER_SELF: the first-person camera leaves
+    // it out; PHView's pip draws it)
+    int[] hiderGunLayer;
     void UpdateHiderGun(int i, PHSlot s, bool mine)
     {
         if (hiderGun == null || i >= hiderGun.Length) return;
-        bool show = s != null && !mine && s.armed && !s.caught && s.def >= 0 && game.phase == PHGame.PH_HUNT
+        bool show = s != null && s.armed && !s.caught && s.def >= 0 && game.phase == PHGame.PH_HUNT
             && game.RoleOf(i) == PHGame.ROLE_HIDER && s.round == game.round;
         Transform g = hiderGun[i];
+        if (show) SetGunLayer(i, mine ? PHSlot.HIDER_SELF : 0);
         if (g.gameObject.activeSelf != show)
         {
             g.gameObject.SetActive(show);
@@ -279,6 +296,42 @@ public class PHWeapons : UdonSharpBehaviour
         // a slow bob, so it reads as floating
         g.SetPositionAndRotation(gunShown[i] + Vector3.up * (0.04f * Mathf.Sin(Time.time * 2.4f + i)), r);
         g.localScale = Vector3.one * GUN_SCALE;
+    }
+
+    // ------------------------------------------------------------------ the halo
+    // over a dead player's head (a caught hider, a hunter who is out; not a mid-round joiner), for those who see the
+    // dead; never one's own (it would hang over the view)
+    void UpdateHalo(int i, PHSlot s, int pid, bool mine, bool seeDead)
+    {
+        if (halo == null || i >= halo.Length) return;
+        Transform h = halo[i];
+        bool show = seeDead && !mine && s != null && pid > 0 && s.ghost && (s.caught || s.hunterOut) && s.round == game.round;
+        VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
+        if (show && (p == null || !Utilities.IsValid(p))) show = false;
+        if (h.gameObject.activeSelf != show) h.gameObject.SetActive(show);
+        if (!show) return;
+        float sc = AvatarScale(p);
+        Vector3 head = p.GetBonePosition(HumanBodyBones.Head);
+        if (head == Vector3.zero) head = p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
+        // a slow bob and a slight tilt, turning, so it reads as floating
+        h.SetPositionAndRotation(head + Vector3.up * (sc * (HALO_UP + 0.015f * Mathf.Sin(Time.time * 2f + i))),
+            Quaternion.Euler(0f, Time.time * 30f + i * 40f, 0f) * Quaternion.Euler(8f, 0f, 0f));
+        h.localScale = Vector3.one * sc;
+    }
+
+    // the layer a hider gun is drawn on (and its model's), set only when it changes
+    void SetGunLayer(int i, int layer)
+    {
+        if (hiderGunLayer == null || hiderGunLayer.Length != hiderGun.Length)
+        {
+            hiderGunLayer = new int[hiderGun.Length];
+            for (int k = 0; k < hiderGunLayer.Length; k++) hiderGunLayer[k] = -1;
+        }
+        if (hiderGunLayer[i] == layer) return;
+        hiderGunLayer[i] = layer;
+        Transform g = hiderGun[i];
+        g.gameObject.layer = layer;
+        for (int k = 0; k < g.childCount; k++) g.GetChild(k).gameObject.layer = layer;
     }
 
     Vector3 GunPlace(PHSlot s)
@@ -304,7 +357,7 @@ public class PHWeapons : UdonSharpBehaviour
         else
         {
             PHSlot s = game.slots[slot];
-            if (hiderGun != null && !hiderGun[slot].gameObject.activeSelf) { hiderGun[slot].gameObject.SetActive(true); gunShown[slot] = GunPlace(s); }
+            if (hiderGun != null && !hiderGun[slot].gameObject.activeSelf) { SetGunLayer(slot, 0); hiderGun[slot].gameObject.SetActive(true); gunShown[slot] = GunPlace(s); }
             Vector3 g = gunShown[slot];
             Vector3 d = end - g;
             from = g + (d.sqrMagnitude > 1e-4f ? d.normalized : Vector3.forward) * (Muzzle(s) * GUN_SCALE);
@@ -501,6 +554,14 @@ public class PHWeapons : UdonSharpBehaviour
         Transform w = held[i];
         Vector3 tip = w.position + w.rotation * (Vector3.forward * meleeTip[model] * sc);
         Vector3 mid = w.position + w.rotation * (Vector3.forward * (meleeHead[model] + meleeTip[model]) * 0.5f * sc);
+        // the reach beyond the tip, short of anything solid along the weapon (looked for from the hand, which never
+        // sits inside a wall, so a tip stuck in one does not reach out of its far side)
+        Vector3 fwd = w.rotation * Vector3.forward;
+        float tipLen = meleeTip[model] * sc, extra = SWING_EXTRA * sc;
+        RaycastHit eh;
+        if (Physics.Raycast(w.position, fwd, out eh, tipLen + extra + SWING_RADIUS * sc, MASK, QueryTriggerInteraction.Ignore))
+            extra = Mathf.Max(0f, eh.distance - tipLen - SWING_RADIUS * sc - 0.02f);
+        Vector3 ext = tip + fwd * extra;
         float dt = Mathf.Max(Time.deltaTime, 0.004f);
         if (prevValid)
         {
@@ -520,21 +581,41 @@ public class PHWeapons : UdonSharpBehaviour
             // speed would strike again, a hider hit twice)
             if (fast && Time.time >= nextVrHit && Time.time - mySwingAt >= SWING_TIME && local.CanStrike())
             {
-                RaycastHit h;
-                bool any = Physics.SphereCast(prevTip, 0.06f * sc, d.normalized, out h, d.magnitude, MASK, QueryTriggerInteraction.Ignore);
-                if (!any)
-                {
-                    Vector3 dm = mid - prevMid;
-                    if (dm.sqrMagnitude > 1e-6f) any = Physics.SphereCast(prevMid, 0.06f * sc, dm.normalized, out h, dm.magnitude, MASK, QueryTriggerInteraction.Ignore);
-                }
-                if (any)
+                // (hop playtest, Cor: low props were hard to hit by hand) three sweeps: the tip, the head's middle,
+                // and a point SWING_EXTRA beyond the tip (kept short of anything solid in front of the tip, so it
+                // never reaches through a wall); a hider's prop beats a map prop, which beats a wall or the floor
+                float rad = SWING_RADIUS * sc;
+                strikeC = null; strikeK = 0;
+                SweepFor(prevTip, tip, rad);
+                SweepFor(prevMid, mid, rad);
+                SweepFor(prevExt, ext, rad);
+                // the floor or a wall right by a low prop: the prop the swing was meant for (PHLocal.Assist)
+                if (strikeK == 1 && local.Assist(strikeP, strikeN, 0.25f * sc)) { strikeC = local.assistCol; strikeP = local.assistPoint; strikeK = 2; }
+                if (strikeC != null)
                 {
                     nextVrHit = Time.time + VR_COOLDOWN;
-                    local.MeleeStrike(h.collider, h.point, d.normalized, true);
+                    local.MeleeStrike(strikeC, strikeP, d.normalized, true);
                 }
             }
         }
-        prevTip = tip; prevMid = mid; prevGrip = w.position; prevValid = true;
+        prevTip = tip; prevMid = mid; prevExt = ext; prevGrip = w.position; prevValid = true;
+    }
+
+    // one sweep of the swing (from where a point of the weapon was last frame to where it is now): keeps the best
+    // thing met so far in strikeC / strikeP / strikeN / strikeK (PHLocal.StrikeKind: 3 hider, 2 prop, 1 other)
+    Collider strikeC;
+    Vector3 strikeP, strikeN;
+    int strikeK;
+
+    void SweepFor(Vector3 from, Vector3 to, float rad)
+    {
+        Vector3 d = to - from;
+        if (d.sqrMagnitude < 1e-6f) return;
+        RaycastHit h;
+        if (!Physics.SphereCast(from, rad, d.normalized, out h, d.magnitude, MASK, QueryTriggerInteraction.Ignore)) return;
+        int k = local.StrikeKind(h.collider);
+        if (k <= strikeK) return;
+        strikeK = k; strikeC = h.collider; strikeP = h.point; strikeN = h.normal;
     }
 
     // a swing's outcome, on every client (PHSlot.Swung): kind 0 a desktop slash that met nothing, 1 a wall or

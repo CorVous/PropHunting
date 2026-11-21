@@ -68,12 +68,15 @@ public class PHExplore : UdonSharpBehaviour
             builder.ShowRoofs(true);
             if (game.local != null && game.local.doors != null) game.local.doors.ListDoors();   // openable props
             Vector3 at = builder.ReleasePoint();
+            float facing = Random.Range(0, 24) * 15f;
             if (gen.nSpawns > 0)
             {
                 int c = gen.spawnCell[Random.Range(0, gen.nSpawns)];
                 at = builder.InnerWorld(c);   // upstairs or in a basement too
+                facing = gen.SpawnFacing(c);  // the longest clear way (Cor: not into a wall)
             }
-            Networking.LocalPlayer.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, Random.Range(0, 24) * 15f, 0f));
+            Networking.LocalPlayer.TeleportTo(at + Vector3.up * 0.1f, Quaternion.Euler(0f, facing, 0f));
+            builder.WriteMood();   // (PHLocal.UpdateMood would within half a second)
             if (sfx != null && done != null) sfx.PlayOneShot(done);
             label.text = "EXPLORE A NEW MAP";
         }

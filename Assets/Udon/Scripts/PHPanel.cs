@@ -55,8 +55,8 @@ public class PHPanel : UdonSharpBehaviour
     public AudioSource sfx;
     public AudioClip pluck, select, drop, tick, bong, error, jingle;
 
-    readonly string[] sizeCap = { "S", "M", "L", "XL" };
-    readonly float[] huntPhase = { 180f, 210f, 240f, 270f };       // PHGame's balance
+    readonly string[] sizeCap = { "S", "M", "L", "XL", "XS" };
+    readonly float[] huntPhase = { 180f, 210f, 240f, 270f, 150f };       // PHGame's balance (S, M, L, XL, XS)
     readonly float[] roundFactor = { 0.75f, 1f, 1.5f };
 
     int seenPhase = -1; float spinStart = -10f; float spinFrom;
@@ -203,12 +203,12 @@ public class PHPanel : UdonSharpBehaviour
         if (kind == 0)
         {
             if (arg < 0) { Queue(select, 0f, 1.2f); Queue(select, 0.07f, 1.45f); Queue(select, 0.15f, 1.3f); }
-            else Queue(pluck, 0f, arg == 0 ? 0.72f : arg == 1 ? 0.95f : arg == 2 ? 1.2f : 1.5f);
+            else Queue(pluck, 0f, arg == 4 ? 0.58f : arg == 0 ? 0.72f : arg == 1 ? 0.95f : arg == 2 ? 1.2f : 1.5f);
         }
         else if (kind == 1)
         {
-            int n = arg == 3 ? 1 : arg == 1 ? 2 : arg == 0 ? 3 : arg == 2 ? 4 : 5;
-            for (int k = 0; k < n; k++) Queue(drop, k * 0.11f, 1f);
+            int n = arg == 5 ? 1 : arg == 3 ? 1 : arg == 1 ? 2 : arg == 0 ? 3 : arg == 2 ? 4 : 5;
+            for (int k = 0; k < n; k++) Queue(drop, k * 0.11f, arg == 5 ? 1.25f : 1f);   // (Minimal: one small crate)
         }
         else if (kind == 2)
         {
@@ -316,7 +316,7 @@ public class PHPanel : UdonSharpBehaviour
     {
         if (game == null) return;
         int auto = game.RoundSize();
-        if (!game.sizeAuto) { int n0 = game.Participants(); auto = n0 <= 8 ? 0 : (n0 <= 16 ? 1 : (n0 <= 24 ? 2 : 3)); }
+        if (!game.sizeAuto) auto = game.AutoSize(game.Participants());
         for (int i = 0; i < tileKind.Length; i++)
         {
             int kind = tileKind[i];

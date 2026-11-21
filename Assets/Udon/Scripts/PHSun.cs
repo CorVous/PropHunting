@@ -77,7 +77,10 @@ public class PHSun : UdonSharpBehaviour
         for (int i = 0; i < fences.childCount; i++) fences.GetChild(i).gameObject.layer = casterLayer;
         for (int i = 0; i < builder.SceneryTileCount(); i++) { GameObject st = builder.SceneryTile(i); if (st != null) st.layer = casterLayer; }   // the fences, hedges and decor, merged (batching)
 
-        Vector3 dir = sun.transform.forward;
+        // the map's sun (MapBuilderUdon.ApplyMood), not the light: a hunter waiting in the lobby has the lobby's (Cor)
+        Vector3 dir = builder.moodSunRot * Vector3.forward;
+        Color sunColor = builder.moodSunColor;
+        float sunIntensity = builder.moodSunIntensity;
         Transform t = spot.transform;
         t.position = centre - dir * height;
         t.rotation = Quaternion.LookRotation(dir);
@@ -90,9 +93,9 @@ public class PHSun : UdonSharpBehaviour
         // also flattens the falloff across the map. A dim sun (night, overcast) gets a larger source: Light Volumes cuts
         // a light's range short where it falls under its brightness cutoff, and a faint moon's spot would end before the
         // ground and leave the map darker than the land past it (an arc where they meet)
-        spot.SetLightSourceSize(height * 2f * Mathf.Max(1f, Mathf.Sqrt(0.6f / Mathf.Max(0.05f, sun.intensity))));
+        spot.SetLightSourceSize(height * 2f * Mathf.Max(1f, Mathf.Sqrt(0.6f / Mathf.Max(0.05f, sunIntensity))));
         float size = spot.LightSourceSize;
-        spot.SetColorAndIntensity(sun.color, sun.intensity * (height * height + size * size) / (size * size) * intensityScale);
+        spot.SetColorAndIntensity(sunColor, sunIntensity * (height * height + size * size) / (size * size) * intensityScale);
         spot.LayerMask = 1 << casterLayer;
         spot.FarClip = height + radius * 2f;
         spot.NearClip = Mathf.Max(1f, height - radius * 2f);
