@@ -1376,6 +1376,9 @@ public class PHLocal : UdonSharpBehaviour
         KnockProp(e, dir, point);
         statPropHits++;
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(point), 2);
+        // scenery (Cor): what no person placed is no disguise, and a swing at it wears nothing
+        int ed = game.gen.emitDef[e];
+        if (ed >= 0 && ed < game.gen.defDisguise.Length && game.gen.defDisguise[ed] <= 0) return;
         // a real prop: it wears the weapon (G17), but the same prop again within 5 s costs nothing
         if (e == lastCharged && Time.time - lastChargedAt < WRONG_SAME_WINDOW) return;
         lastCharged = e; lastChargedAt = Time.time;

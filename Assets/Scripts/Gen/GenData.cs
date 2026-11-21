@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 27;   // 27: fewer mostly-outdoor plots, smaller warehouses (Cor: playtest); 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 28;   // 28: what no person placed is scenery, no disguise and no wrong-category spawn (Cor); 27: fewer mostly-outdoor plots, smaller warehouses (Cor: playtest); 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -1383,6 +1383,7 @@ public static partial class GenData
         BuildThemeDefs();   // revision 12: the map themes' pieces (GenThemes.cs)
         BuildThemes();
         ThemeTwinThemes();
+        SceneryRule();
         BuildGroups();
         BuildRanges();
         BuildTwins();
@@ -1445,6 +1446,33 @@ public static partial class GenData
     }
 
     // ---------------------------------------------------------------- room themes of the items that sit on furniture
+    // Cor (21 Nov): what no person placed is scenery: it stands on the map but is no disguise (cannot be cloned, is
+    // not on the menu, never a wrong-category spawn), and a hunter's swing at it wears nothing (PHLocal: a def that
+    // is no disguise costs nothing). Trees, bushes, flowers, rocks, stumps, loose logs, mushrooms, lilies, and
+    // the pieces a map theme puts in their place (a boulder, a crystal spire, rubble). Pots, planters, crops in
+    // rows and stacked logs were placed by someone and stay props.
+    static readonly string[] NaturalPrefix = { "n_tree", "n_bush", "n_flower", "n_rock", "n_stump", "n_mushroom", "n_lily" };
+    static readonly string[] NaturalId = { "n_log", "n_logLarge" };
+
+    public static bool IsNatural(int d)
+    {
+        for (int guard = 0; guard < 8 && d >= 0; guard++)
+        {
+            if ((defFlags[d] & FL_SCENERY) != 0) return true;
+            string id = defId[d];
+            for (int i = 0; i < NaturalPrefix.Length; i++) if (id.StartsWith(NaturalPrefix[i])) return true;
+            for (int i = 0; i < NaturalId.Length; i++) if (id == NaturalId[i]) return true;
+            d = likeBase[d] - 1;   // a theme's twin of a natural piece is natural too
+        }
+        return false;
+    }
+
+    static void SceneryRule()
+    {
+        for (int d = 0; d < nDefs; d++)
+            if (IsNatural(d)) { defDisguise[d] = 0; defLeakWeight[d] = 0; }
+    }
+
     static void BuildThemes()
     {
         ThOf("k_tv", TH_LIVING | TH_BED | TH_KIDS | TH_OFFICE | TH_TEEN | TH_PLAY); ThOf("k_tvVintage", TH_LIVING | TH_BED | TH_KIDS);
