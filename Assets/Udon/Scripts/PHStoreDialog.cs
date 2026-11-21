@@ -6,7 +6,9 @@ using VRC.SDKBase;
 
 // The little card that pops up over a weapon on the weapon wall (Cor): for a shop weapon a plain "Confirm purchase?"
 // and a buy button with the price (greyed when the player is short; no picture, the weapon is right there: Cor); for
-// a trophy weapon the trophy that unlocks it and its goal. Local to the player; it closes on its X, after a purchase, or when they walk off.
+// a trophy weapon the trophy that unlocks it and its goal. Local to the player; it closes on its X, after a purchase,
+// when a shelf turns, or when they walk off. While it is open the shelves' slot colliders are off (hop playtest: in
+// VR they caught the laser in front of the Buy button); every close turns them back on.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHStoreDialog : UdonSharpBehaviour
 {
@@ -48,12 +50,20 @@ public class PHStoreDialog : UdonSharpBehaviour
     {
         root.transform.SetPositionAndRotation(at, facing);
         root.SetActive(true);
+        Slots(false);
         if (!open) { open = true; SendCustomEventDelayedSeconds(nameof(_Watch), 0.5f); }
     }
 
     // the buttons (PHButton -> these)
     public void BuyPress() { if (cur >= 0 && store.Buy(cur)) Close(); }
-    public void Close() { root.SetActive(false); open = false; cur = -1; }
+    public void Close() { root.SetActive(false); open = false; cur = -1; Slots(true); }
+
+    void Slots(bool on)
+    {
+        if (store == null) return;
+        if (store.shelfMelee != null) store.shelfMelee.SetSlots(on);
+        if (store.shelfGun != null) store.shelfGun.SetSlots(on);
+    }
 
     // closes once the player walks away from it
     public void _Watch()

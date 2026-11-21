@@ -6,10 +6,13 @@ using VRC.SDKBase;
 // One half of the weapon wall on the lobby's east wall (Cor, 2026-11-19): a paternoster shelf with every weapon of
 // one kind on it, ten to a shelf, floor to ceiling: the shelves come up out of a black hole in the floor and go into
 // one at the ceiling (Cor), eight showing. Owned weapons are solid, the rest dithered (the
-// PropHunt/ShelfWeapon shader's _Dither) with a price tag (shop) or a star (trophy). A cart on a rail at the
-// A small floating panel (two round buttons, PHButton -> Up / Down, and the player's coins), slanted towards them,
-// follows them along this half. Clicking a weapon (PHShelfSlot) carries it, or opens the buy dialog or the trophy's note
-// (PHStore.Clicked). Everything here is the local player's own: nothing is synced.
+// PropHunt/ShelfWeapon shader's _Dither) with a price tag (shop) or a star (trophy).
+// A small panel (two round buttons, PHButton -> Up / Down, and the player's coins), slanted towards the player,
+// stands at a fixed place at this half's inner end, by the middle of the wall (Cor, hop playtest: it no longer
+// follows the player, so it never sits between them and the shelves); only its height follows the player's size.
+// Clicking a weapon (PHShelfSlot) carries it, or opens the buy dialog or the trophy's note (PHStore.Clicked); while
+// that card is open the slots' colliders are off (SetSlots), so the VR laser reaches the card's Buy button.
+// Everything here is the local player's own: nothing is synced.
 // This object's space: x along the wall (x = 0 the half's middle; column 0 at +x, the player's left), y up from
 // the floor, z out of the wall into the room.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -32,8 +35,9 @@ public class PHShelf : UdonSharpBehaviour
     public TextMeshPro[] price;
     public float baseY = 0.9f, rowH = 0.62f;
 
-    public Transform cart;
-    public float cartMin = -2.5f, cartMax = 2.5f, cartZ = 1.2f;
+    public Collider[] slotCol;       // the PHShelfSlot colliders, by slot (off while the buy card is open)
+
+    public Transform cart;           // the panel: fixed where LobbyBuilder put it (PHShelf moves only its height)
     public float panelY = 1.05f;     // the plate's height in the panel's own space
     public TextMeshPro cartCoins;
 
@@ -49,9 +53,6 @@ public class PHShelf : UdonSharpBehaviour
     int turnDir;
     MaterialPropertyBlock mpb;
     VRCPlayerApi local;
-    float leashX;                    // where the panel stays while the player moves a little (reaching to click)
-    bool aside;                      // the player has stepped up past the panel: it waits at their side
-    float asideDir = 1f;
 
     void Start()
     {
@@ -128,6 +129,7 @@ public class PHShelf : UdonSharpBehaviour
     void Turn(int dir)
     {
         if (turnT >= 0f || nRows <= 1) return;
+        if (store.dialog != null) store.dialog.Close();   // the card would hang over a shelf that moved away
         int stage = ro[ROOTS - 1];
         Bind(stage, dir > 0 ? Wrap(off - 1) : Wrap(off + SHOWN));
         rows[stage].gameObject.SetActive(true);
@@ -157,7 +159,7 @@ public class PHShelf : UdonSharpBehaviour
         Place();
     }
 
-    // ------------------------------------------------------------------ each frame: the turn, the cart
+    // ------------------------------------------------------------------ each frame: the turn, the panel's height
     void Update()
     {
         if (turnT >= 0f)
@@ -172,24 +174,23 @@ public class PHShelf : UdonSharpBehaviour
         if (cart == null || local == null || !Utilities.IsValid(local)) return;
         Vector3 lp = transform.InverseTransformPoint(local.GetPosition());
         if (lp.z < 0f || lp.z > 9f || lp.y < -1f || lp.y > 4f) return;   // not in front of this wall
+        // the panel stays where it was built (Cor: a fixed place); only its height follows the player's size (Cor):
+        // the plate (panelY up in the panel) at 60% of their eye height, between 0.8 and 1.3 m
         Vector3 cp = cart.localPosition;
-        float follow = 1f - Mathf.Exp(-5f * Time.deltaTime);
-        // it follows the player on a leash: it stays put while they shift or reach within 0.45 m of it (Cor: it moved
-        // when reaching for a button), and only trails them when they walk further
-        leashX = Mathf.Clamp(leashX, lp.x - 0.45f, lp.x + 0.45f);
-        // when the player steps right up to the shelves, past the panel's line, it slides 1 m to their side (Cor),
-        // towards the half's longer end, and comes back in front of them once they step back well clear of it
-        if (!aside && lp.z < cartZ - 0.15f) { aside = true; asideDir = lp.x + 1f <= cartMax ? 1f : -1f; }
-        else if (aside && lp.z > cartZ + 0.3f) { aside = false; leashX = lp.x; }
-        float want = Mathf.Clamp(aside ? lp.x + asideDir : leashX, cartMin, cartMax);
-        cp.x = Mathf.Lerp(cp.x, want, follow);
-        cp.z = cartZ;
-        // its height follows the player's size (Cor): the plate (panelY up in the panel) at 60% of their eye height
         float eye = local.GetAvatarEyeHeightAsMeters();
         if (eye < 0.3f || eye > 5f) eye = 1.6f;
-        float plate = eye * 0.6f;
-        cp.y = Mathf.Lerp(cp.y, plate - panelY, 1f - Mathf.Exp(-6f * Time.deltaTime));
+        float plate = Mathf.Clamp(eye * 0.6f, 0.8f, 1.3f);
+        float want = plate - panelY;
+        if (Mathf.Abs(cp.y - want) < 0.001f) return;
+        cp.y = Mathf.Lerp(cp.y, want, 1f - Mathf.Exp(-6f * Time.deltaTime));
         cart.localPosition = cp;
+    }
+
+    // the slots' colliders on or off (PHStoreDialog: off while its card is open, so they don't catch the laser)
+    public void SetSlots(bool on)
+    {
+        if (slotCol == null) return;
+        for (int i = 0; i < slotCol.Length; i++) if (slotCol[i] != null) slotCol[i].enabled = on;
     }
 
     // ------------------------------------------------------------------ a click on a weapon (PHShelfSlot)
@@ -198,7 +199,9 @@ public class PHShelf : UdonSharpBehaviour
         if (turnT >= 0f || content == null || k < 0 || k >= content.Length) return;
         int c = content[k];
         if (c < 0) return;
-        Vector3 at = items[k].parent.position + transform.up * 0.45f + transform.forward * 0.35f;
+        // the card 0.65 m out from the slot: clear of the slots' colliders (whose fronts are 0.36 m out) even with
+        // them on, and out of the alcove (hop playtest: the laser hit the slots, not the Buy button)
+        Vector3 at = items[k].parent.position + transform.up * 0.45f + transform.forward * 0.65f;
         store.Clicked(c, at, transform.rotation * Quaternion.Euler(0f, 180f, 0f));   // a canvas reads from its back (+z away)
         Refresh();
     }

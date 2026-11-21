@@ -8,8 +8,8 @@ using UnityEngine.UI;
 
 // The weapon store (Cor, 2026-11-19; mock-up https://claude.ai/artifact/3mxFCbw1ypkM12yCjgjDtT):
 //   the weapon wall   the east wall: two paternoster shelves (PHShelf), guns on the north half, melee on the south,
-//                     every weapon of the catalog, floor to ceiling out of black holes, a floating panel with
-//                     up / down and the coins following the player
+//                     every weapon of the catalog, floor to ceiling out of black holes, a panel with up / down
+//                     and the coins at each half's inner end, by the middle of the wall (fixed: Cor)
 //   the dialog        the buy card / trophy note over a clicked weapon (PHStoreDialog)
 //   the Trophies board  the west wall, left of the score pad (PHTrophyBoard)
 //   PHStore           the catalog, the trophies' texts, the player's coins and trophies
@@ -135,7 +135,9 @@ public static partial class LobbyBuilder
         for (int i = 1; i < lines.Length; i++)
         {
             var c = lines[i].Split('\t');
-            if (c.Length >= 2 && c[0].Length > 0) d[c[0]] = c[1];
+            // the English as TextBaker.Read has it (trimmed, \n, numbers glued to their word), so the texts built from
+            // it still match the table's rows (static labels, PHText.En)
+            if (c.Length >= 2 && c[0].Length > 0) d[c[0]] = TextBaker.Glue(c[1].Trim().Replace("\\n", "\n"));
         }
         return d;
     }
@@ -208,6 +210,7 @@ public static partial class LobbyBuilder
         shelf.items = new Transform[slots]; shelf.itemMf = new MeshFilter[slots]; shelf.itemMr = new MeshRenderer[slots];
         shelf.tagShop = new GameObject[slots]; shelf.tagCool = new GameObject[slots]; shelf.tagGoofy = new GameObject[slots];
         shelf.price = new TextMeshPro[slots]; shelf.glow = new GameObject[slots];
+        shelf.slotCol = new Collider[slots];
         var glowMat = GlowPadMat();
         for (int r = 0; r < roots; r++)
         {
@@ -229,6 +232,7 @@ public static partial class LobbyBuilder
                 place.localPosition = new Vector3((Cols / 2f - 0.5f - c) * SlotW, 0f, Depth / 2f);
                 var col = place.gameObject.AddComponent<BoxCollider>();
                 col.center = new Vector3(0f, 0.28f, 0f); col.size = new Vector3(SlotW - 0.04f, 0.56f, Depth - 0.08f);
+                shelf.slotCol[k] = col;   // (off while the buy card is open: PHStoreDialog)
                 var ps = place.gameObject.AddUdonSharpComponent<PHShelfSlot>();
                 ps.shelf = shelf; ps.index = k;
                 UdonSharpEditorUtility.CopyProxyToUdon(ps);
@@ -266,12 +270,16 @@ public static partial class LobbyBuilder
             }
         }
 
-        // the floating panel (Cor: round buttons, slanted towards the player, no rail), 1 m out at hip height: up /
-        // down, and the coins. Its own +z faces the player; the plate tilts its top towards them.
-        float cz = Alcove + 0.9f;
+        // the panel (Cor: round buttons, slanted towards the player, no rail) at hip height: up / down, and the coins.
+        // A fixed place (Cor, hop playtest: no longer following the player): this half's inner end, by the middle of
+        // the wall, its middle 0.6 m from the wall's middle (the two halves' panels side by side with 0.2 m between),
+        // 0.45 m out from the opening, so it stands in front of nobody's shelves but the first column's lowest row.
+        // Its own +z faces the player; the plate tilts its top towards them. PHShelf sets its height.
+        float cz = Alcove + 0.45f;
+        float cx = (kind == 0 ? 1f : -1f) * (Mathf.Abs(at.z) - 0.6f);   // (+x is north: melee's inner end is +x, the guns' -x)
         var cart = new GameObject("Panel").transform;
-        cart.SetParent(t, false); cart.localPosition = new Vector3(0f, 0f, cz);
-        shelf.cart = cart; shelf.cartMin = -halfW + 0.5f; shelf.cartMax = halfW - 0.5f; shelf.cartZ = cz;
+        cart.SetParent(t, false); cart.localPosition = new Vector3(cx, 0f, cz);
+        shelf.cart = cart;
         var tilt = new GameObject("Tilt").transform;
         tilt.SetParent(cart, false); tilt.localPosition = new Vector3(0f, 1.05f, 0f); tilt.localRotation = Quaternion.Euler(35f, 0f, 0f);
         Oval(tilt, "Rim", new Vector3(0f, -0.015f, 0f), new Vector3(1.06f, 0.04f, 0.58f), woodDark);
@@ -619,6 +627,12 @@ public static partial class LobbyBuilder
             Img(cv, "Rule", new Vector2(cx, Hh / 2f - 54), new Vector2(HalfW, 4), sDash, C("c9a46a"), 2f);
             var count = Txt(cv, h == 0 ? "HunterCount" : "HiderCount", new Vector2(cx + HalfW / 2f - 60, Hh / 2f - 32), new Vector2(120, 30), "0 / 40", future, 20, C("6b5d40"), TextAlignmentOptions.Right);
             if (h == 0) board.countHunter = count; else board.countHider = count;
+            // the rows' numbers (hop playtest: players could not name a card to each other), at the board's outer
+            // edges, beside each half's first (left half) or last (right half) column
+            int rowsN = (PHStore.HUNTER_TROPHIES + BoardCols - 1) / BoardCols;
+            float rx = (h == 0 ? -1 : 1) * (halfShift / 2f + HalfW / 2f + 32f);
+            for (int r = 0; r < rowsN; r++)
+                Txt(cv, (h == 0 ? "HunterRow" : "HiderRow") + (r + 1), new Vector2(rx, y0 - r * (CardH + Gap)), new Vector2(50, CardH), (r + 1).ToString(), future, 34, C("8a7b5a"), TextAlignmentOptions.Center);
         }
 
         int T = PHStore.TROPHIES;
@@ -654,6 +668,9 @@ public static partial class LobbyBuilder
             Img(tick.transform, "A", new Vector2(-4, -2), new Vector2(9, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, -45f);
             Img(tick.transform, "B", new Vector2(2, 1), new Vector2(15, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, 50f);
             board.tick[t] = tick.gameObject;
+            // the trophy's own number, the same for everyone (the cards sort per player: "row 2" differs between
+            // players, "#14" does not), small in the bottom right corner
+            Txt(card, "Number", new Vector2(CardW / 2 - 26, -CardH / 2 + 14), new Vector2(44, 18), "#" + (t + 1), future, 12, C("8a7b5a"), TextAlignmentOptions.Right);
             tick.gameObject.SetActive(false); bar.SetActive(false);
         }
         UdonSharpEditorUtility.CopyProxyToUdon(board);

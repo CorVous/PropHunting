@@ -6,7 +6,9 @@ using UnityEngine.UI;
 // The Trophies board on the spawn wall (Cor, 2026-11-19): hunter trophies on the left, hider trophies on the
 // right, 40 each, every card with its name, its goal written out and, for the ones that count up, a
 // bar (no rounds estimate: Cor). Each player sees their own: each half is sorted closest-to-done first, the earned ones
-// at the end. The cards are built by the scene builder; this only moves and colours them.
+// at the end (sortByProgress; off: every card at its own number's place). So that players can name a card to each
+// other (hop playtest), the builder numbers the rows at the board's edges and puts each trophy's fixed number (#1 ..
+// #44) on its card. The cards are built by the scene builder; this only moves and colours them.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHTrophyBoard : UdonSharpBehaviour
 {
@@ -23,6 +25,7 @@ public class PHTrophyBoard : UdonSharpBehaviour
     public Color plain = new Color(0.914f, 0.855f, 0.714f), cool = new Color(0.969f, 0.863f, 0.576f), goofy = new Color(0.965f, 0.753f, 0.710f);
     public Color medalOff = new Color(1f, 1f, 1f, 0.4f);
     public string progressFormat = "{0} / {1}";   // strings_store.tsv store.progress
+    public bool sortByProgress = true;            // false: fixed places, by trophy number
 
     float[] key;
     int[] rank;
@@ -61,7 +64,7 @@ public class PHTrophyBoard : UdonSharpBehaviour
             int b = h * half;
             for (int i = 0; i < half; i++) rank[i] = b + i;
             // closest to done first, earned last (2), then by number: a small insertion sort
-            for (int i = 1; i < half; i++)
+            for (int i = 1; sortByProgress && i < half; i++)
             {
                 int x = rank[i]; int j = i - 1;
                 while (j >= 0 && Before(x, rank[j])) { rank[j + 1] = rank[j]; j--; }
