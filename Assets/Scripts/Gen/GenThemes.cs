@@ -429,6 +429,12 @@ public static partial class GenData
             // the KayKit warehouse barrels are industrial drums: they stay, and the other barrels become them
             "w_barrel", "=w_barrel", "w_barrelB", "=w_barrelB", "w_barrelC", "=w_barrelC", "s_barrel", "=w_barrel", "dg_barrel", "=w_barrelB", "s_barrelOpen", "=w_barrelC", "k_bedside", "sp_bedsideB", "q_bedside", "sp_bedsideB", "q_cabinetSmallDeco", "sp_lockerWide",
             "n_mushroomRed", "sp_stone", "n_mushroomRedTall", "sp_stone", "n_mushroomTan", "sp_stone", "n_mushroomTanTall", "sp_stone", "n_mushroomGroup", "sp_stones", "n_mushroomTanGroup", "sp_stones");
+        // revision 29 (Cor: purposes outdoors): the pieces the garden purposes name, as a base has them: stools at
+        // the station tables, landers round a generator, cargo for bedrolls, solar panels in lines for the drying
+        // racks, lamps for lanterns, a rover for a canoe
+        Twins(S, "k_bench", "=sp_stool", "s_tent", "=sp_lander", "s_tentCanvas", "=sp_landerB", "s_tentHalf", "=sp_landerBase", "n_tentBig", "=sp_lander",
+            "n_tentSmallOpen", "=sp_landerB", "n_campfire", "=sp_generator", "s_campfirePit", "=sp_heater", "s_logSmall", "=sp_stool", "s_bedroll", "=sp_cargoAPacked",
+            "hk_lantern", "=sp_lamp", "ms_clothesRack", "=sp_solar", "n_canoe", "=sp_roverSmall");
         FallbackTwins(S);
     }
 
@@ -490,6 +496,8 @@ public static partial class GenData
             "ms_shelfEnd", "md_tableMedDeco", "k_boxOpen", "=s_boxOpen", "w_boxA", "=s_box", "ms_handTruck", "=f_cart", "ms_cart", "=m_wheelbarrow", "k_trashcan", "=m_bucketWood",
             "w_boxC", "=dg_trunkS", "q_cabinetSmallDeco", "=dg_trunkL", "k_tvCabinet", "md_trunkLargeC", "k_trashcan", "=m_bucketWood", "k_bathSink", "=t_bucketMetal",
             "k_designSofa", "=hk_bench", "k_benchCushion", "=hk_benchShort", "k_bench", "=hk_bench", "w_boxB", "md_box", "k_speaker", "=gk_urnRound", "k_laptop", "md_plateFood", "r_table", "md_tableLong");
+        // revision 29: a village's camp has canvas tents round a fire basket
+        Twins(M, "s_tent", "=md_tent", "s_tentHalf", "=md_tent", "n_tentBig", "=md_tent", "n_tentSmallOpen", "=s_tentCanvas", "s_campfirePit", "=gk_fireBasket");
         FallbackTwins(M);
     }
 
