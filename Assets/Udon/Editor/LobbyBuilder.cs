@@ -788,7 +788,8 @@ public static partial class LobbyBuilder
     const string CreditsTitle = "Disclosures!!!";
     // the world's source, on a banner under the title (Cor: prominent, with its licence)
     const string CreditsRepo = "github.com/CorVous/PropHunting";
-    const string CreditsSource = "SOURCE CODE:  " + CreditsRepo + "   ·   AGPL v3.0";
+    const string CreditsSource = "SOURCE CODE:  " + CreditsRepo;
+    const string CreditsLicence = "https://www.gnu.org/licenses/agpl-3.0.html";
     const string CreditsIntro = "Heya! This map is super vibe coded! I normally like to put in a lot more effort and authorship into my work, but this was (as of writing) made in a week to show to my friends because I wasn't happy with current prop hunt maps! Plus I think even if you're using AI, practice makes perfect! None of the assets were diffusion generated (what most people would call \"Generative AI\") though, and below is a list of the awesome creators of the CC0 public domain asset packs that you should check out! Either if you need free assets or are looking to find awesome assets! Below is everything that was used for this project!";
 
     class CreditRow { public string name, right, url; public int maker; public bool tall; }   // tall: the details on a line of their own
@@ -928,10 +929,25 @@ public static partial class LobbyBuilder
         Img(cv, "MeepleR", Q(CW - side - 46, 56), new Vector2(64, 64), Icon("meeple_hunt"), Color.white);
         var title = Txt(cv, "Title", Q(CW / 2, 50), new Vector2(900, 70), CreditsTitle, rocket, 54, C("f6d773"), TextAlignmentOptions.Center);
         title.characterSpacing = 6f;
-        var banner = Img(cv, "SourceBanner", Q(CW / 2, 124), new Vector2(1120, 56), sTile, RowColour[1], 2f);
-        var src = Txt(banner.transform, "Text", new Vector2(0, 3), new Vector2(1060, 40), Clean(CreditsSource, future), future, 24, C("1e190f"), TextAlignmentOptions.Center);
-        src.enableAutoSizing = true; src.fontSizeMin = 16f; src.fontSizeMax = 24f;
-        CopyLink(banner.transform, Vector2.zero, new Vector2(1120, 56), "https://" + CreditsRepo, C("1e190f"));
+        // the source banner copies the repo link: fitted to its text with even margins on both ends (Cor), centred under the title.
+        // The licence is its own sticker stuck on the banner's right end, like the map bonus badges, drawn after the banner
+        // so it and its own copy link sit on top
+        const float bannerH = 66f, bannerPad = 40f;
+        var banner = Img(cv, "SourceBanner", Q(CW / 2, 124), new Vector2(100f, bannerH), sTile, RowColour[1], 2f);
+        var src = Txt(banner.transform, "Text", new Vector2(0, 3), new Vector2(1600f, 48), Clean(CreditsSource, future), future, 28, C("1e190f"), TextAlignmentOptions.Center);
+        float srcW = Mathf.Ceil(src.GetPreferredValues(src.text).x);
+        src.rectTransform.sizeDelta = new Vector2(srcW, 48);
+        float bannerW = srcW + 2f * bannerPad;
+        banner.rectTransform.sizeDelta = new Vector2(bannerW, bannerH);
+        CopyLink(banner.transform, Vector2.zero, new Vector2(bannerW, bannerH), "https://" + CreditsRepo, C("1e190f"));
+        // the sticker's lower edge rises toward its left end (tilted clockwise), so it can sit over the right margin
+        // and the corner, lifted above the text line
+        var badge = Img(cv, "LicenceBadge", Q(CW / 2 + bannerW / 2 + 25, 86), new Vector2(200, 52), sRound, C("d8473a"), 3f);
+        badge.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -8f);   // tilted clockwise (Cor)
+        Img(badge.transform, "Face", Vector2.zero, new Vector2(192, 44), sRound, C("f2c45a"), 3f);
+        var badgeText = Txt(badge.transform, "Text", new Vector2(0, 1), new Vector2(172, 36), "AGPL v3", rocket, 24, C("d8473a"), TextAlignmentOptions.Center);
+        badgeText.enableAutoSizing = true; badgeText.fontSizeMin = 14f; badgeText.fontSizeMax = 24f;
+        CopyLink(badge.transform, Vector2.zero, new Vector2(200, 52), CreditsLicence, C("d8473a"));
         intro.rectTransform.anchoredPosition = Q(CW / 2, introTop + introH / 2);
         intro.transform.SetAsLastSibling();
 
