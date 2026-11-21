@@ -23,6 +23,14 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _CardTex:
+        m_Texture: {fileID: 2800000, guid: 4ac41847056ca2048ad71c7ad1f5fef7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _CardWear:
+        m_Texture: {fileID: 2800000, guid: 427cce44685b7ab4a9bf0f8f7af720ea, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _WearTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
