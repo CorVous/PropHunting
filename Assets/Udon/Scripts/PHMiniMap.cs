@@ -490,6 +490,12 @@ public class PHMiniMap : UdonSharpBehaviour
 
     int FenceCap() { return 300; }
 
+    // the replay on the table (PHReplay): while it plays, the paths, pins and hiding spots step aside
+    [HideInInspector] public bool replaying;
+    public void SetReplay(bool on) { replaying = on; Apply(); }
+    public Vector3 Origin() { return origin; }
+    public bool UpperOn() { return upperOn; }
+
     // the buttons: the upper floors on or off; everyone, or one player alone (each press the next one)
     public void ToggleUpper() { upperOn = !upperOn; Apply(); }
 
@@ -519,7 +525,7 @@ public class PHMiniMap : UdonSharpBehaviour
         SetBox();
         for (int i = 0; i < paths.Length; i++)
         {
-            bool mine = solo < 0 || solo == i;
+            bool mine = !replaying && (solo < 0 || solo == i);
             bool has = roleOf[i] != 0 && npts[i] > 0;
             paths[i].gameObject.SetActive(has && mine);
             for (int s = 1; s < MAXSEG; s++) { LineRenderer e = segLine[i * MAXSEG + s]; if (e != null) e.gameObject.SetActive(has && mine && s < nSeg[i]); }
@@ -531,7 +537,7 @@ public class PHMiniMap : UdonSharpBehaviour
                 if (go == null) continue;
                 // everyone: each player's longest hide; one player alone: all of their hiding spots (Cor)
                 bool spot = solo == i || (solo < 0 && longestStay[i] == i * MAXS + j);
-                bool on = spot && (upperOn || go.transform.localPosition.y <= UPPER_Y);
+                bool on = !replaying && spot && (upperOn || go.transform.localPosition.y <= UPPER_Y);
                 go.SetActive(on);
                 if (shownOutline[i * MAXS + j] != null) shownOutline[i * MAXS + j].SetActive(on);
             }

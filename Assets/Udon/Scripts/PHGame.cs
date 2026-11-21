@@ -681,6 +681,7 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public int failedAtMs;
     public GameObject failNotice;
     public PHStore store;        // the weapon wall's coins and trophies (LobbyBuilder.BuildStore): taunts count there
+    public PHReplay replay;      // the diorama's round replay (LobbyBuilder.BuildReplay): a hider's taunts are marked there
     public PHDiag diag;          // the game log on the debug sign's back, for testers to copy (LobbyBuilder.BuildGameLog)
 
     // a diagnostic line: VRChat's log ("[prophunt] ...") and the game log in the lobby

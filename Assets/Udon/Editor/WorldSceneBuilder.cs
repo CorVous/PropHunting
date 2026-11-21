@@ -311,7 +311,9 @@ public static class WorldSceneBuilder
         // the audio board over them: each player's own volume per kind of sound (PHAudio)
         LobbyBuilder.BuildAudioBoard(lobby.transform, local.sound, AudioBoardAt);
         // the LAST ROUND diorama (Cor, item 40: the last round in miniature on a table in the ready area): move it here
-        LobbyBuilder.BuildMiniMap(lobby.transform, game, builder, MiniMapAt, MiniMapYaw);
+        var miniMap = LobbyBuilder.BuildMiniMap(lobby.transform, game, builder, MiniMapAt, MiniMapYaw);
+        // its full round replay (Cor): shared playback of everyone's own recording
+        LobbyBuilder.BuildReplay(miniMap, game, builder);
 
         // the DEBUG plaque (explore a map, spawn as hunter / hider, end round, theme) and the profiler on a sign standing
         // left of the spawn, the language board's twin (Cor: no wall space for debug); the scripts the profiler watches:
