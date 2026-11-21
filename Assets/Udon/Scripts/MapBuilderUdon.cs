@@ -398,6 +398,80 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     Color moodSun = Color.white, moodFog = Color.grey;   // ApplyMood's light and haze, for the clouds
 
+    // ---- where the mood shows (Cor, playtest 2026-11-20: the lobby kept the last map's dusk, night or space sky). The
+    // sun, the ambient light, the fog and the sky are global, so ApplyMood only works the map's values out (BeginBuild)
+    // and WriteMood puts them in the scene; ResetMood puts the lobby's back (the scene's own values, as
+    // WorldSceneBuilder sets them). PHLocal.UpdateMood picks by where the local player stands, and sets moodByZone;
+    // without it (a bench, a test scene) the mood is written at once as before. PHSun bakes from the map's values
+    // (moodSunRot, moodSunColor, moodSunIntensity), not from the light, which may be the lobby's at the time.
+    [System.NonSerialized] public bool moodByZone;      // PHLocal decides when the mood shows
+    [System.NonSerialized] public bool moodShown;       // the map's mood is in the scene now (false: the lobby's)
+    [System.NonSerialized] public Quaternion moodSunRot;   // (set by ApplyMood before anything reads it)
+    [System.NonSerialized] public Color moodSunColor = new Color(1f, 0.96f, 0.88f);
+    [System.NonSerialized] public float moodSunIntensity = 1f;
+    Color mAmbSky, mAmbEq, mAmbGr, mFog, mZen, mHorizon, mSkyGround;
+    float mFogStart, mFogEnd, mSunSize;
+    bool mSky, mReady;
+
+    // the map's mood into the scene (when its values have been worked out: a map was built since the start)
+    public void WriteMood()
+    {
+        if (!mReady) return;
+        moodShown = true;
+        if (sun != null)
+        {
+            sun.transform.rotation = moodSunRot;
+            sun.color = moodSunColor;
+            sun.intensity = moodSunIntensity;
+        }
+        RenderSettings.ambientSkyColor = mAmbSky;
+        RenderSettings.ambientEquatorColor = mAmbEq;
+        RenderSettings.ambientGroundColor = mAmbGr;
+        RenderSettings.fogColor = mFog;
+        RenderSettings.fogStartDistance = mFogStart;
+        RenderSettings.fogEndDistance = mFogEnd;
+        Material skyMat = RenderSettings.skybox;
+        if (skyMat != null && mSky)
+        {
+            skyMat.SetColor("_Zenith", mZen);
+            skyMat.SetColor("_Horizon", mHorizon);
+            skyMat.SetColor("_GroundColor", mSkyGround);
+            skyMat.SetColor("_SunColor", moodSunColor * 1.2f);
+            skyMat.SetFloat("_SunSize", mSunSize);
+            skyMat.SetFloat("_Exposure", 1f);
+        }
+    }
+
+    // the lobby's light: the scene's own values (WorldSceneBuilder: the sun at 52, 38 degrees, its colour, the trilight
+    // ambient, the fog) and the sky of an ordinary afternoon map under them (ApplyMood's defaults)
+    public void ResetMood()
+    {
+        moodShown = false;
+        Color sunCol = new Color(1f, 0.96f, 0.88f), fog = new Color(0.56f, 0.76f, 0.93f);
+        if (sun != null)
+        {
+            sun.transform.rotation = Quaternion.Euler(52f, 38f, 0f);
+            sun.color = sunCol;
+            sun.intensity = 1f;
+        }
+        RenderSettings.ambientSkyColor = new Color(0.62f, 0.66f, 0.72f);
+        RenderSettings.ambientEquatorColor = new Color(0.52f, 0.53f, 0.54f);
+        RenderSettings.ambientGroundColor = new Color(0.50f, 0.48f, 0.45f);
+        RenderSettings.fogColor = fog;
+        RenderSettings.fogStartDistance = 45f;
+        RenderSettings.fogEndDistance = 160f;
+        Material skyMat = RenderSettings.skybox;
+        if (skyMat != null)
+        {
+            skyMat.SetColor("_Zenith", new Color(0.36f, 0.54f, 0.84f));
+            skyMat.SetColor("_Horizon", Color.Lerp(fog, Color.white, 0.12f));
+            skyMat.SetColor("_GroundColor", fog * 0.92f);
+            skyMat.SetColor("_SunColor", sunCol * 1.2f);
+            skyMat.SetFloat("_SunSize", 0.035f);
+            skyMat.SetFloat("_Exposure", 1f);
+        }
+    }
+
     void ApplyMood()
     {
         float elev = 52f, intensity = 1f;
@@ -454,12 +528,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             else if (moodTime == 4) { zen = new Color(0.58f, 0.60f, 0.64f); sunSize = 0f; }   // overcast: grey, no sun disc
             else if (moodTime == 5) { zen = new Color(0.02f, 0.03f, 0.08f); horizon = fog * 1.3f; sunSize = 0f; }   // night: the moon is its own object
             if (gen.mapTheme == GenData.THEME_SPACE && moodTime != 5) { zen = Color.Lerp(zen, new Color(0.26f, 0.18f, 0.34f), 0.7f); horizon = Color.Lerp(horizon, new Color(0.70f, 0.42f, 0.36f), 0.5f); }
-            skyMat.SetColor("_Zenith", zen);
-            skyMat.SetColor("_Horizon", horizon);
-            skyMat.SetColor("_GroundColor", skyGround);
-            skyMat.SetColor("_SunColor", sunCol * 1.2f);
-            skyMat.SetFloat("_SunSize", sunSize);
-            skyMat.SetFloat("_Exposure", 1f);
+            mZen = zen; mHorizon = horizon; mSkyGround = skyGround; mSunSize = sunSize; mSky = true;   // (WriteMood)
             // the shadows take the sky's colour (Cor): the ambient from above takes the hue of the sky's zenith and the
             // ambient from the sides the hue of the horizon haze; each keeps the brightness the mood set
             Color zenith = zen;
@@ -469,18 +538,11 @@ public class MapBuilderUdon : UdonSharpBehaviour
             if (moodSeason == 3) { sky = Color.Lerp(sky, HueOf(new Color(1f, 0.98f, 0.95f), sky), 0.7f); eq = Color.Lerp(eq, HueOf(new Color(1f, 0.98f, 0.95f), eq), 0.6f); }
         }
         moodSun = sunCol; moodFog = fog;
-        if (sun != null)
-        {
-            sun.transform.rotation = Quaternion.Euler(elev, azim, 0f);
-            sun.color = sunCol;
-            sun.intensity = intensity;
-        }
-        RenderSettings.ambientSkyColor = sky;
-        RenderSettings.ambientEquatorColor = eq;
-        RenderSettings.ambientGroundColor = gr;
-        RenderSettings.fogColor = fog;
-        RenderSettings.fogStartDistance = fogStart;
-        RenderSettings.fogEndDistance = fogEnd;
+        moodSunRot = Quaternion.Euler(elev, azim, 0f); moodSunColor = sunCol; moodSunIntensity = intensity;
+        mAmbSky = sky; mAmbEq = eq; mAmbGr = gr; mFog = fog; mFogStart = fogStart; mFogEnd = fogEnd;
+        mReady = true;
+        // shown at once unless PHLocal places it, or while the local player is out on the map already
+        if (!moodByZone || moodShown) WriteMood();
     }
 
     Color32 Tinted(Color32 c) { return C(c.r * palWallTint.r / 255, c.g * palWallTint.g / 255, c.b * palWallTint.b / 255); }
