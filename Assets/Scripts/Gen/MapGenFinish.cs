@@ -87,10 +87,11 @@ public partial class MapGen
     int vPhase, vRepair, vRoom, vK, vFree, vOk;
     bool vFailed;
     int vBadType;   // the type of the room that could not be made reachable (the console tools' retry reason)
+    int vScen;      // revision 30: a scenery ground room cut off, taken last: what cuts it off lies in another room
 
     bool ValidateStep()
     {
-        if (vPhase == 0) { FloodBegin(); vPhase = 1; vRoom = 0; vK = 0; vFree = 0; vOk = 0; return false; }
+        if (vPhase == 0) { FloodBegin(); vPhase = 1; vRoom = 0; vK = 0; vFree = 0; vOk = 0; vScen = -1; return false; }
         if (vPhase == 1) { if (FloodRun(FS_CHUNK)) vPhase = 2; return false; }
         int cells = 0, bad = -1;
         while (vRoom < nRooms && bad < 0 && cells < FS_CHUNK / 4)
@@ -108,10 +109,11 @@ public partial class MapGen
             }
             cells += k1 - vK; vK = k1;
             if (vK < n) break;   // the rest of the room next step
-            if (vFree - vOk > SealedAllowance(r)) bad = r;
+            if (vFree - vOk > SealedAllowance(r)) { if (roomType[r] != GenData.R_SCENERY) bad = r; else if (vScen < 0) vScen = r; }
             vRoom++; vK = 0; vFree = 0; vOk = 0;
         }
         if (bad < 0 && vRoom < nRooms) return false;
+        if (bad < 0) bad = vScen;
         if (bad < 0) return true;
         if (vRepair >= 10 || !RepairRoom(bad)) { vFailed = true; vBadType = roomType[bad]; return true; }
         vRepair++; vPhase = 0;
@@ -424,6 +426,7 @@ public partial class MapGen
                 bool keep = (fsRng.NextU() & (fsDense ? 3u : 7u)) == 0;   // thin out evenly (revision 30: half as thin on a map short of spawns)
                 if (reach[i] == 0 || occ[i] != 0 || solid[i] != 0 || !keep || fsNc >= cand.Length) continue;
                 if ((tags[i] & (GenData.T_NO_SPAWN | GenData.T_DOOR_CLEAR)) != 0) continue;
+                if (innerRoom[i] >= 0 && roomType[innerRoom[i]] == GenData.R_SCENERY) continue;   // revision 30: no hider starts on scenery ground
                 int dx = i % IW - rx, dz = i / IW - rz;
                 if (dx * dx + dz * dz < 12 * 12) continue;
                 if (!fsLoose && !SpawnRoomy(i)) continue;
@@ -1089,6 +1092,7 @@ public partial class MapGen
         if (rt == GenData.R_ZOO_WALK || rt == GenData.R_ENC_SAVANNA || rt == GenData.R_WOODYARD) return GR_TRACK;
         if (rt == GenData.R_PORCH) return GR_DECK;
         if (rt == GenData.R_DRYING) return GR_PAVING;   // revision 29: the drying yard is a paved standing
+        if (rt == GenData.R_SCENERY) return (t & GenData.T_PATH) != 0 ? GR_LAWN : GR_FOREST;   // revision 30: scenery ground reads as planted
         if ((t & GenData.T_EARTH) != 0) return GR_TRACK;                 // trodden earth around a fire
         if (zone == GenData.Z_FOREST) return (t & GenData.T_PATH) != 0 ? GR_TRACK : GR_FOREST;
         if ((t & GenData.T_COVERED) != 0) return GR_PAVING;

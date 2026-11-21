@@ -1010,6 +1010,58 @@ public partial class MapGen
         }
     }
 
+    // ---- revision 30: scenery ground (Cor: the outside areas with just trees or rocks are ok inside the fence) -------
+    // The lawn nobody needs, and the funfair's ring past its rides yard, planted with natural things only: trees,
+    // bushes, big rocks (a space base's twins: crystals and rocks), two or three an outer cell, each kept only
+    // if the area stays walkable, and now and then a few small rocks at a foot. The open edges to the next area stay
+    // clear (YardOpenings). No prop, no leak, no hider spawn, no decorations (PopulateRoomStep, LeakAttempt, spawns).
+    static readonly string[] SceneryPlants = { "n_treeFat", "n_treeOak", "n_treeDefault", "n_treePineRound", "n_bush", "n_bushLarge", "n_bushDetailed", "n_bush", "n_rockLarge", "n_rockTall" };
+    int hq_PlanScenery_n, hq_PlanScenery_placed, hq_PlanScenery_last;
+    GenRng hq_PlanScenery_r;
+
+    void PlanScenery()
+    {
+        planMax = 2;
+        int room = pRoom;
+        if (planPhase == 0)
+        {
+            YardOpenings(room);
+            GenRng r = SR(1);
+            int cells = roomCellCount[room] / 64;
+            if (cells < 1) cells = 1;
+            hq_PlanScenery_n = cells * 2 + r.Range(cells + 1);
+            hq_PlanScenery_placed = 0; hq_PlanScenery_last = -1;
+            hq_PlanScenery_r = r;
+        }
+        // one plant a step (each a walkway test)
+        if (planPhase == 1 && PhLoop(1, 100000))
+        {
+            GenRng r = hq_PlanScenery_r;
+            if (!(planIter < hq_PlanScenery_n * 4 && hq_PlanScenery_placed < hq_PlanScenery_n)) PhBreak();
+            else
+            {
+                int cell = roomCells[roomCellStart[room] + r.Range(roomCellCount[room])];
+                // a space base: no spires or boulders (a tree's twin is solid to its top, two metres and more across: in a
+                // four-metre strip it closes the way), its crystals and rocks only
+                int roll = mapTheme == GenData.THEME_SPACE ? 4 + r.Range(SceneryPlants.Length - 4) : r.Range(SceneryPlants.Length);
+                int def = Dn(SceneryPlants[roll]);
+                int e = TreeAt(def, cell % IW * GenData.INNER_MM + 250, cell / IW * GenData.INNER_MM + 250, ref r);
+                if (e >= 0) { hq_PlanScenery_placed++; hq_PlanScenery_last = e; }
+            }
+            hq_PlanScenery_r = r;
+        }
+        // a few small rocks at the foot of the last one, now and then
+        if (planPhase == 2)
+        {
+            GenRng r = hq_PlanScenery_r;
+            if (hq_PlanScenery_last >= 0 && r.Chance(450))
+            {
+                int first = nEmit;
+                if (GroupBeside(GenData.FindGrp("rocks"), hq_PlanScenery_last, r.Between(2, 3), 0, ref r)) Keep(first, false);
+            }
+        }
+    }
+
     int TreeCount(int room, ref GenRng rng)
     {
         int type = roomType[room];

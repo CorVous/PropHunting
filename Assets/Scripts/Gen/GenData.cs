@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 30;   // 30: the lawn nobody needs is closed and planted: a plot keeps its front, patio, purposes, yards, the cells at its doors and gates and one passage to the back (Cor: fewer outdoor areas, each with a purpose); 29: house gardens get a purpose (picnic ground, vegetable garden, drying yard, fire pit, pond, campsite), sets in countable patterns, a verge along the lane, a camp in a smaller wood (Cor: outdoors is just rocks); 28: what no person placed is scenery, no disguise and no wrong-category spawn (Cor); 27: fewer mostly-outdoor plots, smaller warehouses (Cor: playtest); 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 30;   // 30: the lawn nobody needs is scenery ground (trees, bushes, rocks; walkable, no props): a plot keeps its front, patio, purposes, yards, the cells at its doors and gates and one passage to the back; a funfair keeps its midway and one rides yard (Cor: fewer outdoor areas, each with a purpose; the ones with just trees or rocks are ok inside the fence); 29: house gardens get a purpose (picnic ground, vegetable garden, drying yard, fire pit, pond, campsite), sets in countable patterns, a verge along the lane, a camp in a smaller wood (Cor: outdoors is just rocks); 28: what no person placed is scenery, no disguise and no wrong-category spawn (Cor); 27: fewer mostly-outdoor plots, smaller warehouses (Cor: playtest); 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -150,6 +150,10 @@ public static partial class GenData
     // revision 29 (Cor: outdoors is just rocks): a house garden's purposes besides the existing garden, fire pit, pond
     // and campsite: the picnic ground (tables with their benches) and the drying yard (racks in lines)
     public const int R_PICNIC = 68, R_DRYING = 69;
+    // revision 30 (Cor: the outside areas with just trees or rocks are ok inside the fence): the lawn nobody needs, and
+    // the funfair's ring past its rides yard, is scenery ground: walkable, planted with trees, bushes and rocks only
+    // (no prop, no leak, no hider spawn)
+    public const int R_SCENERY = 70;
     public static bool IsEnclosure(int r) { return (r >= R_ENC_FARM && r <= R_AVIARY && r != R_RELEASE); }
     public const int R_DINER_DINING = 30, R_DINER_KITCHEN = 31, R_DINER_STORE = 32;
     public const int R_FOREST_DENSE = 40, R_FOREST_CLEARING = 41;
@@ -180,6 +184,7 @@ public static partial class GenData
             case R_FOREST_DENSE: return "Dense forest";
             case R_FOREST_CLEARING: return "Forest camp";
             case R_PICNIC: return "Picnic ground";
+            case R_SCENERY: return "Scenery ground";
             case R_DRYING: return "Drying yard";
             case R_LANE: return "Lane";
             case R_YARD: return "Yard";
@@ -1655,6 +1660,9 @@ public static partial class GenData
         Range(R_PICNIC,            14,   30,        8,             40,      0,  1,    0,  0);
         Range(R_DRYING,            10,   24,        2,             40,      0,  1,    0,  0);
         rangeFloorAbs[R_PICNIC] = 5; rangeFloorAbs[R_DRYING] = 4;
+        // revision 30: scenery ground has no floor minimum (its plan plants it; nothing fills it up)
+        Range(R_SCENERY,            0,    0,        0,             30);
+        rangeFloorAbs[R_SCENERY] = 0;
         // revision 9
         Range(R_SHOP_FLOOR,        42,   58,       18,             58);   // revision 10: 34 to 48
         Range(R_STOCKROOM,         44,   60,       36,             55);   // revision 10: 38 to 54
@@ -1839,6 +1847,7 @@ public static partial class GenData
         Native(Z_LAWN, R_GARDEN, "n_treeFat", "@flowersRed", "@flowersYellow", "@flowersPurple", "n_bush", "n_bushLarge", "n_bushDetailed", "@rocks", "@pots", "n_sign", "@buckets", "@tools",
             "@watering", "gen_tap", "gen_shed", "m_wheelbarrow", "@sacks", "@vegCarrot", "@vegPumpkin", "@vegMelon", "k_bench", "n_pathStone");
         Native(Z_LAWN, R_PICNIC, "k_table", "k_bench", "k_trashcan", "gen_tap", "n_treeFat", "n_bush", "n_bushLarge", "@rocks", "@flowersYellow", "n_pathStone", "s_barrel", "r_tableRound");
+        Native(Z_LAWN, R_SCENERY, "n_treeFat", "n_treeOak", "n_treeDefault", "n_treePineRound", "n_bush", "n_bushDetailed", "n_bushLarge", "n_rockLarge", "n_rockTall", "@rocks");
         Native(Z_LAWN, R_DRYING, "ms_clothesRack", "gen_laundryBasket", "k_bench", "k_trashcan", "@buckets", "n_bush", "@rocks", "@flowersRed", "n_pathStone", "gen_tap");
         Native(Z_LAWN, R_PATIO, "n_treeFat", "k_table", "r_tableRound", "@pots", "k_loungeChair", "k_bench", "k_benchCushion", "n_bushLarge", "n_bush", "s_barrel", "n_pathStone", "@flowersYellow");
         Native(Z_LAWN, R_FIREPIT, "n_treeFat", "n_campfire", "s_campfirePit", "n_logStack", "n_logStackLarge", "@logpile", "n_bush", "n_bushLarge", "@rocks", "n_stump", "n_stumpRound", "n_log",

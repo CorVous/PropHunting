@@ -1395,9 +1395,12 @@ public partial class MapGen
     // space): every building stood in a ring of lawn four metres wide. A plot keeps its front garden, its patio, its
     // purposes and yards, the cell outside each door and gate, and the shortest lawn path from each of those to the
     // front garden (its one side passage); a path avoids the fence of a neighbour whose own passage runs along it, so
-    // two plots keep one passage between them. The rest of the open lawn is closed: it leaves the map (a fence against
-    // the garden, the house wall against the building, as at the map's edge) and the builder plants it solid. Nothing
-    // is drawn from the layout's stream, so a seed keeps its buildings, wood and gates.
+    // two plots keep one passage between them. The rest of the open lawn is scenery ground (Cor: the outside areas with
+    // just trees or rocks are ok inside the fence): it stays on the map, walkable, and its plan plants trees, bushes and
+    // rocks only (PlanScenery). With SCENERY_GROUND off it is closed instead: it leaves the map (a fence against the
+    // garden, the house wall against the building, as at the map's edge) and the builder plants it solid. Nothing is
+    // drawn from the layout's stream, so a seed keeps its buildings, wood and gates.
+    public const bool SCENERY_GROUND = true;
     public int nClosed;
     public int[] closedX = new int[256], closedZ = new int[256];   // closed cells, world cells of the site
     int nClosedCv;
@@ -1408,6 +1411,7 @@ public partial class MapGen
     {
         int zone = plotZone[k], yi = plotInstY[k];
         if (plotInstB[k] < 0 || yi < 0) return;   // a park or the zoo: all of it is the purpose
+        if (zone == GenData.Z_FAIR) { if (SCENERY_GROUND) TrimFair(k); return; }
         if (zone != GenData.Z_HOUSE && zone != GenData.Z_DINER && zone != GenData.Z_SHOP && zone != GenData.Z_GARAGE) return;
         int A = plotAlong[k], D = plotDepth[k];
         if (A > 16 || D > 16) return;
@@ -1499,7 +1503,9 @@ public partial class MapGen
             for (int v = 0; v < D; v++)
             {
                 int i = u * 16 + v;
-                if (clType[i] != GenData.R_LAWN_OPEN || clKeep[i] != 0 || nClosedCv >= closedCv.Length) continue;
+                if (clType[i] != GenData.R_LAWN_OPEN || clKeep[i] != 0) continue;
+                if (SCENERY_GROUND) { clType[i] = GenData.R_SCENERY; closed++; continue; }
+                if (nClosedCv >= closedCv.Length) continue;
                 int x, y;
                 PlotXY(k, u, v, out x, out y);
                 Put(x, y, GenData.Z_NONE, -1, -1, PL_NONE, -1);
@@ -1509,6 +1515,106 @@ public partial class MapGen
             }
         if (closed == 0) return;
         // the open lawn that is left may lie in more pieces now: the plot's outdoor rooms again
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                if (cvInst[y * CV + x] == yi) cvRoom[y * CV + x] = -1;
+            }
+        LetterRooms(k, yi, clType);
+    }
+
+    // The funfair (Cor: trim the funfair's outside areas too): the arcade hall stood in a ring of paving. The midway
+    // along the lane stays; of the rides yard only one compact piece stays, the largest piece of one side or the back
+    // (at a door of the hall when two are as large), at most a room's cells; the rest of the ring is scenery ground,
+    // walkable, so the way from the midway to the rides and every door stays open.
+    void TrimFair(int k)
+    {
+        int yi = plotInstY[k], A = plotAlong[k], D = plotDepth[k];
+        if (A > 16 || D > 16) return;
+        int nRides = 0;
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int i = u * 16 + v, x, y;
+                PlotXY(k, u, v, out x, out y);
+                int c = y * CV + x;
+                clKeep[i] = 0; clPrev[i] = -1; clCost[i] = 0;
+                if (cvInst[c] != yi || cvRoom[c] < 0) { clType[i] = -1; continue; }
+                clType[i] = siteType[yi * 26 + cvRoom[c]];
+                clCost[i] = cvPlace[c];
+                if (clType[i] == GenData.R_RIDES) nRides++;
+            }
+        if (nRides == 0) return;
+        // the cells at the plot's doors and gates (both sides)
+        for (int s = 0; s < nSd; s++)
+        {
+            if (sdKind[s] == SD_DOOR) continue;
+            int a = sdCell[s], b = (a / CV + DZ[sdDir[s]]) * CV + a % CV + DX[sdDir[s]];
+            for (int h = 0; h < 2; h++)
+            {
+                int c = h == 0 ? a : b;
+                if (c < 0 || c >= CV * CV || cvInst[c] != yi) continue;
+                int u, v;
+                if (PlotUV(k, c, out u, out v)) clKeep[u * 16 + v] = 1;
+            }
+        }
+        // the pieces: rides cells joined side by side, of one place (a side, the back); score by size, a door breaks ties
+        int best = -1, bestScore = -1, piece = 0;
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int i0 = u * 16 + v;
+                if (clType[i0] != GenData.R_RIDES || clPrev[i0] >= 0) continue;
+                int qh = 0, qt = 0, door = 0;
+                clPrev[i0] = piece; cand[1024 + qt++] = i0;
+                while (qh < qt)
+                {
+                    int uv = cand[1024 + qh++], uu = uv / 16, vv = uv % 16;
+                    if (clKeep[uv] != 0) door = 1;
+                    for (int d = 0; d < 4; d++)
+                    {
+                        int nu = uu + (d == 0 ? 1 : (d == 2 ? -1 : 0)), nv = vv + (d == 1 ? 1 : (d == 3 ? -1 : 0));
+                        if (nu < 0 || nv < 0 || nu >= A || nv >= D) continue;
+                        int ni = nu * 16 + nv;
+                        if (clType[ni] != GenData.R_RIDES || clPrev[ni] >= 0 || clCost[ni] != clCost[i0]) continue;
+                        clPrev[ni] = piece; cand[1024 + qt++] = ni;
+                    }
+                }
+                int score = qt * 2 + door;
+                if (score > bestScore) { bestScore = score; best = piece; }
+                piece++;
+            }
+        if (best < 0) return;
+        // the piece kept: from its door cell (else its first cell), the nearest ROOM_CELLS_MAX cells of it
+        int start = -1;
+        for (int i = 0; i < 256 && start < 0; i++) if (i / 16 < A && i % 16 < D && clType[i] == GenData.R_RIDES && clPrev[i] == best && clKeep[i] != 0) start = i;
+        for (int i = 0; i < 256 && start < 0; i++) if (i / 16 < A && i % 16 < D && clType[i] == GenData.R_RIDES && clPrev[i] == best) start = i;
+        {
+            int qh = 0, qt = 0;
+            clKeep[start] = 2; cand[1024 + qt++] = start;
+            while (qh < qt && qt < ROOM_CELLS_MAX)
+            {
+                int uv = cand[1024 + qh++], uu = uv / 16, vv = uv % 16;
+                for (int d = 0; d < 4 && qt < ROOM_CELLS_MAX; d++)
+                {
+                    int nu = uu + (d == 0 ? 1 : (d == 2 ? -1 : 0)), nv = vv + (d == 1 ? 1 : (d == 3 ? -1 : 0));
+                    if (nu < 0 || nv < 0 || nu >= A || nv >= D) continue;
+                    int ni = nu * 16 + nv;
+                    if (clType[ni] != GenData.R_RIDES || clPrev[ni] != best || clKeep[ni] == 2) continue;
+                    clKeep[ni] = 2; cand[1024 + qt++] = ni;
+                }
+            }
+        }
+        int trimmed = 0;
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int i = u * 16 + v;
+                if (clType[i] == GenData.R_RIDES && clKeep[i] != 2) { clType[i] = GenData.R_SCENERY; trimmed++; }
+            }
+        if (trimmed == 0) return;
         for (int u = 0; u < A; u++)
             for (int v = 0; v < D; v++)
             {
