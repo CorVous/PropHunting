@@ -39,7 +39,6 @@ public class PHView : UdonSharpBehaviour
     public GameObject vrHealthBar;
     // over each bar, 0 to 3 shields: how tough the disguise is (small 0, medium 1, large 2, largest 3: PHSlot.HitDamage)
     public GameObject[] desktopShields, vrShields;
-    public UnityEngine.UI.RawImage[] desktopSizes, vrSizes;   // the prop-size pictogram beside them: small to largest crates
     int shieldsShown = -2;
     float shieldPopAt = -99f;
     bool shieldPopping;
@@ -263,18 +262,6 @@ public class PHView : UdonSharpBehaviour
         for (int i = 0; i < list.Length; i++) if (list[i] != null) list[i].SetActive(i < n);
     }
 
-    // n: the size class, -1 when not hiding (the crates go)
-    void ShowSizes(UnityEngine.UI.RawImage[] list, int n)
-    {
-        if (list == null) return;
-        for (int i = 0; i < list.Length; i++)
-        {
-            if (list[i] == null) continue;
-            list[i].gameObject.SetActive(n >= 0);
-            list[i].color = i == n ? Color.white : new Color(1f, 1f, 1f, 0.45f);
-        }
-    }
-
     // a short pop of the shields when their count changes
     void PopShields(GameObject[] list, float k)
     {
@@ -296,8 +283,6 @@ public class PHView : UdonSharpBehaviour
             shieldsShown = shields;
             ShowShields(desktopShields, shields);
             ShowShields(vrShields, shields);
-            ShowSizes(desktopSizes, shields);
-            ShowSizes(vrSizes, shields);
         }
         if (shieldPopping)
         {
