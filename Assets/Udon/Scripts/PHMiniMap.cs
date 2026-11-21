@@ -34,6 +34,11 @@ public class PHMiniMap : UdonSharpBehaviour
     const int MAXP = 1440;               // four points a second: six minutes of hide and hunt
     const float STEP = 0.25f, MIN_MOVE = 0.3f;   // (Cor: a point a second cut corners through the walls)
     const int MAXD = 6;                  // disguises remembered per hider
+    const int MAXSEG = 4;                // path pieces per player: a jump over JUMP metres (a teleport) starts a new one
+    const float JUMP = 40f, LABEL_Y = 8.6f;   // (LABEL_Y: the name's height on its pin, as LobbyBuilder.BuildMiniMap)
+    int[] segAt, nSeg;                   // slot * MAXSEG + s: the point piece s starts at (piece 0 at 0)
+    LineRenderer[] segLine;              // slot * MAXSEG + s, s >= 1: copies of the slot's path, made when first needed
+    Vector3 siteMin, siteMax;            // the map's rectangle this sample: points outside it are not kept
     Vector3[] pts;                       // slot * MAXP + i
     int[] npts;
     float[] dist;
@@ -74,6 +79,7 @@ public class PHMiniMap : UdonSharpBehaviour
         sDef = new int[n * MAXS]; nStay = new int[n]; longestStay = new int[n]; sPos = new Vector3[n * MAXS]; sYaw = new float[n * MAXS]; sDur = new float[n * MAXS];
         shownProp = new GameObject[n * MAXS]; shownOutline = new GameObject[n * MAXS];
         mapProp = new GameObject[0]; mapUpper = new bool[0];   // (sized to the map's objects when they are placed)
+        segAt = new int[n * MAXSEG]; nSeg = new int[n]; segLine = new LineRenderer[n * MAXSEG];
         palette = new Color[] {
             new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
             new Color(0.85f, 0.5f, 0.9f), new Color(1f, 0.62f, 0.2f), new Color(0.4f, 0.9f, 0.8f), new Color(0.95f, 0.55f, 0.7f) };
@@ -157,7 +163,7 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int i = 0; i < npts.Length; i++)
         {
             npts[i] = 0; dist[i] = 0f; caughtAt[i] = -1f; catches[i] = 0; roleOf[i] = 0; playerOf[i] = 0; nameOf[i] = "";
-            still[i] = 0f; stillDef[i] = -1; nStay[i] = 0;
+            still[i] = 0f; stillDef[i] = -1; nStay[i] = 0; nSeg[i] = 1;
         }
         for (int k = 0; k < dDef.Length; k++) { dDef[k] = -1; dTime[k] = 0f; dBestStill[k] = 0f; }
     }
@@ -165,6 +171,7 @@ public class PHMiniMap : UdonSharpBehaviour
     void Sample(bool hunt)
     {
         int n = Mathf.Min(paths.Length, game.slots.Length);
+        siteMin = builder.transform.position; siteMax = siteMin + new Vector3(builder.SiteWidth(), 0f, builder.SiteDepth());
         for (int i = 0; i < n; i++)
         {
             int pid = game.slotPlayer[i];
@@ -227,13 +234,17 @@ public class PHMiniMap : UdonSharpBehaviour
 
     void Add(int i, Vector3 at)
     {
+        // only on the map (a hunter's first samples can fall in the lobby, before the release: Strelia's red line
+        // ran in through the walls)
+        if (at.x < siteMin.x - 1f || at.x > siteMax.x + 1f || at.z < siteMin.z - 1f || at.z > siteMax.z + 1f) return;
         int k = npts[i];
         if (k > 0)
         {
             Vector3 last = pts[i * MAXP + k - 1];
             float d = Vector3.Distance(new Vector3(last.x, 0f, last.z), new Vector3(at.x, 0f, at.z));
             if (d < MIN_MOVE) return;
-            if (d < 40f) dist[i] += d;   // (a teleport is not a walk)
+            if (d < JUMP) dist[i] += d;   // (a teleport is not a walk: and it starts a new piece of the line)
+            else if (k < MAXP && nSeg[i] < MAXSEG) { segAt[i * MAXSEG + nSeg[i]] = k; nSeg[i]++; }
         }
         if (k >= MAXP) return;
         pts[i * MAXP + k] = at;
@@ -289,6 +300,7 @@ public class PHMiniMap : UdonSharpBehaviour
         nFence = 0; fenceNext = 99999;
         for (int i = 0; i < pins.Length; i++) { pins[i].gameObject.SetActive(false); pinLabel[i].text = ""; }
         for (int i = 0; i < paths.Length; i++) paths[i].gameObject.SetActive(false);
+        for (int i = 0; i < segLine.Length; i++) if (segLine[i] != null) segLine[i].gameObject.SetActive(false);
     }
 
     Color ColourOf(int i)
@@ -305,16 +317,36 @@ public class PHMiniMap : UdonSharpBehaviour
         int k = npts[i];
         if (roleOf[i] == 0 || k == 0) return;
         Color c = ColourOf(i);
-        LineRenderer lr = paths[i];
-        Vector3[] line = new Vector3[k];
         Vector3 lift = new Vector3(0f, 0.15f, 0f) - origin;
-        for (int j = 0; j < k; j++) line[j] = pts[i * MAXP + j] + lift;
-        lr.positionCount = k;
-        lr.SetPositions(line);   // (one call: a point at a time was a call each)
-        lr.widthMultiplier = 0.0012f / Mathf.Max(0.001f, model.localScale.x);   // (Cor: thinner)
-        lr.startColor = c; lr.endColor = c;
-        lr.gameObject.SetActive(true);
+        int ns = Mathf.Clamp(nSeg[i], 1, MAXSEG);
+        for (int s = 0; s < ns; s++)
+        {
+            int a = s == 0 ? 0 : segAt[i * MAXSEG + s], b = s + 1 < ns ? segAt[i * MAXSEG + s + 1] : k;
+            LineRenderer lr = SegLine(i, s);
+            Vector3[] line = new Vector3[b - a];
+            for (int j = a; j < b; j++) line[j - a] = pts[i * MAXP + j] + lift;
+            lr.positionCount = b - a;
+            lr.SetPositions(line);   // (one call: a point at a time was a call each)
+            lr.widthMultiplier = 0.0012f / Mathf.Max(0.001f, model.localScale.x);   // (Cor: thinner)
+            lr.startColor = c; lr.endColor = c;
+            lr.gameObject.SetActive(true);
+        }
+        Transform pin = pins[i];
+        Transform tag = pin.GetChild(pin.childCount - 1);   // (the name: the pin's last child)
+        // a hunter's tag (Cor: clickable like the hiders'): at the release point, stacked over the other hunters'
+        if (roleOf[i] == PHGame.ROLE_HUNTER)
+        {
+            int h = 0;
+            for (int j = 0; j < i; j++) if (roleOf[j] == PHGame.ROLE_HUNTER && npts[j] > 0) h++;
+            pin.localPosition = builder.ReleasePoint() - origin;
+            tag.localPosition = new Vector3(0f, LABEL_Y + h * 3.2f, 0f);
+            pin.gameObject.SetActive(true);
+            pinLabel[i].text = Clean(nameOf[i]);
+            pinLabel[i].color = c;
+            return;
+        }
         if (roleOf[i] != PHGame.ROLE_HIDER) return;
+        tag.localPosition = new Vector3(0f, LABEL_Y, 0f);
         // every spot they hid in (stood still STAY_MIN or more), the prop they were there, (Cor:
         // outlined); the pin with their name over the longest
         int bs = i * MAXS, longest = -1;
@@ -344,11 +376,26 @@ public class PHMiniMap : UdonSharpBehaviour
             }
         }
         longestStay[i] = longest;
-        Transform pin = pins[i];
         pin.localPosition = (longest >= 0 ? sPos[longest] : pts[i * MAXP + k - 1]) - origin;
         pin.gameObject.SetActive(true);
         pinLabel[i].text = Clean(nameOf[i]);
         pinLabel[i].color = c;
+    }
+
+    // piece s of slot i's path: piece 0 is the slot's own line, the others copies of it made the first time needed
+    LineRenderer SegLine(int i, int s)
+    {
+        if (s == 0) return paths[i];
+        int x = i * MAXSEG + s;
+        if (segLine[x] == null)
+        {
+            GameObject go = Instantiate(paths[i].gameObject);
+            Transform t = go.transform;
+            t.SetParent(paths[i].transform.parent, false);
+            t.localPosition = Vector3.zero; t.localRotation = Quaternion.identity; t.localScale = Vector3.one;
+            segLine[x] = go.GetComponent<LineRenderer>();
+        }
+        return segLine[x];
     }
 
     // a prop's copy on the table: no colliders, on the default layer
@@ -475,7 +522,8 @@ public class PHMiniMap : UdonSharpBehaviour
             bool mine = solo < 0 || solo == i;
             bool has = roleOf[i] != 0 && npts[i] > 0;
             paths[i].gameObject.SetActive(has && mine);
-            bool pinOn = has && mine && roleOf[i] == PHGame.ROLE_HIDER && pinLabel[i].text != "" && (upperOn || pins[i].localPosition.y <= UPPER_Y);
+            for (int s = 1; s < MAXSEG; s++) { LineRenderer e = segLine[i * MAXSEG + s]; if (e != null) e.gameObject.SetActive(has && mine && s < nSeg[i]); }
+            bool pinOn = has && mine && pinLabel[i].text != "" && (upperOn || pins[i].localPosition.y <= UPPER_Y);
             if (pins[i].gameObject.activeSelf != pinOn) pins[i].gameObject.SetActive(pinOn);
             for (int j = 0; j < MAXS; j++)
             {
