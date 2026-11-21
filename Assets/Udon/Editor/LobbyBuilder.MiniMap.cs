@@ -83,7 +83,8 @@ public static partial class LobbyBuilder
             tmp.rectTransform.sizeDelta = new Vector2(20f, 3f); tmp.text = "";
 
             // the tag is a button (Cor): pressing it shows that player alone, pressing it again everyone
-            var hit = label.AddComponent<BoxCollider>(); hit.size = new Vector3(14f, 3f, 0.5f);
+            // (a trigger: Interact still finds it, and nobody walks into it; Cor, the poles at the table were solid)
+            var hit = label.AddComponent<BoxCollider>(); hit.size = new Vector3(14f, 3f, 0.5f); hit.isTrigger = true;
             var tagBtn = label.AddUdonSharpComponent<PHButton>();
             tagBtn.game = game; tagBtn.target = mm; tagBtn.action = nameof(PHMiniMap.PickSolo); tagBtn.arg = i + 1;
             UdonSharpEditorUtility.CopyProxyToUdon(tagBtn);
