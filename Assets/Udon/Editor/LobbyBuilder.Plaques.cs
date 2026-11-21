@@ -3,9 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // Small pictographic plaques (Cor, onboarding: icons only, no words) in the lobby's style: a cream card on a darker
-// lip with a row of icons, for the weapon wall's two halves, the Trophies board, the LAST ROUND diorama and the host
-// panel. Icons are Assets/Lobby/Icons sprites (trophy and crown from Tools/make_plaque_icons.py) or cells of
-// Assets/Lobby/WeaponIcons.png. Static world-space canvases with no raycaster or collider: they never take a press.
+// lip with a row of icons, over the Trophies board's two halves. Icons are Assets/Lobby/Icons sprites (trophy from
+// Tools/make_plaque_icons.py) or cells of Assets/Lobby/WeaponIcons.png. Static world-space canvases with no raycaster or collider: they never take a press.
 public static partial class LobbyBuilder
 {
     const float PlaqueIcon = 96f, PlaquePad = 14f, PlaqueLip = 9f;
@@ -38,27 +37,17 @@ public static partial class LobbyBuilder
         return cv;
     }
 
-    // the plaques, in lobby space (centre of the room at 0, north +z); a canvas faces away from its forward
+    // the plaques, in lobby space (centre of the room at 0, north +z); a canvas faces away from its forward. Only the
+    // Trophies board's (Cor: the weapon wall's halves carry word labels instead, LobbyBuilder.Store.cs)
     public static void BuildPlaques(Transform lobby, float roomW, float roomD)
     {
-        Sprite trophy = Icon("trophy"), crown = Icon("crown"), hunt = Icon("meeple_hunt"), hide = Icon("meeple_hide"), glass = Icon("hourglass");
+        Sprite trophy = Icon("trophy"), hunt = Icon("meeple_hunt"), hide = Icon("meeple_hide");
         var root = new GameObject("Plaques").transform;
         root.SetParent(lobby, false);
-        // the weapon wall (east): over each half's selector disc, where that half's bottom row has no weapon (the
-        // disc takes the slot): melee on the south half, guns on the north half
-        float hz = 5.42f, sx = roomW / 2f - 0.9f;
-        Plaque(root, "PlaqueMelee", new Vector3(sx, 1.48f, -hz), Quaternion.Euler(0f, 90f, 0f), 0.24f, new Sprite[] { null, null }, new[] { 0, 2 });
-        Plaque(root, "PlaqueGuns", new Vector3(sx, 1.48f, hz), Quaternion.Euler(0f, 90f, 0f), 0.24f, new Sprite[] { null, null }, new[] { 90, 115 });
         // the Trophies board (west wall): over each half, the side and a cup (hunters' half to the south, the
         // viewer's left)
         float tx = -roomW / 2f + 0.06f;
         Plaque(root, "PlaqueTrophiesHunt", new Vector3(tx, 5.38f, -2.7f), Quaternion.Euler(0f, -90f, 0f), 0.56f, new[] { hunt, trophy }, null);
         Plaque(root, "PlaqueTrophiesHide", new Vector3(tx, 5.38f, 2.7f), Quaternion.Euler(0f, -90f, 0f), 0.56f, new[] { hide, trophy }, null);
-        // the host panel (north wall): a crown sticker off its top-left corner
-        Plaque(root, "PlaqueHost", new Vector3(-3.74f, 4.28f, roomD / 2f - 0.16f), Quaternion.Euler(0f, 0f, 8f), 0.55f, new[] { crown }, null);
-        // the LAST ROUND diorama: a tent card on the table's south-west corner (with the table, so it moves with it)
-        var dio = lobby.Find("Diorama");
-        if (dio != null)
-            Plaque(dio, "PlaqueLastRound", new Vector3(-1.05f, 0.85f + 0.115f, -1.24f), Quaternion.Euler(12f, 0f, 0f), 0.22f, new[] { glass, hide }, null);
     }
 }

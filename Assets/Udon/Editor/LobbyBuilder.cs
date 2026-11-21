@@ -1113,7 +1113,8 @@ public static partial class LobbyBuilder
         for (float y = 0.4f; y < roomD; y += 1.2f)
         {
             Slab(root, "Rule", L(0.05f, y, wallH - 0.78f), new Vector3(0.02f, 0.12f, 0.7f), rule);
-            Slab(root, "Rule", L(roomW - 0.05f, y, wallH - 0.78f), new Vector3(0.02f, 0.12f, 0.7f), rule);
+            if (Mathf.Abs(Mathf.Abs(roomD / 2 - y) - LabelZ) > LabelHalf + 0.2f)   // (not behind the weapon wall's labels)
+                Slab(root, "Rule", L(roomW - 0.05f, y, wallH - 0.78f), new Vector3(0.02f, 0.12f, 0.7f), rule);
         }
         var name = WorldText(root, "Name", L(roomW / 2, roomD - 0.03f, 4.3f), Quaternion.Euler(0f, 180f, 0f), "PROPHUNT", 26f, C("f6d773"), new Vector2(20f, 2.2f));
         name.characterSpacing = 6f;

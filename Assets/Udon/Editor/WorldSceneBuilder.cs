@@ -329,7 +329,7 @@ public static class WorldSceneBuilder
 
         // the weapon wall (east wall) and the Trophies board (spawn wall): after the weapons, whose lists number the picks
         LobbyBuilder.BuildStore(lobby.transform, game, local.sound, RoomW, RoomD);
-        // small pictographic plaques: the weapon wall's halves, the Trophies board, the host panel, the diorama
+        // small pictographic plaques over the Trophies board (the weapon wall has word labels: BuildStore)
         LobbyBuilder.BuildPlaques(lobby.transform, RoomW, RoomD);
 
         UdonSharpEditorUtility.CopyProxyToUdon(local);

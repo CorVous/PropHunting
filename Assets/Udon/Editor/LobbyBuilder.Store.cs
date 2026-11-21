@@ -111,6 +111,7 @@ public static partial class LobbyBuilder
         var guns = BuildShelf(root, store, 1, cat, meshByName, new Vector3(roomW / 2f + Alcove, 0f, hz));
         store.shelfMelee = melee; store.shelfGun = guns;
         BuildOpeningTrim(root, roomW);
+        BuildShelfLabels(root, roomW, text);
         store.dialog = BuildStoreDialog(root, store, text);
         store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 2.75f, 0f));   // the middle of the west wall (the score pad went north: Cor)
         UdonSharpEditorUtility.CopyProxyToUdon(store);
@@ -409,6 +410,25 @@ public static partial class LobbyBuilder
         m.Clear(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(tri, 0); m.RecalculateBounds();
         if (fresh) AssetDatabase.CreateAsset(m, path); else EditorUtility.SetDirty(m);
         return m;
+    }
+
+    // the shelves' names on the room's cream trim band over the opening (Cor): "Hider Multitool" over the guns (north
+    // half), "Hunter Weapon" over the melee weapons (south half), in the heading font; DressRoom leaves the band's
+    // dashes out behind them. Static labels: TextBaker matches their English to the rows and PHText switches language
+    public const float LabelHalf = 3.4f;                       // half a label's width along the wall (m)
+    public const float LabelZ = 0.3f + Cols * SlotW / 2f;      // each half's centre (as hz in BuildStore)
+    static void BuildShelfLabels(Transform root, float roomW, Dictionary<string, string> text)
+    {
+        const float scale = 0.005f;   // canvas units are 5 mm
+        Vector2 box = new Vector2(2f * LabelHalf / scale, 0.44f / scale);
+        for (int h = 0; h < 2; h++)
+        {
+            string key = h == 0 ? "store.shelf_hider" : "store.shelf_hunter";
+            var cv = Canvas(root, h == 0 ? "LabelHider" : "LabelHunter", new Vector3(roomW / 2f - 0.045f, Ceiling - 0.75f, h == 0 ? LabelZ : -LabelZ),
+                Quaternion.Euler(0f, 90f, 0f), box, scale, false);
+            var t = Txt(cv, "Title", Vector2.zero, box, Get(text, key), rocket, 64f, C("24604a"), TextAlignmentOptions.Center);
+            t.characterSpacing = 4f;
+        }
     }
 
     // the bottom strip across the weapon wall's opening: a plain raised lip in the wall's green (Cor: simpler, no
