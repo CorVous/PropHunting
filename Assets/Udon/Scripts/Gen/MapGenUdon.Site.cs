@@ -694,7 +694,7 @@ public partial class MapGenUdon
                 if (plotSR[prev] == 0 && plotSet[k] + d + plotBack[k] < prevEnd) plotBack[k] = prevEnd - plotSet[k] - d;
             }
             // revision 10: from M up a farm's paddock is two cells wide (on the side that has the side yard)
-            if (kinds[i] == GenData.Z_BARN && size >= 1) { if (plotSR[k] >= 1) plotSR[k] = 2; else plotSL[k] = 2; }
+            if (kinds[i] == GenData.Z_BARN && size >= 1 && size != 4 /* XS, GenData.SIZE_XS */) { if (plotSR[k] >= 1) plotSR[k] = 2; else plotSL[k] = 2; }
             plotY0[k] = off;
             plotAlong[k] = w + plotSL[k] + plotSR[k];
             plotDepth[k] = plotSet[k] + d + plotBack[k];
