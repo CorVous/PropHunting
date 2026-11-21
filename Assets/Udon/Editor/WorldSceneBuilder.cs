@@ -24,7 +24,8 @@ public static class WorldSceneBuilder
     // 5 cm up so its floor does not fight the map's ground plane, which reaches out under it
     static readonly Vector3 LobbyOrigin = new Vector3(-170f, 0.05f, -170f);
     const float RoomW = 24f, RoomD = 22f, WallH = 7f, ZoneHalf = 5.5f;
-    public static readonly Vector3 GripStationAt = new Vector3(-5.6f, 0f, -RoomD / 2 + 3.2f);
+    // (2 m west of the first spot, which sat between the lying blue meeple and a gold coin stack: open floor here)
+    public static readonly Vector3 GripStationAt = new Vector3(-7.6f, 0f, -RoomD / 2 + 4.2f);
     public const float GripStationYaw = 20f;
     static readonly Vector3 MiniMapAt = new Vector3(-7.0f, 0f, 4.0f);    // the LAST ROUND diorama table, lobby space (centre of the room at 0, north +z): in the ready area's west half
     const float MiniMapYaw = 0f;
