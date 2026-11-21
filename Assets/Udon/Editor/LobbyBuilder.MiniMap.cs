@@ -19,7 +19,7 @@ public static partial class LobbyBuilder
         table.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
         var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
         // the table: a green felt top in a wooden frame on four legs (solid, as the lobby's furniture)
-        Block(table.transform, "Top", new Vector3(0f, top - 0.03f, 0f), new Vector3(side, 0.06f, side), wood, C("6fae5a"), true);   // (grass: the map's ground)
+        Block(table.transform, "Top", new Vector3(0f, top - 0.03f, 0f), new Vector3(side, 0.06f, side), wood, C("6fae5a"), false);   // (grass: the map's ground; no collider, Cor: the table has no collision)
         Block(table.transform, "Rim", new Vector3(0f, top - 0.06f, 0f), new Vector3(side + 0.12f, 0.06f, side + 0.12f), wood, C("7a5030"), false);
         for (int i = 0; i < 4; i++)
         {
