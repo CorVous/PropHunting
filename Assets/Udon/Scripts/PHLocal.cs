@@ -815,6 +815,12 @@ public class PHLocal : UdonSharpBehaviour
                 d = game.gen.emitDef[e];
                 if (game.gen.defDisguise[d] > 0) o = game.builder.objects[e];
             }
+            else
+            {
+                // another hider's prop: its disguise can be copied (TryTakeDisguise); it glows the same way
+                int h = CopyFrom(c);
+                if (h >= 0 && game.slots[h].squashRig != null) { o = game.slots[h].squashRig.gameObject; d = game.slots[h].def; }
+            }
         }
         if (o == hoverObj) return;
         if (hoverObj != null) game.builder.Hover(hoverObj, hoverDef, false);
@@ -934,6 +940,18 @@ public class PHLocal : UdonSharpBehaviour
     int[] emitHint;          // emit index by the prop's place among propRoot's children (EmitOf)
     GameObject[] emitHintOf; // the objects array it is for (a new map, a new table)
 
+    // another hider whose disguise this hider can copy, from a collider of their prop: a hider of this round, hiding,
+    // not caught, wearing a prop that can be a disguise; -1 if not
+    int CopyFrom(Collider c)
+    {
+        if (c == null) return -1;
+        int h = HiderOf(c.transform);
+        if (h < 0 || h >= game.slots.Length || h == slotIndex || game.RoleOf(h) != PHGame.ROLE_HIDER) return -1;
+        PHSlot o = game.slots[h];
+        if (o == null || !o.hiding || o.caught || o.ghost || o.def < 0 || o.def >= game.gen.defDisguise.Length || game.gen.defDisguise[o.def] <= 0) return -1;
+        return h;
+    }
+
     // the slot whose hider prop was hit, or -1
     int HiderOf(Transform t)
     {
@@ -953,8 +971,17 @@ public class PHLocal : UdonSharpBehaviour
         if (game.Endgame) return;   // the final stand: the disguise is kept to the end (Cor)
         if (!Aim(TAKE_RANGE)) return;
         int e = EmitOf(hit.collider.transform);
-        if (e < 0) return;
-        int d = game.gen.emitDef[e];
+        int d;
+        if (e >= 0) d = game.gen.emitDef[e];
+        else
+        {
+            // another hider's prop (Cor, hop playtest: "copy disguise"): the same pick copies their disguise; they keep
+            // theirs, and nothing is asked of them
+            int h = CopyFrom(hit.collider);
+            if (h < 0) return;
+            d = game.slots[h].def;
+            if (d == s.def) { sound.Play("error_004", 0.5f); return; }
+        }
         // a prop that cannot be taken says so, and a change that took has its own cue; both heard only by the hider (Cor)
         if (game.gen.defDisguise[d] <= 0) { sound.Play("error_004", 0.5f); Say(T("say.notDisguise"), 2f); return; }
         if (game.phase == PHGame.PH_HUNT)
