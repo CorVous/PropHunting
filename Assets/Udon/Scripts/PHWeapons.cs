@@ -78,6 +78,7 @@ public class PHWeapons : UdonSharpBehaviour
     public Vector3 deskEuler = new Vector3(-40f, -25f, 15f);
     public const float SWING_TIME = 0.42f, SWING_HIT_AT = 0.12f, SWING_SPEED = 3.0f, VR_COOLDOWN = 0.45f;
     public const float WHOOSH_SPEED = 7.0f, WHOOSH_HAND = 2.5f, WHOOSH_REARM = 1.0f;   // VR: the swing sound needs the tip AND the hand moving fast; it re-arms once the tip is nearly still
+    public const float SWING_RADIUS = 0.08f, SWING_EXTRA = 0.5f;   // VR: the sweeps' radius (was 0.06) and the reach beyond the tip (hop playtest)
     public const float REACH = 2.2f;   // desktop: how far in front of the eyes a slash strikes (metres at avatar size 1)
     public const int MASK = ~(1 << 9 | 1 << 10 | 1 << 18);    // as PHLocal.Aim: not players
 
@@ -91,7 +92,7 @@ public class PHWeapons : UdonSharpBehaviour
     bool ready;
 
     // the local VR swing
-    Vector3 prevTip, prevMid, prevGrip;
+    Vector3 prevTip, prevMid, prevExt, prevGrip;
     bool prevValid, whooshArmed = true;
     float nextVrHit;
     // the local desktop slash
@@ -501,6 +502,14 @@ public class PHWeapons : UdonSharpBehaviour
         Transform w = held[i];
         Vector3 tip = w.position + w.rotation * (Vector3.forward * meleeTip[model] * sc);
         Vector3 mid = w.position + w.rotation * (Vector3.forward * (meleeHead[model] + meleeTip[model]) * 0.5f * sc);
+        // the reach beyond the tip, short of anything solid along the weapon (looked for from the hand, which never
+        // sits inside a wall, so a tip stuck in one does not reach out of its far side)
+        Vector3 fwd = w.rotation * Vector3.forward;
+        float tipLen = meleeTip[model] * sc, extra = SWING_EXTRA * sc;
+        RaycastHit eh;
+        if (Physics.Raycast(w.position, fwd, out eh, tipLen + extra + SWING_RADIUS * sc, MASK, QueryTriggerInteraction.Ignore))
+            extra = Mathf.Max(0f, eh.distance - tipLen - SWING_RADIUS * sc - 0.02f);
+        Vector3 ext = tip + fwd * extra;
         float dt = Mathf.Max(Time.deltaTime, 0.004f);
         if (prevValid)
         {
@@ -520,21 +529,41 @@ public class PHWeapons : UdonSharpBehaviour
             // speed would strike again, a hider hit twice)
             if (fast && Time.time >= nextVrHit && Time.time - mySwingAt >= SWING_TIME && local.CanStrike())
             {
-                RaycastHit h;
-                bool any = Physics.SphereCast(prevTip, 0.06f * sc, d.normalized, out h, d.magnitude, MASK, QueryTriggerInteraction.Ignore);
-                if (!any)
-                {
-                    Vector3 dm = mid - prevMid;
-                    if (dm.sqrMagnitude > 1e-6f) any = Physics.SphereCast(prevMid, 0.06f * sc, dm.normalized, out h, dm.magnitude, MASK, QueryTriggerInteraction.Ignore);
-                }
-                if (any)
+                // (hop playtest, Cor: low props were hard to hit by hand) three sweeps: the tip, the head's middle,
+                // and a point SWING_EXTRA beyond the tip (kept short of anything solid in front of the tip, so it
+                // never reaches through a wall); a hider's prop beats a map prop, which beats a wall or the floor
+                float rad = SWING_RADIUS * sc;
+                strikeC = null; strikeK = 0;
+                SweepFor(prevTip, tip, rad);
+                SweepFor(prevMid, mid, rad);
+                SweepFor(prevExt, ext, rad);
+                // the floor or a wall right by a low prop: the prop the swing was meant for (PHLocal.Assist)
+                if (strikeK == 1 && local.Assist(strikeP, strikeN, 0.25f * sc)) { strikeC = local.assistCol; strikeP = local.assistPoint; strikeK = 2; }
+                if (strikeC != null)
                 {
                     nextVrHit = Time.time + VR_COOLDOWN;
-                    local.MeleeStrike(h.collider, h.point, d.normalized, true);
+                    local.MeleeStrike(strikeC, strikeP, d.normalized, true);
                 }
             }
         }
-        prevTip = tip; prevMid = mid; prevGrip = w.position; prevValid = true;
+        prevTip = tip; prevMid = mid; prevExt = ext; prevGrip = w.position; prevValid = true;
+    }
+
+    // one sweep of the swing (from where a point of the weapon was last frame to where it is now): keeps the best
+    // thing met so far in strikeC / strikeP / strikeN / strikeK (PHLocal.StrikeKind: 3 hider, 2 prop, 1 other)
+    Collider strikeC;
+    Vector3 strikeP, strikeN;
+    int strikeK;
+
+    void SweepFor(Vector3 from, Vector3 to, float rad)
+    {
+        Vector3 d = to - from;
+        if (d.sqrMagnitude < 1e-6f) return;
+        RaycastHit h;
+        if (!Physics.SphereCast(from, rad, d.normalized, out h, d.magnitude, MASK, QueryTriggerInteraction.Ignore)) return;
+        int k = local.StrikeKind(h.collider);
+        if (k <= strikeK) return;
+        strikeK = k; strikeC = h.collider; strikeP = h.point; strikeN = h.normal;
     }
 
     // a swing's outcome, on every client (PHSlot.Swung): kind 0 a desktop slash that met nothing, 1 a wall or

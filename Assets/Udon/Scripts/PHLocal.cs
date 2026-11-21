@@ -1124,10 +1124,59 @@ public class PHLocal : UdonSharpBehaviour
     {
         PHSlot s = Me();
         if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut) return;
-        float reach = MELEE_REACH * Mathf.Clamp(Networking.LocalPlayer.GetAvatarEyeHeightAsMeters() / 1.6f, 0.5f, 2f);
+        // (hop playtest, Cor: low props were hard to hit): the reach always gets past the player's own feet, whatever
+        // the avatar's eye height (a tall avatar's slash ended above the floor), looking down at a prop on the floor
+        // about half a metre in front of them
+        float eye = Networking.LocalPlayer.GetAvatarEyeHeightAsMeters();
+        float reach = Mathf.Max(MELEE_REACH * Mathf.Clamp(eye / 1.6f, 0.5f, 3f), eye + 0.6f);
         lastHitName = "nothing";
         if (!Reach(reach)) { s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), Aim0(), 0); return; }
-        MeleeStrike(hit.collider, hit.point, hit.point - Aim0(), false);
+        Collider c = hit.collider; Vector3 at = hit.point;
+        // the slash met the floor or a wall right by a low prop (the wide cast grazes the floor before the prop):
+        // the prop it was meant for, if one is that close and in plain sight of the contact
+        if (StrikeKind(c) == 1 && Assist(hit.point, hit.normal, 0.3f * AvatarScale())) { c = assistCol; at = assistPoint; }
+        MeleeStrike(c, at, at - Aim0(), false);
+    }
+
+    // what a strike would meet: 3 a hider's prop, 2 a map prop, 1 anything else (a wall, the floor), 0 nothing
+    public int StrikeKind(Collider c)
+    {
+        if (c == null) return 0;
+        if (HiderOf(c.transform) >= 0) return 3;
+        if (EmitOf(c.transform) >= 0) return 2;
+        return 1;
+    }
+
+    // a strike that met the floor or a wall at 'point': the nearest hider's prop (else map prop) within 'radius' of it
+    // that the contact can see (nothing solid in between, so never through a wall). Sets assistCol / assistPoint.
+    [System.NonSerialized] public Collider assistCol;
+    [System.NonSerialized] public Vector3 assistPoint;
+
+    public bool Assist(Vector3 point, Vector3 normal, float radius)
+    {
+        assistCol = null;
+        Vector3 from = point + normal * 0.05f;
+        Collider[] near = Physics.OverlapSphere(from, radius, ~(1 << 9 | 1 << 10 | 1 << 18 | 1 << 13), QueryTriggerInteraction.Ignore);
+        if (near == null) return false;
+        int bestK = 1; float bestD = 1e9f;
+        for (int i = 0; i < near.Length; i++)
+        {
+            Collider c = near[i];
+            if (c == null) continue;
+            int k = StrikeKind(c);
+            if (k < 2) continue;
+            Vector3 to = c.bounds.center;
+            float d = (to - from).sqrMagnitude;
+            if (k < bestK || (k == bestK && d >= bestD)) continue;
+            // in plain sight of the contact: the first thing on the way there is this prop itself
+            RaycastHit r;
+            Vector3 way = to - from;
+            float len = way.magnitude;
+            if (len > 1e-3f && Physics.Raycast(from, way / len, out r, len, ~(1 << 9 | 1 << 10 | 1 << 18 | 1 << 13), QueryTriggerInteraction.Ignore) && StrikeKind(r.collider) < 2) continue;
+            bestK = k; bestD = d; assistCol = c;
+            assistPoint = Vector3.Lerp(from, to, 0.5f);
+        }
+        return assistCol != null;
     }
 
     // a wide, short sphere cast from the eyes (a slash is easier to land than a dart)
