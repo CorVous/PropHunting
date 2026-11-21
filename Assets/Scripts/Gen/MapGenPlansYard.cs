@@ -76,21 +76,27 @@ public partial class MapGen
         return (roomZ1[room] + 1) * GenData.INNER_MM - margin;
     }
 
-    // GRID: sets of setW x setD (setW along the set's own x) in rows facing the anchor's side, evenly spaced, centred
-    // in the room's box; the rows nearest the anchor first. A row is a line of sets side by side, across the side's axis.
+    // GRID: sets of setW x setD (setW along the set's own x) in rows, evenly spaced, centred in the room's box; the
+    // rows run across the anchor's side (the sets face it) unless the other way round fits more of them (a narrow
+    // strip); the rows nearest the anchor first
     void GridSpots(int room, int setW, int setD, int gapW, int gapD)
     {
         yardN = 0;
         bool alongX = yardSide == 0 || yardSide == 2;   // the anchor lies on a z side: the rows run along x
+        if (GridCount(room, !alongX, setW, setD, gapW, gapD) > GridCount(room, alongX, setW, setD, gapW, gapD)) alongX = !alongX;
         int a0 = alongX ? YardBox(room, 0, 600) : YardBox(room, 2, 600), a1 = alongX ? YardBox(room, 1, 600) : YardBox(room, 3, 600);
         int b0 = alongX ? YardBox(room, 2, 600) : YardBox(room, 0, 600), b1 = alongX ? YardBox(room, 3, 600) : YardBox(room, 1, 600);
         int pa = setW + gapW, pb = setD + gapD;
         int na = (a1 - a0 - setW) / pa + 1, nb = (b1 - b0 - setD) / pb + 1;
-        if (na < 1) na = 1; if (nb < 1) nb = 1;
-        if (na > 6) na = 6; if (nb > 5) nb = 5;
+        if (na < 1) na = 1;
+        if (nb < 1) nb = 1;
+        if (na > 6) na = 6;
+        if (nb > 5) nb = 5;
         int ma = (a0 + a1) / 2, mb = (b0 + b1) / 2;
-        bool nearHigh = yardSide == 0 || yardSide == 1;   // the anchor on the high side of the row axis
-        if (yardKind == 2) nearHigh = !nearHigh;          // facing the middle: the rows start at the far side
+        // the row nearest the anchor first (facing the middle: the far rows first)
+        int anchorB = alongX ? yardAZ : yardAX;
+        bool nearHigh = anchorB > mb;
+        if (yardKind == 2) nearHigh = !nearHigh;
         int yaw = alongX ? 0 : 90;
         for (int jb = 0; jb < nb; jb++)
         {
@@ -105,19 +111,30 @@ public partial class MapGen
         }
     }
 
-    // LONG TABLE: sets end to end in one line through the middle, pointing at the anchor; the spot nearest the
-    // anchor first (it stays free for the serving table: yardRow -1)
+    // how many sets a grid holds with its rows along x (or z)
+    int GridCount(int room, bool alongX, int setW, int setD, int gapW, int gapD)
+    {
+        int la = alongX ? YardBox(room, 1, 600) - YardBox(room, 0, 600) : YardBox(room, 3, 600) - YardBox(room, 2, 600);
+        int lb = alongX ? YardBox(room, 3, 600) - YardBox(room, 2, 600) : YardBox(room, 1, 600) - YardBox(room, 0, 600);
+        if (la < setW || lb < setD) return 0;
+        return ((la - setW) / (setW + gapW) + 1) * ((lb - setD) / (setD + gapD) + 1);
+    }
+
+    // LONG TABLE: sets end to end in one line down the room's long axis through the middle, from the end nearer the
+    // anchor; that first spot stays free for the serving table
     void LineSpots(int room, int setW, int gap)
     {
         yardN = 0;
-        bool alongZ = yardSide == 0 || yardSide == 2;   // the line runs towards the anchor
+        bool alongZ = RoomLongAxis(room) == 1;
         int a0 = alongZ ? YardBox(room, 2, 600) : YardBox(room, 0, 600), a1 = alongZ ? YardBox(room, 3, 600) : YardBox(room, 1, 600);
         int m = alongZ ? RoomMidX(room) : RoomMidZ(room);
         int p = setW + gap;
         int n = (a1 - a0 - setW) / p + 1;
-        if (n < 1) n = 1; if (n > 8) n = 8;
+        if (n < 1) n = 1;
+        if (n > 8) n = 8;
         int mid = (a0 + a1) / 2;
-        bool fromHigh = yardSide == 0 || yardSide == 1;
+        bool fromHigh = (alongZ ? yardAZ : yardAX) > mid;
+        yardSide = alongZ ? (fromHigh ? 0 : 2) : (fromHigh ? 1 : 3);   // the serving table's end
         int yaw = alongZ ? 90 : 0;
         for (int j = 0; j < n && yardN < yardX.Length; j++)
         {
@@ -181,7 +198,7 @@ public partial class MapGen
     // ============================================================================================ PICNIC GROUND
     void PlanPicnic()
     {
-        planMax = 8;
+        planMax = 9;
         int room = pRoom;
         if (planPhase == 0)
         {
@@ -220,6 +237,7 @@ public partial class MapGen
         // the sets, one a step; LONG TABLE keeps the first spot (nearest the anchor) for the serving table
         if (planPhase == 2 && PhLoop(2, 100000))
         {
+            if (planIter == 0) hq_Yard_first = nEmit;
             int i = planIter + (hq_Yard_rule == 1 ? 1 : 0);
             if (i >= yardN || hq_Yard_got >= hq_Yard_want + (hq_Yard_rule == 1 ? 2 : 0)) PhBreak();
             else
@@ -229,7 +247,33 @@ public partial class MapGen
                 if (t >= 0) hq_Yard_got++;
             }
         }
-        if (planPhase == 3)
+        if (planPhase == 3 && PhLoop(3, 100000))
+        {
+            // a LONG TABLE or a RING that holds fewer than two sets (a room cut by the house's corner, a doorstep in
+            // the way) is taken back and laid out as a GRID instead, a set a step
+            if (planIter == 0)
+            {
+                if (hq_Yard_rule == 0 || hq_Yard_got >= 2 || hq_Yard_got >= hq_Yard_want) PhBreak();
+                else
+                {
+                    TakeBack(hq_Yard_first);
+                    hq_Yard_rule = 0; hq_Yard_got = 0;
+                    GridSpots(room, Sx(hq_Yard_a), Sz(hq_Yard_a) + 2 * (60 + Sz(hq_Yard_b)), 1300, 1100);
+                }
+            }
+            else
+            {
+                int i = planIter - 1;
+                if (i >= yardN || hq_Yard_got >= hq_Yard_want) PhBreak();
+                else
+                {
+                    int t = PicnicSet(hq_Yard_a, hq_Yard_b, yardX[i], yardZ[i], yardYaw[i]);
+                    yardSet[i] = t;
+                    if (t >= 0) hq_Yard_got++;
+                }
+            }
+        }
+        if (planPhase == 4)
         {
             // LONG TABLE: the serving table across the line's end, with nothing round it but its things
             if (hq_Yard_rule == 1 && yardN > 0 && hq_Yard_got > 0)
@@ -244,7 +288,7 @@ public partial class MapGen
                 if (StampAt(sv, room, px, pz, alongZ ? 0 : 90, EF_BOOTH, -1, H_FREE, false) >= 0) Keep(first, false);
             }
         }
-        if (planPhase == 4)
+        if (planPhase == 5)
         {
             // a bin at the end of each row (GRID), at the far end of the line (LONG TABLE), by the gate (RING)
             int bin = Dn("k_trashcan");
@@ -266,7 +310,7 @@ public partial class MapGen
             }
             hq_Yard_r = r;
         }
-        if (planPhase == 5)
+        if (planPhase == 6)
         {
             // the tap at the gate
             int first = nEmit;
@@ -274,20 +318,20 @@ public partial class MapGen
             if (WallPlace(Dn("gen_tap"), WM_NEAR, yardGX, yardGZ, WIN_ANY, 0, ref r) >= 0) Keep(first, false);
             hq_Yard_r = r;
         }
-        if (planPhase == 6)
+        if (planPhase == 7)
         {
             string[] pool = { "s_barrel", "s_chest", "r_tableRound" };
             GenRng r = SR(6);
             YardAccent(pool, r.Chance(500), ref r);
             ClearBans();
         }
-        if (planPhase == 7 && PhLoop(7, 100000))
+        if (planPhase == 8 && PhLoop(8, 100000))
         {
             if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 4; hq_Borders_soil = false; PhSubReset(); }
             PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
             if (fin) PhBreak();
         }
-        if (planPhase == 8)
+        if (planPhase == 9)
         {
             if (TraceRoom == room) System.Console.Error.WriteLine("  picnic sets " + hq_Yard_got + " of " + hq_Yard_want + " floor " + roomFloor[room]);
         }
@@ -409,6 +453,6 @@ public partial class MapGen
         }
     }
 
-    int hq_Yard_rule, hq_Yard_a, hq_Yard_b, hq_Yard_want, hq_Yard_got;
+    int hq_Yard_rule, hq_Yard_a, hq_Yard_b, hq_Yard_want, hq_Yard_got, hq_Yard_first;
     GenRng hq_Yard_r;
 }
