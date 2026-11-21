@@ -230,6 +230,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     [System.NonSerialized] public double[] stageMs = new double[32];
 
     const float CELL = 4f, INNER = 0.5f, WALL_HALF = 0.1f;
+    const float ROOF_CAP = 6f;   // the invisible wall on a building's roof (CellBody): no hop from anything reaches over it
     const int FACE_XN = 1, FACE_XP = 2, FACE_YN = 4, FACE_YP = 8, FACE_ZN = 16, FACE_ZP = 32, FACE_ALL = 63;
     const int B_GROUND = 0, B_WALLS = 1, B_ROOFS = 2, B_COLL = 3, B_SCENERY = 4;
 
@@ -1146,8 +1147,35 @@ public class MapBuilderUdon : UdonSharpBehaviour
             }
         }
         Track(land);
+        ReleasePad();
         groundFilter.sharedMesh = ToMesh(B_GROUND, "Ground");
         cellColour = null;
+    }
+
+    // Cor (playtest 2026-11-20): the hunters' start glows on the map, all round long. Two square frames of light on the
+    // release cell's floor, 3.4 and 2 m across, just over the ground (vertex alpha 0: PropLit draws them at full
+    // brightness, like a lamp's bulb). In the ground's mesh: no collider, and the END reveal leaves it.
+    void ReleasePad()
+    {
+        lv = Vector3.zero;
+        float cx = (gen.releaseX + 0.5f) * CELL, cz = (gen.releaseZ + 0.5f) * CELL;
+        Color32 hot = new Color32(255, 92, 60, 0), warm = new Color32(255, 156, 84, 0);
+        PadFrame(cx, cz, 1.7f, 0.2f, 0.014f, hot);
+        PadFrame(cx, cz, 1.0f, 0.08f, 0.014f, warm);
+    }
+
+    // a square frame of half size r and width w at height y round (cx, cz), facing up
+    void PadFrame(float cx, float cz, float r, float w, float y, Color32 col)
+    {
+        PadQuad(cx - r, cx + r, cz - r, cz - r + w, y, col);
+        PadQuad(cx - r, cx + r, cz + r - w, cz + r, y, col);
+        PadQuad(cx - r, cx - r + w, cz - r + w, cz + r - w, y, col);
+        PadQuad(cx + r - w, cx + r, cz - r + w, cz + r - w, y, col);
+    }
+
+    void PadQuad(float x0, float x1, float z0, float z1, float y, Color32 col)
+    {
+        Quad(B_GROUND, new Vector3(x0, y, z0), new Vector3(x0, y, z1), new Vector3(x1, y, z1), new Vector3(x1, y, z0), Vector3.up, col);
     }
 
     // the lane carries on past the release as a track into the country, fading into the grass (review 2: a way in)
@@ -2953,6 +2981,12 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Box3(sbuf, new Vector3(s0, h, zz0), new Vector3(s1, t, zz1), rc, rc, ceiling, FACE_ALL);
             }
             Slab(B_COLL, x * CELL - WALL_HALF, (x + 1) * CELL + WALL_HALF, z * CELL - WALL_HALF, (z + 1) * CELL + WALL_HALF, h, t, hx0, hx1, hz0, hz1, rc, rc, rc);
+            // Cor (playtest 2026-11-20: hiders hopped from rocks and poles onto the roofs): a wall on top of the building
+            // instead of a ceiling over the map. In the collision mesh only, over the roof slab's footprint: its sides
+            // rise ROOF_CAP from the roof's outer edges (none toward the building's own cells) and its top is out of
+            // reach, so a prop can neither land on a roof nor get over it. Low furniture, crates and tables stay hoppable.
+            if (top) Box(B_COLL, new Vector3(x * CELL - WALL_HALF, t, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, t + ROOF_CAP, (z + 1) * CELL + WALL_HALF),
+                         new Color32(0, 0, 0, 255), FACE_YP | (bw ? 0 : FACE_XN) | (be ? 0 : FACE_XP) | (bs ? 0 : FACE_ZN) | (bn2 ? 0 : FACE_ZP));
             // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider);
             // a space base keeps its roofs flat, with an orange parapet round the edge
             if (theme == GenData.THEME_SPACE && top)
