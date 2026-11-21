@@ -16,6 +16,8 @@ using UnityEngine.TextCore.LowLevel;
 //     fonts lack (accents from the Kenney fonts themselves, Cyrillic from Rubik, CJK from Noto Sans JP/KR/SC/TC; the
 //     TTFs in Assets/Lobby/Fonts/L10n come from Tools/make_l10n_fonts.py), hung under the Kenney fonts and
 //     LiberationSans as fallbacks. Re-run after any TSV edit.
+// Every cell is glued first (Glue): a space between a number (or a {0} placeholder) and the word after it becomes a
+// no-break space, so "10 s", "5 m" or "10 rounds" never split across lines (hop playtest), in every language.
 public static class TextBaker
 {
     public const string TextDir = "Assets/Udon/Text";
@@ -79,7 +81,7 @@ public static class TextBaker
                 for (int c = 1; c < head.Length && c < cells.Length; c++)
                 {
                     int l = System.Array.IndexOf(Codes, head[c].Trim());
-                    if (l >= 0) row[l] = cells[c].Trim().Replace("\\n", "\n");
+                    if (l >= 0) row[l] = Glue(cells[c].Trim().Replace("\\n", "\n"));
                 }
                 if (string.IsNullOrEmpty(row[0])) { t.warnings.Add(Path.GetFileName(path) + ":" + n + " " + key + " has no English"); row[0] = key; }
                 foreach (var code in Rtl)
@@ -98,6 +100,21 @@ public static class TextBaker
             }
         }
         return t;
+    }
+
+    // a number and the word after it held together (hop playtest: "10 s" split across lines on the trophy cards): the
+    // plain space between a digit or a placeholder's "}" and a letter becomes U+00A0, which TextMeshPro never breaks
+    // a line at (the Kenney fonts lack the glyph; TMP finds it in LiberationSans, TMP Settings' default font, and
+    // draws nothing for it). Before right-to-left shaping: RtlText cuts lines only at plain spaces too.
+    // LobbyBuilder.ReadTsv glues the same way, so the builders' English still matches the table's.
+    public const char Nbsp = ' ';
+    public static string Glue(string s)
+    {
+        if (string.IsNullOrEmpty(s) || s.IndexOf(' ') < 0) return s;
+        var sb = new System.Text.StringBuilder(s);
+        for (int i = 1; i + 1 < sb.Length; i++)
+            if (sb[i] == ' ' && (char.IsDigit(sb[i - 1]) || sb[i - 1] == '}') && char.IsLetter(sb[i + 1])) sb[i] = Nbsp;
+        return sb.ToString();
     }
 
     [MenuItem("PropHunt/Bake text table")]
@@ -145,7 +162,8 @@ public static class TextBaker
         foreach (var tmp in Object.FindObjectsOfType<TMP_Text>(true))
         {
             if (tmp.GetComponentInParent<TMP_InputField>(true) != null && tmp.GetComponentInParent<TMP_InputField>(true).textComponent == tmp) continue;
-            if (byEnglish.TryGetValue(tmp.text.Trim(), out int k) || byUpper.TryGetValue(tmp.text.Trim(), out k)) { labels.Add(tmp); labelKey.Add(k); }
+            string lt = Glue(tmp.text.Trim());   // (a label a builder wrote with a plain space still finds its glued row)
+            if (byEnglish.TryGetValue(lt, out int k) || byUpper.TryGetValue(lt, out k)) { labels.Add(tmp); labelKey.Add(k); }
         }
         text.labels = labels.ToArray(); text.labelKey = labelKey.ToArray();
         // longer languages shrink to fit their label instead of spilling out (Cor: "make sure all the text stays

@@ -135,7 +135,9 @@ public static partial class LobbyBuilder
         for (int i = 1; i < lines.Length; i++)
         {
             var c = lines[i].Split('\t');
-            if (c.Length >= 2 && c[0].Length > 0) d[c[0]] = c[1];
+            // the English as TextBaker.Read has it (trimmed, \n, numbers glued to their word), so the texts built from
+            // it still match the table's rows (static labels, PHText.En)
+            if (c.Length >= 2 && c[0].Length > 0) d[c[0]] = TextBaker.Glue(c[1].Trim().Replace("\\n", "\n"));
         }
         return d;
     }
