@@ -608,7 +608,7 @@ public partial class MapGenUdon
             lkTarget = SizeLeaks[size];
             lkPlaced = 0; lkAttempts = lkTarget * 14;
             lkTotalCells = 0;
-            for (int r = 0; r < nRooms; r++) if (roomZone[r] != GenData.Z_RELEASE) lkTotalCells += roomCellCount[r];
+            for (int r = 0; r < nRooms; r++) if (roomZone[r] != GenData.Z_RELEASE && roomType[r] != GenData.R_SCENERY) lkTotalCells += roomCellCount[r];   // revision 30: nothing leaks onto scenery ground
             lkPhase = 1; lkRun = false;
             return false;
         }
@@ -643,7 +643,7 @@ public partial class MapGenUdon
             int pick = RngRange(lkRng, totalCells), room = -1;
             for (int r = 0; r < nRooms; r++)
             {
-                if (roomZone[r] == GenData.Z_RELEASE) continue;
+                if (roomZone[r] == GenData.Z_RELEASE || roomType[r] == GenData.R_SCENERY) continue;
                 if (pick < roomCellCount[r]) { room = r; break; }
                 pick -= roomCellCount[r];
             }
