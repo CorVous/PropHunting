@@ -1667,6 +1667,7 @@ public partial class MapGenUdon
         {
             uint[] r5 = SR(5);
             int trees = TreeCount(room, r5);
+            trees = 0;   // revision 30 (Cor: gardens can just have veggies): no tree over the beds
             hq_PlanGarden_r5 = r5;
             hq_PlanGarden_trees = trees;
         }
@@ -1738,8 +1739,9 @@ public partial class MapGenUdon
         }
         if (planPhase == 32)
         {
-            // the beds along the fences
+            // the beds along the fences (revision 30: crop rows, on top of the budget the rest used)
             ClearBans();
+            if (roomFloorTarget[room] < roomFloor[room] + 9) roomFloorTarget[room] = roomFloor[room] + 9;
         }
         if (planPhase == 33 && PhLoop(33, 100000))
         {
