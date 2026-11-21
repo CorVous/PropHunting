@@ -246,13 +246,13 @@ public partial class MapGen
     // LayoutSite in phases, a step a call (autophase4); LayoutSite() above runs them to the end
     void LayoutSite_Body()
     {
-        planMax = 10;
+        planMax = 12;
         if (planPhase == 0)
         {
             GenRng rng = Rng(ST_LAYOUT, 0, 0);
             if (cvZone == null) { cvZone = new int[CV * CV]; cvInst = new int[CV * CV]; cvRoom = new int[CV * CV]; cvPlace = new int[CV * CV]; cvPlot = new int[CV * CV]; }
             for (int i = 0; i < CV * CV; i++) { cvZone[i] = GenData.Z_NONE; cvInst[i] = -1; cvRoom[i] = -1; cvPlace[i] = PL_NONE; cvPlot[i] = -1; }
-            nInst = 0; nSd = 0; nPlots = 0;
+            nInst = 0; nSd = 0; nPlots = 0; nClosedCv = 0;
             ydeckN = 0; ydeckDeals = 0;   // revision 29: a fresh deck of garden purposes for every try at a layout
 
             // the hunter release, where the lane begins
@@ -496,8 +496,18 @@ public partial class MapGen
 
             // (6) turn and mirror the whole site, and take it onto the outer grid
             layRng = rng;   // PlaceSite goes on with this stream, a step later (MapGen.Step, stage 9)
-            { hq_LayoutSite_ret = true; hq_LayoutSite_rng = rng; PhEnd(); return; }
             hq_LayoutSite_rng = rng;
+        }
+        // (5b) revision 30: the lawn nobody needs is closed, a plot a step (ClosePlot)
+        if (planPhase == 11 && PhLoop(11, 100000))
+        {
+            int k = planIter;
+            if (!(k < nPlots)) PhBreak();
+            else ClosePlot(k);
+        }
+        if (planPhase == 12)
+        {
+            { hq_LayoutSite_ret = true; PhEnd(); return; }
         }
     }
     void LayoutSite_L1()
@@ -1381,6 +1391,164 @@ public partial class MapGen
         }
     }
 
+    // ---- revision 30 (Cor: fewer outdoor areas, each with a purpose; keep some for getting about and a bit of
+    // space): every building stood in a ring of lawn four metres wide. A plot keeps its front garden, its patio, its
+    // purposes and yards, the cell outside each door and gate, and the shortest lawn path from each of those to the
+    // front garden (its one side passage); a path avoids the fence of a neighbour whose own passage runs along it, so
+    // two plots keep one passage between them. The rest of the open lawn is closed: it leaves the map (a fence against
+    // the garden, the house wall against the building, as at the map's edge) and the builder plants it solid. Nothing
+    // is drawn from the layout's stream, so a seed keeps its buildings, wood and gates.
+    public int nClosed;
+    public int[] closedX = new int[256], closedZ = new int[256];   // closed cells, world cells of the site
+    int nClosedCv;
+    int[] closedCv = new int[256];                                 // ... canvas cells while laying out
+    int[] clType = new int[256], clCost = new int[256], clPrev = new int[256], clKeep = new int[256];
+
+    void ClosePlot(int k)
+    {
+        int zone = plotZone[k], yi = plotInstY[k];
+        if (plotInstB[k] < 0 || yi < 0) return;   // a park or the zoo: all of it is the purpose
+        if (zone != GenData.Z_HOUSE && zone != GenData.Z_DINER && zone != GenData.Z_SHOP && zone != GenData.Z_GARAGE) return;
+        int A = plotAlong[k], D = plotDepth[k];
+        if (A > 16 || D > 16) return;
+        int nSrc = 0, nOpen = 0;
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int i = u * 16 + v, x, y;
+                PlotXY(k, u, v, out x, out y);
+                int c = y * CV + x;
+                clKeep[i] = 0; clCost[i] = (1 << 29); clPrev[i] = -1;
+                if (cvInst[c] != yi || cvRoom[c] < 0) { clType[i] = -1; continue; }
+                int t = siteType[yi * 26 + cvRoom[c]];
+                clType[i] = t;
+                if (cvPlace[c] == PL_FRONT) { clKeep[i] = 2; clCost[i] = 0; nSrc++; }
+                else if (t != GenData.R_LAWN_OPEN) clKeep[i] = 1;
+                else nOpen++;
+            }
+        if (nOpen == 0) return;
+        // the cells either side of every door and gate of this plot: ways in, like the front garden
+        for (int s = 0; s < nSd; s++)
+        {
+            if (sdKind[s] == SD_DOOR) continue;
+            int a = sdCell[s], b = (a / CV + DZ[sdDir[s]]) * CV + a % CV + DX[sdDir[s]];
+            for (int h = 0; h < 2; h++)
+            {
+                int c = h == 0 ? a : b;
+                if (c < 0 || c >= CV * CV || cvInst[c] != yi) continue;
+                int u, v;
+                if (!PlotUV(k, c, out u, out v)) continue;
+                if (clKeep[u * 16 + v] != 2) nSrc++;
+                clKeep[u * 16 + v] = 2; clCost[u * 16 + v] = 0;
+            }
+        }
+        if (nSrc == 0) return;
+        // the cheapest ways from the front garden over the plot's outdoor cells (Dijkstra; the plot is small)
+        for (int round = 0; round < A * D; round++)
+        {
+            int best = -1;
+            for (int u = 0; u < A; u++)
+                for (int v = 0; v < D; v++)
+                {
+                    int i = u * 16 + v;
+                    if (clType[i] < 0 || clCost[i] == (1 << 29) || clCost[i] < 0) continue;
+                    if (best < 0 || clCost[i] < clCost[best]) best = i;
+                }
+            if (best < 0) break;
+            int bc = clCost[best];
+            clCost[best] = -1 - bc;   // done
+            int bu = best / 16, bv = best % 16;
+            for (int d = 0; d < 4; d++)
+            {
+                int nu = bu + (d == 0 ? 1 : (d == 2 ? -1 : 0)), nv = bv + (d == 1 ? 1 : (d == 3 ? -1 : 0));
+                if (nu < 0 || nv < 0 || nu >= A || nv >= D) continue;
+                int ni = nu * 16 + nv;
+                if (clType[ni] < 0 || clCost[ni] < 0) continue;
+                int step = clKeep[ni] != 0 ? 4 : 10;
+                if (clKeep[ni] == 0 && NeighbourPassage(k, nu, nv)) step += 8;
+                if (bc + step < clCost[ni]) { clCost[ni] = bc + step; clPrev[ni] = best; }
+            }
+        }
+        // keep the way from every kept cell back to the front garden
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int i = u * 16 + v;
+                if (clKeep[i] != 1) continue;
+                int j = clPrev[i];
+                while (j >= 0 && clKeep[j] != 2) { if (clKeep[j] == 0) clKeep[j] = 3; j = clPrev[j]; }
+            }
+        // a bit of space (Cor): a lawn cell beside each purpose stays, room to walk round it
+        int room = (size == 2 || size == 3) ? 2 : 1;
+        for (int u = 0; u < A && room > 0; u++)
+            for (int v = 0; v < D && room > 0; v++)
+            {
+                int i = u * 16 + v;
+                if (clType[i] != GenData.R_LAWN_OPEN || clKeep[i] != 0) continue;
+                for (int d = 0; d < 4; d++)
+                {
+                    int nu = u + (d == 0 ? 1 : (d == 2 ? -1 : 0)), nv = v + (d == 1 ? 1 : (d == 3 ? -1 : 0));
+                    if (nu < 0 || nv < 0 || nu >= A || nv >= D) continue;
+                    int t = clType[nu * 16 + nv];
+                    if (t >= 0 && t != GenData.R_LAWN_OPEN && clKeep[nu * 16 + nv] != 0 && (t == GenData.R_PICNIC || t == GenData.R_GARDEN || t == GenData.R_DRYING || t == GenData.R_FIREPIT || t == GenData.R_CAMPSITE)) { clKeep[i] = 4; room--; break; }
+                }
+            }
+        // close the rest of the open lawn
+        int closed = 0;
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int i = u * 16 + v;
+                if (clType[i] != GenData.R_LAWN_OPEN || clKeep[i] != 0 || nClosedCv >= closedCv.Length) continue;
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                Put(x, y, GenData.Z_NONE, -1, -1, PL_NONE, -1);
+                closedCv[nClosedCv++] = y * CV + x;
+                clType[i] = -1;
+                closed++;
+            }
+        if (closed == 0) return;
+        // the open lawn that is left may lie in more pieces now: the plot's outdoor rooms again
+        for (int u = 0; u < A; u++)
+            for (int v = 0; v < D; v++)
+            {
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                if (cvInst[y * CV + x] == yi) cvRoom[y * CV + x] = -1;
+            }
+        LetterRooms(k, yi, clType);
+    }
+
+    // a plot cell from a canvas cell
+    bool PlotUV(int k, int c, out int u, out int v)
+    {
+        for (u = 0; u < plotAlong[k]; u++)
+            for (v = 0; v < plotDepth[k]; v++)
+            {
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                if (y * CV + x == c) return true;
+            }
+        u = -1; v = -1;
+        return false;
+    }
+
+    // whether an earlier plot keeps open lawn just across the fence from plot cell (u, v) of plot k
+    bool NeighbourPassage(int k, int u, int v)
+    {
+        int x, y;
+        PlotXY(k, u, v, out x, out y);
+        for (int d = 0; d < 4; d++)
+        {
+            int nx = x + DX[d], ny = y + DZ[d];
+            if (nx < 0 || ny < 0 || nx >= CV || ny >= CV) continue;
+            int n = ny * CV + nx, q = cvPlot[n];
+            if (q < 0 || q >= k || cvZone[n] != GenData.Z_LAWN || cvInst[n] != plotInstY[q] || cvRoom[n] < 0) continue;
+            if (siteType[cvInst[n] * 26 + cvRoom[n]] == GenData.R_LAWN_OPEN) return true;
+        }
+        return false;
+    }
+
     // ---- the turn onto the outer grid -----------------------------------------------------------------------
     int siteRot, siteMir, siteMinX, siteMinY, siteCW, siteCH;
 
@@ -1439,6 +1607,15 @@ public partial class MapGen
             int wx, wz;
             ToWorld(CO, 0, out wx, out wz);
             releaseX = wx; releaseZ = wz; releaseDir = DirToWorld(0);
+        }
+        // revision 30: the closed cells inside the site, for the builder's planting
+        nClosed = 0;
+        for (int k = 0; k < nClosedCv; k++)
+        {
+            int wx, wz;
+            ToWorld(closedCv[k] % CV, closedCv[k] / CV, out wx, out wz);
+            if (wx < 0 || wz < 0 || wx >= W || wz >= H) continue;
+            closedX[nClosed] = wx; closedZ[nClosed] = wz; nClosed++;
         }
         statGroundCells = 0;
         for (int c = 0; c < W * H; c++) if (cellZone[c] != GenData.Z_NONE && cellZone[c] != GenData.Z_RELEASE) statGroundCells++;
