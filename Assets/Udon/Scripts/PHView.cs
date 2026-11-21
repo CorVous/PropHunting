@@ -56,6 +56,13 @@ public class PHView : UdonSharpBehaviour
     float boltsAt = -99f;
     bool boltsOn;
     public Material capReady, capWait;
+    // the forced taunt's clock (hop playtest, Cor): a ring of pieces round the taunt cap (VR) and round a small icon on
+    // the desktop HUD, filling clockwise from the top towards the next forced taunt and emptying on a taunt
+    // (PHLocal.ForcedProgress). Only pieces switched on and off: nothing moves in the view.
+    public GameObject[] tauntRingSegs;      // VR: children of the taunt button
+    public GameObject deskTauntRing;        // desktop: the icon (its track and speaker) ...
+    public GameObject[] deskTauntSegs;      // ... and its pieces
+    int tauntRingShown = -2;
     // desktop: the controls, drawn as VRChat's own panels are (Cor): a picture for each state, bottom left, clear
     // of VRChat's rows (top left, top right)
     public RawImage legend;
@@ -318,6 +325,7 @@ public class PHView : UdonSharpBehaviour
             UpdateLegend(s, hider);
         }
         UpdateOutline(s, hider);
+        UpdateTauntRing(s, hider);
         hiderNow = hider;
         // the third-person camera renders every second frame while there is a prop to show
         frame++;
@@ -339,6 +347,19 @@ public class PHView : UdonSharpBehaviour
         }
     }
     int pipWarmRound = -1;
+
+    // the forced taunt's ring: as many pieces lit as the clock has run (none at all while there is no clock)
+    void UpdateTauntRing(PHSlot s, bool hider)
+    {
+        GameObject[] segs = vr ? tauntRingSegs : deskTauntSegs;
+        if (segs == null || segs.Length == 0) return;
+        float k = hider ? local.ForcedProgress(s) : -1f;
+        int n = k < 0f ? -1 : Mathf.Clamp(Mathf.CeilToInt(k * segs.Length - 0.001f), 0, segs.Length);
+        if (n == tauntRingShown) return;
+        tauntRingShown = n;
+        for (int i = 0; i < segs.Length; i++) if (segs[i] != null && segs[i].activeSelf != (i < n)) segs[i].SetActive(i < n);
+        if (!vr && deskTauntRing != null && deskTauntRing.activeSelf != (n >= 0)) deskTauntRing.SetActive(n >= 0);
+    }
 
     // the own prop's outline: shown while hiding, laid out anew when the prop changes. It is the footprint of the
     // prop's own collider boxes as the hider's body is moved (Cor: the projection should match the actual collider),
