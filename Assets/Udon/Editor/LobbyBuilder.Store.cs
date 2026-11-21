@@ -8,8 +8,8 @@ using UnityEngine.UI;
 
 // The weapon store (Cor, 2026-11-19; mock-up https://claude.ai/artifact/3mxFCbw1ypkM12yCjgjDtT):
 //   the weapon wall   the east wall: two paternoster shelves (PHShelf), guns on the north half, melee on the south,
-//                     every weapon of the catalog, floor to ceiling out of black holes, a floating panel with
-//                     up / down and the coins following the player
+//                     every weapon of the catalog, floor to ceiling out of black holes, a panel with up / down
+//                     and the coins at each half's inner end, by the middle of the wall (fixed: Cor)
 //   the dialog        the buy card / trophy note over a clicked weapon (PHStoreDialog)
 //   the Trophies board  the west wall, left of the score pad (PHTrophyBoard)
 //   PHStore           the catalog, the trophies' texts, the player's coins and trophies
@@ -208,6 +208,7 @@ public static partial class LobbyBuilder
         shelf.items = new Transform[slots]; shelf.itemMf = new MeshFilter[slots]; shelf.itemMr = new MeshRenderer[slots];
         shelf.tagShop = new GameObject[slots]; shelf.tagCool = new GameObject[slots]; shelf.tagGoofy = new GameObject[slots];
         shelf.price = new TextMeshPro[slots]; shelf.glow = new GameObject[slots];
+        shelf.slotCol = new Collider[slots];
         var glowMat = GlowPadMat();
         for (int r = 0; r < roots; r++)
         {
@@ -229,6 +230,7 @@ public static partial class LobbyBuilder
                 place.localPosition = new Vector3((Cols / 2f - 0.5f - c) * SlotW, 0f, Depth / 2f);
                 var col = place.gameObject.AddComponent<BoxCollider>();
                 col.center = new Vector3(0f, 0.28f, 0f); col.size = new Vector3(SlotW - 0.04f, 0.56f, Depth - 0.08f);
+                shelf.slotCol[k] = col;   // (off while the buy card is open: PHStoreDialog)
                 var ps = place.gameObject.AddUdonSharpComponent<PHShelfSlot>();
                 ps.shelf = shelf; ps.index = k;
                 UdonSharpEditorUtility.CopyProxyToUdon(ps);
@@ -266,12 +268,16 @@ public static partial class LobbyBuilder
             }
         }
 
-        // the floating panel (Cor: round buttons, slanted towards the player, no rail), 1 m out at hip height: up /
-        // down, and the coins. Its own +z faces the player; the plate tilts its top towards them.
-        float cz = Alcove + 0.9f;
+        // the panel (Cor: round buttons, slanted towards the player, no rail) at hip height: up / down, and the coins.
+        // A fixed place (Cor, hop playtest: no longer following the player): this half's inner end, by the middle of
+        // the wall, its middle 0.6 m from the wall's middle (the two halves' panels side by side with 0.2 m between),
+        // 0.45 m out from the opening, so it stands in front of nobody's shelves but the first column's lowest row.
+        // Its own +z faces the player; the plate tilts its top towards them. PHShelf sets its height.
+        float cz = Alcove + 0.45f;
+        float cx = (kind == 0 ? 1f : -1f) * (Mathf.Abs(at.z) - 0.6f);   // (+x is north: melee's inner end is +x, the guns' -x)
         var cart = new GameObject("Panel").transform;
-        cart.SetParent(t, false); cart.localPosition = new Vector3(0f, 0f, cz);
-        shelf.cart = cart; shelf.cartMin = -halfW + 0.5f; shelf.cartMax = halfW - 0.5f; shelf.cartZ = cz;
+        cart.SetParent(t, false); cart.localPosition = new Vector3(cx, 0f, cz);
+        shelf.cart = cart;
         var tilt = new GameObject("Tilt").transform;
         tilt.SetParent(cart, false); tilt.localPosition = new Vector3(0f, 1.05f, 0f); tilt.localRotation = Quaternion.Euler(35f, 0f, 0f);
         Oval(tilt, "Rim", new Vector3(0f, -0.015f, 0f), new Vector3(1.06f, 0.04f, 0.58f), woodDark);
