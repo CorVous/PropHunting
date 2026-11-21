@@ -1033,6 +1033,7 @@ public partial class MapGenUdon
         if (purpose == GenData.R_GARDEN) minCells = 1;
         else if (purpose == GenData.R_DRYING) { minCells = 1; maxCells = 2; }
         else if (purpose == GenData.R_FIREPIT) { minCells = 1; maxCells = 1; }
+        else if (purpose == GenData.R_CAMPSITE) maxCells = 4;   // two cells across both ways (below)
         // the candidate seeds, best first (scores at cand[3072 + i], cells at cand[3328 + i])
         int n = 0;
         for (int u = 0; u < plotAlong[k]; u++)
@@ -1081,6 +1082,18 @@ public partial class MapGenUdon
                 }
             }
             bool ok = got >= minCells;
+            if (ok && purpose == GenData.R_CAMPSITE)
+            {
+                // a camp in a strip one cell wide left no way past its tents (Keep took them back): it wants a
+                // piece two cells across both ways
+                int u0 = 16, u1 = -1, v0 = 16, v1 = -1;
+                for (int i = 0; i < got; i++)
+                {
+                    int uu = cand[3584 + i] / 16, vv = cand[3584 + i] % 16;
+                    if (uu < u0) u0 = uu; if (uu > u1) u1 = uu; if (vv < v0) v0 = vv; if (vv > v1) v1 = vv;
+                }
+                if (u1 == u0 || v1 == v0) ok = false;
+            }
             for (int i = 0; i < got; i++) type[cand[3584 + i]] = ok ? purpose : GenData.R_LAWN_OPEN;
             if (ok) return true;
         }
