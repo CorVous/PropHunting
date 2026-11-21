@@ -70,6 +70,11 @@ public class PHWeapons : UdonSharpBehaviour
     public Transform[] bullets;
     public TrailRenderer[] bulletTrails;
     public const float GUN_SCALE = 1.8f, BULLET_SPEED = 120f, BULLET_TRAIL = 1.5f;   // the trail's time is set on the TrailRenderers (WeaponBuilder)
+    // the halo (Cor, hop playtest): a glowing ring over the head of a caught hider or a hunter who is out, seen only by
+    // those who can see the dead (the other ghosts during the round; everyone in the END reveal); one per slot
+    // (WeaponBuilder), put over the avatar's head bone each frame
+    public Transform[] halo;
+    public const float HALO_UP = 0.3f;   // above the head bone, metres at avatar size 1
 
     // ---- how weapons sit and move (tunable)
     public Vector3 handEuler = new Vector3(-50f, 0f, 0f);     // VR and remote players: the weapon against the hand's tracking
@@ -132,6 +137,7 @@ public class PHWeapons : UdonSharpBehaviour
         int nb = bullets != null ? bullets.Length : 0;
         bFrom = new Vector3[nb]; bTo = new Vector3[nb]; bStart = new float[nb]; bTime = new float[nb]; bTimeLast = new float[nb]; bHit = new int[nb];
         for (int b = 0; b < nb; b++) { bullets[b].gameObject.SetActive(false); bTime[b] = -1f; }
+        if (halo != null) for (int i = 0; i < halo.Length; i++) halo[i].gameObject.SetActive(false);
     }
 
     // profiling (PHProfiler)
@@ -165,12 +171,16 @@ public class PHWeapons : UdonSharpBehaviour
         // so the slots are only looked over a few times a second (what a round left out is put away within 0.2 s)
         if (!round && (Time.frameCount % 12) != 0) { UpdateSelector(me, mine); UpdateBullets(); return; }
         int model = ModelNow();
+        // who sees the dead: a ghost of this round, and everyone in the reveal
+        PHSlot meS = mine >= 0 && mine < game.slots.Length ? game.slots[mine] : null;
+        bool seeDead = round && (phase == PHGame.PH_END || (meS != null && meS.ghost));
         for (int i = 0; i < held.Length; i++)
         {
             PHSlot s = i < game.slots.Length ? game.slots[i] : null;
             int pid = game.slotPlayer[i];
             // (Perf: an empty slot, most of the 32, once its weapon and gun are put away)
-            if (pid <= 0 && heldModel[i] == -1 && (hiderGun == null || i >= hiderGun.Length || !hiderGun[i].gameObject.activeSelf)) { heldOut[i] = false; continue; }
+            if (pid <= 0 && heldModel[i] == -1 && (hiderGun == null || i >= hiderGun.Length || !hiderGun[i].gameObject.activeSelf)
+                && (halo == null || i >= halo.Length || !halo[i].gameObject.activeSelf)) { heldOut[i] = false; continue; }
             bool show = round && s != null && pid > 0 && game.RoleOf(i) == PHGame.ROLE_HUNTER && s.round == game.round;
             VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
             if (p == null || !Utilities.IsValid(p)) show = false;
@@ -185,6 +195,7 @@ public class PHWeapons : UdonSharpBehaviour
                 if (s.hunterOut && i == watchSlot && Time.time < watchUntil) { local.statWeaponsBroken++; watchSlot = -1; }
             }
             UpdateHiderGun(i, s, i == mine);
+            UpdateHalo(i, s, pid, i == mine, seeDead);
             if (show && s.hunterOut) show = false;
             if (!show)
             {
@@ -280,6 +291,27 @@ public class PHWeapons : UdonSharpBehaviour
         // a slow bob, so it reads as floating
         g.SetPositionAndRotation(gunShown[i] + Vector3.up * (0.04f * Mathf.Sin(Time.time * 2.4f + i)), r);
         g.localScale = Vector3.one * GUN_SCALE;
+    }
+
+    // ------------------------------------------------------------------ the halo
+    // over a dead player's head (a caught hider, a hunter who is out; not a mid-round joiner), for those who see the
+    // dead; never one's own (it would hang over the view)
+    void UpdateHalo(int i, PHSlot s, int pid, bool mine, bool seeDead)
+    {
+        if (halo == null || i >= halo.Length) return;
+        Transform h = halo[i];
+        bool show = seeDead && !mine && s != null && pid > 0 && s.ghost && (s.caught || s.hunterOut) && s.round == game.round;
+        VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
+        if (show && (p == null || !Utilities.IsValid(p))) show = false;
+        if (h.gameObject.activeSelf != show) h.gameObject.SetActive(show);
+        if (!show) return;
+        float sc = AvatarScale(p);
+        Vector3 head = p.GetBonePosition(HumanBodyBones.Head);
+        if (head == Vector3.zero) head = p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
+        // a slow bob and a slight tilt, turning, so it reads as floating
+        h.SetPositionAndRotation(head + Vector3.up * (sc * (HALO_UP + 0.015f * Mathf.Sin(Time.time * 2f + i))),
+            Quaternion.Euler(0f, Time.time * 30f + i * 40f, 0f) * Quaternion.Euler(8f, 0f, 0f));
+        h.localScale = Vector3.one * sc;
     }
 
     Vector3 GunPlace(PHSlot s)
