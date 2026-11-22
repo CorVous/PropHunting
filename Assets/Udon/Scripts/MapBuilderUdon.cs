@@ -1991,6 +1991,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     bool[] defTintDone;
     MaterialPropertyBlock tintBlock;
     Color fenceTint = new Color(0, 0, 0, 0);
+    int fenceDef = -2;   // the def n_fence (TintProp), looked up once
 
     void Tint(GameObject go, Color c)
     {
@@ -2203,8 +2204,19 @@ public class MapBuilderUdon : UdonSharpBehaviour
     public void TintProp(GameObject go, int def)
     {
         if (go == null || def < 0) return;
-        if (theme == GenData.THEME_SPACE) return;   // a space base's twins keep theirs (autumn's orange trees are not green: untouched)
         if (defTint == null || defTint.Length != propPrefabs.Length) { defTint = new Color[propPrefabs.Length]; defTintDone = new bool[propPrefabs.Length]; }
+        // a space base's twins keep theirs (autumn's orange trees are not green: untouched), but not the crops: their
+        // models' leaves are cyan, and a vegetable garden on a space base looked blue (Cor). They take a plain green.
+        // a vegetable garden's low fence (revision 30): the map's wood, as the plots' fences
+        if (fenceDef == -2) { fenceDef = -1; string[] ids = gen.defId; for (int i = 0; i < ids.Length; i++) if (ids[i] == "n_fence") { fenceDef = i; break; } }
+        if (theme != GenData.THEME_SPACE && fencePrefab != null && def == fenceDef) { Tint(go, FenceTint()); return; }
+        bool crop = false;
+        if (theme == GenData.THEME_SPACE)
+        {
+            string id = gen.defId[def];
+            crop = id.StartsWith("n_crop") || id.StartsWith("n_lettuce") || id.StartsWith("n_corn") || id.StartsWith("n_wheat");
+            if (!crop) return;
+        }
         if (!defTintDone[def])
         {
             defTintDone[def] = true;
@@ -2214,7 +2226,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             // whole prop: a tan basket with a blue towel in it turned olive)
             if (avg.a > 0f && avg.b > avg.g * 0.72f && greenShare >= 0.2f)
             {
-                Color32 want = Blend(palGrass, C(54, 112, 58), 45);   // the map's green, darker and fuller than its grass
+                Color32 want = crop ? C(62, 126, 56) : Blend(palGrass, C(54, 112, 58), 45);   // the map's green, darker and fuller than its grass (a space base's grass is not green)
                 t = new Color(Mathf.Clamp(want.r / 255f / Mathf.Max(0.05f, avg.r), 0.3f, 1.6f), Mathf.Clamp(want.g / 255f / Mathf.Max(0.05f, avg.g), 0.3f, 1.6f),
                               Mathf.Clamp(want.b / 255f / Mathf.Max(0.05f, avg.b), 0.3f, 1.6f), 0.5f);   // alpha 0.5: the leaves only (PropLit, MergeOne). The trunk took the tint too and turned orange
             }
