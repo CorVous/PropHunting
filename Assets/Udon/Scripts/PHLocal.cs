@@ -75,6 +75,7 @@ public class PHLocal : UdonSharpBehaviour
         slotIndex = game.SlotOf(me.playerId);
         PHSlot s = Me();
         role = game.RoleOf(slotIndex);
+        huntJump = role == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT;
         game.Log("phase " + phase + " round " + game.round + " slot " + slotIndex + " role " + role);
         if (s != null) s.Claim();
         UpdateOrigin();   // (first: the landing, the release and the reveal below are places in the team's copy of the map)
@@ -476,8 +477,14 @@ public class PHLocal : UdonSharpBehaviour
         me.SetWalkSpeed(frozen ? 0f : 2f);
         me.SetRunSpeed(frozen ? 0f : 4f);
         me.SetStrafeSpeed(frozen ? 0f : 2f);
-        me.SetJumpImpulse(frozen ? 0f : 3f);
+        me.SetJumpImpulse(frozen ? 0f : (huntJump ? HUNTER_JUMP : 3f));
     }
+
+    // Cor (playtest 2026-11-22): hunters jump higher during the hunt. VRChat's default 3 lifts about 0.46 m; 5 about
+    // 1.27 m, a hider's hop (PHHiderBody.hopHeight 1.3) and over a fence (1.05). Everyone else, and the lobby, keep 3.
+    // The roofs' boxes and skirts (MapBuilderUdon.CellBody) stop a hunter as they stop a hider.
+    const float HUNTER_JUMP = 5f;
+    bool huntJump;
 
     // hunters pass through props (G45); hiders and everyone else collide with them
     void SetPropLayer(int layer)
