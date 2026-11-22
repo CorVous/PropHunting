@@ -898,6 +898,14 @@ public static class PropPrefabBaker
         c.size = new Vector3(Mathf.Max(0.001f, mx.x - mn.x), Mathf.Max(0.001f, mx.y - mn.y), Mathf.Max(0.001f, mx.z - mn.z));
     }
 
+    // a bush, flower or mushroom, or a natural plant a theme puts in place of one
+    static bool SoftPlant(int d)
+    {
+        string id = GenData.defId[d];
+        if (id.StartsWith("n_bush") || id.StartsWith("n_flower") || id.StartsWith("n_mushroom")) return true;
+        return (GenData.defKind[d] & GenData.K_PLANT) != 0 && GenData.IsNatural(d);
+    }
+
     static void BuildColliders(GameObject go, int def, int model, float sc)
     {
         int kind = GenData.defCollider[def];
@@ -907,6 +915,16 @@ public static class PropPrefabBaker
         float top = GenData.defTopY[def] / 1000f / sc;
         float cm = 0.01f / sc;
         if ((fl & GenData.FL_DECOR) != 0) return;
+        // A plant of leaves (bush, flower, mushroom) is one solid box over its middle (Cor, 22 Nov: a hider pushed
+        // into a bush). Its fitted boxes followed the separate leaves and filled 9 to 17% of a bush, so props slid
+        // in among them. Plants are scenery (GenData.SceneryRule), so there is no gap in them to hide in anyway.
+        // The box keeps to the middle 70% across and 85% of the height, so the leaf tips stay soft at the edges.
+        if (SoftPlant(def))
+        {
+            Vector3 c = (mn + mx) * 0.5f, h = (mx - mn) * 0.35f;
+            Add(go, new Vector3(c.x - h.x, Mathf.Max(mn.y, 0f), c.z - h.z), new Vector3(c.x + h.x, mn.y + 0.85f * (mx.y - mn.y), c.z + h.z));
+            return;
+        }
         // Fitted to the model (Cor: a small hider should get into the gaps a thing has: under a chair, between a
         // table's legs, into an open crate). The kinds whose collider is not the model's shape on purpose keep
         // theirs: a tree is only its trunk, a tent stays open, a flat thing is a thin base.
