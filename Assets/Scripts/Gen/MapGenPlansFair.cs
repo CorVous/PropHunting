@@ -353,6 +353,11 @@ public partial class MapGen
             GenRng r = SR(1);
             string[] stalls = { "f_stallRed", "f_stallGreen", "ck_food", "ck_drinks", "ck_info" };
             int s0 = r.Range(stalls.Length);
+            // revision 30 (Cor: there can be variation): one stall to as many as fit, in a row along one fence or
+            // spread round the midway
+            hq_Mid_want = 1 + r.Range(2 + AreaM2(room) / 24);
+            hq_Mid_row = r.Chance(500) ? 1 : 0;
+            hq_Mid_last = -1;
             hq_PlanMidway_dx = dx;
             hq_PlanMidway_dz = dz;
             hq_PlanMidway_stalls = stalls;
@@ -363,7 +368,7 @@ public partial class MapGen
             if (!PhSubActive())
             {
                 int k = planIter;
-                if (!(k < 2 + AreaM2(room) / 24 && Fit(1))) PhBreak();
+                if (!(k < hq_Mid_want && Fit(1))) PhBreak();
                 else { hq_PlanMidway_k = k; PhSubBegin(); }
             }
             if (PhSubActive())
@@ -393,7 +398,8 @@ public partial class MapGen
             int k = hq_PlanMidway_k;
             GenRng rk = SR(2 + k);
             int first = nEmit;
-            int st = WallPlace(Dn(stalls[(s0 + k) % stalls.Length]), WM_ANY, 0, 0, WIN_ANY, 0, ref rk);
+            int near = hq_Mid_row != 0 && hq_Mid_last >= 0 ? hq_Mid_last : -1;
+            int st = WallPlace(Dn(stalls[(s0 + k) % stalls.Length]), near >= 0 ? WM_NEAR : WM_ANY, near >= 0 ? emitX[near] : 0, near >= 0 ? emitZ[near] : 0, WIN_ANY, 0, ref rk);
             hq_PlanMidway_stalls = stalls;
             hq_PlanMidway_s0 = s0;
             hq_PlanMidway_rk = rk;
@@ -408,6 +414,7 @@ public partial class MapGen
             {
                 { hq_PlanMidway_first = first; hq_PlanMidway_st = st; PhEnd(); return; }
             }
+            hq_Mid_last = st;
             hq_PlanMidway_first = first;
             hq_PlanMidway_st = st;
         }
@@ -441,7 +448,8 @@ public partial class MapGen
         if (planPhase == 1)
         {
             GenRng r2 = SR(2);
-            if (Fit(2)) { hp_PlanRides_first = nEmit; if (PlaceGroup(GenData.FindGrp("queue"), room, GenData.A_OUT_OPEN, r2.Between(2, 3), 0, ref r2)) Keep(hp_PlanRides_first, false); }
+            // revision 30 (Cor: there can be variation): no queue rails now and then, else one to four
+            if (Fit(2) && r2.Chance(800)) { hp_PlanRides_first = nEmit; if (PlaceGroup(GenData.FindGrp("queue"), room, GenData.A_OUT_OPEN, r2.Between(1, 4), 0, ref r2)) Keep(hp_PlanRides_first, false); }
         }
         if (planPhase == 2)
         {
@@ -473,6 +481,7 @@ public partial class MapGen
     int hp_PlanSnackbar_first;
     string[] hp_PlanPrizeStore_rows;
     int hp_PlanRides_first;
+    int hq_Mid_want, hq_Mid_row, hq_Mid_last;
 
     // locals of the split plans and helpers, kept from one phase to the next (autophase4)
     int hq_PlanArcade_cell;

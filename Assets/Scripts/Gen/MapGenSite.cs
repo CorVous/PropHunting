@@ -246,7 +246,7 @@ public partial class MapGen
     // LayoutSite in phases, a step a call (autophase4); LayoutSite() above runs them to the end
     void LayoutSite_Body()
     {
-        planMax = 12;
+        planMax = 15;
         if (planPhase == 0)
         {
             GenRng rng = Rng(ST_LAYOUT, 0, 0);
@@ -432,7 +432,25 @@ public partial class MapGen
                 if (phReturn) { phReturn = false; PhEnd(); return; }
             }
         }
-        if (planPhase == 7)
+        // (2b) revision 30: the house gardens' purposes, the campsite and the vegetable garden first (DealPurposes)
+        if (planPhase == 7 && PhLoop(7, 100000))
+        {
+            int k = planIter;
+            if (k == 0) { mapCamp = false; mapGarden = false; }
+            if (!(k < nPlots)) PhBreak();
+            else ScanPlot(k);
+        }
+        if (planPhase == 8)
+        {
+            DealCampGarden();
+        }
+        if (planPhase == 9 && PhLoop(9, 100000))
+        {
+            int k = planIter;
+            if (!(k < nPlots)) PhBreak();
+            else DealPlot(k);
+        }
+        if (planPhase == 10)
         {
             // @cut
 
@@ -467,12 +485,12 @@ public partial class MapGen
                     }
             Sd(CO, 0, 0, SD_OPEN);
         }
-        if (planPhase == 8)
+        if (planPhase == 11)
         {
             // @cut
             SplitLane();
         }
-        if (planPhase == 9)
+        if (planPhase == 12)
         {
             GenRng rng = hq_LayoutSite_rng;
             int offL = hq_LayoutSite_offL;
@@ -485,7 +503,7 @@ public partial class MapGen
             hq_LayoutSite_offL = offL;
             hq_LayoutSite_offR = offR;
         }
-        if (planPhase == 10)
+        if (planPhase == 13)
         {
             GenRng rng = hq_LayoutSite_rng;
 
@@ -499,13 +517,13 @@ public partial class MapGen
             hq_LayoutSite_rng = rng;
         }
         // (5b) revision 30: the lawn nobody needs is closed, a plot a step (ClosePlot)
-        if (planPhase == 11 && PhLoop(11, 100000))
+        if (planPhase == 14 && PhLoop(14, 100000))
         {
             int k = planIter;
             if (!(k < nPlots)) PhBreak();
             else ClosePlot(k);
         }
-        if (planPhase == 12)
+        if (planPhase == 15)
         {
             { hq_LayoutSite_ret = true; PhEnd(); return; }
         }
@@ -994,7 +1012,16 @@ public partial class MapGen
             // stream (and every building after this plot) is as it was
             if (n > 0) rng.Range(n);
         }
-        if (zone == GenData.Z_HOUSE) YardPurposes(k, type);
+        if (zone == GenData.Z_HOUSE)
+        {
+            // revision 30 (Cor: gardens and campsites in square plots): a house's purposes are dealt once every plot
+            // is laid out (LayoutSite, stage 7: DealPurposes), so a campsite and a vegetable garden go to the plots
+            // that hold a block for them; the plot's types wait till then
+            for (int u = 0; u < plotAlong[k]; u++)
+                for (int v = 0; v < plotDepth[k]; v++) plotYT[k * 256 + u * 16 + v] = type[u * 16 + v];
+            plotWant[k] = (size == 2 || size == 3) ? 2 : 1;
+            return;
+        }
         LetterRooms(k, yi, type);
     }
 
@@ -1007,9 +1034,147 @@ public partial class MapGen
     int[] ydeck = new int[8];
     int ydeckN, ydeckDeals;
 
+    // ---- revision 30 (Cor: gardens and campsites in square plots; a strip one cell wide is not a campsite) -------
+    // A campsite and a vegetable garden take a block of the plot's back and side lawn two cells by two (8 x 8 m); a
+    // garden takes two by one (8 x 4 m) only when no plot of the map has a block of two by two. They are dealt before
+    // the deck, once every plot is laid out: the campsite on the best block of the map, then the garden on the best
+    // block left; the deck deals the other purposes after them (picnic grounds, drying yards and fire pits fit the
+    // narrow strips). The draws are the generator's (GEN_VERSION), not the layout's: a seed keeps its buildings.
+    int[] plotYT = new int[16 * 256];   // a house plot's yard types (u * 16 + v), kept from TypeYard till dealt
+    int[] plotWant = new int[16];       // how many purposes a house plot still takes
+    int[] ytype = new int[256];         // one plot's types while dealing
+    int[] plotBlk = new int[16 * 15];   // per plot: the campsite's, the garden's and the half garden's best block (score, u, v, w, d)
+    bool[] blkFree = new bool[256];
+    int[] blkNearB = new int[256];
+    int blkU, blkV, blkW, blkD;
+    bool mapCamp, mapGarden;
+
+    // a cell a purpose may take: open lawn of the plot's garden, not the front
+    void BlockMask(int k, int[] type)
+    {
+        for (int u = 0; u < plotAlong[k]; u++)
+            for (int v = 0; v < plotDepth[k]; v++)
+            {
+                int i = u * 16 + v;
+                blkFree[i] = false; blkNearB[i] = 0;
+                if (type[i] != GenData.R_LAWN_OPEN) continue;
+                int x, y;
+                PlotXY(k, u, v, out x, out y);
+                int c = y * CV + x;
+                if (cvInst[c] != plotInstY[k] || cvPlace[c] == PL_FRONT) continue;
+                blkFree[i] = true;
+                for (int d = 0; d < 4; d++) if (GenData.IsBuilding(CvZone(x + DX[d], y + DZ[d]))) blkNearB[i]++;
+            }
+    }
+
+    // the best block of bw x bd cells (either way round) for the purpose on plot k (BlockMask first): its score, or -1
+    int PurposeBlock(int k, int purpose, int bw, int bd, ref GenRng pr)
+    {
+        int A = plotAlong[k], D = plotDepth[k], best = -1;
+        for (int o = 0; o < 2; o++)
+        {
+            if (o == 1 && bw == bd) break;
+            int w = o == 0 ? bw : bd, d = o == 0 ? bd : bw;
+            for (int u0 = 0; u0 + w <= A; u0++)
+                for (int v0 = 0; v0 + d <= D; v0++)
+                {
+                    bool ok = true;
+                    int nearB = 0;
+                    for (int u = u0; u < u0 + w && ok; u++)
+                        for (int v = v0; v < v0 + d && ok; v++)
+                        {
+                            if (!blkFree[u * 16 + v]) ok = false;
+                            else nearB += blkNearB[u * 16 + v];
+                        }
+                    if (!ok) continue;
+                    // a vegetable garden lies along the plot's fence (the site tests want one), best the back fence
+                    bool back = v0 + d == D, edge = back || u0 == 0 || u0 + w == A;
+                    if (purpose == GenData.R_GARDEN && !edge) continue;
+                    // room round it: open lawn beside the block (a way past it, a bit of space)
+                    int room = 0;
+                    for (int u = u0; u < u0 + w; u++)
+                    {
+                        if (v0 > 0 && blkFree[u * 16 + v0 - 1]) room++;
+                        if (v0 + d < D && blkFree[u * 16 + v0 + d]) room++;
+                    }
+                    for (int v = v0; v < v0 + d; v++)
+                    {
+                        if (u0 > 0 && blkFree[(u0 - 1) * 16 + v]) room++;
+                        if (u0 + w < A && blkFree[(u0 + w) * 16 + v]) room++;
+                    }
+                    int score = pr.Range(100) + 30 * (room < 4 ? room : 4);
+                    if (purpose == GenData.R_CAMPSITE) score += nearB == 0 ? 300 : 0;   // the fire away from the walls
+                    else if (back) score += 200;
+                    if (score > best) { best = score; blkU = u0; blkV = v0; blkW = w; blkD = d; }
+                }
+        }
+        return best;
+    }
+
+    void MarkBlock(int k, int u0, int v0, int w, int d, int purpose)
+    {
+        for (int u = u0; u < u0 + w; u++)
+            for (int v = v0; v < v0 + d; v++) plotYT[k * 256 + u * 16 + v] = purpose;
+    }
+
+    // DealPurposes, step one (a plot a step): the plot's best blocks for a campsite, a garden and a half garden
+    void ScanPlot(int k)
+    {
+        for (int j = 0; j < 3; j++) plotBlk[k * 15 + j * 5] = -1;
+        if (plotZone[k] != GenData.Z_HOUSE || plotWant[k] <= 0) return;
+        for (int i = 0; i < 256; i++) ytype[i] = plotYT[k * 256 + i];
+        BlockMask(k, ytype);
+        for (int j = 0; j < 3; j++)
+        {
+            GenRng pr = GenRng.Sub(seed, (uint)GenData.GEN_VERSION, 9300 + attempt, k * 3 + j, size);
+            int s = PurposeBlock(k, j == 0 ? GenData.R_CAMPSITE : GenData.R_GARDEN, 2, j == 2 ? 1 : 2, ref pr);
+            int o = k * 15 + j * 5;
+            plotBlk[o] = s;
+            if (s >= 0) { plotBlk[o + 1] = blkU; plotBlk[o + 2] = blkV; plotBlk[o + 3] = blkW; plotBlk[o + 4] = blkD; }
+        }
+    }
+
+    // DealPurposes, step two: the campsite on the map's best block, then the garden on the best block left
+    void DealCampGarden()
+    {
+        mapCamp = false; mapGarden = false;
+        int kc = -1;
+        for (int k = 0; k < nPlots; k++) if (plotBlk[k * 15] >= 0 && (kc < 0 || plotBlk[k * 15] > plotBlk[kc * 15])) kc = k;
+        if (kc >= 0)
+        {
+            int o = kc * 15;
+            MarkBlock(kc, plotBlk[o + 1], plotBlk[o + 2], plotBlk[o + 3], plotBlk[o + 4], GenData.R_CAMPSITE);
+            plotWant[kc]--; mapCamp = true;
+            ScanPlot(kc);   // what the campsite's plot holds now
+        }
+        for (int j = 1; j <= 2 && !mapGarden; j++)
+        {
+            // (a half garden only when no plot holds a whole one)
+            int kg = -1;
+            for (int k = 0; k < nPlots; k++)
+            {
+                int s = plotBlk[k * 15 + j * 5];
+                if (s >= 0 && plotWant[k] > 0 && (kg < 0 || s > plotBlk[kg * 15 + j * 5])) kg = k;
+            }
+            if (kg < 0) continue;
+            int o = kg * 15 + j * 5;
+            MarkBlock(kg, plotBlk[o + 1], plotBlk[o + 2], plotBlk[o + 3], plotBlk[o + 4], GenData.R_GARDEN);
+            plotWant[kg]--; mapGarden = true;
+        }
+    }
+
+    // DealPurposes, step three (a plot a step): the deck deals the plot's other purposes, then its outdoor rooms
+    void DealPlot(int k)
+    {
+        if (plotZone[k] != GenData.Z_HOUSE) return;
+        for (int i = 0; i < 256; i++) ytype[i] = plotYT[k * 256 + i];
+        YardPurposes(k, ytype);
+        LetterRooms(k, plotInstY[k], ytype);
+    }
+
     void YardPurposes(int k, int[] type)
     {
-        int want = (size == 2 || size == 3) ? 2 : 1;
+        int want = plotWant[k];
         GenRng pr = GenRng.Sub(seed, (uint)GenData.GEN_VERSION, 9100 + attempt, k, size);
         for (int w = 0; w < want; w++)
         {
@@ -1019,8 +1184,17 @@ public partial class MapGen
                 int[] all = { GenData.R_PICNIC, GenData.R_GARDEN, GenData.R_DRYING, GenData.R_FIREPIT, GenData.R_CAMPSITE };
                 for (int i = 0; i < all.Length; i++) ydeck[i] = all[i];
                 ydeckN = all.Length;
-                GenRng dr = GenRng.Sub(seed, (uint)GenData.GEN_VERSION, 9200 + attempt, ydeckDeals++, size);
+                GenRng dr = GenRng.Sub(seed, (uint)GenData.GEN_VERSION, 9200 + attempt, ydeckDeals, size);
                 Shuffle(ydeck, ydeckN, ref dr);
+                // the first deck: without the campsite and the garden dealt before it
+                if (ydeckDeals == 0)
+                {
+                    int n = 0;
+                    for (int i = 0; i < ydeckN; i++)
+                        if (!(ydeck[i] == GenData.R_CAMPSITE && mapCamp) && !(ydeck[i] == GenData.R_GARDEN && mapGarden)) ydeck[n++] = ydeck[i];
+                    ydeckN = n;
+                }
+                ydeckDeals++;
             }
             // the first purpose of the deck that this plot's lawn can hold
             bool done = false;
@@ -1038,6 +1212,15 @@ public partial class MapGen
     // one purpose on plot k's back and side lawn: the best seed cell for it, grown to the purpose's size
     bool YardPurpose(int k, int[] type, int purpose, ref GenRng pr)
     {
+        if (purpose == GenData.R_CAMPSITE || purpose == GenData.R_GARDEN)
+        {
+            // revision 30: a whole block of two by two, or not on this plot
+            BlockMask(k, type);
+            if (PurposeBlock(k, purpose, 2, 2, ref pr) < 0) return false;
+            for (int u = blkU; u < blkU + blkW; u++)
+                for (int v = blkV; v < blkV + blkD; v++) type[u * 16 + v] = purpose;
+            return true;
+        }
         int minCells = 2, maxCells = 3;
         if (purpose == GenData.R_GARDEN) minCells = 1;
         else if (purpose == GenData.R_DRYING) { minCells = 1; maxCells = 2; }
