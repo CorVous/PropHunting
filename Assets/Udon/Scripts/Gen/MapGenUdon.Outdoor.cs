@@ -1833,6 +1833,8 @@ public partial class MapGenUdon
             int cx = cell % IW, cz = cell / IW;
             bool alongX = RoomLongAxis(room) == 0;
             int hw = alongX ? 3 : 2, hd = alongX ? 2 : 3;
+            // revision 30 (Cor: gardens can just have veggies): a vegetable garden's plot has three rows
+            if (roomType[room] == GenData.R_GARDEN) { if (alongX) hd = 3; else hw = 3; }
             for (int z = cz - hd; z < cz + hd; z++)
                 for (int x = cx - hw; x < cx + hw; x++)
                 {
@@ -1857,7 +1859,7 @@ public partial class MapGenUdon
             if (!PhSubActive())
             {
                 int row = planIter;
-                if (!(row < 2 && Fit(3))) PhBreak();
+                if (!(row < (roomType[pRoom] == GenData.R_GARDEN ? 3 : 2) && (Fit(3) || roomType[pRoom] == GenData.R_GARDEN))) PhBreak();
                 else { hq_VegPlot_row = row; PhSubBegin(); }
             }
             if (PhSubActive())
@@ -1886,7 +1888,7 @@ public partial class MapGenUdon
             if (ChooseMembers(g, room, RngBetween(rng, 3, 4), rng) < 3) { hq_VegPlot_rng = rng; hq_VegPlot_room = room; hq_VegPlot_alongX = alongX; hq_VegPlot_crops = crops; hq_VegPlot_c0 = c0; hq_VegPlot_mx = mx; hq_VegPlot_mz = mz; PhEnd(); return; }
             BuildFormation(GenData.GL_ROW, grpGapMm[g], rng);
             int first = nEmit;
-            int across = (row == 0 ? -1 : 1) * 450 - fDep / 2;
+            int across = (roomType[room] == GenData.R_GARDEN ? (row - 1) * 900 : (row == 0 ? -1 : 1) * 450) - fDep / 2;
             int rot = alongX ? 0 : 1;
             fHost = H_NATURE;
             int e = StampFormation(room, rot, (alongX ? mx : mz) - fLen / 2, (alongX ? mz : mx) + across, -1, 0, g, -1);
