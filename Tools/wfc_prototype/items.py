@@ -19,6 +19,7 @@ NAMES = ["VOID", "FLOOR", "GRASS", "LAWN", "PAVING", "BOARDS", "RUG",
          "NIGHTSTAND", "WARDROBE", "DESK", "ARMCHAIR", "PLANT", "SHELF", "COUNTER", "STOVE", "FRIDGE",
          "SINK", "TOILET", "TUB", "BASIN", "TILL", "WORKBENCH", "TOOLCHEST", "ALTAR",
          "LAMP", "COATRACK", "BENCH", "DRESSER", "TOYBOX", "WASHER", "BASKET", "FIREPLACE", "CABINET", "FREEZER", "DISPLAY", "ARCADE", "BIN",
+         "TOY", "BOOKS", "SHOES", "CUSHION", "STOOL", "BUCKET", "SBOX", "BOTTLES", "TOOLS", "POT",       # small things on the floor: walked around, never in the way
          "TABLESET", "COUNTERKIT", "DESKPC", "SHELFSET", "NIGHTLAMP", "DRESSERSET", "CABINETSET",    # a piece with things on it
          "VIEW_NS", "VIEW_EW", "VIEWT_NS", "VIEWT_EW"]           # the rug between a TV and its sofa (VIEWT: with the coffee table on it)
 for base in ("SEAT", "CHAIR", "BEDH", "BEDF", "TV", "SOFA"):
@@ -42,13 +43,23 @@ def group(t):
 
 GROUP = [group(t) for t in range(NT)]
 GROUND = {ID[n] for n in ("FLOOR", "GRASS", "LAWN", "PAVING", "BOARDS", "RUG")}
-WALK = GROUND | {t for t in range(NT) if GROUP[t] in ("FERN", "MUSHROOM", "FLOWERS", "TRAIL", "BLANKET", "REEDS", "VEG", "LINE", "VIEW")}
+SMALL = ("TOY", "BOOKS", "SHOES", "CUSHION", "STOOL", "BUCKET", "SBOX", "BOTTLES", "TOOLS", "POT")
+WALK = GROUND | {t for t in range(NT) if GROUP[t] in ("FERN", "MUSHROOM", "FLOWERS", "TRAIL", "BLANKET", "REEDS", "VEG", "LINE", "VIEW") + SMALL}
+NOCOUNT = ("TRAIL", "BEDF", "VIEW", "WATER", "REEDS", "POST")      # not a piece of its own when the fill of a place is counted
 NATURAL = {t for t in range(NT) if GROUP[t] in ("TREE", "BUSH", "FERN", "ROCK", "LOG", "STUMP", "MUSHROOM", "FLOWERS", "WATER", "REEDS", "HEDGE", "FLOWERBED", "TRAIL")}
 NEED_WALL = {"LAMP", "COATRACK", "BENCH", "DRESSER", "WASHER", "FIREPLACE", "CABINET", "FREEZER", "ARCADE", "NIGHTSTAND", "WARDROBE", "DESK", "SHELF", "COUNTER", "STOVE", "FRIDGE", "SINK", "TOILET", "TUB", "BASIN", "TILL", "WORKBENCH", "ALTAR"}
 FORCED = {"CHAIR", "SEAT", "BEDF", "POST", "LINE", "TRAIL", "VIEW", "VIEWT", "SOFA", "TV"}
 TWO = {ID[x] for x in ("TABLESET", "COUNTERKIT", "DESKPC", "SHELFSET", "NIGHTLAMP", "DRESSERSET", "CABINETSET")} | {t for t in range(NT) if GROUP[t] == "VIEWT"}      # a piece with another on it
 SETRATE = {"TABLE": 7, "COUNTER": 4, "DESK": 8, "SHELF": 7, "NIGHTSTAND": 7, "DRESSER": 6, "CABINET": 5}
 FORCEDW = {"VIEW": 5, "VIEWT": 1, "SOFA": 5, "TV": 5, "LINE": 3, "POST": 2}      # pieces that only come with another: never cut by the cover budget
+
+
+# how many things a piece can carry (the generator's slots)
+TOPS = dict(TABLE=3, COUNTER=2, DESK=3, SHELF=3, RACK=3, CABINET=2, DRESSER=2, NIGHTSTAND=1, CRATE=1, WORKBENCH=3, DISPLAY=2, TILL=1, FREEZER=1, TOOLCHEST=1, ALTAR=2,
+            BENCH=1, BARREL=1, WASHER=1, TOYBOX=1, FIREPLACE=2, PEW=1, HAY=1, STOVE=1, FRIDGE=1, BASIN=1, COATRACK=1)
+# a piece that may turn up in the wrong room (the generator's leaks)
+LEAKS = ("TOYBOX", "BASKET", "CRATE", "BARREL", "ARMCHAIR", "PLANT", "BIN", "TOOLCHEST", "TOY", "BOOKS", "SHOES", "CUSHION", "STOOL", "BUCKET", "SBOX", "BOTTLES", "TOOLS", "POT")
+LEAK_BUDGET = [8, 11, 15, 18]
 
 
 def trail_mask(t): return int(NAMES[t][5:])
@@ -139,7 +150,7 @@ PROFILE = {
     "churchyard": prof("LAWN", dict(GRAVE=45, FLOWERBED=15, HEDGE=6, TREE=14), aff=dict(FLOWERBED=2), cover=(14, 24)),
     "cabinyard": prof("LAWN", dict(SEAT=4000, LOG=40, STUMP=30, TREE=25, BUSH=15), must=["FIRE"], cap=dict(SEAT=3), cover=(14, 26)),
     "park": prof("LAWN", dict(FLOWERS=60, TREE=30, BUSH=15, TABLE=5, CHAIR=2500, WATER=1), must=["WATER"], cap=dict(TABLE=3, WATER=14, REEDS=12, CHAIR=5), aff=dict(FLOWERS=4), cover=(12, 22)),
-    "zoo": prof("LAWN", dict(HEDGE=50, ROCK=35, TREE=25, BUSH=20, WATER=1), must=["WATER"], cap=dict(WATER=10, REEDS=8), aff=dict(HEDGE=4), cover=(16, 28)),
+    "zoo": prof("LAWN", dict(HEDGE=50, ROCK=35, TREE=25, BUSH=20, WATER=1, TABLE=5, CHAIR=3000, DISPLAY=4), must=["WATER"], cap=dict(WATER=10, REEDS=8, TABLE=3, CHAIR=8, DISPLAY=2), aff=dict(HEDGE=4), cover=(16, 28)),
     # indoors: a cap of (n, m) is n in a room of one outer cell and m more for every further cell
     "living": prof("BOARDS", dict(SOFA=25, ARMCHAIR=60, PLANT=120, LAMP=120, SHELF=220, CABINET=120, FIREPLACE=60, TABLE=15, CHAIR=2500, RUG=40), must=[("TV", "SOFA", "ARMCHAIR")],
                    cap=dict(TV=1, SOFA=(2, 1), ARMCHAIR=(1, 1), PLANT=(1, 1), LAMP=(1, 1), SHELF=(2, 1), CABINET=(1, 1), FIREPLACE=1, TABLE=1, CHAIR=2, RUG=(4, 3), VIEWT=1), aff=dict(RUG=6), cover=(26, 38)),
@@ -173,6 +184,28 @@ PROFILE = {
     "playroom": prof("BOARDS", dict(RUG=100, SHELF=250, TOYBOX=200, CRATE=50, TABLE=30, CHAIR=4000, ARMCHAIR=50, LAMP=60),
                      cap=dict(SHELF=(1, 1), TOYBOX=(2, 1), CRATE=2, TABLE=1, CHAIR=3, ARMCHAIR=1, LAMP=1, RUG=(6, 3)), aff=dict(RUG=6), cover=(22, 34)),
 }
+# how full each kind of place is in today's generator: pieces on the ground and things on furniture per 100 m2
+# (measured over 100 seeds a size with bench/current), and the small floor things that belong there
+DENS = dict(wood=(22, 0), green=(16, 0), picnic=(28, 5), veg=(33, 0), drying=(25, 0), firepit=(30, 0), campsite=(27, 0), patio=(30, 10), yard=(20, 2), farm=(30, 0),
+            churchyard=(30, 0), cabinyard=(35, 0), park=(32, 0), zoo=(36, 6),
+            living=(26, 9), kitchen=(30, 7), dining=(30, 12), dinerdining=(28, 10), bedroom=(29, 9), bunkroom=(35, 4), bath=(34, 2), office=(34, 17), hall=(14, 2),
+            store=(38, 22), shop=(36, 2), arcade=(25, 1), workshop=(30, 11), barn=(32, 7), cabin=(31, 6), nave=(22, 4), playroom=(40, 2))
+SMALLW = dict(
+    living=dict(CUSHION=120, BOOKS=90, TOY=50, STOOL=70, SHOES=30, POT=60), kitchen=dict(STOOL=120, BOTTLES=110, BUCKET=60, SBOX=70, POT=50),
+    dining=dict(STOOL=90, BOTTLES=60, CUSHION=40, POT=70, SBOX=40), dinerdining=dict(STOOL=140, BOTTLES=60, SBOX=50, POT=60),
+    bedroom=dict(SHOES=110, BOOKS=110, CUSHION=90, TOY=80, SBOX=60, STOOL=40), bunkroom=dict(SHOES=140, BOOKS=60, SBOX=90, BUCKET=40, CUSHION=60),
+    bath=dict(BUCKET=110, BOTTLES=120, STOOL=70, SHOES=40, POT=40), office=dict(BOOKS=140, SBOX=110, STOOL=50, POT=50),
+    hall=dict(SHOES=160, SBOX=50, POT=60, STOOL=40), store=dict(SBOX=220, BUCKET=90, BOTTLES=110, TOOLS=70, BOOKS=40),
+    shop=dict(SBOX=160, BOTTLES=110, STOOL=40, BUCKET=40), arcade=dict(STOOL=160, BOTTLES=60, SBOX=50, TOY=60),
+    workshop=dict(TOOLS=200, BUCKET=110, SBOX=110, STOOL=70, BOTTLES=50), barn=dict(BUCKET=160, TOOLS=120, SBOX=80, STOOL=40),
+    cabin=dict(CUSHION=70, BOOKS=70, SHOES=70, BUCKET=60, STOOL=80, TOOLS=40), nave=dict(BOOKS=110, CUSHION=90, STOOL=70, POT=70),
+    playroom=dict(TOY=320, CUSHION=140, BOOKS=110, SBOX=70, STOOL=50),
+    picnic=dict(TOY=14, BUCKET=8, POT=14, CUSHION=8, BOTTLES=6), veg=dict(BUCKET=10, TOOLS=10, POT=12, SBOX=5), drying=dict(BUCKET=14, POT=14, TOY=10, STOOL=6),
+    firepit=dict(BUCKET=8, STOOL=10, BOTTLES=8, TOOLS=5), campsite=dict(BUCKET=10, STOOL=10, BOTTLES=8, SBOX=8, SHOES=5),
+    patio=dict(POT=30, STOOL=20, BOTTLES=10, SBOX=8), yard=dict(SBOX=25, BUCKET=14, TOOLS=12, BOTTLES=10), farm=dict(BUCKET=10, TOOLS=10, SBOX=5),
+    churchyard=dict(POT=12, BUCKET=4), cabinyard=dict(BUCKET=12, TOOLS=14, STOOL=10, SBOX=6), park=dict(TOY=5, POT=5), zoo=dict(BUCKET=8, POT=8, SBOX=5))
+for _k, _w in SMALLW.items():
+    PROFILE[_k]["w"].update(_w)
 ROOM_KIND = {1: "living", 2: "kitchen", 3: "dining", 4: "bedroom", 5: "bath", 6: "office", 7: "bedroom", 8: "hall", 9: "store", 37: "bedroom", 38: "playroom", 39: "store",
              20: "store", 21: "store", 22: "office", 24: "shop", 25: "store", 26: "office", 27: "workshop", 28: "store", 34: "barn", 35: "store", 36: "workshop",
              29: "cabin", 33: "bunkroom", 59: "arcade", 60: "kitchen", 61: "store", 64: "nave", 65: "office", 30: "dinerdining", 31: "kitchen", 32: "store"}
@@ -232,7 +265,7 @@ class Items:
                 keys[key] = len(self.regions)
                 pr = PROFILE[kind]
                 self.regions.append(dict(key=key, kind=kind, prof=pr, cells=[], count={}, block=0,
-                                         cover=pr["cover"][0] + rng.range(pr["cover"][1] - pr["cover"][0] + 1), lean=70 + rng.range(71)))
+                                         cover=pr["cover"][0] + rng.range(pr["cover"][1] - pr["cover"][0] + 1), lean=70 + rng.range(71), fill=78 + rng.range(45)))
             okey[oc] = keys[key]
         self.reg = [-1] * (n * n)
         for c in range(n * n):
@@ -296,7 +329,26 @@ class Items:
             self.layout()
         rng = self.rng = Rng.sub(s.seed, 100, 4, self.attempt, s.size)
         for r in self.regions:
-            r["count"], r["block"] = {}, 0
+            r["count"], r["block"], r["pieces"], r["leak"] = {}, 0, 0, []
+            d = DENS[r["kind"]]
+            aim = 100
+            v = d[0] * len(r["cells"]) * r["fill"] * aim
+            r["need"] = v // 1000000 + (1 if rng.range(1000000) < v % 1000000 else 0)
+            v = d[1] * len(r["cells"]) * r["fill"]
+            r["need_top"] = v // 10000 + (1 if rng.range(10000) < v % 10000 else 0)
+            r["free"] = sum(1 for c in r["cells"] if c not in self.clear)
+        # a few pieces turn up where they do not belong
+        self.leaks = 0
+        homes = [r for r in self.regions if r["key"][0] in ("room", "yard") and len(r["cells"]) >= F * F]
+        want = LEAK_BUDGET[s.size] if homes else 0
+        for _ in range(want * 6):
+            if want == 0:
+                break
+            r = homes[rng.range(len(homes))]
+            g = LEAKS[rng.range(len(LEAKS))]
+            if g not in r["prof"]["w"] and g not in r["leak"] and len(r["leak"]) < 2:
+                r["leak"].append(g)
+                want -= 1
         wv = self.wv = Wave(n, n, NT, COMPAT, VOID, self.walls)
         self.missed = 0
         # what each cell may hold: its place's pieces; ground only on the way through a door; wall pieces at walls
@@ -306,7 +358,7 @@ class Items:
                 wv.restrict(c, 1 << VOID)
                 continue
             pr = self.regions[r]["prof"]
-            groups = set(pr["w"])
+            groups = set(pr["w"]) | set(self.regions[r]["leak"])
             for alts in pr["must"]:
                 groups |= set(alts) if isinstance(alts, tuple) else {alts}
             for g in list(groups):
@@ -328,6 +380,7 @@ class Items:
             musts = list(r["prof"]["must"])
             if r["kind"] == "wood" and len(r["cells"]) >= 48:
                 musts += ["FIRE"]
+            musts += r["leak"]
             for alts in musts:
               for g in (alts if isinstance(alts, tuple) else (alts,)):      # the first of the alternatives that fits
                 cands = [c for c in r["cells"] if not wv.decided(c) and any(wv.wave[c] >> t & 1 and GROUP[t] == g for t in range(NT))]
@@ -335,13 +388,15 @@ class Items:
                     inner = [c for c in cands if not self.edge[c]]
                     cands = inner or cands
                 if not cands:
-                    if g == (alts[-1] if isinstance(alts, tuple) else alts):
+                    if g == (alts[-1] if isinstance(alts, tuple) else alts) and g not in r["leak"]:
                         self.missed += 1
                     continue
                 c = cands[rng.range(len(cands))]
                 opts = [t for t in range(NT) if wv.wave[c] >> t & 1 and GROUP[t] == g]
                 if not self.put(c, opts[rng.range(len(opts))]):
                     return self.failed("must " + g)
+                if g in r["leak"]:
+                    self.leaks += 1
                 break
         # a trail into the wood from where it meets the lane or the green
         for r in self.regions:
@@ -385,6 +440,16 @@ class Items:
             c = cand[rng.range(len(cand))]
             opts = [t for t in range(NT) if wv.wave[c] >> t & 1]
             wts = [self.weight(c, t, opts) for t in opts]
+            # the place's fill: the chance of a piece here is what the place still needs over the cells it has left
+            rr = self.regions[self.reg[c]]
+            gi = ID[rr["prof"]["ground"]]
+            free = [i for i, t in enumerate(opts) if t != gi and GROUP[t] not in FORCED and wts[i] > 0]
+            if gi in opts and free:
+                tot = sum(wts[i] for i in free)
+                left = rr["need"] - rr["pieces"]
+                pm = 20 if left <= 0 else max(20, min(900, left * 1000 // max(1, rr["free"])))
+                for i in free:
+                    wts[i] = max(1, wts[i] * pm * 1000 // ((1000 - pm) * tot))
             if sum(wts) == 0:
                 g = ID[self.regions[self.reg[c]]["prof"]["ground"]]
                 wts = [1 if t == g else 0 for t in opts]
@@ -427,6 +492,10 @@ class Items:
         t = self.wv.tile(c)
         r = self.regions[self.reg[c]]
         r["count"][GROUP[t]] = r["count"].get(GROUP[t], 0) + 1
+        if c not in self.clear:
+            r["free"] -= 1
+        if t not in GROUND and GROUP[t] not in NOCOUNT:
+            r["pieces"] += 1
         if t not in WALK:
             r["block"] += 1
 
@@ -471,6 +540,8 @@ class Items:
                 return 0
         if t not in WALK and g not in FORCED and r["block"] * 100 >= r["cover"] * len(r["cells"]):
             return 0
+        if g in SMALL and r["block"] * 100 < r["cover"] * len(r["cells"]):
+            w = w // 4                           # furniture first; the small things fill what is left
         if g in ("TREE", "BUSH", "HAY", "CRATE", "RACK", "PEW", "GRAVE", "VEG", "FLOWERS"):
             w = w * r["lean"] // 100             # how full this place is on this seed
         same, extra = 0, 0
@@ -486,10 +557,11 @@ class Items:
         w = w * (1 + pr["aff"].get(g, 0) * same)
         if g in pr["w"] or g in IMPLIED.get("WATER", []) and "WATER" in pr["w"] or g == "NIGHTSTAND":
             w += extra
-        if g == "HEDGE" and self.edge[c]:
-            w *= 12
+        if g == "HEDGE":
+            w = w * 12 if self.edge[c] else 0     # a hedge runs along the fence
         if g in SETRATE:
-            w = w * (SETRATE[g] if t in TWO else 10 - SETRATE[g]) // 5
+            rate = max(1, min(9, DENS[r["kind"]][1] // 2))
+            w = w * (rate if t in TWO else 10 - rate) // 5
         if g in ("PLANT", "LAMP") and popcount(self.walls[c]) >= 2:
             w *= 5                               # corners
         return w
@@ -508,6 +580,7 @@ class Items:
         self.cut_off = 0
         for r in self.regions:
             ground = ID[r["prof"]["ground"]]
+            smalls = sorted(g for g in r["prof"]["w"] if g in SMALL) if r["key"][0] != "wood" else []
             for _ in range(40):
                 walk = [c for c in r["cells"] if T[c] in WALK]
                 if not walk:
@@ -545,7 +618,7 @@ class Items:
                             nx, nz = x + DX[d], z + DZ[d]
                             nc = nz * n + nx
                             if 0 <= nx < n and 0 <= nz < n and self.reg[nc] == self.reg[c] and not (self.walls[c] >> d & 1) and T[nc] not in WALK and GROUP[T[nc]] not in ("BEDH", "BEDF", "FIRE", "TABLE", "WATER", "TV", "SOFA", "VIEWT"):
-                                T[nc] = ground
+                                T[nc] = ID[smalls[self.rng.range(len(smalls))]] if smalls else ground      # a small thing in its place: the way is open, the room as full
                                 self.repairs += 1
                                 fixed = True
                                 break
@@ -556,11 +629,32 @@ class Items:
                 if not fixed:
                     self.cut_off += len(small)
                     break
+        # things on furniture, drawn against the place's budget: a set piece has one at least
+        rng = self.rng
+        self.tops = {}
+        for r in self.regions:
+            can = [c for c in r["cells"] if GROUP[T[c]] in TOPS]
+            for c in can:
+                if T[c] in TWO:
+                    self.tops[c] = 1
+            have = sum(self.tops.get(c, 0) for c in can)
+            open_ = [c for c in can if self.tops.get(c, 0) < TOPS[GROUP[T[c]]]]
+            while have < r["need_top"] and open_:
+                i = rng.range(len(open_))
+                c = open_[i]
+                self.tops[c] = self.tops.get(c, 0) + 1
+                have += 1
+                if self.tops[c] >= TOPS[GROUP[T[c]]]:
+                    open_[i] = open_[-1]
+                    open_.pop()
+            r["tops"] = have
+            r["final"] = sum(1 for c in r["cells"] if T[c] not in GROUND and GROUP[T[c]] not in NOCOUNT)
+        self.kinds = len({GROUP[T[c]] for c in range(n * n) if self.reg[c] >= 0 and T[c] not in GROUND})
         isprop = lambda t: t not in NATURAL and t not in GROUND and GROUP[t] not in ("BEDF", "VIEW", "LINE")
-        self.props = sum((1 if isprop(T[c]) else 0) + (1 if T[c] in TWO else 0) for c in range(n * n) if self.reg[c] >= 0)
+        self.props = sum((1 if isprop(T[c]) else 0) + self.tops.get(c, 0) for c in range(n * n) if self.reg[c] >= 0)
         self.in_cells = sum(1 for c in range(n * n) if self.indoor[c])
         self.in_props = sum(1 for c in range(n * n) if self.indoor[c] and isprop(T[c]))
-        self.in_top = sum(1 for c in range(n * n) if self.indoor[c] and T[c] in TWO)
+        self.in_top = sum(self.tops.get(c, 0) for c in range(n * n) if self.indoor[c])
         self.in_block = sum(1 for c in range(n * n) if self.indoor[c] and T[c] not in WALK)
         self.scenery = sum(1 for c in range(n * n) if self.reg[c] >= 0 and T[c] in NATURAL)
 
@@ -586,6 +680,7 @@ if __name__ == "__main__":
     for size in range(4):
         t0 = time.time()
         att = collections.Counter(); whys = collections.Counter(); fails = 0
+        kd = collections.defaultdict(lambda: [0, 0, 0]); lk = 0; kn = 0
         cells = []; coll = []; prop = []; props = []; scen = []; rep = []; missed = 0; cut = 0; ic = 0; ip = 0; itp = 0; ib = 0
         for seed in range(1, N + 1):
             s = S.generate(seed, size)
@@ -597,7 +692,14 @@ if __name__ == "__main__":
             for w in it.retries:
                 whys[w] += 1
             cells.append(sum(1 for r in it.reg if r >= 0)); coll.append(it.collapses); prop.append(it.wv.propagations)
+            lk += it.leaks; kn += it.kinds
+            for r in it.regions:
+                k = kd[r["kind"]]; k[0] += len(r["cells"]); k[1] += r["final"]; k[2] += r["tops"]
             props.append(it.props); scen.append(it.scenery); rep.append(it.repairs); missed += it.missed; cut += it.cut_off; ic += it.in_cells; ip += it.in_props; itp += it.in_top; ib += it.in_block
         m = lambda a: sum(a) // max(1, len(a))
         print(S.SIZE_NAME[size], "failed", fails, "of", N, "| attempts", sorted(att.items()), dict(whys), "| item cells", m(cells), "decisions", m(coll), "neighbour updates", m(prop),
-              "| props", m(props), "scenery", m(scen), "| repairs/map", round(sum(rep) / max(1, len(rep)), 1), "missed musts", missed, "cut off", cut, "| indoor: floor pieces per 100 m2 %.1f, on furniture %.1f, floor blocked %d%%" % (100.0 * ip / ic, 100.0 * itp / ic, 100 * ib // ic), "| %.1f s/map" % ((time.time() - t0) / N))
+              "| props", m(props), "scenery", m(scen), "| repairs/map", round(sum(rep) / max(1, len(rep)), 1), "missed musts", missed, "cut off", cut, "| indoor: floor pieces per 100 m2 %.1f, on furniture %.1f, floor blocked %d%%" % (100.0 * ip / ic, 100.0 * itp / ic, 100 * ib // ic), "| wrong-room %.1f, piece kinds %.0f" % (lk / max(1, N - fails), kn / max(1, N - fails)), "| %.1f s/map" % ((time.time() - t0) / N))
+        if size == 3 or "-k" in sys.argv:
+            for k in sorted(kd):
+                a = kd[k]
+                print("   %-12s floor %5.1f (target %2d)  top %5.1f (target %2d)" % (k, 100.0 * a[1] / a[0], DENS[k][0], 100.0 * a[2] / a[0], DENS[k][1]))

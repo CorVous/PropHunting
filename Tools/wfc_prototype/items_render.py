@@ -255,16 +255,33 @@ def draw(it, px=14, title=None):
             dr.rectangle(sub(c, 4, 4, 6, 6), fill=(120, 124, 130))
         elif g == "TOOLCHEST":
             dr.rectangle(sub(c, 1, 2, 9, 8), fill=(200, 60, 50), outline=(120, 30, 26))
+        elif g in I.SMALL:
+            col, shape = {"TOY": ((230, 80, 80), 0), "BOOKS": ((70, 110, 180), 1), "SHOES": ((90, 70, 60), 2), "CUSHION": ((226, 150, 190), 0), "STOOL": ((176, 136, 90), 0),
+                          "BUCKET": ((90, 150, 200), 0), "SBOX": ((206, 170, 110), 1), "BOTTLES": ((80, 160, 110), 2), "TOOLS": ((200, 60, 50), 1), "POT": ((190, 110, 70), 0)}[g]
+            ox, oy = (h & 3) - 1, (h >> 2 & 3) - 1
+            if shape == 0:
+                dr.ellipse([cx - 3 + ox, cy - 3 + oy, cx + 3 + ox, cy + 3 + oy], fill=col, outline=(60, 50, 44))
+                if g == "POT":
+                    dr.ellipse([cx - 1 + ox, cy - 1 + oy, cx + 1 + ox, cy + 1 + oy], fill=(70, 150, 80))
+            elif shape == 1:
+                dr.rectangle([cx - 3 + ox, cy - 2 + oy, cx + 3 + ox, cy + 2 + oy], fill=col, outline=(60, 50, 44))
+            else:
+                dr.ellipse([cx - 3 + ox, cy - 2 + oy, cx - 1 + ox, cy + 2 + oy], fill=col)
+                dr.ellipse([cx + 1 + ox, cy - 2 + oy, cx + 3 + ox, cy + 2 + oy], fill=col)
         elif g == "ALTAR":
             dr.rectangle(toward(c, ws, 7), fill=(245, 242, 232), outline=(180, 150, 60))
-    for c in range(n * n):
-        if it.reg[c] >= 0 and T[c] in I.TWO and I.GROUP[T[c]] != "VIEWT":
-            x0, y0, x1, y1 = box(c)
-            ws = wall_side(c)
-            bx = toward(c, ws, 6) if I.GROUP[T[c]] != "TABLE" else [x0, y0, x1, y1]
-            mx, my = (bx[0] + bx[2]) // 2, (bx[1] + bx[3]) // 2
-            dr.ellipse([mx - 3, my - 3, mx, my], fill=(250, 250, 250), outline=(90, 90, 90))
-            dr.ellipse([mx, my - 1, mx + 3, my + 2], fill=(230, 90, 80))
+    for c, k in getattr(it, "tops", {}).items():
+        g = I.GROUP[T[c]]
+        if g == "VIEWT":
+            continue
+        x0, y0, x1, y1 = box(c)
+        ws = wall_side(c)
+        bx = toward(c, ws, 6) if g in I.NEED_WALL else [x0, y0, x1, y1]
+        mx, my = (bx[0] + bx[2]) // 2, (bx[1] + bx[3]) // 2
+        cols = [(250, 250, 250), (230, 90, 80), (90, 140, 220)]
+        for i in range(k):
+            ox, oy = [(-4, -3), (2, 0), (-3, 3)][i]
+            dr.ellipse([mx + ox - 2, my + oy - 2, mx + ox + 2, my + oy + 2], fill=cols[i], outline=(40, 40, 40))
     # walls, doors and fences
     for c in range(n * n):
         if it.reg[c] < 0:
