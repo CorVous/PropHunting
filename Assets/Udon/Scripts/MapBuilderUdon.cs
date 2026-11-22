@@ -231,7 +231,6 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     const float CELL = 4f, INNER = 0.5f, WALL_HALF = 0.1f;
     const float LIP_OUT = 0.36f;   // the roof skirt past the wall's face: the deepest facade (space, 0.3 m) and its 3 cm frame, and a little
-    [System.NonSerialized] public float[] roofTop;   // per map cell (siteW x siteH), map-local: the top of the roof slab over it, 1e6 none
     const float ROOF_CAP = 6f;   // the invisible wall on a building's roof (CellBody): no hop from anything reaches over it
     const int FACE_XN = 1, FACE_XP = 2, FACE_YN = 4, FACE_YP = 8, FACE_ZN = 16, FACE_ZP = 32, FACE_ALL = 63;
     const int B_GROUND = 0, B_WALLS = 1, B_ROOFS = 2, B_COLL = 3, B_SCENERY = 4;
@@ -754,8 +753,6 @@ public class MapBuilderUdon : UdonSharpBehaviour
         BufInit(B_WALLS, W * H * 40 + 64);
         BufInit(B_ROOFS, W * H * 20 + 64);
         BufInit(B_COLL, W * H * 24 + 64);
-        roofTop = new float[siteW * siteH];
-        for (int i = 0; i < roofTop.Length; i++) roofTop[i] = 1e6f;
         stage = 6; cursor = 0; built = false; failed = false; busy = true; progress = 0f; buildMs = 0; worstStepMs = 0; worstStage = 0; worstCursor = 0;
         for (int i = 0; i < stageMs.Length; i++) stageMs[i] = 0;
         cellColour = new Color32[IW * IH];
@@ -928,23 +925,6 @@ public class MapBuilderUdon : UdonSharpBehaviour
 
     public Vector3 ToWorld(Vector3 local) { return local + origin; }
     public Vector3 ToLocal(Vector3 world) { return world - origin; }
-
-    // Whether a world point is on a roof (its slab's top, or above it over the same cell): a ghost does not stand there
-    // (PHHiderBody.GroundBelow). Playtest 2026-11-22: ghosts walk through walls, the roof's box too, and stepped up
-    // from a wardrobe through the ceiling onto the roof.
-    public bool OnRoof(Vector3 world)
-    {
-        if (roofTop == null) return false;
-        Vector3 p = ToLocal(world);
-        // (the slab reaches past the cell to the wall's outer face: the cells within that much count too)
-        for (int k = 0; k < 4; k++)
-        {
-            int x = Mathf.FloorToInt((p.x + ((k & 1) == 0 ? -0.15f : 0.15f)) / CELL), z = Mathf.FloorToInt((p.z + ((k & 2) == 0 ? -0.15f : 0.15f)) / CELL);
-            if (x < 0 || z < 0 || x >= siteW || z >= siteH) continue;
-            if (p.y >= roofTop[z * siteW + x] - 0.05f) return true;
-        }
-        return false;
-    }
 
     public void SetOrigin(Vector3 o)
     {
@@ -3194,7 +3174,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
             // wall's top h, 0.14 m under the roof, a lip outside the box above that a hider hopped onto from a chair by
             // the wall. A solid skirt over every outer side, from just under the facade's top to the box's top, as deep
             // as the deepest facade: nothing stands on the lip, and nothing gets up past it. Out round the corners
-            // where two outer sides meet. Ghosts (no collision) are kept off the roofs by OnRoof.
+            // where two outer sides meet. (Ghosts still walk through it: Cor, they don't matter.)
             if (top)
             {
                 float e = LIP_OUT, y0 = h - 0.08f, y1 = t + ROOF_CAP;
@@ -3205,9 +3185,6 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 if (!bn2) Collider(new Vector3(ax0, y0, cz1), new Vector3(ax1, y1, cz1 + e));
                 if (!bw) Collider(new Vector3(cx0 - e, y0, cz0), new Vector3(cx0, y1, cz1));
                 if (!be) Collider(new Vector3(cx1, y0, cz0), new Vector3(cx1 + e, y1, cz1));
-                // where this roof is on the map (an upper floor's cells are drawn beside the map and moved over it)
-                int mx = x + Mathf.RoundToInt(lv.x / CELL), mz = z + Mathf.RoundToInt(lv.z / CELL);
-                if (roofTop != null && mx >= 0 && mz >= 0 && mx < siteW && mz < siteH) roofTop[mz * siteW + mx] = Mathf.Min(roofTop[mz * siteW + mx], t + lv.y);
             }
             // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider);
             // a space base keeps its roofs flat, with an orange parapet round the edge
