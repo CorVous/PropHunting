@@ -223,9 +223,19 @@ public static partial class LobbyBuilder
                 b.targetGraphic = tile;
                 var cb = b.colors; cb.highlightedColor = new Color(1.06f, 1.06f, 1.06f); cb.pressedColor = new Color(0.85f, 0.85f, 0.85f); b.colors = cb;
                 var auto = Img(tile.transform, "AutoPick", Vector2.zero, new Vector2(126, 104), sDashed, C("b8892b"), 2f);   // (unused: Refresh wants one per tile)
-                // ON / OFF, set by PHPanel.Refresh (empty here: not a static label)
-                var cap = Txt(tile.transform, "Caption", new Vector2(0, -4), new Vector2(110, 40), "", future, 26, C("1e190f", 0.85f), TextAlignmentOptions.Center);
-                cap.enableAutoSizing = true; cap.fontSizeMin = 12f; cap.fontSizeMax = 26f;   // (LIGADO, DESLIGADO)
+                // ON / OFF, set by PHPanel.Refresh (empty here: not a static label). NO PLACING has a picture (Cor: a
+                // sticker and an item in a crossed-out circle, grey while off), its ON / OFF under it like the other tiles
+                bool pic = k == 1;
+                if (pic)
+                {
+                    panel.noPlacingOn = Icon("no_placing_on"); panel.noPlacingOff = Icon("no_placing_off");
+                    panel.noPlacingIcon = Img(tile.transform, "Icon", new Vector2(0, 9), new Vector2(58, 58), panel.noPlacingOff, Color.white);
+                    panel.noPlacingTile = tile; panel.noPlacingColour = tile.color; panel.noPlacingGrey = C("c9c3b8");
+                    tile.color = panel.noPlacingGrey;   // (off to start)
+                }
+                var cap = pic ? Txt(tile.transform, "Caption", new Vector2(0, -31), new Vector2(104, 20), "", future, 17, C("1e190f", 0.85f), TextAlignmentOptions.Center)
+                              : Txt(tile.transform, "Caption", new Vector2(0, -4), new Vector2(110, 40), "", future, 26, C("1e190f", 0.85f), TextAlignmentOptions.Center);
+                cap.enableAutoSizing = true; cap.fontSizeMin = 10f; cap.fontSizeMax = pic ? 17f : 26f;   // (LIGADO, DESLIGADO)
                 panel.switchCaption[k] = cap;
                 var mk = Img(tile.transform, "Marker", new Vector2(42, 47), new Vector2(54, 54), marker, Color.white);
                 panel.tileKind[t] = 4 + k; panel.tileArg[t] = 1;
