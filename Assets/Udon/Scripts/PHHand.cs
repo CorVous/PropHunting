@@ -35,6 +35,11 @@ public class PHHand : UdonSharpBehaviour
     public TextMeshProUGUI[] stepText;
     public TextMeshProUGUI[] handText;
     public int buttonArg;               // set by PHButton
+    // PREVIEW GRIP (Cor): a camera in front of the player's own weapon hand, its picture on a screen over each board,
+    // and the player's own weapon drawn in the hand as everyone else sees it (desktop: instead of the view's corner)
+    public Camera previewCam;
+    public GameObject[] previewScreens;
+    public float previewDist = 0.55f;   // the camera's distance from the hand (metres at avatar size 1)
 
     public const string SAVE_KEY = "ph.hand";
     public const int SLOTS = 32;
@@ -71,6 +76,7 @@ public class PHHand : UdonSharpBehaviour
     // ---- the store's show
     int[] zoneOf = new int[SLOTS];     // per slot: -1 none, 0 melee half, 1 gun half (looked at every few frames)
     int myZone = -1;
+    bool previewOn;
     bool showing;
     bool dragging;
     int dragKind;
@@ -83,6 +89,7 @@ public class PHHand : UdonSharpBehaviour
         for (int i = 0; i < SLOTS; i++) { cPid[i] = -1; zoneOf[i] = -1; }
         for (int i = 0; i < SLOTS * 2; i++) { cTurn[i] = Quaternion.identity; cSize[i] = 1f; }
         HideAll();
+        ShowPreview();
         if (game != null && game.text != null) game.text.Register(this);
         Show();
     }
@@ -241,6 +248,33 @@ public class PHHand : UdonSharpBehaviour
 
     public void ToggleHand() { myLeft = !myLeft; dragging = false; Changed(); }
 
+    public void PreviewGrip() { previewOn = !previewOn; ShowPreview(); }
+
+    void ShowPreview()
+    {
+        bool on = previewOn && myZone >= 0 && !InRound();
+        if (previewCam != null && previewCam.enabled != on) previewCam.enabled = on;
+        if (previewScreens != null)
+            for (int k = 0; k < previewScreens.Length; k++)
+                if (previewScreens[k] != null && previewScreens[k].activeSelf != (on && k == myZone)) previewScreens[k].SetActive(on && k == myZone);
+    }
+
+    // the camera: in front of the player, a little above the hand, looking at the grip
+    void PlacePreview(VRCPlayerApi me)
+    {
+        if (previewCam == null || !previewCam.enabled) return;
+        PHSlot ms = game.LocalSlot();
+        Apply(me, ms != null ? ms.index : -1, myZone == 1);
+        float sc = weapons.AvatarScale(me);
+        Quaternion hr = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).rotation;
+        Vector3 fwd = hr * Vector3.forward; fwd.y = 0f;
+        if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.forward;
+        fwd.Normalize();
+        Vector3 at = holdPos + (fwd * previewDist + Vector3.up * 0.12f) * sc;
+        previewCam.transform.SetPositionAndRotation(at, Quaternion.LookRotation(holdPos - at, Vector3.up));
+        previewCam.nearClipPlane = 0.02f * sc;
+    }
+
     // arg: kind + 1
     public void ResetKind()
     {
@@ -280,7 +314,7 @@ public class PHHand : UdonSharpBehaviour
         Read(nextRead);
         nextRead = (nextRead + 1) % SLOTS;
         if (dirty && Time.time >= saveAt) { dirty = false; saveAt = Time.time + 1f; Store(); }
-        if (InRound()) { if (showing) HideAll(); dragging = false; myZone = -1; return; }
+        if (InRound()) { if (showing) HideAll(); dragging = false; if (myZone >= 0) { myZone = -1; ShowPreview(); } return; }
         VRCPlayerApi me = Networking.LocalPlayer;
         if (me == null) return;
         // who stands where: a few times a second
@@ -293,7 +327,7 @@ public class PHHand : UdonSharpBehaviour
                 zoneOf[i] = p != null && Utilities.IsValid(p) ? ZoneAt(p.GetPosition()) : -1;
             }
             int z = ZoneAt(me.GetPosition());
-            if (z != myZone) { myZone = z; if (z < 0) dragging = false; Show(); }
+            if (z != myZone) { myZone = z; if (z < 0) dragging = false; Show(); ShowPreview(); }
         }
         if (Time.time >= nextShow) { nextShow = Time.time + 0.5f; if (myZone >= 0) Show(); }
         int nm = 0, ng = 0;
@@ -316,6 +350,7 @@ public class PHHand : UdonSharpBehaviour
         if (showOff != null) for (int k = nm; k < showOff.Length; k++) if (showOff[k] != null && showOff[k].gameObject.activeSelf) showOff[k].gameObject.SetActive(false);
         for (int k = ng; k < showGun.Length; k++) if (showGun[k].gameObject.activeSelf) showGun[k].gameObject.SetActive(false);
         showing = nm + ng > 0;
+        PlacePreview(me);
     }
 
     // one shown weapon: pool entry n of its kind, in player p's hand (the local desktop player: in the view's corner)
@@ -330,7 +365,7 @@ public class PHHand : UdonSharpBehaviour
         if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
         float sc = weapons.AvatarScale(p);
         if (!gun) PlaceShownOff(p, slot, m, n, mine, sc);
-        if (mine && !p.IsUserInVR())
+        if (mine && !p.IsUserInVR() && !previewOn)
         {
             VRCPlayerApi.TrackingData head = p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
             if (gun) weapons.PutGun(t, m, head.position + head.rotation * (weapons.deskSelectorAt * sc), head.rotation * Quaternion.Euler(weapons.deskSelectorEuler), sc * mySize[1]);
@@ -359,7 +394,7 @@ public class PHHand : UdonSharpBehaviour
         if (showOffFilter[n].sharedMesh != off) showOffFilter[n].sharedMesh = off;
         if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
         Vector3 at; Quaternion r; float s;
-        if (mine && !p.IsUserInVR())
+        if (mine && !p.IsUserInVR() && !previewOn)
         {
             VRCPlayerApi.TrackingData head = p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
             Vector3 d = weapons.deskAt, e = weapons.deskEuler;
