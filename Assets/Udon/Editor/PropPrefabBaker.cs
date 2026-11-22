@@ -898,12 +898,12 @@ public static class PropPrefabBaker
         c.size = new Vector3(Mathf.Max(0.001f, mx.x - mn.x), Mathf.Max(0.001f, mx.y - mn.y), Mathf.Max(0.001f, mx.z - mn.z));
     }
 
-    // a bush, flower or mushroom, or a natural plant a theme puts in place of one
+    // a bush, flower or mushroom (the space stand-ins keep their fitted shapes)
     static bool SoftPlant(int d)
     {
         string id = GenData.defId[d];
         if (id.StartsWith("n_bush") || id.StartsWith("n_flower") || id.StartsWith("n_mushroom")) return true;
-        return (GenData.defKind[d] & GenData.K_PLANT) != 0 && GenData.IsNatural(d);
+        return false;
     }
 
     static void BuildColliders(GameObject go, int def, int model, float sc)
