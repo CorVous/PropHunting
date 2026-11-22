@@ -60,7 +60,7 @@ def draw(it, px=14, title=None):
         if r < 0:
             continue
         g = it.regions[r]["prof"]["ground"]
-        col = GROUND_COL["RUG" if T[c] == I.ID["RUG"] else g]
+        col = GROUND_COL["RUG" if T[c] == I.ID["RUG"] or I.GROUP[T[c]] in ("VIEW", "VIEWT") else g]
         dr.rectangle(box(c), fill=col)
     # pieces
     for c in range(n * n):
@@ -73,8 +73,15 @@ def draw(it, px=14, title=None):
         cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
         h = (c * 2654435761) >> 7
         ws = wall_side(c)
-        if t in I.GROUND:
+        if t in I.GROUND or g == "VIEW":
             continue
+        if g == "VIEWT":
+            dr.rounded_rectangle(sub(c, 2, 2, 8, 8), 2, fill=(196, 150, 100), outline=DARKW)
+            continue
+        if nm in ("TABLESET",):
+            g = "TABLE"
+        if nm in ("COUNTERKIT", "DESKPC", "SHELFSET", "NIGHTLAMP", "DRESSERSET", "CABINETSET"):
+            g = I.GROUP[t]
         if g == "TREE":
             rr = px * (52 + h % 12) // 100
             dr.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=(52, 100, 56))
@@ -180,9 +187,44 @@ def draw(it, px=14, title=None):
             dr.rectangle(toward(c, ws, 6), fill=(124, 84, 52), outline=(70, 46, 28))
         elif g == "SOFA":
             dr.rectangle([x0 + 1, y0 + 1, x1 - 1, y1 - 1], fill=(104, 160, 150), outline=(50, 96, 90))
-            dr.rectangle(toward(c, ws, 3), fill=(70, 122, 114))
+            dr.rectangle(toward(c, (I.dirn(t) + 2) & 3, 3), fill=(70, 122, 114))
         elif g == "TV":
-            dr.rectangle(toward(c, ws, 3), fill=(30, 30, 36))
+            dr.rectangle(toward(c, I.dirn(t), 5), fill=(150, 110, 70), outline=DARKW)
+            dr.rectangle(toward(c, I.dirn(t), 2), fill=(30, 30, 36))
+        elif g == "LAMP":
+            dr.ellipse(sub(c, 2, 2, 8, 8), fill=(250, 226, 130), outline=(190, 160, 60))
+            dr.ellipse(sub(c, 4, 4, 6, 6), fill=(120, 100, 40))
+        elif g == "COATRACK":
+            dr.rectangle(toward(c, ws, 3), fill=DARKW)
+            for i in range(3):
+                dr.ellipse([x0 + 2 + i * 4, y0 + 4, x0 + 5 + i * 4, y0 + 8], fill=[(90, 110, 170), (170, 80, 70), (90, 140, 100)][i])
+        elif g == "BENCH":
+            dr.rounded_rectangle(toward(c, ws, 5), 2, fill=(196, 150, 100), outline=DARKW)
+        elif g == "DRESSER":
+            dr.rectangle(toward(c, ws, 6), fill=(176, 130, 86), outline=DARKW)
+        elif g == "TOYBOX":
+            dr.rectangle(sub(c, 1, 2, 9, 8), fill=(240, 190, 60), outline=(170, 120, 30))
+            dr.ellipse(sub(c, 3, 3, 6, 6), fill=(220, 70, 70))
+        elif g == "WASHER":
+            dr.rectangle(sub(c, 1, 1, 9, 9), fill=(240, 242, 245), outline=(130, 134, 140))
+            dr.ellipse(sub(c, 3, 3, 7, 7), fill=(150, 190, 220), outline=(100, 110, 120))
+        elif g == "BASKET":
+            dr.ellipse(sub(c, 2, 2, 8, 8), fill=(214, 186, 130), outline=(150, 120, 70))
+        elif g == "FIREPLACE":
+            dr.rectangle(toward(c, ws, 6), fill=(150, 90, 80), outline=(90, 50, 44))
+            dr.ellipse(sub(c, 3, 3, 7, 7), fill=(240, 140, 40))
+        elif g == "CABINET":
+            dr.rectangle(toward(c, ws, 6), fill=(150, 104, 62), outline=(84, 56, 32))
+        elif g == "FREEZER":
+            dr.rectangle(toward(c, ws, 7), fill=(200, 226, 240), outline=(110, 140, 160))
+        elif g == "DISPLAY":
+            dr.rectangle(sub(c, 1, 1, 9, 9), fill=(230, 220, 200), outline=(150, 140, 120))
+            dr.ellipse(sub(c, 3, 3, 7, 7), fill=(220, 120, 80))
+        elif g == "ARCADE":
+            dr.rectangle(toward(c, ws, 7), fill=(70, 60, 120), outline=(30, 26, 60))
+            dr.rectangle(sub(c, 3, 3, 7, 7), fill=(90, 220, 200))
+        elif g == "BIN":
+            dr.ellipse(sub(c, 3, 3, 7, 7), fill=(110, 116, 122), outline=(60, 64, 70))
         elif g == "ARMCHAIR":
             dr.rounded_rectangle(sub(c, 1, 1, 9, 9), 3, fill=(210, 150, 90), outline=(140, 96, 50))
         elif g == "PLANT":
@@ -215,6 +257,14 @@ def draw(it, px=14, title=None):
             dr.rectangle(sub(c, 1, 2, 9, 8), fill=(200, 60, 50), outline=(120, 30, 26))
         elif g == "ALTAR":
             dr.rectangle(toward(c, ws, 7), fill=(245, 242, 232), outline=(180, 150, 60))
+    for c in range(n * n):
+        if it.reg[c] >= 0 and T[c] in I.TWO and I.GROUP[T[c]] != "VIEWT":
+            x0, y0, x1, y1 = box(c)
+            ws = wall_side(c)
+            bx = toward(c, ws, 6) if I.GROUP[T[c]] != "TABLE" else [x0, y0, x1, y1]
+            mx, my = (bx[0] + bx[2]) // 2, (bx[1] + bx[3]) // 2
+            dr.ellipse([mx - 3, my - 3, mx, my], fill=(250, 250, 250), outline=(90, 90, 90))
+            dr.ellipse([mx, my - 1, mx + 3, my + 2], fill=(230, 90, 80))
     # walls, doors and fences
     for c in range(n * n):
         if it.reg[c] < 0:
