@@ -5,7 +5,7 @@
 public static partial class GenData
 {
     // Bump whenever any seed would produce a different map (04 section 6.3).
-    public const int GEN_VERSION = 31;   // 31: every stair has open floor of its own room at its foot on both levels, two rows of it kept clear; a doorway in its way moves (Cor: the stairs leading straight into a wall); 30: the lawn nobody needs is scenery ground (trees, bushes, rocks; walkable, no props): a plot keeps its front, patio, purposes, yards, the cells at its doors and gates and one passage to the back; a funfair keeps its midway and one rides yard (Cor: fewer outdoor areas, each with a purpose; the ones with just trees or rocks are ok inside the fence); 29: house gardens get a purpose (picnic ground, vegetable garden, drying yard, fire pit, pond, campsite), sets in countable patterns, a verge along the lane, a camp in a smaller wood (Cor: outdoors is just rocks); 28: what no person placed is scenery, no disguise and no wrong-category spawn (Cor); 27: fewer mostly-outdoor plots, smaller warehouses (Cor: playtest); 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
+    public const int GEN_VERSION = 32;   // 32: small props grow evenly to at least the volume of a 20 cm cube (Cor: small props bigger); 31: every stair has open floor of its own room at its foot on both levels, two rows of it kept clear; a doorway in its way moves (Cor: the stairs leading straight into a wall); 30: the lawn nobody needs is scenery ground (trees, bushes, rocks; walkable, no props): a plot keeps its front, patio, purposes, yards, the cells at its doors and gates and one passage to the back; a funfair keeps its midway and one rides yard (Cor: fewer outdoor areas, each with a purpose; the ones with just trees or rocks are ok inside the fence); 29: house gardens get a purpose (picnic ground, vegetable garden, drying yard, fire pit, pond, campsite), sets in countable patterns, a verge along the lane, a camp in a smaller wood (Cor: outdoors is just rocks); 28: what no person placed is scenery, no disguise and no wrong-category spawn (Cor); 27: fewer mostly-outdoor plots, smaller warehouses (Cor: playtest); 26: basements about twice as often (Cor: playtest); 25: no torch on a village's walls, nothing on a space base's display tables (Cor: playtest); 24: three keep-clear cells straight through a doorway (bugfix 4: a bed at two stood over the door); 23: stairs with open floor at their foot; 22: banners are not props, nothing on chests, trunks and ready-laid tables (Cor: playtest); 21: the lane and big lawns in rooms of six cells, furnishing in steps (Cor: build freezes); 20: upstairs room types by room size (review 7); 19: fewer extra floors, rarely both (Cor: varied); 18: upper floors and basements (MapGenLevels.cs); 17: the mixed theme off again (Cor: three distinct themes work better), a third each
     // The zone layout and the walls and doors have a version of their own, so a seed keeps its buildings when only
     // the prop rules change. Bump it when the layout, the walls and doors or the room types change.
     // Layout 1 (generators 1 to 4): zone pieces glued to a lawn hub, room types by room size (AssignRoomTypes).
@@ -1396,6 +1396,7 @@ public static partial class GenData
         BuildThemes();
         ThemeTwinThemes();
         SceneryRule();
+        MinSize();
         BuildGroups();
         BuildRanges();
         BuildTwins();
@@ -1483,6 +1484,53 @@ public static partial class GenData
     {
         for (int d = 0; d < nDefs; d++)
             if (IsNatural(d)) { defDisguise[d] = 0; defLeakWeight[d] = 0; }
+    }
+
+    // Cor (22 Nov): small props bigger, at least the volume of a 20 cm cube (8 litres of bounding box). A disguise
+    // smaller than that grows evenly (it keeps its shape) until its box holds MIN_VOLUME_L litres: an apple becomes a
+    // 20 cm apple, a plate a 43 cm plate. Bigger things keep their size; scenery is no disguise and keeps its size
+    // too; so do the place settings, laid one at each seat of a table. Sizes, footprint, top, slots on the prop,
+    // class and mass follow the scale.
+    public const int MIN_VOLUME_L = 8;
+
+    static void MinSize()
+    {
+        for (int d = 0; d < nDefs; d++)
+        {
+            if (defDisguise[d] == 0 || (defTags[d] & I_SETTING) != 0) continue;
+            long want = MIN_VOLUME_L * 1000000L;   // mm3 (a litre is 10^6 mm3)
+            if (defSx[d] <= 0 || defSy[d] <= 0 || defSz[d] <= 0 || (long)defSx[d] * defSy[d] * defSz[d] >= want) continue;
+            int k = 1000;   // per mille, integer steps (no floating point in the generator)
+            while ((long)(defSx[d] * k / 1000) * (defSy[d] * k / 1000) * (defSz[d] * k / 1000) < want) k += 5;
+            Grow(d, k);
+        }
+    }
+
+    static void Grow(int d, int k)
+    {
+        int m = defModel[d];
+        int oldTop = defTopY[d];
+        defScale[d] = defScale[d] * k / 1000;
+        int sc = defScale[d];
+        defSx[d] = GenModels.SizeMm[m * 3] * sc / 1000;
+        defSy[d] = GenModels.SizeMm[m * 3 + 1] * sc / 1000;
+        defSz[d] = GenModels.SizeMm[m * 3 + 2] * sc / 1000;
+        int w = Cells(defSx[d]), dd = Cells(defSz[d]);
+        if (w > defW[d]) defW[d] = w;
+        if (dd > defD[d]) defD[d] = dd;
+        defTopY[d] = ModelTop(m) * sc / 1000;
+        for (int i = defSlotStart[d]; i < defSlotStart[d] + defSlotCount[d]; i++)
+        {
+            slotX[i] = slotX[i] * k / 1000; slotZ[i] = slotZ[i] * k / 1000;
+            slotY[i] = slotY[i] == oldTop ? defTopY[d] : slotY[i] * k / 1000;
+        }
+        int longest = defSx[d] > defSz[d] ? defSx[d] : defSz[d];
+        if (defSy[d] > longest) longest = defSy[d];
+        defSizeClass[d] = longest < 100 ? SZ_XS : (longest < 300 ? SZ_S : (longest < 600 ? SZ_M : (longest < 1000 ? SZ_L : SZ_XL)));
+        defDisguise[d] = longest < 350 ? 1 : 2;
+        long vol = (long)defSx[d] * defSy[d] / 1000 * defSz[d] / 1000;
+        int kg = (int)(vol * 35 / 1000);
+        defMassKg[d] = kg < 1 ? 1 : (kg > 40 ? 40 : kg);
     }
 
     static void BuildThemes()

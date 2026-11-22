@@ -12,6 +12,8 @@ GameObject:
   - component: {fileID: 7997216041769690373}
   - component: {fileID: 5902891842157745769}
   - component: {fileID: 4006585449800273670}
+  - component: {fileID: 7719992727181314580}
+  - component: {fileID: 7471876895533201806}
   - component: {fileID: 3043930316252087054}
   m_Layer: 11
   m_Name: 343_fk_grapes
@@ -30,7 +32,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_LocalScale: {x: 0.662, y: 0.662, z: 0.662}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4834031189275809334}
@@ -43,7 +45,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 447738635028089125}
-  m_Mesh: {fileID: 4859856964541279507, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 1045961280276827778, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &5902891842157745769
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,8 +107,50 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.27899456, y: 0.42261794, z: 0.23859915}
-  m_Center: {x: 0, y: 0.21130897, z: 0}
+  m_Size: {x: 0.23566091, y: 0.27102917, z: 0.23859915}
+  m_Center: {x: 0, y: 0.20788258, z: 0}
+--- !u!65 &7719992727181314580
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 447738635028089125}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.13728, y: 0.058639996, z: 0.15352899}
+  m_Center: {x: 0, y: 0.029319998, z: 0}
+--- !u!65 &7471876895533201806
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 447738635028089125}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.13728, y: 0.06549281, z: 0.2295998}
+  m_Center: {x: 0, y: 0.38987154, z: 0}
 --- !u!54 &3043930316252087054
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -161,7 +205,7 @@ Transform:
   m_GameObject: {fileID: 8925295353359192242}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.024, z: 0}
+  m_LocalPosition: {x: 0, y: 0.018126888, z: 0}
   m_LocalScale: {x: 0.22319566, y: 1, z: 0.19087933}
   m_ConstrainProportionsScale: 0
   m_Children: []

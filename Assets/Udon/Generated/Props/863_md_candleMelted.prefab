@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 2138945113545170}
   - component: {fileID: 7785803779596445741}
   - component: {fileID: 7047270851710081826}
+  - component: {fileID: 2683792843068273202}
   - component: {fileID: 7024475896617702302}
   m_Layer: 11
   m_Name: 863_md_candleMelted
@@ -30,7 +31,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  m_LocalScale: {x: 0.474, y: 0.474, z: 0.474}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6661237261046559297}
@@ -43,7 +44,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1465125380131634950}
-  m_Mesh: {fileID: -8938247493129998333, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: -5871581108985930220, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &7785803779596445741
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -105,8 +106,29 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.3343711, y: 0.70153946, z: 0.32929122}
-  m_Center: {x: 0, y: 0.35076973, z: 0}
+  m_Size: {x: 0.3343711, y: 0.6006969, z: 0.32929122}
+  m_Center: {x: 0, y: 0.30034846, z: 0}
+--- !u!65 &2683792843068273202
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1465125380131634950}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.23044014, y: 0.10015309, z: 0.30695018}
+  m_Center: {x: 0.051965475, y: 0.6514629, z: 0.011170521}
 --- !u!54 &7024475896617702302
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -161,7 +183,7 @@ Transform:
   m_GameObject: {fileID: 5154388208202378835}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.03, z: 0}
+  m_LocalPosition: {x: 0, y: 0.025316456, z: 0}
   m_LocalScale: {x: 0.26749688, y: 1, z: 0.26343298}
   m_ConstrainProportionsScale: 0
   m_Children: []
