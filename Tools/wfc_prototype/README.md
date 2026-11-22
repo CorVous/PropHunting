@@ -21,3 +21,9 @@ Nothing here is used by the world. It is the reference for a C# port (`MapGenSit
 - `render.py`, `items_render.py`, `make_out.py`: pictures.
 
 Needs Pillow.
+
+## Speed against the current generator
+
+`bench/current` times `MapGen` per size and stage outside Unity (`dotnet run -c Release -- 200`).
+`bench/replay` replays the prototype's collapses in C#: `python trace.py 60` writes what each collapse did,
+`dotnet run -c Release` times the same work (propagation, the scan for the next cell, a weight per option).
