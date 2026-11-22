@@ -567,7 +567,8 @@ public class PHSlot : UdonSharpBehaviour
         Vector3 at = mateOn.transform.position + new Vector3(0f, 2f * proxyHalf.y + 0.3f, 0f);
         Vector3 eye = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
         Vector3 away = at - eye; away.y = 0f;
-        mateName.transform.SetPositionAndRotation(at, away.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(away) : mateName.transform.rotation);
+        Transform mt = mateName.gameObject.transform;   // (TextMeshPro.transform is not exposed to Udon)
+        mt.SetPositionAndRotation(at, away.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(away) : mt.rotation);
     }
 
     void MateCageOff()
