@@ -12,7 +12,9 @@
 // first flight climbs on the room's side from the cell's entry row to a landing at the far end, the second comes back
 // along the wall to the entry row of the level above, where the floor has a hole over the stair. In the inner grid both
 // levels lose the stair's floor (rows 1 to 7: no floor, no room) and the two entry rows are joined by a link
-// (link[]): the reachability flood and every room's exits step through it.
+// (link[]): the reachability flood and every room's exits step through it. Both flights end facing the cell's foot
+// edge, so on both levels that edge is open floor into the next cell of the same room (generator 31, Cor: the stairs
+// leading straight into a wall).
 public partial class MapGenUdon
 {
     public int siteW, siteH;                    // the map itself; W x H also holds the levels laid out beside it
@@ -51,6 +53,55 @@ public partial class MapGenUdon
             case GenData.Z_DINER: return 400;
             default: return 0;
         }
+    }
+
+    // the site's doorway on edge d of cell c, either side of it: its kind, -1 none
+    int SdAt(int c, int d)
+    {
+        int n = (c / W + DZ[d]) * W + c % W + DX[d], o = (d + 2) & 3;
+        for (int k = 0; k < nSd; k++)
+            if ((sdCell[k] == c && sdDir[k] == d) || (sdCell[k] == n && sdDir[k] == o)) return sdKind[k];
+        return -1;
+    }
+
+    // Before the levels: may building bi's ground floor hold a stair (PlaceStairs, StairFits)? A cell with a cell of
+    // its own room at the foot, and a wall to stand against with no doorway (but one the two rooms have twice), nor
+    // an outside door on the far edge.
+    bool StairPossible(int bi)
+    {
+        for (int c = 0; c < W * H; c++)
+        {
+            if (cellInst[c] != bi) continue;
+            int cx = c % W, cz = c / W;
+            for (int run = 0; run < 4; run++)
+            {
+                int foot = (run + 2) & 3, fx = cx + DX[foot], fz = cz + DZ[foot];
+                if (!InGrid(fx, fz) || cellInst[fz * W + fx] != bi || cellRoom[fz * W + fx] != cellRoom[c]) continue;
+                int far = SdAt(c, run);
+                if (far >= 0 && far != SD_DOOR) continue;
+                for (int t = 0; t < 2; t++)
+                {
+                    int side = (run + 1 + 2 * t) & 3, sd = SdAt(c, side);
+                    if (sd < 0) return true;
+                    if (sd != SD_DOOR) continue;
+                    // the two rooms have another doorway
+                    int nx = cx + DX[side], nz = cz + DZ[side];
+                    if (!InGrid(nx, nz)) continue;
+                    int ra = cellRoom[c], rb = cellRoom[nz * W + nx], ways = 0;
+                    for (int e = 0; e < W * H; e++)
+                    {
+                        if (cellInst[e] != bi || cellRoom[e] != ra) continue;
+                        for (int k = 0; k < 4; k++)
+                        {
+                            int ex = e % W + DX[k], ez = e / W + DZ[k];
+                            if (InGrid(ex, ez) && cellInst[ez * W + ex] == bi && cellRoom[ez * W + ex] == rb && SdAt(e, k) == SD_DOOR) ways++;
+                        }
+                    }
+                    if (ways >= 2) return true;
+                }
+            }
+        }
+        return false;
     }
 
     // the room types of a level: the first ones in order, then drawn from the rest
@@ -100,6 +151,9 @@ public partial class MapGenUdon
             int cells = 0;
             for (int c = 0; c < W * H; c++) if (cellInst[c] == bi) cells++;
             if (cells < 2) continue;
+            // a stair needs a room of two cells in a row, the stair in one and open floor at its foot in the other
+            // (Cor: the stairs leading straight into a wall), and the ground floor a place for it: see StairPossible
+            if (!StairPossible(bi)) continue;
             int zone = plotZone[k];
             bool up = nLvl < cap && RngChance(rng, LevelChance(zone, true));
             // Cor: varied, not every building with both: a building with an upper floor gets a basement too only now and then
@@ -201,34 +255,109 @@ public partial class MapGenUdon
         return ((c / W) * 8 + lz) * IW + (c % W) * 8 + lx;
     }
 
-    // may a stair stand in outer cell c this way round? No doorway of the cell, nor its keep-clear floor, may reach
-    // the flights or the landing
-    bool StairFits(int c, int run, int side)
+    // may a stair stand in outer cell c this way round? Open floor of the same room at its foot, and no doorway of the
+    // cell, nor its keep-clear floor, reaching the flights or the landing. An inside doorway in the way may move: one
+    // on the wall the stair stands against to the same wall of the foot cell (the same two rooms), one on the far edge
+    // along that edge to the room's side. moves counts them; apply makes them (once the stair is chosen). -1: no fit.
+    int StairFits(int c, int run, int side, bool apply)
     {
-        if (!IsBuilding(cellZone[c])) return false;
+        if (!IsBuilding(cellZone[c])) return -1;
         int cx = c % W, cz = c / W;
+        // the foot: both flights end on the entry row facing the cell's edge at b = 0, so that edge must be open floor
+        // of the same room (Cor: the stairs leading straight into a wall). A wall, a window or a doorway beside the
+        // flights left 0.5 m before the wall; another stair's cell beyond would put its flights there.
+        int foot = (run + 2) & 3;
+        if (EdgeType(cx, cz, foot) != GenData.E_NONE) return -1;
+        int fx = cx + DX[foot], fz = cz + DZ[foot];
+        if (!InGrid(fx, fz) || cellInst[fz * W + fx] != cellInst[c] || IsStairCell(fz * W + fx)) return -1;
+        int moves = 0;
         for (int d = 0; d < 4; d++)
         {
-            if (EdgeType(cx, cz, d) != GenData.E_DOOR) continue;
-            int off = EdgeOff(cx, cz, d);
-            for (int al = off - 1; al <= off + GenData.DOOR_CELLS; al++)
+            if (EdgeType(cx, cz, d) != GenData.E_DOOR || !DoorHitsStair(run, side, d, EdgeOff(cx, cz, d))) continue;
+            int nx = cx + DX[d], nz = cz + DZ[d];
+            // an outside door stays where the site put it; nothing moves next to another stair
+            if (!InGrid(nx, nz) || cellInst[nz * W + nx] != cellInst[c] || IsStairCell(nz * W + nx)) return -1;
+            if (d == run)
             {
-                if (al < 0 || al > 7) continue;
-                for (int depth = 0; depth < 2; depth++)
+                int to = -1;
+                for (int off = 1; off <= 5; off += 2) if (!DoorHitsStair(run, side, d, off)) to = off;
+                if (to < 0) return -1;
+                if (apply) SetEdge(cx, cz, d, GenData.E_DOOR, to);
+            }
+            else if (d == side)
+            {
+                if (OtherDoor(c, d))
                 {
-                    int lx, lz;
-                    if (d == 0) { lx = al; lz = 7 - depth; }
-                    else if (d == 2) { lx = al; lz = depth; }
-                    else if (d == 1) { lx = 7 - depth; lz = al; }
-                    else { lx = depth; lz = al; }
-                    // stair-local of (lx, lz)
-                    int b = run == 0 ? lz : (run == 2 ? 7 - lz : (run == 1 ? lx : 7 - lx));
-                    int a = side == 1 ? 7 - lx : (side == 3 ? lx : (side == 0 ? 7 - lz : lz));
-                    if (a < STAIR_W && b >= 1) return false;
+                    // the two rooms have another doorway: this one becomes wall
+                    if (apply) SetEdge(cx, cz, d, GenData.E_WALL, 0);
+                }
+                else
+                {
+                    int ox = fx + DX[d], oz = fz + DZ[d];
+                    if (InGrid(ox, oz) && cellInst[oz * W + ox] == cellInst[c] && cellRoom[oz * W + ox] == cellRoom[nz * W + nx]
+                        && !IsStairCell(oz * W + ox) && EdgeType(fx, fz, d) == GenData.E_WALL)
+                    {
+                        if (apply) { SetEdge(fx, fz, d, GenData.E_DOOR, EdgeOff(cx, cz, d)); SetEdge(cx, cz, d, GenData.E_WALL, 0); }
+                    }
+                    else
+                    {
+                        // on an upper floor or in a basement: walled up, and JoinLevel then gives the room across a
+                        // doorway somewhere else. The ground floor keeps its doors (the house tests, T6)
+                        if (instLevel[cellInst[c]] == 0) return -1;
+                        if (apply) SetEdge(cx, cz, d, GenData.E_WALL, 0);
+                        moves++;
+                    }
                 }
             }
+            else return -1;
+            moves++;
         }
-        return true;
+        return moves;
+    }
+
+    // is there another doorway between the room of cell c and the room across its edge d?
+    bool OtherDoor(int c, int d)
+    {
+        int ra = cellRoom[c], rb = cellRoom[(c / W + DZ[d]) * W + c % W + DX[d]];
+        for (int e = 0; e < W * H; e++)
+        {
+            if (cellRoom[e] != ra || cellInst[e] != cellInst[c]) continue;
+            for (int k = 0; k < 4; k++)
+            {
+                if (e == c && k == d) continue;
+                int nx = e % W + DX[k], nz = e / W + DZ[k];
+                if (InGrid(nx, nz) && cellRoom[nz * W + nx] == rb && cellInst[nz * W + nx] == cellInst[c] && EdgeType(e % W, e / W, k) == GenData.E_DOOR) return true;
+            }
+        }
+        return false;
+    }
+
+    bool IsStairCell(int c)
+    {
+        for (int s = 0; s < nStairs; s++) if (stairLow[s] == c || stairHigh[s] == c) return true;
+        return false;
+    }
+
+    // does a doorway at offset off on edge d of a stair's cell, or its keep-clear floor, reach the flights or the landing?
+    bool DoorHitsStair(int run, int side, int d, int off)
+    {
+        for (int al = off - 1; al <= off + GenData.DOOR_CELLS; al++)
+        {
+            if (al < 0 || al > 7) continue;
+            for (int depth = 0; depth < 2; depth++)
+            {
+                int lx, lz;
+                if (d == 0) { lx = al; lz = 7 - depth; }
+                else if (d == 2) { lx = al; lz = depth; }
+                else if (d == 1) { lx = 7 - depth; lz = al; }
+                else { lx = depth; lz = al; }
+                // stair-local of (lx, lz)
+                int b = run == 0 ? lz : (run == 2 ? 7 - lz : (run == 1 ? lx : 7 - lx));
+                int a = side == 1 ? 7 - lx : (side == 3 ? lx : (side == 0 ? 7 - lz : lz));
+                if (a < STAIR_W && b >= 1) return true;
+            }
+        }
+        return false;
     }
 
     int StairScore(int c, int side, int run)
@@ -239,10 +368,7 @@ public partial class MapGenUdon
         if (rt == GenData.R_BATH || rt == GenData.R_PANTRY) s -= 40;
         if (rt == GenData.R_KITCHEN || rt == GenData.R_DINER_KITCHEN) s -= 10;
         if (EdgeType(c % W, c / W, side) != GenData.E_NONE) s += 10;   // against a wall
-        // the foot of the stair: open floor before the first step. With a wall there the way onto the stair was the
-        // 0.4 m between that wall and the first step (Cor: such a tiny gap between the wall corner and the stair)
-        int foot = EdgeType(c % W, c / W, (run + 2) & 3);
-        if (foot == GenData.E_NONE) s += 60; else if (foot != GenData.E_DOOR) s -= 40;
+        // (the foot is open floor: StairFits)
         return s;
     }
 
@@ -263,19 +389,20 @@ public partial class MapGenUdon
             {
                 if (cellInst[c] != low) continue;
                 int ch = (c / W + ddz) * W + c % W + ddx;
-                bool used = false;
-                for (int s = 0; s < nStairs; s++) if (stairLow[s] == c || stairHigh[s] == c || stairLow[s] == ch || stairHigh[s] == ch) used = true;
-                if (used) continue;
+                if (IsStairCell(c) || IsStairCell(ch)) continue;
                 for (int run = 0; run < 4; run++)
                     for (int t = 0; t < 2; t++)
                     {
                         int side = (run + 1 + 2 * t) & 3;
-                        if (!StairFits(c, run, side) || !StairFits(ch, run, side)) continue;
-                        int score = StairScore(c, side, run) + StairScore(ch, side, run) + RngRange(rng, 10);
+                        int mc = StairFits(c, run, side, false), mh = StairFits(ch, run, side, false);
+                        if (mc < 0 || mh < 0) continue;
+                        int score = StairScore(c, side, run) + StairScore(ch, side, run) - 25 * (mc + mh) + RngRange(rng, 10);
                         if (score > best) { best = score; bc = c; brun = run; bside = side; }
                     }
             }
             if (bc < 0) return false;
+            StairFits(bc, brun, bside, true);
+            StairFits((bc / W + ddz) * W + bc % W + ddx, brun, bside, true);
             stairLow[nStairs] = bc; stairHigh[nStairs] = (bc / W + ddz) * W + bc % W + ddx;
             stairRun[nStairs] = brun; stairSide[nStairs] = bside;
             nStairs++;
@@ -314,13 +441,13 @@ public partial class MapGenUdon
             int nc = 0;
             for (int c = 0; c < W * H; c++)
             {
-                if (cellInst[c] != li || !got[cellRoom[c]] || c == stairCell) continue;
+                if (cellInst[c] != li || !got[cellRoom[c]] || IsStairCell(c)) continue;
                 for (int d = 0; d < 4; d++)
                 {
                     int nx = c % W + DX[d], nz = c / W + DZ[d];
                     if (!InGrid(nx, nz)) continue;
                     int n = nz * W + nx;
-                    if (n == stairCell || cellInst[n] != li || got[cellRoom[n]] || EdgeType(c % W, c / W, d) != GenData.E_WALL) continue;
+                    if (IsStairCell(n) || cellInst[n] != li || got[cellRoom[n]] || EdgeType(c % W, c / W, d) != GenData.E_WALL) continue;
                     if (nc < 1024) cand[nc++] = c * 4 + d;
                 }
             }
@@ -352,6 +479,14 @@ public partial class MapGenUdon
                         int i = StairInner(c, run, side, a, b);
                         if (b >= 1) { tags[i] = 0; innerRoom[i] = -1; }
                         else tags[i] |= GenData.T_DOOR_CLEAR | GenData.T_NO_SPAWN;
+                    }
+                // the landing beyond the foot: two rows of the next cell in front of the flights kept clear, so no
+                // prop stands where a player steps off the stair
+                for (int b = -2; b <= -1; b++)
+                    for (int a = 0; a < STAIR_W; a++)
+                    {
+                        int i = StairInner(c, run, side, a, b);
+                        if (innerRoom[i] >= 0) tags[i] |= GenData.T_DOOR_CLEAR | GenData.T_NO_SPAWN;
                     }
             }
             // the first flight starts from the lower entry row on the room's side, the second ends on the upper one by the wall
