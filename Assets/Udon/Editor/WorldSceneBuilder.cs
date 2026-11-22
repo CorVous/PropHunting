@@ -291,6 +291,34 @@ public static class WorldSceneBuilder
             }
         }
 
+        // where players may place VRChat's own things (Cor, 2026-11-22; PHLocal.UpdatePlacement): one box that PHLocal
+        // fits round the built map (scaled: each zone is a unit box), with two zones on it. PortalBlock: user portals
+        // never on the map (the lobby keeps them). PlaceBlock: stickers, sharing pedestals and attached items, on only
+        // while the host's NO PLACING switch is on (PHGame.noPlacing). Off to start: the switch is off by default.
+        {
+            var box = new GameObject("PlacementZones").transform;
+            box.SetParent(gameGo.transform, false);
+            VRCPlacementZone Zone(string name, bool portals)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(box, false);
+                var z = go.AddComponent<VRCPlacementZone>();
+                z.Center = Vector3.zero; z.Rotation = Quaternion.identity; z.Size = Vector3.one;
+                var block = VRCPlacementZone.PlacementPermission.BlockHere;
+                var free = VRCPlacementZone.PlacementPermission.Unaffected;
+                z.Portals = portals ? block : free;
+                z.Stickers = portals ? free : block;
+                z.SharingPedestals = portals ? free : block;
+                z.AttachedItems = portals ? free : block;
+                return z;
+            }
+            Zone("PortalBlock", true);
+            var place = Zone("PlaceBlock", false);
+            place.gameObject.SetActive(false);
+            local.placementBox = box;
+            local.placeBlock = place.gameObject;
+        }
+
         var knocksRoot = new GameObject("Knocks");
         knocksRoot.transform.SetParent(gameGo.transform, false);
         var knocks = new PHKnock[16];

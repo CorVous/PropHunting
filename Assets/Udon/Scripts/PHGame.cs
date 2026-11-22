@@ -128,7 +128,10 @@ public class PHGame : UdonSharpBehaviour
     [UdonSynced] public int wrongPenalty = 10;
     // (hop playtest, Cor: host settings, both off by default)
     [UdonSynced] public bool seeHiders;   // hiders (and ghosts) see the other hiders' props as edge cages (PHSlot, MapBuilderUdon.MateCage)
-    [UdonSynced] public bool layers;      // "anti troll" (Strelia): each team plays on its own copy of the map (TeamOf)
+    [UdonSynced] public bool noPlacing;   // NO PLACING (Cor, 2026-11-22): no stickers or VRChat items on the map (PHLocal.UpdatePlacement)
+    // "anti troll" (Strelia): each team plays on its own copy of the map (TeamOf). Its switch made way for NO PLACING
+    // (Cor, 2026-11-22), so nothing turns it on now; the copies' code is kept for a later try.
+    [UdonSynced] public bool layers;
 
     // ---- the teams' copies of the map (layers). Every client builds one copy of the map; with layers on, where it
     // stands depends on the local player's team: the hunters' copy at the world's origin (where it always stands), the
@@ -379,7 +382,7 @@ public class PHGame : UdonSharpBehaviour
     public void PanelTaunt() { SetTauntInterval(panelArg); }
     public void PanelPenalty() { SetWrongPenalty(panelArg); }
     public void PanelSeeHiders() { SetSeeHiders(panelArg != 0); }
-    public void PanelLayers() { SetLayers(panelArg != 0); }
+    public void _PanelNoPlacing() { SetNoPlacing(panelArg != 0); }   // ("_": no player can call it over the network)
 
     public readonly string[] sizeName = { "S", "M", "L", "XL", "XS" };   // (XS is 4: the codes and trail of S to XL keep their numbers)
     public readonly string[] densityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense", "Minimal" };
@@ -404,7 +407,7 @@ public class PHGame : UdonSharpBehaviour
     public void SetTauntInterval(int v) { if (!IsHost || phase != PH_LOBBY) return; tauntInterval = v; RequestSerialization(); }
     public void SetWrongPenalty(int v) { if (!IsHost || phase != PH_LOBBY) return; wrongPenalty = v; RequestSerialization(); }
     public void SetSeeHiders(bool v) { if (!IsHost || phase != PH_LOBBY) return; seeHiders = v; RequestSerialization(); }
-    public void SetLayers(bool v) { if (!IsHost || phase != PH_LOBBY) return; layers = v; RequestSerialization(); }
+    public void SetNoPlacing(bool v) { if (!IsHost || phase != PH_LOBBY) return; noPlacing = v; RequestSerialization(); }
 
     // the host enters a seed code for the next map (the panel's text field)
     public void SubmitSeed(string text)

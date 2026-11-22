@@ -240,7 +240,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     // generator 18 (Cor: upper floors and basements): each level lies beside the map in the generator's grid and is drawn
     // where it belongs, lifted or sunk over its ground floor. lv is the offset of whatever is being drawn (Quad4,
     // AppendPart, PlaceFixture, PlaceDecor and AddLight add it); siteW x siteH is the map without the levels.
-    int siteW, siteH;
+    [System.NonSerialized] public int siteW, siteH;   // (public: PHLocal.UpdatePlacement fits the placement zones to it)
     Vector3 lv;
     Vector3[] instOff;
     int[] instLevelB, instBaseB;

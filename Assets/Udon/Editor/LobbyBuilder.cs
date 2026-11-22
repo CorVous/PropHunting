@@ -206,12 +206,12 @@ public static partial class LobbyBuilder
 
         // the two switches (hop playtest, Cor: host settings), right of the short ROUND and TAUNT rows: a tile each that
         // turns over with every press (its meeple on and ON while it is on), its title, and a line on what it does.
-        // SEE HIDERS: hiders see each other's props as outlines (PHGame.seeHiders); ANTI TROLL: each team on its own
-        // copy of the map (PHGame.layers; Strelia's idea, Cor: with an explanation of what it hides)
+        // SEE HIDERS: hiders see each other's props as outlines (PHGame.seeHiders); NO PLACING: no stickers or VRChat
+        // items on the map (PHGame.noPlacing, Cor 2026-11-22: in place of ANTI TROLL, the teams' own copies of the map)
         {
             var plain = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
-            string[] swTitle = { "SEE HIDERS", "ANTI TROLL" };
-            string[] swTell = { "Hiders see each other's props as outlines.", "Each team plays in its own copy of the map: no one can stand on or mark another team's props." };
+            string[] swTitle = { "SEE HIDERS", "NO PLACING" };
+            string[] swTell = { "Hiders see each other's props as outlines.", "Stickers and items can't be placed on the map, so no one can mark a hiding spot." };
             panel.switchCaption = new TextMeshProUGUI[2];
             for (int k = 0; k < 2; k++, t++)
             {

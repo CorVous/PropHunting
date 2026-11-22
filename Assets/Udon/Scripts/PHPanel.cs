@@ -15,7 +15,7 @@ public class PHPanel : UdonSharpBehaviour
 {
     public PHGame game;
 
-    // the tiles, in parallel arrays: kind 0 size, 1 props, 2 round, 3 taunt, 4 see hiders, 5 anti troll (layers); arg
+    // the tiles, in parallel arrays: kind 0 size, 1 props, 2 round, 3 taunt, 4 see hiders, 5 no placing (PHGame.noPlacing); arg
     // is the PHGame.Panel* argument (kinds 4 and 5 are switches: one tile each, arg 1, its meeple on while it is on)
     public int[] tileKind;
     public int[] tileArg;
@@ -88,7 +88,7 @@ public class PHPanel : UdonSharpBehaviour
         if (kind == 1) return game.densityChoice;
         if (kind == 2) return game.roundLength;
         if (kind == 4) return game.seeHiders ? 1 : 0;
-        if (kind == 5) return game.layers ? 1 : 0;
+        if (kind == 5) return game.noPlacing ? 1 : 0;
         return game.tauntInterval;
     }
 
@@ -101,7 +101,7 @@ public class PHPanel : UdonSharpBehaviour
         {
             // a switch: each press turns it over
             game.panelArg = Value(kind) == 1 ? 0 : 1;
-            if (kind == 4) game.PanelSeeHiders(); else game.PanelLayers();
+            if (kind == 4) game.PanelSeeHiders(); else game._PanelNoPlacing();
             Refresh();
             return;
         }

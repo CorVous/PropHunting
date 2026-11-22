@@ -853,6 +853,7 @@ public class PHLocal : UdonSharpBehaviour
     {
         UpdateOrigin();
         UpdateSeeMates();
+        UpdatePlacement();
         UpdateStandIns();
         UpdateWeaponRepair();
         if (Input.GetKeyDown(KeyCode.T)) Taunt();
@@ -1638,6 +1639,34 @@ public class PHLocal : UdonSharpBehaviour
         int ph = game.phase;
         seeMates = game.seeHiders && s != null && (ph == PHGame.PH_BRIEF || ph == PHGame.PH_HIDE || ph == PHGame.PH_HUNT)
             && (s.ghost || game.RoleOf(s.index) == PHGame.ROLE_HIDER);
+    }
+
+    // ---- where players may place VRChat's own items (Cor, 2026-11-22: instead of ANTI TROLL; VRCPlacementZone). Placed
+    // things stand at the player's true position, so a caught hider's sticker or item could mark a live hider's spot
+    // (memory: vrchat-station-info-leak). Two zones on one box (WorldSceneBuilder) that this fits round the built map:
+    // portalBlock always blocks user portals there (the lobby keeps them); placeBlock blocks stickers, sharing pedestals
+    // and attached items while the host's NO PLACING switch is on (PHGame.noPlacing). Every client derives the same box
+    // and switch from the synced map and setting, as VRChat asks of zones changed at runtime; nothing here is synced.
+    public Transform placementBox;
+    public GameObject placeBlock;
+    const float PLACE_MARGIN = 30f, PLACE_BELOW = 30f, PLACE_HEIGHT = 110f;   // past the fence; under the basements, over the roofs
+    int placeW = -1, placeH = -1;
+    Vector3 placeOrigin;
+
+    void UpdatePlacement()
+    {
+        if (placementBox == null) return;
+        MapBuilderUdon b = game.builder;
+        int w = b.built ? b.siteW : 0, h = b.built ? b.siteH : 0;
+        if (w != placeW || h != placeH || b.origin != placeOrigin)
+        {
+            placeW = w; placeH = h; placeOrigin = b.origin;
+            // before the first map: a box over where maps stand (from the world's origin out), well clear of the lobby
+            float x = w > 0 ? w * 4f : 200f, z = h > 0 ? h * 4f : 200f;
+            placementBox.position = b.origin + new Vector3(x * 0.5f, PLACE_HEIGHT * 0.5f - PLACE_BELOW, z * 0.5f);
+            placementBox.localScale = new Vector3(x + 2f * PLACE_MARGIN, PLACE_HEIGHT, z + 2f * PLACE_MARGIN);
+        }
+        if (placeBlock != null && placeBlock.activeSelf != game.noPlacing) placeBlock.SetActive(game.noPlacing);
     }
 
     // ---- the hunters' stand-ins (PHGame.layers): a hider or a ghost plays on another copy of the map than the hunters,
