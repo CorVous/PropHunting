@@ -230,6 +230,7 @@ public class MapBuilderUdon : UdonSharpBehaviour
     [System.NonSerialized] public double[] stageMs = new double[32];
 
     const float CELL = 4f, INNER = 0.5f, WALL_HALF = 0.1f;
+    const float LIP_OUT = 0.36f;   // the roof skirt past the wall's face: the deepest facade (space, 0.3 m) and its 3 cm frame, and a little
     const float ROOF_CAP = 6f;   // the invisible wall on a building's roof (CellBody): no hop from anything reaches over it
     const int FACE_XN = 1, FACE_XP = 2, FACE_YN = 4, FACE_YP = 8, FACE_ZN = 16, FACE_ZP = 32, FACE_ALL = 63;
     const int B_GROUND = 0, B_WALLS = 1, B_ROOFS = 2, B_COLL = 3, B_SCENERY = 4;
@@ -3176,6 +3177,22 @@ public class MapBuilderUdon : UdonSharpBehaviour
             // reach, so a prop can neither land on a roof nor get over it. Low furniture, crates and tables stay hoppable.
             if (top) Box(B_COLL, new Vector3(x * CELL - WALL_HALF, t, z * CELL - WALL_HALF), new Vector3((x + 1) * CELL + WALL_HALF, t + ROOF_CAP, (z + 1) * CELL + WALL_HALF),
                          new Color32(0, 0, 0, 255), FACE_YP | (bw ? 0 : FACE_XN) | (be ? 0 : FACE_XP) | (bs ? 0 : FACE_ZN) | (bn2 ? 0 : FACE_ZP));
+            // Playtest 2026-11-22 (players still on the roofs): the facade's collision stands out past the wall up to the
+            // wall's top h, 0.14 m under the roof, a lip outside the box above that a hider hopped onto from a chair by
+            // the wall. A solid skirt over every outer side, from just under the facade's top to the box's top, as deep
+            // as the deepest facade: nothing stands on the lip, and nothing gets up past it. Out round the corners
+            // where two outer sides meet. (Ghosts still walk through it: Cor, they don't matter.)
+            if (top)
+            {
+                float e = LIP_OUT, y0 = h - 0.08f, y1 = t + ROOF_CAP;
+                float cx0 = x * CELL - WALL_HALF, cx1 = (x + 1) * CELL + WALL_HALF, cz0 = z * CELL - WALL_HALF, cz1 = (z + 1) * CELL + WALL_HALF;
+                float ax0 = bw ? x * CELL : cx0 - e, ax1 = be ? (x + 1) * CELL : cx1 + e;
+                float az0 = bs ? z * CELL : cz0 - e, az1 = bn2 ? (z + 1) * CELL : cz1 + e;
+                if (!bs) Collider(new Vector3(ax0, y0, cz0 - e), new Vector3(ax1, y1, cz0));
+                if (!bn2) Collider(new Vector3(ax0, y0, cz1), new Vector3(ax1, y1, cz1 + e));
+                if (!bw) Collider(new Vector3(cx0 - e, y0, cz0), new Vector3(cx0, y1, cz1));
+                if (!be) Collider(new Vector3(cx1, y0, cz0), new Vector3(cx1 + e, y1, cz1));
+            }
             // houses get a pitched roof on top of the flat one (the flat slab stays: the ceiling and the collider);
             // a space base keeps its roofs flat, with an orange parapet round the edge
             if (theme == GenData.THEME_SPACE && top)
