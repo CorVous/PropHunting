@@ -20,7 +20,7 @@ using UnityEngine.UI;
 public static partial class LobbyBuilder
 {
     [System.Serializable] class StoreCatalog { public string note; public StoreWeapon[] weapons; }
-    [System.Serializable] class StoreWeapon { public string id, kind, category, pack, model, thumb; public int sheet; }
+    [System.Serializable] class StoreWeapon { public string id, kind, category, pack, model, thumb, twin; public int sheet; }
 
     // the east wall (Cor): an alcove 1 m deep behind an opening from 0.5 to 5.85 m up (WorldSceneBuilder); the
     // shelves stand in it, flat against its back, five showing, sixteen weapons wide
@@ -67,7 +67,7 @@ public static partial class LobbyBuilder
         var store = root.gameObject.AddUdonSharpComponent<PHStore>();
         store.game = game; store.sound = sound; game.store = store;
         store.wId = new string[n]; store.wKind = new int[n]; store.wCat = new int[n]; store.wPrice = new int[n];
-        store.wTrophy = new int[n]; store.wGameIdx = new int[n];
+        store.wTrophy = new int[n]; store.wGameIdx = new int[n]; store.wTwin = new int[n];
         for (int i = 0; i < n; i++)
         {
             var w = cat[i];
@@ -79,6 +79,12 @@ public static partial class LobbyBuilder
             store.wTrophy[i] = -1;
             string[] list = store.wKind[i] == 0 ? gameMelee : gameGun;
             store.wGameIdx[i] = list != null ? System.Array.IndexOf(list, w.id) : -1;
+        }
+        // a weapon for both sides (Cor's gunblade: "unlock one for both"): each names the other
+        for (int i = 0; i < n; i++)
+        {
+            store.wTwin[i] = string.IsNullOrEmpty(cat[i].twin) ? -1 : System.Array.IndexOf(store.wId, cat[i].twin);
+            if (!string.IsNullOrEmpty(cat[i].twin) && store.wTwin[i] < 0) Debug.LogError("[store] " + cat[i].id + ": its twin " + cat[i].twin + " is not in the catalog");
         }
 
         // the trophies, in strings_store.tsv's order; each one's weapon and rounds-to-earn range from

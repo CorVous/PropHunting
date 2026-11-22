@@ -1665,6 +1665,89 @@
    "pack": "cor",
    "model": "cleaver",
    "thumb": ""
+  },
+  {
+   "id": "melee:cor:lance",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "lance",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:gunblade",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "gunblade",
+   "thumb": "",
+   "twin": "gun:cor:gunblade"
+  },
+  {
+   "id": "gun:cor:gunblade",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "gunblade",
+   "thumb": "",
+   "twin": "melee:cor:gunblade"
+  },
+  {
+   "id": "melee:cor:great_cleaver",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "great_cleaver",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:knife",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "knife",
+   "thumb": ""
+  },
+  {
+   "id": "melee:cor:gem_sword",
+   "kind": "melee",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "gem_sword",
+   "thumb": ""
+  },
+  {
+   "id": "gun:cor:light_bowgun",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "light_bowgun",
+   "thumb": ""
+  },
+  {
+   "id": "gun:cor:heavy_bowgun",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "heavy_bowgun",
+   "thumb": ""
+  },
+  {
+   "id": "gun:cor:bow",
+   "kind": "gun",
+   "category": "shop",
+   "sheet": 0,
+   "pack": "cor",
+   "model": "bow",
+   "thumb": ""
   }
  ]
 }

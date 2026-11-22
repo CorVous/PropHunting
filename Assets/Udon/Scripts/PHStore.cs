@@ -30,6 +30,7 @@ public class PHStore : UdonSharpBehaviour
     public int[] wPrice;         // shop weapons only
     public int[] wTrophy;        // the trophy that unlocks it, -1 none
     public int[] wGameIdx;       // its index in PHWeapons' melee or gun list (what PHSlot.meleeChoice / gunChoice hold), -1 unknown
+    public int[] wTwin;          // the same weapon on the other side (Cor's gunblade: one unlock for both), -1 none
     public const int CAT_STARTER = 0, CAT_COOL = 1, CAT_GOOFY = 2, CAT_SHOP = 3;
 
     // ---- the trophies (baked; texts from Assets/Udon/Text/strings_store.tsv)
@@ -114,6 +115,12 @@ public class PHStore : UdonSharpBehaviour
         return -1;
     }
 
+    void OwnTwins()
+    {
+        if (wTwin == null) return;
+        for (int i = 0; i < own.Length && i < wTwin.Length; i++) if (own[i] && wTwin[i] >= 0) own[wTwin[i]] = true;
+    }
+
     void GiveStarters() { for (int i = 0; i < own.Length; i++) if (wCat[i] == CAT_STARTER) own[i] = true; }
 
     // ------------------------------------------------------------------ saving
@@ -135,6 +142,7 @@ public class PHStore : UdonSharpBehaviour
         if (PlayerData.TryGetString(player, "ph.gun", out s) && Find(s) >= 0) pickGun = Find(s);
         // a trophy earned before its weapon was in the catalog, or a weapon lost: what a trophy gives is always owned
         for (int t = 0; t < TROPHIES; t++) if (got[t] && tWeapon[t] >= 0) own[tWeapon[t]] = true;
+        OwnTwins();
         if (pickMelee < 0 || !own[pickMelee] || wKind[pickMelee] != 0) pickMelee = RandomFree(0);
         if (pickGun < 0 || !own[pickGun] || wKind[pickGun] != 1) pickGun = RandomFree(1);
         loaded = true;
@@ -199,6 +207,7 @@ public class PHStore : UdonSharpBehaviour
         if (c < 0 || own[c] || wCat[c] != CAT_SHOP || wTrophy[c] >= 0 || coins < wPrice[c] || !loaded) { Play("error_004", 0.5f); return false; }
         coins -= wPrice[c];
         own[c] = true;
+        OwnTwins();   // (the gunblade: bought on either shelf, both sides have it)
         Play("jingles_PIZZI07", 0.7f);
         Pick(c);   // carry it at once (saves)
         return true;

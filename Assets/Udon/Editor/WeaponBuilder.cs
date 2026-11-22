@@ -53,7 +53,7 @@ public static class WeaponBuilder
     }
 
     class Model { public string kind, name, id; public Mesh mesh; public float tip, head; public Vector3[] spots; public Color color;
-        public bool card; public Mesh off, shelf; public bool offShield; public float offTip, offHead; }
+        public bool card; public Mesh off, shelf; public bool offShield; public float offTip, offHead; public bool hasMuzzle; public Vector3 muzzle; }
 
     // ---- Cor's drawn weapons (Tools/make_card_weapons.py -> Tools/card_weapons.json and the atlas
     // Assets/Udon/Textures/CardWeapons.png, with the wear in CardWeaponsWear.png): each piece a flat card, the drawing
@@ -64,7 +64,7 @@ public static class WeaponBuilder
     [Serializable] class CardCorner { public float[] p; public float[] uv; }
     [Serializable] class CardPiece { public string role, plane; public CardCorner[] corners; public float tip, head; public int[] color; public float[] spots; }   // spots: x y z, x y z, ...
     [Serializable] class CardShelf { public CardCorner[] corners; }
-    [Serializable] class CardWeapon { public string id; public CardPiece[] pieces; public CardShelf[] shelf; }
+    [Serializable] class CardWeapon { public string id, twin; public CardPiece[] pieces; public CardShelf[] shelf; public float[] muzzle; }   // muzzle: a gun's
     [Serializable] class CardFile { public CardWeapon[] weapons; }
 
     static Mesh SubMesh(string name, Dictionary<string, Mesh> keep, ref Mesh holder)
@@ -121,8 +121,10 @@ public static class WeaponBuilder
         foreach (var w in root.weapons)
         {
             string baseName = w.id.Replace(':', '_');
-            var mo = new Model { kind = "melee", id = w.id, card = true };
-            string[] parts = w.id.Split(':'); mo.name = parts[parts.Length - 1];
+            string[] parts = w.id.Split(':');
+            var mo = new Model { kind = parts[0], id = w.id, card = true };   // "melee" or "gun" (a hider gun: one piece)
+            mo.name = parts[parts.Length - 1];
+            if (w.muzzle != null && w.muzzle.Length == 3) { mo.hasMuzzle = true; mo.muzzle = new Vector3(w.muzzle[0], w.muzzle[1], w.muzzle[2]); }
             foreach (var p in w.pieces)
             {
                 var quads = new List<CardCorner[]> { p.corners };
@@ -368,7 +370,8 @@ public static class WeaponBuilder
     {
         var models = Load();
         var melee = models.FindAll(m => m.kind == "melee");
-        melee.AddRange(LoadCards());   // (after the blob's: the picks' numbers of the others stay)
+        var cards = LoadCards();
+        melee.AddRange(cards.FindAll(m => m.kind == "melee"));   // (after the blob's: the picks' numbers of the others stay)
         var gun = models.Find(m => m.kind == "gun" && m.name == "blaster-b") ?? models.Find(m => m.kind == "gun");
         var root = new GameObject("Weapons");
         root.transform.SetParent(gameRoot, false);
@@ -379,13 +382,15 @@ public static class WeaponBuilder
         var guns = models.FindAll(m => m.kind == "gun");
         // the starter selector first (index 0 = the default)
         guns.Sort((a, b) => (b.name == "blaster-b").CompareTo(a.name == "blaster-b"));
+        guns.AddRange(cards.FindAll(m => m.kind == "gun"));   // Cor's drawn guns, after the others (their numbers stay)
         w.gunMesh = guns.ConvertAll(m => m.mesh).ToArray();
         w.gunId = guns.ConvertAll(m => m.id).ToArray();
-        w.gunMuzzle = guns.ConvertAll(m => m.tip).ToArray();
+        w.gunMuzzle = guns.ConvertAll(m => m.hasMuzzle ? m.muzzle.z : m.tip).ToArray();
         // where the barrel ends, in the model's own space: the middle of its front-most vertices (the barrel need
         // not lie on the model's z axis; Cor: the laser must come out of the gun)
         w.gunMuzzlePoint = guns.ConvertAll(m =>
         {
+            if (m.hasMuzzle) return m.muzzle;   // a drawn gun: where its drawing's barrel ends
             var v = m.mesh.vertices;
             float zMax = float.MinValue;
             foreach (var p in v) zMax = Mathf.Max(zMax, p.z);
