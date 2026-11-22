@@ -25,6 +25,8 @@ public class PHPanel : UdonSharpBehaviour
     public TextMeshProUGUI autoCaption;  // "Auto · M"
     public TextMeshProUGUI[] roundCaption;   // hunt time for Short, Normal, Long at the current size
     public TextMeshProUGUI[] switchCaption;  // ON / OFF on the switch tiles (kinds 4, 5: index kind - 4)
+    public Image seeHidersIcon;              // SEE HIDERS' picture (Cor): grey with a crossed-out eye while off
+    public Sprite seeHidersOn, seeHidersOff;
     public Image noPlacingIcon;              // NO PLACING's picture (Cor): a sticker and an item, in a crossed-out circle while on
     public Sprite noPlacingOn, noPlacingOff;
 
@@ -339,7 +341,7 @@ public class PHPanel : UdonSharpBehaviour
         for (int i = 0; i < tileKind.Length; i++)
         {
             int kind = tileKind[i];
-            bool on = Value(kind) == tileArg[i] && kind != 5;   // (NO PLACING has no meeple: its circle shows it)
+            bool on = Value(kind) == tileArg[i] && kind < 4;   // (the switches have no meeple: their pictures show it)
             if (tileMarker[i].activeSelf != on) tileMarker[i].SetActive(on);
             bool ap = kind == 0 && game.sizeAuto && tileArg[i] == auto;
             if (tileAuto[i].activeSelf != ap) tileAuto[i].SetActive(ap);
@@ -348,6 +350,11 @@ public class PHPanel : UdonSharpBehaviour
         if (switchCaption != null)
             for (int k = 0; k < switchCaption.Length; k++)
                 if (switchCaption[k] != null) switchCaption[k].text = game.text.Get(Value(4 + k) == 1 ? "panel.on" : "panel.off");
+        if (seeHidersIcon != null)
+        {
+            Sprite want = game.seeHiders ? seeHidersOn : seeHidersOff;
+            if (seeHidersIcon.sprite != want) seeHidersIcon.sprite = want;
+        }
         if (noPlacingIcon != null)
         {
             Sprite want = game.noPlacing ? noPlacingOn : noPlacingOff;
