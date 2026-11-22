@@ -249,6 +249,20 @@ public static class WorldSceneBuilder
             beacon.GetComponent<MeshRenderer>().sharedMaterial = local.beaconGreen;
             beacon.SetActive(false);
             slot.beacon = beacon; slot.beaconRenderer = beacon.GetComponent<MeshRenderer>();
+            // SEE HIDERS (Cor, 2026-11-22): the hider's name over their prop, for the other hiders and ghosts (PHSlot.mateName)
+            {
+                var nameGo = new GameObject("MateName" + i);
+                nameGo.transform.SetParent(beaconsRoot, false);
+                var tmp = nameGo.AddComponent<TextMeshPro>();
+                var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Lobby/Fonts/KenneyFuture SDF.asset");
+                if (font != null) tmp.font = font;
+                tmp.fontSize = 2.2f; tmp.alignment = TextAlignmentOptions.Bottom; tmp.enableWordWrapping = false;
+                tmp.color = new Color(0.62f, 1f, 0.58f);   // the hiders' green, as the outline
+                tmp.rectTransform.sizeDelta = new Vector2(4f, 0.5f); tmp.text = "";
+                tmp.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                nameGo.SetActive(false);
+                slot.mateName = tmp;
+            }
             UdonSharpEditorUtility.CopyProxyToUdon(slot);
             slots[i] = slot;
         }

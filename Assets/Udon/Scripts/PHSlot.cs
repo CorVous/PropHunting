@@ -25,6 +25,7 @@ public class PHSlot : UdonSharpBehaviour
     public Vector3 parkAt = new Vector3(0f, -400f, 0f);
     public AudioSource voice;          // taunts play here, at the prop
     public PHWeapons weapons;          // the held weapons and their bursts (Swung)
+    public TMPro.TextMeshPro mateName;  // SEE HIDERS (Cor, 2026-11-22): this hider's name over their prop, for the other hiders and ghosts
 
     // ---- synced, written by the owner
     [UdonSynced] public bool inZone;
@@ -365,7 +366,17 @@ public class PHSlot : UdonSharpBehaviour
     {
         // everyone else's copy of a hiding player's station is parked out of sight
         if (!remoteSet) { station.PlayerMobility = VRCStation.Mobility.Immobilize; remoteSet = true; }
-        if (hiding) Park();
+        if (hiding)
+        {
+            // SEE HIDERS (Cor, 2026-11-22): a fellow hider or a ghost hears this hider from where their prop is, so on
+            // their client the station (avatar and voice) sits right at the prop; hunters' clients still park it
+            if (game.local != null && game.local.seeMates && proxy != null)
+            {
+                station.transform.SetPositionAndRotation(proxy.transform.position, Quaternion.Euler(0f, proxy.transform.eulerAngles.y, 0f));
+                parked = false;
+            }
+            else Park();
+        }
         else if (ghost)
         {
             // ghosts see ghosts; nobody else does (Cor: the dead see only the dead and the hunters)
@@ -535,16 +546,34 @@ public class PHSlot : UdonSharpBehaviour
     {
         bool want = !mine && game.local != null && game.local.seeMates && game.phase != PHGame.PH_END;
         GameObject target = want ? proxy : null;
-        if (target == mateOn) return;
+        if (target == mateOn) { PlaceMateName(); return; }
         MateCageOff();
         if (target == null) return;
         mateCage = game.builder.MateCage(target, proxyDef, mateCage);
         mateOn = target;   // (also where the model has no cage: not asked again every frame)
+        if (mateName != null)
+        {
+            VRCPlayerApi p = VRCPlayerApi.GetPlayerById(game.slotPlayer[index]);
+            mateName.text = Utilities.IsValid(p) ? p.displayName : "";
+            mateName.gameObject.SetActive(true);
+            PlaceMateName();
+        }
+    }
+
+    // the name floats a little over the prop's top, turned to face the local player's head
+    void PlaceMateName()
+    {
+        if (mateName == null || mateOn == null) return;
+        Vector3 at = mateOn.transform.position + new Vector3(0f, 2f * proxyHalf.y + 0.3f, 0f);
+        Vector3 eye = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
+        Vector3 away = at - eye; away.y = 0f;
+        mateName.transform.SetPositionAndRotation(at, away.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(away) : mateName.transform.rotation);
     }
 
     void MateCageOff()
     {
         mateOn = null;
+        if (mateName != null && mateName.gameObject.activeSelf) mateName.gameObject.SetActive(false);
         if (mateCage == null) return;
         mateCage.SetActive(false);
         mateCage.transform.SetParent(proxyRoot, false);   // (not destroyed with the prop it hung on)

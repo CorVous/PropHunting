@@ -326,7 +326,8 @@ public class PHLocal : UdonSharpBehaviour
     VRCPlayerApi[] voicePlayers = new VRCPlayerApi[90];
 
     // Hunters cannot hear hiders. Hiders hear each other like a radio: the same volume and centred left/right
-    // wherever they are (no fall-off, a volumetric radius bigger than the map and the parking, no lowpass).
+    // wherever they are (no fall-off, a volumetric radius bigger than the map and the parking, no lowpass). With SEE
+    // HIDERS on, hiders and ghosts hear each hider at that same volume but from the hider's prop (want 4).
     // Everything else is VRChat's default (the parked stations already put hidden voices far away).
     void UpdateVoices()
     {
@@ -373,8 +374,11 @@ public class PHLocal : UdonSharpBehaviour
                 if (slotOfKey[h] == pid) { slot = slotOfSlot[h]; break; }
             PHSlot ps = slot >= 0 ? game.slots[slot] : null;
             bool theyHide = round && ps != null && game.RoleOf(slot) == PHGame.ROLE_HIDER && ps.hiding && !ps.ghost;
-            // 1: VRChat's default, 2: a hunter does not hear a hider, 3: hiders hear each other like a radio
+            // 1: VRChat's default, 2: a hunter does not hear a hider, 3: hiders hear each other like a radio,
+            // 4: SEE HIDERS (Cor, 2026-11-22): hiders and ghosts hear a hider at full volume anywhere on the map, but from
+            // where their prop is (PHSlot.UpdateRemote puts the hider's station there on this client)
             int want = (iHunt && theyHide) ? 2 : ((iHide && theyHide) ? 3 : 1);
+            if (theyHide && seeMates && (iHide || meGhost)) want = 4;
             // another copy of the map (a hunter heard by a hider or a ghost): VRChat's fall-off over 25 m, begun as far
             // out as the copies lie apart, so they sound as near as they are on the map (only the loudness: the way they
             // are heard from is no guide; the wide volumetric radius keeps it from pointing at the other copy). Coded as
@@ -396,6 +400,7 @@ public class PHLocal : UdonSharpBehaviour
             bool lowpass = true;
             if (want == 2) gain = 0f;
             else if (want == 3) { gain = 9f; near = 10000f; far = 10001f; radius = 1000f; lowpass = false; }   // (quieter: Cor's group playtest)
+            else if (want == 4) { gain = 9f; near = 10000f; far = 10001f; radius = 0f; lowpass = false; }      // (the radio's level, but from a point)
             else if (want >= 10) { near = want - 10; far = near + 25f; radius = near; }
             p.SetVoiceGain(gain);
             p.SetVoiceDistanceNear(near);
