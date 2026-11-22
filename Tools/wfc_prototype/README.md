@@ -9,11 +9,15 @@ Nothing here is used by the world. It is the reference for a C# port (`MapGenSit
     python sitegen.py            # retry rates and lane variety over 200 seeds a size
     python render.py 2 l.png     # twelve L maps on one sheet (0 S, 1 M, 2 L, 3 XL)
     python make_out.py out       # the sheets of every size and the collapse as a film
+    python items.py 25           # the item pass over 25 seeds a size
+    python items_render.py out   # maps with their items
 
 - `wfc.py`: the core, written as the Udon port has to be: flat arrays, bit masks, integer maths, GenRng,
   no backtracking (a contradiction is the seed's next attempt).
 - `sitegen.py`: the tiles and what may stand beside what (`allowed`), the lanes grown first along their open
   ends, then every other cell, then the plots cut from the frontage and a plan seated on each.
-- `render.py`, `make_out.py`: pictures.
+- `items.py`: a second collapse on 1 m cells for the items of every room, garden, the wood and the green: one
+  tile set, and per kind of place the tiles it may hold, their weights and the pieces it must have.
+- `render.py`, `items_render.py`, `make_out.py`: pictures.
 
 Needs Pillow.

@@ -72,7 +72,8 @@ class Wave:
     border is the tile every cell outside the grid counts as.
     """
 
-    def __init__(self, w, h, ntiles, compat, border):
+    def __init__(self, w, h, ntiles, compat, border, walls=None):
+        self.walls = walls        # per cell: the sides (bits N, E, S, W) a wall closes; a walled side counts as the border
         self.W, self.H, self.N = w, h, ntiles
         self.compat = compat
         self.full = (1 << ntiles) - 1
@@ -85,7 +86,7 @@ class Wave:
             for x in range(w):
                 for d in range(4):
                     nx, nz = x + DX[d], z + DZ[d]
-                    if nx < 0 or nz < 0 or nx >= w or nz >= h:
+                    if nx < 0 or nz < 0 or nx >= w or nz >= h or (walls is not None and walls[z * w + x] >> d & 1):
                         self.restrict(z * w + x, compat[(d + 2) & 3][border])
         self.propagate()
 
@@ -119,7 +120,7 @@ class Wave:
             m = self.wave[c]
             for d in range(4):
                 nx, nz = x + DX[d], z + DZ[d]
-                if nx < 0 or nz < 0 or nx >= W or nz >= H:
+                if nx < 0 or nz < 0 or nx >= W or nz >= H or (self.walls is not None and self.walls[c] >> d & 1):
                     continue
                 self.propagations += 1
                 self.restrict(nz * W + nx, self.allowed_from(m, d))
