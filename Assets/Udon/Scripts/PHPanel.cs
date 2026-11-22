@@ -25,10 +25,8 @@ public class PHPanel : UdonSharpBehaviour
     public TextMeshProUGUI autoCaption;  // "Auto · M"
     public TextMeshProUGUI[] roundCaption;   // hunt time for Short, Normal, Long at the current size
     public TextMeshProUGUI[] switchCaption;  // ON / OFF on the switch tiles (kinds 4, 5: index kind - 4)
-    public Image noPlacingIcon;              // NO PLACING's picture (Cor: a sticker and an item in a crossed-out circle), grey while off
+    public Image noPlacingIcon;              // NO PLACING's picture (Cor): a sticker and an item, in a crossed-out circle while on
     public Sprite noPlacingOn, noPlacingOff;
-    public Image noPlacingTile;              // ...and the tile itself, its row colour while on, grey while off (Cor)
-    public Color noPlacingColour, noPlacingGrey;
 
     public TextMeshProUGUI benchText;    // "5 Props · 2 Hunters"
     public Image[] benchMeeples;
@@ -341,7 +339,7 @@ public class PHPanel : UdonSharpBehaviour
         for (int i = 0; i < tileKind.Length; i++)
         {
             int kind = tileKind[i];
-            bool on = Value(kind) == tileArg[i];
+            bool on = Value(kind) == tileArg[i] && kind != 5;   // (NO PLACING has no meeple: its circle shows it)
             if (tileMarker[i].activeSelf != on) tileMarker[i].SetActive(on);
             bool ap = kind == 0 && game.sizeAuto && tileArg[i] == auto;
             if (tileAuto[i].activeSelf != ap) tileAuto[i].SetActive(ap);
@@ -354,11 +352,6 @@ public class PHPanel : UdonSharpBehaviour
         {
             Sprite want = game.noPlacing ? noPlacingOn : noPlacingOff;
             if (noPlacingIcon.sprite != want) noPlacingIcon.sprite = want;
-        }
-        if (noPlacingTile != null)
-        {
-            Color want = game.noPlacing ? noPlacingColour : noPlacingGrey;
-            if (noPlacingTile.color != want) noPlacingTile.color = want;
         }
         int sizeNow = game.sizeAuto ? auto : game.sizeChoice;
         for (int r = 0; r < roundCaption.Length; r++)
