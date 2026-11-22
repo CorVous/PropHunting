@@ -629,10 +629,21 @@ public class PHHiderBody : UdonSharpBehaviour
             // up a stair to an upper floor or down into a basement (generator 18); the ground when there is none
             RaycastHit g;
             groundY = 0f; groundN = Vector3.up;
-            if (Physics.Raycast(from + Vector3.up * 0.5f, Vector3.down, out g, dist + 0.5f, 1 << 11, QueryTriggerInteraction.Ignore))
+            // (not a roof: a ghost on a wardrobe stepped up through the ceiling onto it, and walked onto one through the
+            // roof's box; on a roof it falls back into the building, playtest 2026-11-22)
+            Vector3 o = from + Vector3.up * 0.5f;
+            float left = dist + 0.5f;
+            for (int k = 0; k < 3; k++)
             {
-                groundY = g.point.y; groundN = g.normal;
-                return true;
+                if (!Physics.Raycast(o, Vector3.down, out g, left, 1 << 11, QueryTriggerInteraction.Ignore)) break;
+                if (!game.builder.OnRoof(g.point))
+                {
+                    groundY = g.point.y; groundN = g.normal;
+                    return true;
+                }
+                float d = g.distance + 0.02f;
+                o.y -= d; left -= d;
+                if (left <= 0f) break;
             }
             return from.y - dist <= 0f && from.y >= -0.05f;
         }
