@@ -1247,12 +1247,20 @@ public partial class MapGenUdon
         {
             uint[] r = SR(1);
             YardAnchor(room, r);   // (FindGates too: the fire ring keeps its seats off the gates' lines)
-            hq_Yard_rule = RngRange(r, 3);
+            // revision 30 (Cor: there can be variation): the rule, the number of tents, one kind of tent or a mix,
+            // the centre (the fire most of the time, now and then a camp table), the things beside each tent
+            int roll = RngRange(r, 100);
+            hq_Yard_rule = roll < 35 ? 0 : (roll < 60 ? 1 : (roll < 78 ? 2 : 3));
             planB = RngRange(r, tents.Length);
             int tent = Dn(tents[planB]);
             hq_Yard_a = tent; hq_Yard_got = 0; planA = -1;
-            hq_Yard_want = 2 + AreaM2(room) / 24;
-            if (hq_Yard_want > 4) hq_Yard_want = 4;
+            int most = 2 + AreaM2(room) / 24;
+            if (most > 4) most = 4;
+            hq_Yard_want = 2 + RngRange(r, most - 1);
+            if (hq_Yard_rule == 3) hq_Yard_want = 1;   // SOLO: one tent at a bigger fire circle
+            hq_Camp_mix = RngChance(r, 300) ? 1 : 0;
+            hq_Camp_table = hq_Yard_rule != 2 && RngChance(r, 220) ? 1 : 0;
+            hq_Camp_isTable = 0; hq_Camp_fire0 = 0;
             yardN = 0;
             if (hq_Yard_rule == 1)
             {
@@ -1285,11 +1293,18 @@ public partial class MapGenUdon
         {
             // the fire: ARC rings it in the middle; TWO ROWS sets it in the path's middle
             if (hq_Yard_rule == 2) PhBreak();
+            else if (hq_Camp_table == 1 && planIter == 0)
+            {
+                // the camp table in the middle (else the fire, the next step)
+                planA = YardOne(Dn("r_tableRound"), RoomMidX(room), RoomMidZ(room), 0);
+                if (planA >= 0) { hq_Camp_isTable = 1; PhBreak(); }
+                else { hq_Camp_table = 0; hq_Camp_fire0 = 1; }
+            }
             else if (hq_Yard_rule == 1) { planA = YardOne(Dn("s_campfirePit"), RoomMidX(room), RoomMidZ(room), 0); PhBreak(); }
             else
             {
                 uint[] r = hq_Yard_r;
-                if (planIter == 0) { hq_FireRing_minClr = 6; hq_FireRing_tx = RoomMidX(room); hq_FireRing_tz = RoomMidZ(room); hq_FireRing_soft = false; hq_FireRing_rng = r; PhSubReset(); }
+                if (planIter == hq_Camp_fire0) { hq_FireRing_minClr = 6; hq_FireRing_tx = RoomMidX(room); hq_FireRing_tz = RoomMidZ(room); hq_FireRing_soft = false; hq_FireRing_rng = r; PhSubReset(); }
                 PhPush(); FireRing_Body(); bool fin = PhAdvance(); PhPop();
                 if (fin)
                 {
@@ -1301,8 +1316,8 @@ public partial class MapGenUdon
         }
         if (planPhase == 2)
         {
-            // ARC: the spots, across the fire from the gate
-            if (hq_Yard_rule == 0)
+            // ARC (and SOLO): the spots, across the fire from the gate
+            if (hq_Yard_rule == 0 || hq_Yard_rule == 3)
             {
                 uint[] r = hq_Yard_r;
                 int fx = planA >= 0 ? emitX[planA] : RoomMidX(room), fz = planA >= 0 ? emitZ[planA] : RoomMidZ(room);
@@ -1320,6 +1335,23 @@ public partial class MapGenUdon
                 int fit = edge - Sz(hq_Yard_a) / 2 - Sx(hq_Yard_a) / 2 - 200;
                 if (rad > fit) rad = fit;
                 if (rad < 1500 + Sz(hq_Yard_a) / 2) rad = 1500 + Sz(hq_Yard_a) / 2;
+                bool small = roomX1[room] - roomX0[room] < 20 && roomZ1[room] - roomZ0[room] < 20;
+                if (small)
+                {
+                    // revision 30: a camp of 8 x 8 m has its tents in the corners round the fire, the far ones first
+                    // (an arc through the middle of the sides met the doorsteps and the fire's seats)
+                    int inset = (Sx(hq_Yard_a) > Sz(hq_Yard_a) ? Sx(hq_Yard_a) : Sz(hq_Yard_a)) / 2 + 1050;   // (clear of the doorsteps along the edges)
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int q = Norm(b0 + 45 + 90 * k);   // the corners as seen from the fire, the far side of the gate first
+                        int sx = sinTab[q] >= 0 ? 1 : -1, sz = sinTab[(q + 90) % 360] >= 0 ? 1 : -1;
+                        int px = sx > 0 ? roomMax - inset : roomMin + inset, pz = sz > 0 ? room2Max - inset : room2Min + inset;
+                        int a = (int)(System.Math.Atan2(px - fx, pz - fz) * 180 / System.Math.PI);
+                        yardX[yardN] = px; yardZ[yardN] = pz;
+                        yardYaw[yardN] = Norm(a + 180); yardRow[yardN] = 0; yardSet[yardN] = -1; yardN++;
+                    }
+                }
+                else
                 for (int k = 0; k < n; k++)
                 {
                     int a = Norm(b0 + spread * (2 * k - (n - 1)) / 2);
@@ -1335,7 +1367,7 @@ public partial class MapGenUdon
             if (planIter >= yardN || hq_Yard_got >= hq_Yard_want) PhBreak();
             else
             {
-                int i = planIter, tent = hq_Yard_a, first = nEmit;
+                int i = planIter, tent = hq_Camp_mix != 0 ? Dn(tents[(planB + i) % tents.Length]) : hq_Yard_a, first = nEmit;
                 uint[] r = SR(10 + i);
                 int px = yardX[i], pz = yardZ[i], a = Norm(yardYaw[i]);
                 if (hq_Yard_rule == 2)
@@ -1345,6 +1377,17 @@ public partial class MapGenUdon
                     px -= back * sinTab[a] / 4096; pz -= back * sinTab[(a + 90) % 360] / 4096;
                 }
                 int t = StampAt(tent, room, px, pz, a, 0, -1, H_FREE, true);
+                if (t < 0 && hq_Yard_rule != 2)
+                {
+                    // revision 30: square to the fence, then a little along it either way (clear of the walk between
+                    // the doors), still facing the fire's side
+                    int sq = Norm((a + 45) / 90 * 90);
+                    for (int k = 0; k < 5 && t < 0; k++)
+                    {
+                        int ox = k == 1 ? 500 : (k == 2 ? -500 : 0), oz = k == 3 ? 500 : (k == 4 ? -500 : 0);
+                        t = StampAt(tent, room, px + ox, pz + oz, sq, 0, -1, H_FREE, true);
+                    }
+                }
                 bool ok = t >= 0;
                 if (ok && hq_Yard_rule == 2)
                 {
@@ -1354,20 +1397,20 @@ public partial class MapGenUdon
                 else if (ok)
                 {
                     // the lantern on one side, the bedroll (or a cot) on the other: the same sides at every tent
-                    RelBeside(Dn("hk_lantern"), t, -1, 150, 0, r);
-                    RelBeside(Dn(RngChance(r, 650) ? "s_bedroll" : "n_cot"), t, 1, 150, 0, r);
+                    if (RngChance(r, 650)) RelBeside(Dn("hk_lantern"), t, -1, 150, 0, r);
+                    if (RngChance(r, 750)) RelBeside(Dn(RngChance(r, 650) ? "s_bedroll" : "n_cot"), t, 1, 150, 0, r);
                 }
                 if (!ok) TakeBack(first);
                 else if (Keep(first, false)) { hq_Yard_got++; yardSet[i] = t; }
             }
         }
         // revision 30 (Cor: they don't really look like campsites): the tents the rule could not place go round the
-        // fire where there is room, so a camp has two at the least
+        // fire where there is room
         if (planPhase == 4 && PhLoop(4, 100000))
         {
             if (!PhSubActive())
             {
-                if (!(planIter < 6 && hq_Yard_got < 2 && planA >= 0 && hq_Yard_rule != 2)) PhBreak();
+                if (!(planIter < 8 && hq_Yard_got < hq_Yard_want && planA >= 0 && hq_Yard_rule != 2)) PhBreak();
                 else
                 {
                     hq_AroundFire_def = hq_Yard_a; hq_AroundFire_fire = planA; hq_AroundFire_relYaw = 180;
@@ -1384,23 +1427,28 @@ public partial class MapGenUdon
         }
         if (planPhase == 5)
         {
-            // ARC: log seats on the gate's side of the fire, along its ring
-            if (hq_Yard_rule == 0 && planA >= 0)
+            uint[] r7 = SR(7);
+            hq_Camp_wood = RngChance(r7, 700) ? 1 : 0;   // the wood pile, most of the time
+            // ARC: log seats on the gate's side of the fire, along its ring; SOLO: four round a bigger circle, away from
+            // the tent; TWO ROWS: one each way along the path; at a camp table, closer in
+            if (hq_Yard_rule != 2 && planA >= 0)
             {
                 int fx = emitX[planA], fz = emitZ[planA];
                 int b0 = (int)(System.Math.Atan2(yardGX - fx, yardGZ - fz) * 180 / System.Math.PI);
-                int seat = Dn("s_logSmall");
-                for (int k = -1; k <= 1; k += 2)
+                if (hq_Yard_rule == 1) b0 = RoomLongAxis(room) == 0 ? 90 : 0;
+                int seat = Dn("s_logSmall"), rad = hq_Camp_isTable != 0 ? 1100 : (hq_Yard_rule == 3 ? 1900 : 1500);
+                int n = hq_Yard_rule == 3 ? 4 : 2, step = hq_Yard_rule == 3 ? 50 : (hq_Yard_rule == 1 ? 180 : 56);
+                for (int k = 0; k < n; k++)
                 {
-                    int a = Norm(b0 + 28 * k);
-                    YardOne(seat, fx + 1500 * sinTab[a] / 4096, fz + 1500 * sinTab[(a + 90) % 360] / 4096, Norm(a + 90));
+                    int a = Norm(b0 + step * k - step * (n - 1) / 2);
+                    YardOne(seat, fx + rad * sinTab[a] / 4096, fz + rad * sinTab[(a + 90) % 360] / 4096, Norm(a + 90));
                 }
             }
         }
         if (planPhase == 6 && PhLoop(6, 100000))
         {
             // the wood pile and the chopping block at the edge (not on PITCHES: each has its own fire)
-            if (hq_Yard_rule == 2 || planA < 0) PhBreak();
+            if (hq_Yard_rule == 2 || planA < 0 || hq_Camp_isTable != 0 || hq_Camp_wood == 0) PhBreak();
             else
             {
                 uint[] r2 = hq_Yard_r;
@@ -1412,9 +1460,15 @@ public partial class MapGenUdon
         }
         if (planPhase == 7)
         {
-            string[] pool = { "n_canoe", "s_chest", "s_barrel" };
+            string[] pool = { "n_canoe", "s_chest", "s_barrel", "s_chest" };
             uint[] r = SR(6);
-            YardAccent(pool, false, r);
+            if (RngChance(r, 800)) YardAccent(pool, false, r);
+            // a cooking spot at the fire now and then: the spit or the fish stand
+            if (planA >= 0 && hq_Camp_isTable == 0 && hq_Yard_rule != 2 && RngChance(r, 400))
+            {
+                int first = nEmit;
+                if (RelBeside(Dn(RngChance(r, 500) ? "s_spit" : "s_fishStand"), planA, RngChance(r, 500) ? -1 : 1, 250, 0, r) >= 0) Keep(first, false);
+            }
             ClearBans();
         }
         if (planPhase == 8 && PhLoop(8, 100000))
@@ -1427,6 +1481,7 @@ public partial class MapGenUdon
 
     // phase state of the split plans (Tools: autophase2)
     int hp_PlanZooWalk_first;
+    int hq_Camp_mix, hq_Camp_table, hq_Camp_isTable, hq_Camp_fire0, hq_Camp_wood;
     int hp_PlanKeeper_first;
     string[] hp_PlanKeeper_rows;
     int hp_PlanWoodyard_first;

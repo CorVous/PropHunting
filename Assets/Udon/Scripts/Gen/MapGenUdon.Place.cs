@@ -713,9 +713,10 @@ public partial class MapGenUdon
     }
 
     // ---- revision 30 (Cor: they don't really look like campsites and the like): a purpose area holds the pieces that
-    // make it what it is, or it is not that area. After its plan, a campsite needs two tents (one, on its last try,
-    // when only one fits) and its fire; a vegetable garden two rows of crops; a picnic ground two tables with their
-    // benches; a drying yard two racks; a fire pit its fire and three seats. An area short of them is cleared and
+    // make it what it is, or it is not that area. A loose minimum (Cor: there can be variation; the plans vary the
+    // counts, the centre, the rule and the extras): after its plan a campsite needs a tent and its centre (the fire or
+    // a camp table); a vegetable garden every row its patch holds planted; a picnic ground a table with its benches or
+    // a blanket; a drying yard a rack; a fire pit its fire and two seats. An area short of them is cleared and
     // planned again with fresh draws (twice), then becomes scenery ground (trees, bushes, rocks) rather than stay
     // half dressed. The layout and the buildings never change.
     public int dressTry;   // the room's try (0: the first; Rng salts the room's draws with it)
@@ -735,10 +736,14 @@ public partial class MapGenUdon
         return id.StartsWith("n_crop") || id.StartsWith("n_lettuce") || id.StartsWith("n_corn") || id.StartsWith("n_wheat");
     }
 
+    int[] cropKindDef = new int[8], cropKindN = new int[8];
+    int nCropKind;
+
     public bool Dressed(int room)
     {
         int t = roomType[room];
-        int tents = 0, fire = 0, crops = 0, sets = 0, racks = 0, seats = 0;
+        int tents = 0, fire = 0, crops = 0, sets = 0, racks = 0, seats = 0, tables = 0, rugs = 0;
+        nCropKind = 0;
         int rack = TwinIn(room, FindDef("ms_clothesRack")), log = TwinIn(room, FindDef("w_logA"));
         // a village's fire basket stands in for the fire pit
         int pit = TwinIn(room, FindDef("s_campfirePit")), ring = TwinIn(room, FindDef("n_campfire"));
@@ -750,14 +755,31 @@ public partial class MapGenUdon
             if ((k & GenData.K_FIRE) != 0 || d == pit || d == ring) fire++;
             if ((k & (GenData.K_SEAT | GenData.K_STUMP)) != 0 || (defTags[d] & GenData.I_SEAT_OUT) != 0 || d == log) seats++;
             if ((emitFlags[e] & EF_BOOTH) != 0) sets++;
+            if ((k & GenData.K_TABLE) != 0) tables++;
             if (d == rack) racks++;
-            if (t == GenData.R_GARDEN && IsCrop(defId[d])) crops++;
+            if ((defTags[d] & GenData.I_RUG) != 0) rugs++;
+            if (t == GenData.R_GARDEN && IsCrop(defId[d]))
+            {
+                crops++;
+                // revision 30: a row is one crop; count the plants of each crop
+                int j = 0;
+                while (j < nCropKind && cropKindDef[j] != d) j++;
+                if (j == nCropKind && j < cropKindDef.Length) { cropKindDef[j] = d; cropKindN[j] = 0; nCropKind++; }
+                if (j < cropKindDef.Length) cropKindN[j]++;
+            }
         }
-        if (t == GenData.R_CAMPSITE) return fire >= 1 && (tents >= 2 || (tents == 1 && dressTry >= DRESS_TRIES));
-        if (t == GenData.R_GARDEN) return crops >= 6;
-        if (t == GenData.R_PICNIC) return sets >= 2;
-        if (t == GenData.R_DRYING) return racks >= 2;
-        if (t == GenData.R_FIREPIT) return fire >= 1 && seats >= 3;
+        if (t == GenData.R_CAMPSITE) return tents >= 1 && (fire >= 1 || tables >= 1);   // (Cor: there can be variation)
+        if (t == GenData.R_GARDEN)
+        {
+            // revision 30 (Cor: a real vegetable patch): four rows of five plants or more in a garden of 8 x 8 m, two in a
+            // narrower one
+            // narrower one: the rows the patch holds, every one of them planted (five plants or more each)
+            return hq_Veg_want >= 2 && hq_Veg_rows >= hq_Veg_want && crops >= 5 * hq_Veg_want;
+        }
+        // (Cor: there can be variation) a loose minimum: something that reads as the purpose
+        if (t == GenData.R_PICNIC) return sets >= 1 || rugs >= 1;
+        if (t == GenData.R_DRYING) return racks >= 1;
+        if (t == GenData.R_FIREPIT) return fire >= 1 && seats >= 2;
         return true;
     }
 

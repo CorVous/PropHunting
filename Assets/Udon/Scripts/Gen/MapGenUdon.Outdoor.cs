@@ -97,6 +97,9 @@ public partial class MapGenUdon
     // bed another
      string[] CropRows = { "vegCarrot", "vegPumpkin", "vegMelon", "rowLettuce", "rowTurnip", "rowLettuceYoung", "rowCornYoung" };
 
+    // a vegetable garden's rows: the crops that keep to a line of cells (pumpkins and lettuces spread wider)
+     string[] GardenCrops = { "vegCarrot", "vegMelon", "rowTurnip", "rowCornYoung" };
+
     int CropGroup(uint[] rng)
     {
         borderColour = (borderColour + 1 + RngRange(rng, 2)) % CropRows.Length;
@@ -1370,407 +1373,154 @@ public partial class MapGenUdon
 
 
     // ============================================================================================ GARDEN
-    // Areas: soil beds along the fences with their planting; a vegetable plot, one crop to a row; the water point
-    // (tap, watering can, buckets); a shed with the barrow and the sacks; tools leaning at the fence; a bench.
+    // Revision 30 (Cor: a real vegetable patch): the patch fills the garden inside a low fence of planks a metre
+    // in from the garden's edge (on a narrow garden, along its long sides), with one gateway on the side facing the way in.
+    // Inside it, crop rows run along the patch's long side, one crop to a row, at least five plants each, with a
+    // walk between the rows: four rows in a garden of 8 x 8 m. One anchor: the tap in a corner of the walk round
+    // the fence, the watering can beside it, tools at the fence near it. No tree, bush or flower bed inside.
     void PlanGarden()
     {
-        planMax = 35;
-        int room = pRoom, cells = roomOuterCells[room];
+        planMax = 5;
+        int room = pRoom;
         if (planPhase == 0)
         {
             uint[] r = SR(1);
-            hq_PlanGarden_r = r;
+            YardAnchor(room, r);   // the way in (yardGX, yardGZ)
+            int w = roomX1[room] - roomX0[room] + 1, h = roomZ1[room] - roomZ0[room] + 1;
+            int ix = w >= 14 ? 2 : 0, iz = h >= 14 ? 2 : 0;   // (a narrow garden: the fence along its long sides, no walk outside them)
+            int c0 = roomX0[room] + ix, c1 = roomX1[room] - ix, r0 = roomZ0[room] + iz, r1 = roomZ1[room] - iz;
+            hq_Veg_c0 = c0; hq_Veg_c1 = c1; hq_Veg_r0 = r0; hq_Veg_r1 = r1;
+            // the soil inside the fence
+            for (int z = r0 + 1; z < r1; z++)
+                for (int x = c0 + 1; x < c1; x++)
+                {
+                    int i = z * IW + x;
+                    if (innerRoom[i] == room && occ[i] == 0 && (tags[i] & (GenData.T_PATH | GenData.T_DOOR_CLEAR | GenData.T_COVERED)) == 0) tags[i] |= GenData.T_SOFT_GROUND;
+                }
+            // the gateway: the middle of the side nearest the way in
+            // (on a narrow garden, the nearer short side: the rows run from the gateway along the garden)
+            int dx = yardGX - RoomMidX(room), dz = yardGZ - RoomMidZ(room), gate;
+            if (w > h + 2 || (w + 2 >= h && Abs(dx) > Abs(dz))) gate = dx > 0 ? 1 : 3; else gate = dz >= 0 ? 0 : 2;
+            hq_Veg_gate = gate;
+            // the fence's pieces (2 m each, centred on each side): +z and -z along x, +x and -x along z between them
+            yardN = 0;
+            for (int side = 0; side < 4; side++)
+            {
+                bool alongX = side == 0 || side == 2;
+                int lo = alongX ? c0 : r0 + 1, hi = alongX ? c1 : r1 - 1, len = hi - lo + 1, n = len / 4;
+                int start = lo + (len - 4 * n) / 2;
+                int line = side == 0 ? r1 : (side == 2 ? r0 : (side == 1 ? c1 : c0));
+                for (int j = 0; j < n && yardN < yardX.Length; j++)
+                {
+                    if (side == gate && j == n / 2) continue;
+                    int a = (start + 4 * j + 2) * GenData.INNER_MM, b = line * GenData.INNER_MM + GenData.INNER_MM / 2;
+                    yardX[yardN] = alongX ? a : b; yardZ[yardN] = alongX ? b : a;
+                    yardYaw[yardN] = alongX ? 0 : 90; yardRow[yardN] = side; yardSet[yardN] = -1; yardN++;
+                }
+            }
+            // the whole patch on top of the area's budget
+            roomFloorTarget[room] = roomFloor[room] + 60;
+            hq_Veg_c = RngRange(r, GardenCrops.Length);
+            // what varies (Cor: there can be variation): the crops (a new one each row, or two by turns), the plants'
+            // spacing, the anchor (the tap and the can; a tool corner with the barrow; the tap with tools beside it)
+            hq_Veg_mix = RngChance(r, 350) ? 1 : 0;
+            hq_Veg_loose = RngChance(r, 300) ? 1 : 0;
+            hq_Veg_anchor = RngRange(r, 3);
+            hq_Veg_rows = 0; hq_Veg_want = 0;
+            hq_Veg_r = r;
         }
+        // the fence, a piece a step
         if (planPhase == 1 && PhLoop(1, 100000))
         {
-            uint[] r = hq_PlanGarden_r;
-            if (planIter == 0) { hq_StonePaths_k0 = 40; hq_StonePaths_rng = r; PhSubReset(); }
-            PhPush(); StonePaths_Body(); bool fin = PhAdvance(); PhPop();
-            if (fin) { r = hq_StonePaths_rng; PhBreak(); }
-            hq_PlanGarden_r = r;
+            if (planIter >= yardN) PhBreak();
+            else YardOne(Dn("n_fence"), yardX[planIter], yardZ[planIter], yardYaw[planIter]);
         }
-        if (planPhase == 2)
+        // the crop rows, a row a step
+        if (planPhase == 2 && PhLoop(2, 100000))
         {
-            uint[] r = hq_PlanGarden_r;
-            // the shed in a corner of a larger garden, the barrow and the sacks beside it
-            int shed = -1;
-            hq_PlanGarden_sel1 = 0;
-            if (cells >= 2 && RngChance(r, 650)) hq_PlanGarden_sel1 = 1;
-            hq_PlanGarden_r = r;
-            hq_PlanGarden_shed = shed;
+            // the rows run away from the gateway, a walk across the patch inside it joins the walks between them
+            int x0 = hq_Veg_c0 + 1, x1 = hq_Veg_c1 - 1, z0 = hq_Veg_r0 + 1, z1 = hq_Veg_r1 - 1, gate = hq_Veg_gate;
+            bool alongX = gate == 1 || gate == 3;
+            // (a metre wide: the walking body keeps to whole cells)
+            if (gate == 0) z1 -= 2; else if (gate == 1) x1 -= 2; else if (gate == 2) z0 += 2; else x0 += 2;
+            int alongMm = ((alongX ? x1 - x0 : z1 - z0) + 1) * GenData.INNER_MM - 200;
+            // each row on a line of cells, two cells of walk between rows: the outer rows against the fence
+            int nCells = (alongX ? z1 - z0 : x1 - x0) + 1;
+            int rows = nCells >= 4 ? (nCells + 2) / 3 : 1;
+            if (rows > 5) rows = 5;
+            hq_Veg_want = rows;
+            if (planIter >= rows) PhBreak();
+            else
+            {
+                uint[] rr = SR(20 + planIter);
+                // a crop to a row: a new crop each row, or two crops by turns (hq_Veg_mix)
+                int ci = hq_Veg_mix != 0 ? (planIter % 2) * 3 : planIter;
+                int g = FindGrp(GardenCrops[(hq_Veg_c + ci) % GardenCrops.Length]);
+                int def = grpMemberDef[grpMemberStart[g]], gap = grpGapMm[g];
+                int n = (alongMm + gap) / (Sx(def) + gap + 40);
+                if (n > 8) n = 8;
+                if (hq_Veg_loose != 0 && n > 5) n--;   // now and then the plants a little further apart
+                int midA = alongX ? (x0 + x1 + 1) * GenData.INNER_MM / 2 : (z0 + z1 + 1) * GenData.INNER_MM / 2;
+                int lowC = alongX ? z0 : x0, off = rows > 1 ? planIter * (nCells - 1) / (rows - 1) : nCells / 2;
+                int across = (lowC + off) * GenData.INNER_MM + GenData.INNER_MM / 2;
+                for (int tryN = 0; tryN < 3; tryN++)
+                {
+                    if (n < 5) break;
+                    if (ChooseMembers(g, room, n, rr) < 5) break;
+                    BuildFormation(GenData.GL_ROW, gap, rr);
+                    int first = nEmit;
+                    fHost = H_NATURE;
+                    int e = StampFormation(room, alongX ? 0 : 1, midA - fLen / 2, across - fDep / 2, -1, 0, g, -1);
+                    fHost = H_NONE;
+                    bool kept = e >= 0 && Keep(first, false);
+                    if (kept) { hq_Veg_rows++; break; }
+                    // again a little further from the fence or the wall (the last time a plant shorter)
+                    if (tryN == 1 && n > 5) n--;
+                    if (rows > 1) across += planIter * 2 < rows - 1 ? GenData.INNER_MM : (planIter * 2 > rows - 1 ? -GenData.INNER_MM : 0);
+                }
+            }
         }
+        // the anchor: the tap in a corner of the walk round the fence (else anywhere at the edge), the can beside it
+        // (or, hq_Veg_anchor 1, a tool corner: the barrow in a corner, the tools and the sacks beside it)
         if (planPhase == 3)
         {
-            if (hq_PlanGarden_sel1 == 1)
-            {
-                uint[] r = hq_PlanGarden_r;
-                int shed = hq_PlanGarden_shed;
-                int first = nEmit;
-                shed = WallPlace(Dn("gen_shed"), WM_CORNER, 0, 0, WIN_ANY, 0, r);
-                hq_PlanGarden_r = r;
-                hq_PlanGarden_shed = shed;
-                hq_PlanGarden_first = first;
-            }
+            uint[] r2 = SR(2);
+            int first = nEmit;
+            int tap = WallPlace(Dn(hq_Veg_anchor == 1 ? "m_wheelbarrow" : "gen_tap"), WM_CORNER, 0, 0, WIN_ANY, 0, r2);
+            if (tap >= 0 && !Keep(first, false)) tap = -1;
+            hq_Veg_tap = tap;
+            hq_Veg_r2 = r2;
         }
         if (planPhase == 4)
         {
-            if (hq_PlanGarden_sel1 == 1)
+            uint[] r2 = hq_Veg_r2;
+            if (hq_Veg_tap < 0)
             {
-                int shed = hq_PlanGarden_shed;
-                int first = hq_PlanGarden_first;
-                if (shed >= 0 && !Keep(first, false))
-                {
-                    shed = -1;
-                }
-                hq_PlanGarden_sel2 = 0;
-                if (shed >= 0) hq_PlanGarden_sel2 = 1;
-                hq_PlanGarden_shed = shed;
-                hq_PlanGarden_first = first;
+                int first = nEmit;
+                int tap = WallPlace(Dn(hq_Veg_anchor == 1 ? "m_wheelbarrow" : "gen_tap"), WM_NEAR, yardGX, yardGZ, WIN_ANY, 0, r2);
+                if (tap >= 0 && !Keep(first, false)) tap = -1;
+                hq_Veg_tap = tap;
             }
+            if (hq_Veg_tap >= 0)
+            {
+                int first = nEmit;
+                if (GroupBeside(FindGrp(hq_Veg_anchor == 1 ? "sacks" : "watering"), hq_Veg_tap, RngBetween(r2, 1, 2), 0, r2)) Keep(first, false);
+            }
+            hq_Veg_r2 = r2;
         }
         if (planPhase == 5)
         {
-            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
-            {
-                uint[] r = hq_PlanGarden_r;
-                hq_PlanGarden_sel3 = 0;
-                if (RngChance(r, 700) && Fit(1)) hq_PlanGarden_sel3 = 1;
-                hq_PlanGarden_r = r;
-            }
-        }
-        if (planPhase == 6)
-        {
-            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel3 == 1)
-            {
-                uint[] r = hq_PlanGarden_r;
-                int shed = hq_PlanGarden_shed;
-                int first = hq_PlanGarden_first;
-                first = nEmit;
-                hq_PlanGarden_sel4 = 0;
-                if (RelBeside(Dn("m_wheelbarrow"), shed, 0, 150, 0, r) >= 0) hq_PlanGarden_sel4 = 1;
-                hq_PlanGarden_r = r;
-                hq_PlanGarden_shed = shed;
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 7 && PhLoop(7, 100000))
-        {
-            if (!(hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel3 == 1 && hq_PlanGarden_sel4 == 1)) PhBreak();
-            else
-            {
-                int first = hq_PlanGarden_first;
-                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
-                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) {  PhBreak(); }
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 8)
-        {
-            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1)
-            {
-                uint[] r = hq_PlanGarden_r;
-                hq_PlanGarden_sel5 = 0;
-                if (RngChance(r, 550) && Fit(2)) hq_PlanGarden_sel5 = 1;
-                hq_PlanGarden_r = r;
-            }
-        }
-        if (planPhase == 9)
-        {
-            if (hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel5 == 1)
-            {
-                uint[] r = hq_PlanGarden_r;
-                int shed = hq_PlanGarden_shed;
-                int first = hq_PlanGarden_first;
-                first = nEmit;
-                hq_PlanGarden_sel6 = 0;
-                if (GroupBeside(FindGrp("sacks"), shed, RngBetween(r, 2, 3), 0, r)) hq_PlanGarden_sel6 = 1;
-                hq_PlanGarden_r = r;
-                hq_PlanGarden_shed = shed;
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 10 && PhLoop(10, 100000))
-        {
-            if (!(hq_PlanGarden_sel1 == 1 && hq_PlanGarden_sel2 == 1 && hq_PlanGarden_sel5 == 1 && hq_PlanGarden_sel6 == 1)) PhBreak();
-            else
-            {
-                int first = hq_PlanGarden_first;
-                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
-                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) {  PhBreak(); }
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 11)
-        {
-            // the water point: a tap at the fence, the can and the buckets beside it
-            uint[] r2 = SR(2);
-            int tap = -1;
-            hq_PlanGarden_r2 = r2;
-            hq_PlanGarden_tap = tap;
-        }
-        if (planPhase == 12)
-        {
-            int shed = hq_PlanGarden_shed;
-            uint[] r2 = hq_PlanGarden_r2;
-            int tap = hq_PlanGarden_tap;
-            int first = nEmit;
-            tap = WallPlace(Dn("gen_tap"), shed >= 0 ? WM_NEAR : WM_ANY, shed >= 0 ? emitX[shed] : 0, shed >= 0 ? emitZ[shed] : 0, WIN_ANY, 0, r2);
-            hq_PlanGarden_shed = shed;
-            hq_PlanGarden_r2 = r2;
-            hq_PlanGarden_tap = tap;
-            hq_PlanGarden_first = first;
-        }
-        if (planPhase == 13)
-        {
-            int tap = hq_PlanGarden_tap;
-            int first = hq_PlanGarden_first;
-            if (tap >= 0 && !Keep(first, false))
-            {
-                tap = -1;
-            }
-            hq_PlanGarden_sel7 = 0;
-            if (tap >= 0 && Fit(2)) hq_PlanGarden_sel7 = 1;
-            hq_PlanGarden_tap = tap;
-            hq_PlanGarden_first = first;
-        }
-        if (planPhase == 14)
-        {
-            if (hq_PlanGarden_sel7 == 1)
-            {
-                uint[] r2 = hq_PlanGarden_r2;
-                int tap = hq_PlanGarden_tap;
-                int first = hq_PlanGarden_first;
-                first = nEmit;
-                hq_PlanGarden_sel8 = 0;
-                if (GroupBeside(FindGrp("watering"), tap, RngBetween(r2, 2, 3), 0, r2)) hq_PlanGarden_sel8 = 1;
-                hq_PlanGarden_r2 = r2;
-                hq_PlanGarden_tap = tap;
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 15 && PhLoop(15, 100000))
-        {
-            if (!(hq_PlanGarden_sel7 == 1 && hq_PlanGarden_sel8 == 1)) PhBreak();
-            else
-            {
-                int first = hq_PlanGarden_first;
-                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
-                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) {  PhBreak(); }
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 16)
-        {
-            // the vegetable plot: a bed of soil in the open, two rows, one crop to a row
-            uint[] r3 = SR(3);
-            // revision 30 (Cor: gardens can just have veggies): a vegetable garden always has its plot, on top of
-            // the budget if the shed and the water point used it
-            hq_PlanGarden_sel9 = 1;
-            if (!Fit(6)) roomFloorTarget[room] = roomFloor[room] + 6;
-            hq_PlanGarden_r3 = r3;
-        }
-        if (planPhase == 17 && PhLoop(17, 100000))
-        {
-            if (!(hq_PlanGarden_sel9 == 1)) PhBreak();
-            else
-            {
-                uint[] r3 = hq_PlanGarden_r3;
-                int cell = 0;
-                if (planIter == 0) { hq_OpenSpot_minClr = 4; hq_OpenSpot_mode = WM_ANY; hq_OpenSpot_tx = 0; hq_OpenSpot_tz = 0; hq_OpenSpot_need = 0; hq_OpenSpot_rng = r3; PhSubReset(); }
-                PhPush(); OpenSpot_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) { r3 = hq_OpenSpot_rng; cell = hq_OpenSpot_ret; PhBreak(); }
-                hq_PlanGarden_r3 = r3;
-                hq_PlanGarden_cell = cell;
-            }
-        }
-        if (planPhase == 18)
-        {
-            if (hq_PlanGarden_sel9 == 1)
-            {
-                int cell = hq_PlanGarden_cell;
-                hq_PlanGarden_sel10 = 0;
-                if (cell >= 0) hq_PlanGarden_sel10 = 1;
-                hq_PlanGarden_cell = cell;
-            }
-        }
-        if (planPhase == 19 && PhLoop(19, 100000))
-        {
-            if (!(hq_PlanGarden_sel9 == 1 && hq_PlanGarden_sel10 == 1)) PhBreak();
-            else
-            {
-                uint[] r3 = hq_PlanGarden_r3;
-                int cell = hq_PlanGarden_cell;
-                if (planIter == 0) { hq_VegPlot_cell = cell; hq_VegPlot_rng = r3; PhSubReset(); }
-                PhPush(); VegPlot_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) { r3 = hq_VegPlot_rng; PhBreak(); }
-                hq_PlanGarden_r3 = r3;
-                hq_PlanGarden_cell = cell;
-            }
-        }
-        if (planPhase == 20)
-        {
-            // tools leaning at the fence near the water point
             uint[] r4 = SR(4);
-            hq_PlanGarden_sel11 = 0;
-            if (RngChance(r4, 750) && Fit(2)) hq_PlanGarden_sel11 = 1;
-            hq_PlanGarden_r4 = r4;
-        }
-        if (planPhase == 21)
-        {
-            if (hq_PlanGarden_sel11 == 1)
-            {
-                int shed = hq_PlanGarden_shed;
-                uint[] r4 = hq_PlanGarden_r4;
-                int first = nEmit;
-                bool ok = shed >= 0 && GroupBeside(FindGrp("tools"), shed, RngBetween(r4, 2, 3), 0, r4);
-                hq_PlanGarden_shed = shed;
-                hq_PlanGarden_r4 = r4;
-                hq_PlanGarden_first = first;
-                hq_PlanGarden_ok = ok;
-            }
-        }
-        if (planPhase == 22)
-        {
-            if (hq_PlanGarden_sel11 == 1)
-            {
-                int tap = hq_PlanGarden_tap;
-                uint[] r4 = hq_PlanGarden_r4;
-                bool ok = hq_PlanGarden_ok;
-                if (!ok) ok = GroupAt(FindGrp("tools"), GenData.A_OUT_EDGE, RngBetween(r4, 2, 3), tap >= 0 ? WM_NEAR : WM_ANY, tap >= 0 ? emitX[tap] : 0, tap >= 0 ? emitZ[tap] : 0, 0, r4);
-                hq_PlanGarden_sel12 = 0;
-                if (ok) hq_PlanGarden_sel12 = 1;
-                hq_PlanGarden_tap = tap;
-                hq_PlanGarden_r4 = r4;
-                hq_PlanGarden_ok = ok;
-            }
-        }
-        if (planPhase == 23 && PhLoop(23, 100000))
-        {
-            if (!(hq_PlanGarden_sel11 == 1 && hq_PlanGarden_sel12 == 1)) PhBreak();
-            else
-            {
-                int first = hq_PlanGarden_first;
-                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
-                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) {  PhBreak(); }
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 24)
-        {
-            DoorSides(50);
-        }
-        if (planPhase == 25)
-        {
-            uint[] r5 = SR(5);
-            int trees = TreeCount(room, r5);
-            trees = 0;   // revision 30 (Cor: gardens can just have veggies): no tree over the beds
-            hq_PlanGarden_r5 = r5;
-            hq_PlanGarden_trees = trees;
-        }
-        if (planPhase == 26 && PhLoop(26, 100000))
-        {
-            int trees = hq_PlanGarden_trees;
-            if (!PhSubActive())
-            {
-                int t = planIter;
-                if (!(t < trees)) PhBreak();
-                else { hq_PlanGarden_t = t; PhSubBegin(); }
-            }
-            hq_PlanGarden_trees = trees;
-            if (PhSubActive())
-            {
-                PhPush(); PlanGarden_L1(); bool fin = PhAdvance(); PhPop();
-                if (fin) PhSubEnd(); else PhStay();
-                if (phBreak) { phBreak = false; PhBreak(); }
-                if (phReturn) { phReturn = false; PhEnd(); return; }
-            }
-        }
-        if (planPhase == 27)
-        {
-            uint[] r5 = hq_PlanGarden_r5;
-            hq_PlanGarden_sel13 = 0;
-            if (RngChance(r5, 450)) hq_PlanGarden_sel13 = 1;
-            hq_PlanGarden_r5 = r5;
-        }
-        if (planPhase == 28 && PhLoop(28, 100000))
-        {
-            if (!(hq_PlanGarden_sel13 == 1)) PhBreak();
-            else
-            {
-                if (planIter == 0) { hq_BenchAtEdge_k = 6; PhSubReset(); }
-                PhPush(); BenchAtEdge_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) {  PhBreak(); }
-            }
-        }
-        if (planPhase == 29)
-        {
-            uint[] r7 = SR(7);
-            hq_PlanGarden_sel14 = 0;
-            if (RngChance(r7, 500) && Fit(2)) hq_PlanGarden_sel14 = 1;
-            hq_PlanGarden_r7 = r7;
-        }
-        if (planPhase == 30)
-        {
-            if (hq_PlanGarden_sel14 == 1)
-            {
-                uint[] r7 = hq_PlanGarden_r7;
-                int first = nEmit;
-                hq_PlanGarden_sel15 = 0;
-                if (GroupAt(FindGrp("pots"), GenData.A_OUT_EDGE, RngBetween(r7, 2, 3), WM_ANY, 0, 0, 0, r7)) hq_PlanGarden_sel15 = 1;
-                hq_PlanGarden_r7 = r7;
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 31 && PhLoop(31, 100000))
-        {
-            if (!(hq_PlanGarden_sel14 == 1 && hq_PlanGarden_sel15 == 1)) PhBreak();
-            else
-            {
-                int first = hq_PlanGarden_first;
-                if (planIter == 0) { hq_Keep_first = first; hq_Keep_must = false; PhSubReset(); }
-                PhPush(); Keep_Body(); bool fin = PhAdvance(); PhPop();
-                if (fin) {  PhBreak(); }
-                hq_PlanGarden_first = first;
-            }
-        }
-        if (planPhase == 32)
-        {
-            // the beds along the fences (revision 30: crop rows, on top of the budget the rest used)
+            int tap = hq_Veg_tap;
+            int first = nEmit;
+            if (hq_Veg_anchor != 0 || RngChance(r4, 400))
+            if (GroupAt(FindGrp("tools"), GenData.A_OUT_EDGE, RngBetween(r4, 2, 3), tap >= 0 ? WM_NEAR : WM_ANY, tap >= 0 ? emitX[tap] : 0, tap >= 0 ? emitZ[tap] : 0, 0, r4)) Keep(first, false);
             ClearBans();
-            if (roomFloorTarget[room] < roomFloor[room] + 9) roomFloorTarget[room] = roomFloor[room] + 9;
-        }
-        if (planPhase == 33 && PhLoop(33, 100000))
-        {
-            if (planIter == 0) { hq_Borders_k0 = 10; hq_Borders_max = 8; hq_Borders_soil = true; PhSubReset(); }
-            PhPush(); Borders_Body(); bool fin = PhAdvance(); PhPop();
-            if (fin) {  PhBreak(); }
-        }
-        if (planPhase == 34)
-        {
-            uint[] r8 = SR(8);
-            hq_PlanGarden_r8 = r8;
-        }
-        if (planPhase == 35 && PhLoop(35, 100000))
-        {
-            if (!PhSubActive())
-            {
-                int k = planIter;
-                if (!(k < 3 && Fit(1))) PhBreak();
-                else { hq_PlanGarden_k = k; PhSubBegin(); }
-            }
-            if (PhSubActive())
-            {
-                PhPush(); PlanGarden_L2(); bool fin = PhAdvance(); PhPop();
-                if (fin) PhSubEnd(); else PhStay();
-                if (phBreak) { phBreak = false; PhBreak(); }
-                if (phReturn) { phReturn = false; PhEnd(); return; }
-            }
         }
     }
+    int hq_Veg_c0, hq_Veg_c1, hq_Veg_r0, hq_Veg_r1, hq_Veg_c, hq_Veg_rows, hq_Veg_tap, hq_Veg_gate, hq_Veg_want, hq_Veg_mix, hq_Veg_loose, hq_Veg_anchor;
+    uint[] hq_Veg_r, hq_Veg_r2;
+
     void PlanGarden_L1()
     {
         int room = pRoom, cells = roomOuterCells[room];
@@ -3338,7 +3088,7 @@ public partial class MapGenUdon
             if (fire < 0) { hq_FireSeats_fire = fire; hq_FireSeats_k = k; PhEnd(); return; }
             uint[] rng = SR(k);
             int n = RngBetween(rng, 2, 3);
-            if (roomType[pRoom] == GenData.R_FIREPIT) n = 3;   // revision 30: a fire pit seats three at the least
+            if (roomType[pRoom] == GenData.R_FIREPIT) n = RngBetween(rng, 2, 6);   // revision 30: a fire pit seats two to six, of mixed kinds
             int s = 0;
             hq_FireSeats_fire = fire;
             hq_FireSeats_k = k;

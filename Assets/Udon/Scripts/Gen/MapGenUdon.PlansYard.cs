@@ -205,11 +205,15 @@ public partial class MapGenUdon
         {
             uint[] r = SR(1);
             YardAnchor(room, r);
-            int rule = RngRange(r, 3);
-            int table = Dn("k_table"), bench = Dn("k_bench");
+            // revision 30 (Cor: there can be variation): the rule (GRID, LONG TABLE, RING, now and then BLANKETS on
+            // the grass), how many sets (one to as many as fit), long tables or a ring of small round ones
+            int roll = RngRange(r, 100);
+            int rule = roll < 30 ? 0 : (roll < 55 ? 1 : (roll < 82 ? 2 : 3));
+            int table = Dn(rule == 2 && RngChance(r, 500) ? "r_tableRound" : "k_table"), bench = Dn("k_bench");
             int setD = Sz(table) + 2 * (60 + Sz(bench));
-            int want = 2 + AreaM2(room) / 14;   // revision 30: two sets at the least (a picnic ground, not a table)
-            if (want > 6) want = 6;
+            int most = 2 + AreaM2(room) / 14;
+            if (most > 6) most = 6;
+            int want = 1 + RngRange(r, most);
             if (rule == 0) GridSpots(room, Sx(table), setD, 1300, 1100);
             else if (rule == 1) LineSpots(room, Sx(table), 40);
             else
@@ -217,6 +221,7 @@ public partial class MapGenUdon
                 // round a tree, or a fire on a quarter of them, in the middle of the box
                 int n = want < 3 ? 3 : (want > 5 ? 5 : want);
                 int rad = 1500 + setD / 2;
+                if (rule == 3) { n = 1 + RngRange(r, 2); rad = n > 1 ? 1300 : 0; }
                 RingSpots(RoomMidX(room), RoomMidZ(room), rad, n, RngRange(r, 4) * 90 + 45 * RngRange(r, 2));
                 want = n;
             }
@@ -225,6 +230,23 @@ public partial class MapGenUdon
         if (planPhase == 1)
         {
             // RING: the middle first (a tree to sit round, or the fire)
+            if (hq_Yard_rule == 3)
+            {
+                // BLANKETS: a rug or two spread on the grass, a basket on each, a lantern now and then
+                uint[] r = hq_Yard_r;
+                string[] rugs = { "q_rugStripes", "q_rugOval", "q_rug" };
+                int rug = Dn(rugs[RngRange(r, 3)]);
+                for (int i = 0; i < yardN; i++)
+                {
+                    int first = nEmit;
+                    int e = StampAt(rug, room, yardX[i], yardZ[i], Norm(yardYaw[i] + 90), 0, -1, H_FREE, false);
+                    if (e < 0) continue;
+                    Rel(Dn("ms_basket"), e, 0, 0, RngRange(r, 4) * 90, 0);
+                    if (Keep(first, false)) { hq_Yard_got++; yardSet[i] = e; }
+                }
+                if (hq_Yard_got > 0 && RngChance(r, 500)) { int first = nEmit; if (WallPlace(Dn("hk_lantern"), WM_NEAR, yardGX, yardGZ, WIN_ANY, 0, r) >= 0) Keep(first, false); }
+                hq_Yard_r = r;
+            }
             if (hq_Yard_rule == 2)
             {
                 uint[] r = hq_Yard_r;
@@ -239,7 +261,7 @@ public partial class MapGenUdon
         {
             if (planIter == 0) hq_Yard_first = nEmit;
             int i = planIter + (hq_Yard_rule == 1 ? 1 : 0);
-            if (i >= yardN || hq_Yard_got >= hq_Yard_want + (hq_Yard_rule == 1 ? 2 : 0)) PhBreak();
+            if (hq_Yard_rule == 3 || i >= yardN || hq_Yard_got >= hq_Yard_want + (hq_Yard_rule == 1 ? 2 : 0)) PhBreak();
             else
             {
                 int t = PicnicSet(hq_Yard_a, hq_Yard_b, yardX[i], yardZ[i], yardYaw[i]);
@@ -249,11 +271,11 @@ public partial class MapGenUdon
         }
         if (planPhase == 3 && PhLoop(3, 100000))
         {
-            // a LONG TABLE or a RING that holds fewer than two sets (a room cut by the house's corner, a doorstep in
+            // a LONG TABLE, a RING or BLANKETS that hold nothing (a room cut by the house's corner, a doorstep in
             // the way) is taken back and laid out as a GRID instead, a set a step
             if (planIter == 0)
             {
-                if (hq_Yard_rule == 0 || hq_Yard_got >= 2 || hq_Yard_got >= hq_Yard_want) PhBreak();
+                if (hq_Yard_rule == 0 || hq_Yard_got >= 1) PhBreak();
                 else
                 {
                     TakeBack(hq_Yard_first);
@@ -293,7 +315,7 @@ public partial class MapGenUdon
             // a bin at the end of each row (GRID), at the far end of the line (LONG TABLE), by the gate (RING)
             int bin = Dn("k_trashcan");
             uint[] r = hq_Yard_r;
-            if (hq_Yard_rule == 2) { int first = nEmit; if (WallPlace(bin, WM_NEAR, yardGX, yardGZ, WIN_ANY, 0, r) >= 0) Keep(first, false); }
+            if (hq_Yard_rule == 2 || hq_Yard_rule == 3) { int first = nEmit; if (WallPlace(bin, WM_NEAR, yardGX, yardGZ, WIN_ANY, 0, r) >= 0) Keep(first, false); }
             else
             {
                 for (int row = 0; row < 6; row++)
@@ -371,8 +393,12 @@ public partial class MapGenUdon
             if (rule == 0) GridSpots(room, Sx(rack) * 2 + 150, lineD, 1400, 1500);
             else if (rule == 2) GridSpots(room, Sx(rack) + 0, lineD * 2 + 700, 1600, 1500);
             hq_Yard_rule = rule; hq_Yard_a = rack; hq_Yard_b = Dn("gen_laundryBasket"); hq_Yard_got = 0; hq_Yard_r = r;
-            hq_Yard_want = 1 + AreaM2(room) / 12;
-            if (hq_Yard_want > 4) hq_Yard_want = 4;
+            // revision 30 (Cor: there can be variation): one line to as many as fit, of one rack or two
+            int most = 1 + AreaM2(room) / 12;
+            if (most > 4) most = 4;
+            hq_Yard_want = 1 + RngRange(r, most);
+            hq_Yard_b2 = RngChance(r, 400) ? 1 : 2;
+            hq_Yard_r = r;   // (after the draws: in Udon the stream is one array, not a copy)
         }
         if (planPhase == 1 && PhLoop(1, 100000))
         {
@@ -388,7 +414,7 @@ public partial class MapGenUdon
                     int e = WallPlace(rack, WM_FAR, yardGX, yardGZ, WIN_ANY, 0, r);
                     if (e >= 0)
                     {
-                        int prev = e, n = 2 + AreaM2(room) / 16;   // revision 30: a line of two racks at the least
+                        int prev = e, n = 1 + RngRange(r, 1 + AreaM2(room) / 16);
                         for (int k = 1; k < n && k < 4; k++) { int f = Rel(rack, prev, Sx(rack) + 150, 0, 0, 0); if (f < 0) break; prev = f; }
                         Rel(basket, prev, Sx(rack) / 2 + 150 + Sx(basket) / 2, 0, RngRange(r, 4) * 90, 0);
                         if (Keep(first, false)) hq_Yard_got++;
@@ -404,7 +430,8 @@ public partial class MapGenUdon
                     // PARALLEL: two racks end to end, the basket at the end
                     int lx = -(Sx(rack) + 150) / 2;
                     int a = yardYaw[i], sn = sinTab[a], cs = sinTab[(a + 90) % 360];
-                    if (RackLine(rack, basket, yardX[i] + lx * cs / 4096, yardZ[i] - lx * sn / 4096, a, 2, r) > 0) hq_Yard_got++;
+                    if (hq_Yard_b2 == 1) lx = 0;
+                    if (RackLine(rack, basket, yardX[i] + lx * cs / 4096, yardZ[i] - lx * sn / 4096, a, hq_Yard_b2, r) > 0) hq_Yard_got++;
                 }
                 else
                 {
@@ -451,6 +478,6 @@ public partial class MapGenUdon
         }
     }
 
-    int hq_Yard_rule, hq_Yard_a, hq_Yard_b, hq_Yard_want, hq_Yard_got, hq_Yard_first;
+    int hq_Yard_rule, hq_Yard_a, hq_Yard_b, hq_Yard_want, hq_Yard_got, hq_Yard_first, hq_Yard_b2;
     uint[] hq_Yard_r;
 }
