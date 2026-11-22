@@ -1880,15 +1880,19 @@ public class MapBuilderUdon : UdonSharpBehaviour
     void Boundary(bool horizontal, float ex, float ez, int cellA, int cellB)
     {
         // Inside the map a fence, a hedge or a low wall stops what is as high as it is drawn: a hider's prop can hop
-        // over it (Cor). The map's own edge and the hunters' release pen keep a wall 6 m high.
+        // over a fence or a low wall (Cor), not a 1.32 m hedge. The map's own edge and the hunters' release pen keep a
+        // wall 6 m high.
         bool keepIn = cellA < 0 || cellB < 0 || cellZone[cellA] == GenData.Z_RELEASE || cellZone[cellB] == GenData.Z_RELEASE;
         if (theme == GenData.THEME_SPACE || cellA < 0 || cellB < 0) { Fence(horizontal, ex, ez, keepIn ? 6f : FENCE_TOP); return; }
         int kind = BoundaryKind(cellA, cellB);   // 0 fence, 1 hedge, 2 low wall, 3 open
         if (kind == 3) return;   // open: no fence, no collider
         if (kind == 0) { Fence(horizontal, ex, ez, keepIn ? 6f : FENCE_TOP); return; }
-        float top = keepIn ? 6f : (kind == 2 ? 0.7f : 0.8f);
-        if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - 0.12f), new Vector3(ex + CELL + 0.1f, top, ez + 0.12f));
-        else Collider(new Vector3(ex - 0.12f, 0, ez - 0.1f), new Vector3(ex + 0.12f, top, ez + CELL + 0.1f));
+        float top = keepIn ? 6f : (kind == 2 ? 0.7f : HEDGE_TOP);
+        // a hedge's wall is the hedge's own size (Cor, 22 Nov: a hider pushed into a hedge row; the 0.24 m by 0.8 m
+        // wall left the 0.88 m by 1.32 m hedge open for 32 cm on each side, and a prop hopped onto it, inside the leaves)
+        float th = kind == 1 ? HEDGE_HALF : 0.12f;
+        if (horizontal) Collider(new Vector3(ex - 0.1f, 0, ez - th), new Vector3(ex + CELL + 0.1f, top, ez + th));
+        else Collider(new Vector3(ex - th, 0, ez - 0.1f), new Vector3(ex + th, top, ez + CELL + 0.1f));
         if (kind == 1 && decorPrefabs != null && DECOR_HEDGE < decorPrefabs.Length && decorPrefabs[DECOR_HEDGE] != null)
         {
             // the row's ends: on unbroken where the next stretch is hedge too; short of a building (and its facade);
@@ -1954,6 +1958,9 @@ public class MapBuilderUdon : UdonSharpBehaviour
     }
 
     float hedgeLen;   // the hedge model's length along a boundary, as placed (measured on the first one)
+    // a garden hedge row's wall: as high as the hedge model (decor hedge-large, 1.32 m: no prop hops onto or over
+    // it, Cor 22 Nov) and half as thick as it (0.44 m) less a few cm for the leaf tips
+    const float HEDGE_TOP = 1.32f, HEDGE_HALF = 0.40f;
 
     // a hedge in the map's greens
     void TintHedge(GameObject h)
