@@ -218,6 +218,7 @@ public static partial class LobbyBuilder
         shelf.tagShop = new GameObject[slots]; shelf.tagCool = new GameObject[slots]; shelf.tagGoofy = new GameObject[slots];
         shelf.price = new TextMeshPro[slots]; shelf.glow = new GameObject[slots];
         shelf.slotCol = new Collider[slots];
+        shelf.rowNum = new TextMeshPro[roots * 2];
         var glowMat = GlowPadMat();
         for (int r = 0; r < roots; r++)
         {
@@ -231,6 +232,19 @@ public static partial class LobbyBuilder
             board.AddComponent<MeshFilter>().sharedMesh = RoundedBoard(2 * halfW + 0.06f, Depth + 0.12f, 0.045f, 0.1f);
             var br = board.AddComponent<MeshRenderer>(); br.sharedMaterial = wood;
             br.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // the row's number on the lip at both ends (hop playtest: players could not name a weapon to each other;
+            // Cor: the row numbers belong on the weapon shelves). PHShelf writes the shelf row's number as it turns,
+            // so a row keeps its number wherever it is on the wall. Digits only, no text rows.
+            for (int e = 0; e < 2; e++)
+            {
+                float ex = (e == 0 ? 1f : -1f) * (halfW - 0.085f), lz = Depth / 2f + 0.005f;
+                var tag = new GameObject(e == 0 ? "RowTagL" : "RowTagR").transform; tag.SetParent(row, false);
+                tag.localPosition = new Vector3(ex, 0f, Depth / 2f);   // (as a place: the lip at Depth / 2 + 0.005 from there)
+                Slab(tag, "Tag", new Vector3(0f, -0.05f, lz), new Vector3(0.15f, 0.12f, 0.012f), cream);   // bigger than a price: read from the floor
+                var nt = WorldText(tag, "Number", new Vector3(0f, -0.05f, lz + 0.008f), Quaternion.Euler(0f, 180f, 0f), (r + 1).ToString(), 1.1f, C("24604a"), new Vector2(0.14f, 0.11f));
+                nt.font = future;
+                shelf.rowNum[r * 2 + e] = nt;
+            }
             for (int c = 0; c < Cols; c++)
             {
                 int k = r * Cols + c;
@@ -635,12 +649,6 @@ public static partial class LobbyBuilder
             Img(cv, "Rule", new Vector2(cx, Hh / 2f - 54), new Vector2(HalfW, 4), sDash, C("c9a46a"), 2f);
             var count = Txt(cv, h == 0 ? "HunterCount" : "HiderCount", new Vector2(cx + HalfW / 2f - 60, Hh / 2f - 32), new Vector2(120, 30), "0 / 40", future, 20, C("6b5d40"), TextAlignmentOptions.Right);
             if (h == 0) board.countHunter = count; else board.countHider = count;
-            // the rows' numbers (hop playtest: players could not name a card to each other), at the board's outer
-            // edges, beside each half's first (left half) or last (right half) column
-            int rowsN = (PHStore.HUNTER_TROPHIES + BoardCols - 1) / BoardCols;
-            float rx = (h == 0 ? -1 : 1) * (halfShift / 2f + HalfW / 2f + 32f);
-            for (int r = 0; r < rowsN; r++)
-                Txt(cv, (h == 0 ? "HunterRow" : "HiderRow") + (r + 1), new Vector2(rx, y0 - r * (CardH + Gap)), new Vector2(50, CardH), (r + 1).ToString(), future, 34, C("8a7b5a"), TextAlignmentOptions.Center);
         }
 
         int T = PHStore.TROPHIES;
@@ -676,9 +684,6 @@ public static partial class LobbyBuilder
             Img(tick.transform, "A", new Vector2(-4, -2), new Vector2(9, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, -45f);
             Img(tick.transform, "B", new Vector2(2, 1), new Vector2(15, 3), null, Color.white).rectTransform.localRotation = Quaternion.Euler(0, 0, 50f);
             board.tick[t] = tick.gameObject;
-            // the trophy's own number, the same for everyone (the cards sort per player: "row 2" differs between
-            // players, "#14" does not), small in the bottom right corner
-            Txt(card, "Number", new Vector2(CardW / 2 - 26, -CardH / 2 + 14), new Vector2(44, 18), "#" + (t + 1), future, 12, C("8a7b5a"), TextAlignmentOptions.Right);
             tick.gameObject.SetActive(false); bar.SetActive(false);
         }
         UdonSharpEditorUtility.CopyProxyToUdon(board);

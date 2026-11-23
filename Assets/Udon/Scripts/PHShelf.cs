@@ -33,6 +33,7 @@ public class PHShelf : UdonSharpBehaviour
     public GameObject[] tagShop, tagCool, tagGoofy;
     public GameObject[] glow;        // the warm pool of light under the carried weapon (with the shader's _Glow)
     public TextMeshPro[] price;
+    public TextMeshPro[] rowNum;     // root * 2 + end: the shelf row's number on the lip at both ends
     public float baseY = 0.9f, rowH = 0.62f;
 
     public Collider[] slotCol;       // the PHShelfSlot colliders, by slot (off while the buy card is open)
@@ -90,6 +91,12 @@ public class PHShelf : UdonSharpBehaviour
 
     void Bind(int root, int shelfRow)
     {
+        if (rowNum != null)
+            for (int e = 0; e < 2; e++)
+            {
+                int i = root * 2 + e;
+                if (i < rowNum.Length && rowNum[i] != null) rowNum[i].text = (shelfRow + 1).ToString();
+            }
         for (int col = 0; col < COLS; col++)
         {
             int k = root * COLS + col;
