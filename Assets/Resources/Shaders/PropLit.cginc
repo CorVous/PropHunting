@@ -151,6 +151,11 @@ fixed4 frag (v2f i) : SV_Target
     // the prop viewer's cutout (PipCut.cginc): a prop in it is see-through (_Fade), the rest cut; never on the hider's own prop.
     // An if, never ?: or &&: HLSL works out both sides of those, so PipCut's clip() ran on the own prop too and cut away
     // the half of it nearer the camera (Cor: half the prop was clipped out)
+    // PropHunt/LitDither only (the diorama's upper floors in the round's replay, Cor 2026-11-22): every other pixel, a
+    // see-through screen; never in PropLit itself, whose main view keeps no clip() (early depth on Quest)
+    #if defined(PH_DITHER)
+    if ((((int)i.pos.x + (int)i.pos.y) & 1) == 0) discard;
+    #endif
     float3 n = normalize(i.normal);
     half cutRim = 0;
     // (only in the PH_PIP variant, which the prop viewer's camera alone renders with (PHView.RenderPip): the main

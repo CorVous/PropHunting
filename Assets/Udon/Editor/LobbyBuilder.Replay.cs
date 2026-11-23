@@ -39,11 +39,68 @@ public static partial class LobbyBuilder
         // the markers, in the model's space (the map's metres): a pawn for a hunter or a hider out of a prop, a burst,
         // a tail and the name
         var pawnMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/ReplayPawn.mat");
-        if (pawnMat == null) { pawnMat = new Material(Shader.Find("Unlit/Color")) { name = "ReplayPawn" }; AssetDatabase.CreateAsset(pawnMat, "Assets/Udon/Generated/ReplayPawn.mat"); }
-        pawnMat.color = Color.white; EditorUtility.SetDirty(pawnMat);
+        if (pawnMat == null) { pawnMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayPawn" }; AssetDatabase.CreateAsset(pawnMat, "Assets/Udon/Generated/ReplayPawn.mat"); }
+        // (flat colour, solid at alpha 1; at 0.5 a see-through screen: a pawn up on a floor switched off, PHReplay.Screen)
+        pawnMat.shader = Shader.Find("PropHunt/DitherPulse"); pawnMat.SetFloat("_Flat", 1f); pawnMat.color = Color.white; EditorUtility.SetDirty(pawnMat);
         var lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/MiniMapLine.mat");
         rp.pawns = new Transform[n]; rp.pawnRenderer = new Renderer[n]; rp.pops = new Transform[n]; rp.popRenderer = new Renderer[n];
         rp.tails = new LineRenderer[n]; rp.tags = new Transform[n]; rp.tagLabel = new TextMeshPro[n];
+        // a hider's taunt (Cor, 2026-11-22): a dithered pulse around them, in their colour (PropHunt/DitherPulse)
+        var tauntMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/ReplayTaunt.mat");
+        if (tauntMat == null) { tauntMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayTaunt" }; AssetDatabase.CreateAsset(tauntMat, "Assets/Udon/Generated/ReplayTaunt.mat"); }
+        tauntMat.shader = Shader.Find("PropHunt/DitherPulse"); tauntMat.enableInstancing = true; EditorUtility.SetDirty(tauntMat);
+        rp.taunts = new Transform[n]; rp.tauntRenderer = new Renderer[n];
+        rp.guns = new Transform[n]; rp.gunModel = new MeshFilter[n]; rp.gunFlash = new Transform[n]; rp.gunFlashRenderer = new Renderer[n];
+        var flashMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/ReplayGunFlash.mat");
+        if (flashMat == null) { flashMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayGunFlash" }; AssetDatabase.CreateAsset(flashMat, "Assets/Udon/Generated/ReplayGunFlash.mat"); }
+        flashMat.shader = Shader.Find("PropHunt/DitherPulse"); flashMat.SetFloat("_Flat", 1f); flashMat.color = new Color(1f, 0.85f, 0.35f, 1f); EditorUtility.SetDirty(flashMat);
+        // a hunter (Cor, 2026-11-22): the red meeple (the board game toys' meeple_red, as the props bake it), holding the
+        // weapon they had (PHReplay fills the mesh), swinging it hard each time they swung or hit something. A body
+        // to lean the swing, a hand each side to hold the weapon and a two-piece set's other piece. No colliders.
+        var meepleSrc = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Udon/Generated/Props/445_bg_meeple.prefab");
+        Mesh meepleMesh = null; Material meepleMat = null;
+        if (meepleSrc != null)
+            foreach (var mf in meepleSrc.GetComponentsInChildren<MeshFilter>(true))
+                if (mf.gameObject.name != "Shade" && mf.sharedMesh != null) { meepleMesh = mf.sharedMesh; meepleMat = mf.GetComponent<MeshRenderer>().sharedMaterial; break; }
+        if (meepleMesh == null) Debug.LogWarning("[prophunt] replay: the meeple prop is missing; hunters stay capsules");
+        var weaponMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/Weapon.mat");
+        const float MEEPLE_H = 1.8f;
+        float msc = 1f; Vector3 mc = Vector3.zero, me = Vector3.one;
+        if (meepleMesh != null) { var bb = meepleMesh.bounds; msc = MEEPLE_H / Mathf.Max(0.01f, bb.size.y); mc = bb.center; me = bb.extents; }
+        rp.meeples = new Transform[n]; rp.meepleBody = new Transform[n]; rp.meepleHand = new Transform[n]; rp.meepleOffHand = new Transform[n];
+        rp.meepleWeapon = new MeshFilter[n]; rp.meepleOff = new MeshFilter[n]; rp.meepleFig = new MeshRenderer[n];
+        for (int i = 0; i < n && meepleMesh != null; i++)
+        {
+            var mp = new GameObject("ReplayMeeple" + i);
+            mp.transform.SetParent(mm.model, false);
+            var body = new GameObject("Body").transform;
+            body.SetParent(mp.transform, false);
+            var fig = new GameObject("Meeple");
+            fig.transform.SetParent(body, false);
+            fig.transform.localScale = Vector3.one * msc;
+            fig.transform.localPosition = new Vector3(-mc.x, me.y - mc.y, -mc.z) * msc;   // (feet at the origin, centred)
+            fig.AddComponent<MeshFilter>().sharedMesh = meepleMesh;
+            var fr = fig.AddComponent<MeshRenderer>(); fr.sharedMaterial = meepleMat;
+            fr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; fr.receiveShadows = false;
+            rp.meepleFig[i] = fr;
+            // the hands at the arms' ends, a little over half way up
+            float hx = me.x * msc * 0.85f, hy = MEEPLE_H * 0.58f;
+            for (int h = 0; h < 2; h++)
+            {
+                var hand = new GameObject(h == 0 ? "Hand" : "OffHand").transform;
+                hand.SetParent(body, false);
+                hand.localPosition = new Vector3(h == 0 ? hx : -hx, hy, 0.05f);
+                var wgo = new GameObject("Weapon");
+                wgo.transform.SetParent(hand, false);
+                var wf = wgo.AddComponent<MeshFilter>();
+                var wr = wgo.AddComponent<MeshRenderer>(); wr.sharedMaterial = weaponMat;
+                wr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; wr.receiveShadows = false;
+                if (h == 0) { rp.meepleHand[i] = hand; rp.meepleWeapon[i] = wf; }
+                else { rp.meepleOffHand[i] = hand; rp.meepleOff[i] = wf; wgo.SetActive(false); }
+            }
+            mp.SetActive(false);
+            rp.meeples[i] = mp.transform; rp.meepleBody[i] = body;
+        }
         for (int i = 0; i < n; i++)
         {
             var pawn = new GameObject("ReplayPawn" + i);
@@ -57,6 +114,29 @@ public static partial class LobbyBuilder
             rp.popRenderer[i] = Shape(pop.transform, PrimitiveType.Sphere, Vector3.zero, Vector3.one, pawnMat);
             pop.SetActive(false);
             rp.pops[i] = pop.transform;
+
+            var taunt = new GameObject("ReplayTaunt" + i);
+            taunt.transform.SetParent(mm.model, false);
+            rp.tauntRenderer[i] = Shape(taunt.transform, PrimitiveType.Sphere, Vector3.zero, Vector3.one, tauntMat);
+            taunt.SetActive(false);
+            rp.taunts[i] = taunt.transform;
+
+            // a hider's gun in the final stand (PHReplay.Gun): a holder turned to the shot, the model under it (its grip,
+            // turn and size set at run time, PHWeapons.PutGunModel), and a flash at the muzzle
+            var gun = new GameObject("ReplayGun" + i);
+            gun.transform.SetParent(mm.model, false);
+            var gmo = new GameObject("Gun");
+            gmo.transform.SetParent(gun.transform, false);
+            var gmf = gmo.AddComponent<MeshFilter>();
+            var gmr = gmo.AddComponent<MeshRenderer>(); gmr.sharedMaterial = weaponMat;
+            gmr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; gmr.receiveShadows = false;
+            gun.SetActive(false);
+            rp.guns[i] = gun.transform; rp.gunModel[i] = gmf;
+            var flash = new GameObject("ReplayGunFlash" + i);
+            flash.transform.SetParent(mm.model, false);
+            rp.gunFlashRenderer[i] = Shape(flash.transform, PrimitiveType.Sphere, Vector3.zero, Vector3.one, flashMat);
+            flash.SetActive(false);
+            rp.gunFlash[i] = flash.transform;
 
             var tail = new GameObject("ReplayTail" + i);
             tail.transform.SetParent(mm.model, false);
@@ -85,7 +165,7 @@ public static partial class LobbyBuilder
         const float barW = 760f; const int segs = 20; const int sides = 4;
         rp.bar = new GameObject[sides];
         rp.playLabel = new TextMeshProUGUI[sides]; rp.speedLabel = new TextMeshProUGUI[sides];
-        rp.clock = new TextMeshProUGUI[sides]; rp.summaryLabel = new TextMeshProUGUI[sides];
+        rp.clock = new TextMeshProUGUI[sides];
         rp.playhead = new Transform[sides]; rp.huntMark = new Transform[sides];
         var only = new System.Collections.Generic.List<GameObject>();
         for (int sd = 0; sd < sides; sd++)
@@ -93,11 +173,12 @@ public static partial class LobbyBuilder
             var turn = Quaternion.Euler(0f, sd * 90f, 0f);
             var near = new Vector3(0f, top + 0.12f - down * Mathf.Cos(a), -side / 2 - 0.1f - down * Mathf.Sin(a));
             var cv = Canvas(table, "ReplayControls" + sd, turn * near, turn * Quaternion.Euler(35f, 0f, 0f), new Vector2(1400f, 80f), 0.002f, true);
+            cv.GetComponent<BoxCollider>().isTrigger = true;   // (Cor: no colliders on the seek bars; still pressable, nothing bumps or strikes it)
             var bar = new GameObject("Bar", typeof(RectTransform));
             bar.transform.SetParent(cv, false);
             ((RectTransform)bar.transform).sizeDelta = new Vector2(1400f, 80f);
             rp.bar[sd] = bar;
-            rp.playLabel[sd] = ReplayButton(bar.transform, game, "Watch replay", new Vector2(-580f, 0f), new Vector2(220f, 64f), C("f2c45a"), rp, nameof(PHReplay.PlayPause), 0);
+            rp.playLabel[sd] = ReplayButton(bar.transform, game, "Play", new Vector2(-580f, 0f), new Vector2(220f, 64f), C("f2c45a"), rp, nameof(PHReplay.PlayPause), 0);
             rp.speedLabel[sd] = ReplayButton(bar.transform, game, "1×", new Vector2(-415f, 0f), new Vector2(90f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Speed), 0);
             only.Add(rp.speedLabel[sd].transform.parent.parent.gameObject);
             // the scrub bar: a track, the hunt's start on it, the playhead, and pressable pieces over it
@@ -121,8 +202,7 @@ public static partial class LobbyBuilder
             only.Add(track.gameObject);
             rp.clock[sd] = Txt(bar.transform, "Clock", new Vector2(470f, 3f), new Vector2(120f, 40f), "0:00 / 0:00", future, 16, C("f6ecd4"), TextAlignmentOptions.Center);
             only.Add(rp.clock[sd].gameObject);
-            rp.summaryLabel[sd] = ReplayButton(bar.transform, game, "Summary", new Vector2(610f, 0f), new Vector2(160f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Close), 0);
-            only.Add(rp.summaryLabel[sd].transform.parent.parent.gameObject);
+            // (no summary button any more, Cor 2026-11-22: the replay is the diorama's view)
             bar.SetActive(false);
         }
         rp.barWidth = barW; rp.segments = segs;

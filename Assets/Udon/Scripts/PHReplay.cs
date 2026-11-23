@@ -15,16 +15,20 @@ using VRC.SDKBase;
 //   while it plays, the diorama's own paths, pins and hiding spots step aside (PHMiniMap.SetReplay).
 //
 // PACKING (PHReplayTrack.data): a header, then one sample per 0.25 s tick:
-//   header: 'R', version 1, role, first tick (int32, server ms / 250), sample count (uint16)            9 bytes
+//   header: 'R', version 2, role, first tick (int32, server ms / 250), sample count (uint16),
+//           the hunter's weapon + 1 / the hider's gun + 1 (PHWeapons models; 0 = none)                      10 bytes
+//           (version 1, still read: 9 bytes, no weapon)
 //   sample: a flags byte, then by the flags
 //     F_ABS   x, y, z as int16 in 2 cm steps, map-local (PHGame.MapLocalOf)                          + 6
 //     F_DELTA dx, dy, dz as int8 in the same steps (a move of up to 2.5 m a tick)                   + 3
 //             (neither: the same place as the last sample)
 //     F_YAW   the facing, a byte (256 steps)                                                        + 1
-//     F_DEF   the disguise + 1 as uint16 (0 = none)                                                 + 2
+//     F_DEF   hider: the disguise + 1 as uint16 (0 = none)                                          + 2
+//             hunter (version 2): swung the weapon this tick (a slash, a VR swing, a strike)         + 0
 //     F_EV1   hider: taunted / hunter: hit a wrong prop
 //     F_EV2   hider: was hit / hunter: hit a hider
 //     F_CATCH hunter: caught a hider
+//             hider (version 2): fired their gun in the final stand, then the aim's yaw as a byte           + 1
 //     F_END   hider caught or hunter out: the track ends here
 //   A hider standing still costs one byte a tick: a six minute round is ~2-6 KB per player.
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
@@ -38,14 +42,26 @@ public class PHReplay : UdonSharpBehaviour
     public Renderer[] pawnRenderer;
     public Transform[] pops;              // per slot: a burst for a taunt, a hit, a catch
     public Renderer[] popRenderer;
+    public Transform[] taunts;            // per slot: a hider's taunt, a dithered pulse round them (PropHunt/DitherPulse)
+    public Renderer[] tauntRenderer;
     public LineRenderer[] tails;          // per slot: the last few seconds of the path behind them
     public Transform[] tags;              // per slot: their name over them
     public TextMeshPro[] tagLabel;
+    // per slot, a hunter (Cor, 2026-11-22): the red meeple holding their weapon, swinging it hard when they swung or
+    // hit something (LobbyBuilder.BuildReplay); its body leans with the swing, the hands turn the weapon
+    public Transform[] meeples, meepleBody, meepleHand, meepleOffHand;
+    public MeshFilter[] meepleWeapon, meepleOff;
+    public MeshRenderer[] meepleFig;
+    // per slot, a hider in the final stand (Cor): their gun floating over their prop from their first shot, turned
+    // to each shot with a kick and a flash (as everyone sees it in the round, PHWeapons.UpdateHiderGun)
+    public Transform[] guns, gunFlash;
+    public MeshFilter[] gunModel;
+    public Renderer[] gunFlashRenderer;
     // the controls, a row on each side of the table (Cor: a seek bar on every side), index 0 the near edge's under
     // the diorama's buttons
     public GameObject[] bar;
-    public GameObject[] playingOnly;      // the controls shown only while the replay is open (speed, scrub, clock, summary; every side's)
-    public TextMeshProUGUI[] playLabel, speedLabel, clock, summaryLabel;
+    public GameObject[] playingOnly;      // the controls shown only while the replay is open (speed, scrub, clock; every side's)
+    public TextMeshProUGUI[] playLabel, speedLabel, clock;
     public Transform[] playhead, huntMark;   // on the scrub bars (canvas units, the middle at 0)
     public float barWidth = 760f;
     public int segments = 20;             // the scrub bar's pressable pieces
@@ -53,8 +69,14 @@ public class PHReplay : UdonSharpBehaviour
     public const int TICK_MS = 250;
     const float TICK_S = 0.25f;
     const int MAXT = 2400;                // ten minutes of hide and hunt
-    const int HDR = 9;
+    const int HDR = 10, HDR1 = 9;
     const int F_ABS = 1, F_DELTA = 2, F_YAW = 4, F_DEF = 8, F_EV1 = 16, F_EV2 = 32, F_CATCH = 64, F_END = 128;
+    const int F_SWING = 256;              // (decoded only: a hunter's F_DEF in version 2)
+    const int F_SHOT = 512;               // (decoded only: a hider's F_CATCH in version 2)
+    const float WEAPON_BIG = 1.5f;        // the weapon a bit larger than life, to read at the table's scale
+    const float SWING_S = 0.6f;           // a replayed swing, in real seconds (as a burst: the same at any speed)
+    const float TAUNT_S = 1.4f;           // a taunt's pulse: two rings going out, in real seconds
+    const float HAND_Y = 1.044f, HAND_Z = 0.05f;   // the meeple's hands at rest (LobbyBuilder.BuildReplay: 0.58 of its 1.8)
     const float Q = 0.02f;                // metres per step
     const int TAIL = 40;                  // ten seconds of trail
     const float UPPER_Y = 2.0f;           // (PHMiniMap's: above it a marker hides with the upper floors)
@@ -73,11 +95,13 @@ public class PHReplay : UdonSharpBehaviour
     int bufLen, recRound = -1, recSlot = -1, recRole, firstTick, lastTick, count;
     int qx, qy, qz, qyaw, qdef;
     bool recEnded, published;
-    int pendFlags, lastHealth, lastHits, lastCatches, lastWrong;
+    int pendFlags, lastHealth, lastHits, lastCatches, lastWrong, recWeapon = -1;
+    bool pendSwing, pendShot;
+    int pendShotYaw;
 
     // ---- decoded tracks (slot * MAXT + k): places relative to the builder's origin
-    Vector3[] tPos; float[] tYaw; int[] tDef, tFlag;
-    int[] tFirst, tCount, tRole, tRound;
+    Vector3[] tPos; float[] tYaw, tAim; int[] tDef, tFlag;
+    int[] tFirst, tCount, tRole, tRound, tWeapon, tFirstShot;
     string[] tWho;
     bool[] dirty;
     int originTick, endTick, huntTick;
@@ -85,8 +109,11 @@ public class PHReplay : UdonSharpBehaviour
 
     // ---- shown
     GameObject[] prop; int[] propDef;
-    int[] lastK;
-    float[] popAt; Color[] colour;
+    int[] lastK, weaponShown;
+    float[] popAt, swingAt, tauntAt, shotAt, aimYaw; Color[] colour;
+    int[] gunShown;
+    bool[] screened;                      // drawn as a see-through screen (up on a floor that is switched off)
+    MaterialPropertyBlock wblock;
     Vector3[] tailBuf;
     MaterialPropertyBlock block;
     bool shownOpen;
@@ -97,10 +124,13 @@ public class PHReplay : UdonSharpBehaviour
     {
         int n = tracks.Length;
         buf = new byte[HDR + MAXT * 10];
-        tPos = new Vector3[n * MAXT]; tYaw = new float[n * MAXT]; tDef = new int[n * MAXT]; tFlag = new int[n * MAXT];
-        tFirst = new int[n]; tCount = new int[n]; tRole = new int[n]; tRound = new int[n]; tWho = new string[n]; dirty = new bool[n];
+        tPos = new Vector3[n * MAXT]; tYaw = new float[n * MAXT]; tAim = new float[n * MAXT]; tFirstShot = new int[n];
+        shotAt = new float[n]; aimYaw = new float[n]; gunShown = new int[n]; tDef = new int[n * MAXT]; tFlag = new int[n * MAXT];
+        tFirst = new int[n]; tCount = new int[n]; tRole = new int[n]; tRound = new int[n]; tWeapon = new int[n]; tWho = new string[n]; dirty = new bool[n];
         prop = new GameObject[n]; propDef = new int[n]; lastK = new int[n]; popAt = new float[n]; colour = new Color[n];
-        for (int i = 0; i < n; i++) { tRound[i] = -1; propDef[i] = -2; lastK[i] = -1; popAt[i] = -9f; tWho[i] = ""; }
+        weaponShown = new int[n]; swingAt = new float[n]; tauntAt = new float[n]; screened = new bool[n];
+        wblock = new MaterialPropertyBlock();
+        for (int i = 0; i < n; i++) { tRound[i] = -1; propDef[i] = -2; lastK[i] = -1; popAt[i] = -9f; tWho[i] = ""; weaponShown[i] = -2; swingAt[i] = -9f; tauntAt[i] = -9f; shotAt[i] = -9f; gunShown[i] = -2; tFirstShot[i] = -1; }
         tailBuf = new Vector3[TAIL];
         block = new MaterialPropertyBlock();
         palette = new Color[] {
@@ -121,7 +151,9 @@ public class PHReplay : UdonSharpBehaviour
         if (!timeline) Timeline();
         bool avail = Available();
         for (int b = 0; b < bar.Length; b++) if (bar[b] != null && bar[b].activeSelf != avail) bar[b].SetActive(avail);
-        bool on = avail && open && viewRound == game.round;
+        // (Cor, 2026-11-22: no summary any more) the replay is the diorama's view whenever it can be watched, paused at
+        // the round's start until someone presses play
+        bool on = avail;
         if (on != shownOpen)
         {
             shownOpen = on;
@@ -144,7 +176,7 @@ public class PHReplay : UdonSharpBehaviour
         {
             if (recRound != game.round)
             {
-                recRound = game.round; published = false; recEnded = false; count = 0; recSlot = -1; pendFlags = 0;
+                recRound = game.round; published = false; recEnded = false; count = 0; recSlot = -1; pendFlags = 0; pendSwing = false; pendShot = false; recWeapon = -1;
                 int slot = game.SlotOf(Networking.LocalPlayer.playerId);
                 int role = game.RoleOf(slot);
                 if (slot < 0 || slot >= tracks.Length || role == PHGame.ROLE_NONE) return;
@@ -165,9 +197,10 @@ public class PHReplay : UdonSharpBehaviour
         {
             published = true;
             if (recSlot < 0 || count == 0) return;
-            buf[0] = 82; buf[1] = 1; buf[2] = (byte)recRole;
+            buf[0] = 82; buf[1] = 2; buf[2] = (byte)recRole;
             Put32(3, firstTick);
             buf[7] = (byte)(count & 255); buf[8] = (byte)((count >> 8) & 255);
+            buf[9] = (byte)Mathf.Clamp(recWeapon + 1, 0, 255);
             byte[] data = new byte[bufLen];
             System.Array.Copy(buf, data, bufLen);
             tracks[recSlot].Publish(recRound, data, Networking.LocalPlayer.displayName);
@@ -176,6 +209,35 @@ public class PHReplay : UdonSharpBehaviour
 
     // a hider's taunt (PHSlot.PlayTaunt, on the hider's own client)
     public void Taunted() { if (recRole == PHGame.ROLE_HIDER) pendFlags |= F_EV1; }
+
+    // a hunter's swing (PHWeapons: a desktop slash, a real VR swing; PHLocal.MeleeStrike: anything struck), on their own
+    // client. (Underscore: not a network event.)
+    public void _Swung() { if (recRole == PHGame.ROLE_HUNTER && recSlot >= 0 && !recEnded && game.phase == PHGame.PH_HUNT) pendSwing = true; }
+
+    // a hider's final-stand shot (PHLocal), on their own client: the aim, as a yaw. (Underscore: not a network event.)
+    public void _Shot(Vector3 dir)
+    {
+        if (recRole != PHGame.ROLE_HIDER || recSlot < 0 || recEnded || game.phase != PHGame.PH_HUNT) return;
+        float yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+        pendShot = true;
+        pendShotYaw = Mathf.RoundToInt(Mathf.Repeat(yaw, 360f) / 360f * 256f) & 255;
+    }
+
+    // the gun this hider shoots with (as PHWeapons.GunOf)
+    int GunOf(PHSlot s)
+    {
+        PHWeapons w = game.local != null ? game.local.weapons : null;
+        if (w == null || w.gunMesh == null || w.gunMesh.Length == 0) return -1;
+        return s.gunChoice >= 0 && s.gunChoice < w.gunMesh.Length ? s.gunChoice : 0;
+    }
+
+    // the melee model this hunter holds this round (as PHWeapons shows it)
+    int WeaponOf(PHSlot s)
+    {
+        PHWeapons w = game.local != null ? game.local.weapons : null;
+        if (w == null || w.meleeMesh == null) return -1;
+        return s.meleeChoice >= 0 && s.meleeChoice < w.meleeMesh.Length ? s.meleeChoice : w.ModelNow();
+    }
 
     void Sample(PHSlot s)
     {
@@ -192,9 +254,14 @@ public class PHReplay : UdonSharpBehaviour
             if (s.health < lastHealth) flags |= F_EV2;
             lastHealth = s.health;
             if (s.caught) flags |= F_END;
+            if (recWeapon < 0) recWeapon = GunOf(s);
+            if (pendShot) flags |= F_CATCH;   // (a hider's F_CATCH: shot)
         }
         else
         {
+            if (recWeapon < 0) recWeapon = WeaponOf(s);
+            flags &= ~F_DEF;
+            if (pendSwing) { flags |= F_DEF; pendSwing = false; }   // (a hunter's F_DEF: swung)
             if (s.wrongProps > lastWrong) flags |= F_EV1;
             if (s.hits > lastHits) flags |= F_EV2;
             if (s.catches > lastCatches) flags |= F_CATCH;
@@ -212,12 +279,13 @@ public class PHReplay : UdonSharpBehaviour
         int yq = Mathf.RoundToInt(Mathf.Repeat(yaw, 360f) / 360f * 256f) & 255;
         int dyaw = Mathf.Abs(yq - qyaw); if (dyaw > 128) dyaw = 256 - dyaw;
         if (count == 0 || dyaw > 2) flags |= F_YAW;
-        if (count == 0 || def != qdef) flags |= F_DEF;
+        if (recRole == PHGame.ROLE_HIDER && (count == 0 || def != qdef)) flags |= F_DEF;
         buf[bufLen++] = (byte)flags;
         if ((flags & F_ABS) != 0) { Put16(x); Put16(y); Put16(z); qx = x; qy = y; qz = z; }
         else if ((flags & F_DELTA) != 0) { Put8(dx); Put8(dy); Put8(dz); qx = x; qy = y; qz = z; }
         if ((flags & F_YAW) != 0) { buf[bufLen++] = (byte)yq; qyaw = yq; }
-        if ((flags & F_DEF) != 0) { Put16(def + 1); qdef = def; }
+        if ((flags & F_DEF) != 0 && recRole == PHGame.ROLE_HIDER) { Put16(def + 1); qdef = def; }
+        if ((flags & F_CATCH) != 0 && recRole == PHGame.ROLE_HIDER) { buf[bufLen++] = (byte)pendShotYaw; pendShot = false; }
         if ((flags & F_END) != 0) recEnded = true;
         count++;
     }
@@ -234,27 +302,60 @@ public class PHReplay : UdonSharpBehaviour
         PHReplayTrack tr = tracks[i];
         byte[] d = tr.data;
         tRound[i] = -1; tCount[i] = 0;
-        if (d == null || d.Length < HDR || d[0] != 82 || d[1] != 1) return;
+        if (d == null || d.Length < HDR1 || d[0] != 82 || (d[1] != 1 && d[1] != 2)) return;
+        int ver = (int)d[1], hdr = ver >= 2 ? HDR : HDR1;
+        if (d.Length < hdr) return;
         tRole[i] = (int)d[2];
+        tWeapon[i] = ver >= 2 ? (int)d[9] - 1 : -1;
+        bool swings = ver >= 2 && tRole[i] == PHGame.ROLE_HUNTER;
+        bool shots = ver >= 2 && tRole[i] == PHGame.ROLE_HIDER;
+        tFirstShot[i] = -1;
+        float aim = 0f;
         tFirst[i] = (int)d[3] | ((int)d[4] << 8) | ((int)d[5] << 16) | ((int)d[6] << 24);
         int n = Mathf.Min(MAXT, (int)d[7] | ((int)d[8] << 8));
-        int p = HDR, x = 0, y = 0, z = 0, yq = 0, def = -1, b = i * MAXT, k = 0;
+        int p = hdr, x = 0, y = 0, z = 0, yq = 0, def = -1, b = i * MAXT, k = 0;
         for (; k < n && p < d.Length; k++)
         {
             int f = (int)d[p++];
             if ((f & F_ABS) != 0) { if (p + 6 > d.Length) break; x = S16(d, p); y = S16(d, p + 2); z = S16(d, p + 4); p += 6; }
             else if ((f & F_DELTA) != 0) { if (p + 3 > d.Length) break; x += S8(d[p]); y += S8(d[p + 1]); z += S8(d[p + 2]); p += 3; }
             if ((f & F_YAW) != 0) { if (p + 1 > d.Length) break; yq = (int)d[p++]; }
-            if ((f & F_DEF) != 0) { if (p + 2 > d.Length) break; def = ((int)d[p] | ((int)d[p + 1] << 8)) - 1; p += 2; }
+            if ((f & F_DEF) != 0 && swings) f = (f & ~F_DEF) | F_SWING;
+            else if ((f & F_DEF) != 0) { if (p + 2 > d.Length) break; def = ((int)d[p] | ((int)d[p + 1] << 8)) - 1; p += 2; }
+            if ((f & F_CATCH) != 0 && shots)
+            {
+                if (p + 1 > d.Length) break;
+                aim = (int)d[p++] * (360f / 256f);
+                f = (f & ~F_CATCH) | F_SHOT;
+                if (tFirstShot[i] < 0) tFirstShot[i] = k;
+            }
+            tAim[b + k] = aim;
             tPos[b + k] = new Vector3(x * Q, y * Q, z * Q);
             tYaw[b + k] = yq * (360f / 256f);
             tDef[b + k] = def;
             tFlag[b + k] = f;
         }
         tCount[i] = k;
+        // the game log (Cor saw a hider turn into a shovel on a map with none, 2026-11-22): each hider track's disguises
+        if (tRole[i] == PHGame.ROLE_HIDER)
+        {
+            string line = "replay slot " + i + " v" + ver + " " + k + " ticks, disguises:";
+            int last = -2, shown = 0;
+            for (int j = 0; j < k && shown < 12; j++)
+            {
+                int dj = tDef[i * MAXT + j];
+                if (dj == last) continue;
+                last = dj; shown++;
+                string nm = dj >= 0 && dj < builder.propPrefabs.Length && builder.propPrefabs[dj] != null ? builder.propPrefabs[dj].name : "-";
+                line += " " + Clock(j * TICK_S) + " " + nm;
+            }
+            game.Log(line);
+        }
         tRound[i] = tr.round;
         tWho[i] = tr.who;
         lastK[i] = -1;
+        weaponShown[i] = -2;
+        gunShown[i] = -2;
     }
 
     int S16(byte[] d, int p) { int v = (int)d[p] | ((int)d[p + 1] << 8); return v > 32767 ? v - 65536 : v; }
@@ -300,8 +401,11 @@ public class PHReplay : UdonSharpBehaviour
     }
 
     // ------------------------------------------------------------------ playback
+    bool Live() { return open && viewRound == game.round; }   // (not yet pressed this round: paused at the start)
+
     float Pos()
     {
+        if (!Live()) return 0f;
         float t = atSec;
         if (playing) t += (game.Now - atMs) * 0.001f * speed;
         return Mathf.Clamp(t, 0f, Duration());
@@ -326,7 +430,9 @@ public class PHReplay : UdonSharpBehaviour
             float frac = k < n - 1 ? Mathf.Clamp01(u - k) : 0f;
             Vector3 rel = k < n - 1 ? Vector3.Lerp(tPos[b + k], tPos[b + k + 1], frac) : tPos[b + k];
             Vector3 at = rel + off;
-            bool shown = upper || rel.y <= UPPER_Y;
+            // above the ground floor with the upper floors off: still shown, as a see-through screen (Cor, as the floors)
+            bool shown = true;
+            bool screen = !upper && rel.y > UPPER_Y;
             int def = tDef[b + k];
             bool asProp = tRole[i] == PHGame.ROLE_HIDER && def >= 0 && def < builder.propPrefabs.Length && builder.propPrefabs[def] != null;
             // the hider as their prop of the moment (a fresh copy when it changes)
@@ -335,6 +441,8 @@ public class PHReplay : UdonSharpBehaviour
                 if (prop[i] != null) Destroy(prop[i]);
                 prop[i] = Copy(builder.propPrefabs[def]);
                 propDef[i] = def;
+                screened[i] = false;
+                if (screen) Screen(i, true);
             }
             if (prop[i] != null)
             {
@@ -342,12 +450,16 @@ public class PHReplay : UdonSharpBehaviour
                 if (prop[i].activeSelf != on) prop[i].SetActive(on);
                 if (on) { prop[i].transform.localPosition = at; prop[i].transform.localRotation = Quaternion.Euler(0f, tYaw[b + k], 0f); }
             }
+            // a hunter: the red meeple with their weapon (a capsule only if the scene has no meeple)
+            bool meeple = tRole[i] == PHGame.ROLE_HUNTER && meeples != null && i < meeples.Length && meeples[i] != null;
+            if (meeple) Meeple(i, at, tYaw[b + k], shown);
+            if (screen != screened[i]) Screen(i, screen);
             Transform pw = pawns[i];
-            bool pawnOn = !asProp && shown;
+            bool pawnOn = !asProp && !meeple && shown;
             if (pw.gameObject.activeSelf != pawnOn)
             {
                 pw.gameObject.SetActive(pawnOn);
-                block.SetColor("_Color", colour[i]); pawnRenderer[i].SetPropertyBlock(block);
+                PawnColour(i);
             }
             if (pawnOn) { pw.localPosition = at; pw.localRotation = Quaternion.Euler(0f, tYaw[b + k], 0f); }
             // the name over them, turned to the viewer
@@ -383,6 +495,8 @@ public class PHReplay : UdonSharpBehaviour
             bool popOn = age < 0.5f && shown;
             if (pp.gameObject.activeSelf != popOn) pp.gameObject.SetActive(popOn);
             if (popOn) { pp.localPosition = at + new Vector3(0f, 1f, 0f); pp.localScale = Vector3.one * (1f + age * 6f); }
+            Taunt(i, at, shown);
+            Gun(i, at, tYaw[b + k], def, asProp && tFirstShot[i] >= 0 && k >= tFirstShot[i]);
         }
         // the controls
         float dur = Duration();
@@ -396,7 +510,7 @@ public class PHReplay : UdonSharpBehaviour
             for (int b = 0; b < clock.Length; b++) if (clock[b] != null) clock[b].text = ct;
         }
         bool atEnd = t >= dur - 0.01f;
-        string pl = game.text != null ? game.text.Get(playing && !atEnd ? "replay.pause" : "replay.play") : "";
+        string pl = game.text != null ? game.text.Get(playing && Live() && !atEnd ? "replay.pause" : "replay.play") : "";
         for (int b = 0; b < playLabel.Length; b++) if (playLabel[b] != null && playLabel[b].text != pl) playLabel[b].text = pl;
     }
 
@@ -410,6 +524,12 @@ public class PHReplay : UdonSharpBehaviour
         for (int j = was + 1; j <= k; j++)
         {
             int f = tFlag[b + j];
+            // a hunter swings hard when they swung, and when they struck a prop, a hider or a catch (an older track
+            // has only the strikes)
+            if (tRole[i] == PHGame.ROLE_HUNTER && (f & (F_SWING | F_EV1 | F_EV2 | F_CATCH)) != 0) swingAt[i] = Time.time;
+            // a hider's taunt: the dithered pulse, not a burst (a hit or a catch in the same tick still bursts red)
+            if (tRole[i] == PHGame.ROLE_HIDER && (f & F_EV1) != 0) { tauntAt[i] = Time.time; f &= ~F_EV1; }
+            if ((f & F_SHOT) != 0) { shotAt[i] = Time.time; aimYaw[i] = tAim[b + j]; }
             if ((f & (F_EV1 | F_EV2 | F_CATCH | F_END)) == 0) continue;
             Color c = colour[i];
             if ((f & (F_EV2 | F_END)) != 0 && tRole[i] == PHGame.ROLE_HIDER) c = new Color(0.92f, 0.2f, 0.18f);   // hit, caught: red
@@ -420,6 +540,92 @@ public class PHReplay : UdonSharpBehaviour
         }
     }
 
+    // a taunt's pulse: two rings, one after the other, each growing out from the hider and thinning to nothing
+    void Taunt(int i, Vector3 at, bool shown)
+    {
+        Transform tp = taunts != null && i < taunts.Length ? taunts[i] : null;
+        if (tp == null) return;
+        float age = Time.time - tauntAt[i];
+        bool on = shown && age >= 0f && age < TAUNT_S;
+        if (tp.gameObject.activeSelf != on) tp.gameObject.SetActive(on);
+        if (!on) return;
+        float u = (age % (TAUNT_S * 0.5f)) / (TAUNT_S * 0.5f);   // (each ring's own 0..1)
+        tp.localPosition = at + new Vector3(0f, 0.6f, 0f);
+        tp.localScale = Vector3.one * Mathf.Lerp(0.8f, 6f, u);
+        Color c = colour[i]; c.a = (1f - u) * (age < TAUNT_S * 0.5f ? 1f : 0.7f);
+        block.SetColor("_Color", c); tauntRenderer[i].SetPropertyBlock(block);
+    }
+
+    // a player up on a floor switched off: the hider's prop, the meeple, its weapon and the pawn as a see-through
+    // screen of every other pixel (PropHunt/LitDither, the Weapon shader's _Dither, the pawn's half fill)
+    void Screen(int i, bool on)
+    {
+        screened[i] = on;
+        Material lit = mini.propLit, dit = mini.propLitDither;
+        if (lit != null && dit != null)
+        {
+            if (prop[i] != null)
+            {
+                MeshRenderer[] rs = prop[i].GetComponentsInChildren<MeshRenderer>(true);
+                for (int q = 0; q < rs.Length; q++)
+                {
+                    if (on && rs[q].sharedMaterial == lit) rs[q].sharedMaterial = dit;
+                    else if (!on && rs[q].sharedMaterial == dit) rs[q].sharedMaterial = lit;
+                }
+            }
+            if (meepleFig != null && i < meepleFig.Length && meepleFig[i] != null) meepleFig[i].sharedMaterial = on ? dit : lit;
+        }
+        if (meepleWeapon != null && i < meepleWeapon.Length && meepleWeapon[i] != null)
+        {
+            wblock.SetFloat("_Dither", on ? 1f : 0f);
+            meepleWeapon[i].GetComponent<MeshRenderer>().SetPropertyBlock(wblock);
+            meepleOff[i].GetComponent<MeshRenderer>().SetPropertyBlock(wblock);
+        }
+        if (gunModel != null && i < gunModel.Length && gunModel[i] != null)
+        {
+            wblock.SetFloat("_Dither", on ? 1f : 0f);
+            gunModel[i].GetComponent<MeshRenderer>().SetPropertyBlock(wblock);
+        }
+        PawnColour(i);
+    }
+
+    void PawnColour(int i)
+    {
+        Color c = colour[i]; c.a = screened[i] ? 0.5f : 1f;
+        block.SetColor("_Color", c); pawnRenderer[i].SetPropertyBlock(block);
+    }
+
+    // a hider's gun over their prop once they have fired: as it floats in the round (PHWeapons.GUN_SCALE, a slow bob),
+    // turned to each shot for a moment, kicking back with a flash at the muzzle
+    void Gun(int i, Vector3 at, float yaw, int def, bool on)
+    {
+        if (guns == null || i >= guns.Length || guns[i] == null) return;
+        Transform g = guns[i];
+        PHWeapons w = game.local != null ? game.local.weapons : null;
+        if (w == null || w.gunMesh == null || w.gunMesh.Length == 0) on = false;
+        if (g.gameObject.activeSelf != on) g.gameObject.SetActive(on);
+        float t = Time.time - shotAt[i];
+        bool flash = on && t >= 0f && t < 0.12f;
+        if (gunFlash[i].gameObject.activeSelf != flash) gunFlash[i].gameObject.SetActive(flash);
+        if (!on) return;
+        int gm = tWeapon[i];
+        if (gm < 0 || gm >= w.gunMesh.Length) gm = 0;
+        Vector3 kick = Vector3.zero; Quaternion kr = Quaternion.identity;
+        if (t >= 0f && t < 0.25f) { float u = 1f - t / 0.25f; kick = new Vector3(0f, 0f, -0.12f * u); kr = Quaternion.Euler(-25f * u, 0f, 0f); }
+        if (gunShown[i] != gm) { gunShown[i] = gm; gunModel[i].sharedMesh = w.gunMesh[gm]; }
+        w.PutGunModel(gunModel[i].transform, gm, kick, kr, 1f);
+        float h = def >= 0 && def < game.gen.defSy.Length ? game.gen.defSy[def] / 1000f : 1f;
+        g.localPosition = at + new Vector3(0f, h + 0.25f + 0.04f * Mathf.Sin(Time.time * 2.4f + i), 0f);
+        g.localRotation = Quaternion.Euler(0f, t >= 0f && t < 0.8f ? aimYaw[i] : yaw, 0f);
+        g.localScale = Vector3.one * PHWeapons.GUN_SCALE;
+        if (flash)
+        {
+            Vector3 muzzle = w.gunMuzzlePoint != null && gm < w.gunMuzzlePoint.Length ? w.gunMuzzlePoint[gm] : new Vector3(0f, 0f, 0.3f);
+            gunFlash[i].position = gunModel[i].transform.TransformPoint(muzzle);
+            gunFlash[i].localScale = Vector3.one * (0.35f + t * 3f);
+        }
+    }
+
     void Hide(int i)
     {
         if (pawns[i].gameObject.activeSelf) pawns[i].gameObject.SetActive(false);
@@ -427,13 +633,75 @@ public class PHReplay : UdonSharpBehaviour
         if (tails[i].gameObject.activeSelf) tails[i].gameObject.SetActive(false);
         if (pops[i].gameObject.activeSelf && Time.time - popAt[i] >= 0.5f) pops[i].gameObject.SetActive(false);
         if (prop[i] != null && prop[i].activeSelf) prop[i].SetActive(false);
+        if (meeples != null && i < meeples.Length && meeples[i] != null && meeples[i].gameObject.activeSelf) meeples[i].gameObject.SetActive(false);
+        if (taunts != null && i < taunts.Length && taunts[i] != null && taunts[i].gameObject.activeSelf) taunts[i].gameObject.SetActive(false);
+        if (guns != null && i < guns.Length && guns[i] != null && guns[i].gameObject.activeSelf) guns[i].gameObject.SetActive(false);
+        if (gunFlash != null && i < gunFlash.Length && gunFlash[i] != null && gunFlash[i].gameObject.activeSelf) gunFlash[i].gameObject.SetActive(false);
     }
+
+    // the hunter's meeple at 'at', turned to yaw: their weapon in its hand (and a set's other piece in the other), raised
+    // high, and on a swing brought far back over the head, slammed down in front as the body lunges, and back up
+    void Meeple(int i, Vector3 at, float yaw, bool shown)
+    {
+        Transform m = meeples[i];
+        if (m.gameObject.activeSelf != shown) m.gameObject.SetActive(shown);
+        if (!shown) return;
+        m.localPosition = at; m.localRotation = Quaternion.Euler(0f, yaw, 0f);
+        PHWeapons w = game.local != null ? game.local.weapons : null;
+        int wm = tWeapon[i];
+        if (w != null && w.meleeMesh != null && (wm < 0 || wm >= w.meleeMesh.Length)) wm = w.ModelNow();
+        if (weaponShown[i] != wm)
+        {
+            weaponShown[i] = wm;
+            bool has = w != null && w.meleeMesh != null && wm >= 0 && wm < w.meleeMesh.Length;
+            Transform wt = meepleWeapon[i].transform;
+            wt.gameObject.SetActive(has);
+            if (has)
+            {
+                meepleWeapon[i].sharedMesh = w.meleeMesh[wm];
+                float sz = w.MeleeSize(wm) * WEAPON_BIG;
+                wt.localScale = Vector3.one * sz; wt.localPosition = -w.MeleeGrip(wm) * sz; wt.localRotation = Quaternion.identity;
+            }
+            bool off = has && w.offMesh != null && wm < w.offMesh.Length && w.offMesh[wm] != null;
+            Transform ot = meepleOff[i].transform;
+            ot.gameObject.SetActive(off);
+            if (off)
+            {
+                meepleOff[i].sharedMesh = w.offMesh[wm];
+                ot.localScale = Vector3.one * (w.MeleeSize(wm) * WEAPON_BIG); ot.localPosition = Vector3.zero; ot.localRotation = Quaternion.identity;
+            }
+        }
+        // the hand's turn about its x (the weapon's head along +z): -70 held up and a little forward
+        float t = Time.time - swingAt[i];
+        // (the wind-up lifts the hands over the head and the weapon points up and back; the slam reaches out in front)
+        float arm = -70f, lean = 0f, hop = 0f, lift = 0f, reach = 0f;
+        if (t >= 0f && t < SWING_S)
+        {
+            float u = t / SWING_S;
+            if (u < 0.35f) { float k = Smooth(u / 0.35f); arm = Mathf.Lerp(-70f, -145f, k); lean = Mathf.Lerp(0f, -12f, k); hop = Mathf.Lerp(0f, 0.25f, k); lift = Mathf.Lerp(0f, 0.45f, k); reach = Mathf.Lerp(0f, -0.1f, k); }
+            else if (u < 0.5f) { float k = (u - 0.35f) / 0.15f; arm = Mathf.Lerp(-145f, 20f, k); lean = Mathf.Lerp(-12f, 28f, k); hop = Mathf.Lerp(0.25f, 0f, k); lift = Mathf.Lerp(0.45f, -0.1f, k); reach = Mathf.Lerp(-0.1f, 0.4f, k); }
+            else { float k = Smooth((u - 0.5f) / 0.5f); arm = Mathf.Lerp(20f, -70f, k); lean = Mathf.Lerp(28f, 0f, k); lift = Mathf.Lerp(-0.1f, 0f, k); reach = Mathf.Lerp(0.4f, 0f, k); }
+        }
+        meepleBody[i].localRotation = Quaternion.Euler(lean, 0f, 0f);
+        meepleBody[i].localPosition = new Vector3(0f, hop, 0f);
+        Quaternion hr = Quaternion.Euler(arm, 0f, 0f);
+        Transform hd = meepleHand[i], oh = meepleOffHand[i];
+        hd.localRotation = hr; hd.localPosition = new Vector3(hd.localPosition.x, HAND_Y + lift, HAND_Z + reach);
+        oh.localRotation = hr; oh.localPosition = new Vector3(oh.localPosition.x, HAND_Y + lift, HAND_Z + reach);
+    }
+
+    float Smooth(float k) { k = Mathf.Clamp01(k); return k * k * (3f - 2f * k); }
 
     void HideMarkers()
     {
         for (int i = 0; i < tracks.Length; i++)
         {
             pawns[i].gameObject.SetActive(false); tags[i].gameObject.SetActive(false); tails[i].gameObject.SetActive(false); pops[i].gameObject.SetActive(false);
+            if (meeples != null && i < meeples.Length && meeples[i] != null) meeples[i].gameObject.SetActive(false);
+            swingAt[i] = -9f; tauntAt[i] = -9f; shotAt[i] = -9f;
+            if (guns != null && i < guns.Length && guns[i] != null) { guns[i].gameObject.SetActive(false); gunFlash[i].gameObject.SetActive(false); }
+            if (screened[i]) Screen(i, false);
+            if (taunts != null && i < taunts.Length && taunts[i] != null) taunts[i].gameObject.SetActive(false);
             if (prop[i] != null) { Destroy(prop[i]); prop[i] = null; }
             propDef[i] = -2; tagLabel[i].text = "";
         }
@@ -474,10 +742,19 @@ public class PHReplay : UdonSharpBehaviour
         Send();
     }
 
+    // the first press of the round on speed or the scrub bar: the replay taken from its paused start
+    void Begin()
+    {
+        if (Live()) return;
+        open = true; playing = false; atSec = 0f; atMs = game.Now; speed = 1;
+        for (int i = 0; i < lastK.Length; i++) lastK[i] = -1;
+    }
+
     public void Speed()
     {
-        if (!open) return;
+        if (!Available()) return;
         Take();
+        Begin();
         atSec = Pos(); atMs = game.Now;
         speed = speed >= 4 ? 1 : speed * 2;
         Send();
@@ -486,17 +763,10 @@ public class PHReplay : UdonSharpBehaviour
     // a piece of a scrub bar (buttonArg = side * SIDE_ARG + the piece + 1): the replay from there
     public void Seek()
     {
-        if (!open) return;
+        if (!Available()) return;
         Take();
+        Begin();
         atSec = Duration() * Mathf.Clamp01(((buttonArg - 1) % SIDE_ARG) / (float)Mathf.Max(1, segments - 1)); atMs = game.Now;
-        Send();
-    }
-
-    // back to the diorama's summary
-    public void Close()
-    {
-        Take();
-        open = false; playing = false;
         Send();
     }
 
@@ -505,12 +775,10 @@ public class PHReplay : UdonSharpBehaviour
     void Labels()
     {
         if (game.text == null) return;
-        string pl = game.text.Get(open && viewRound == game.round ? (playing ? "replay.pause" : "replay.play") : "replay.watch");
+        string pl = game.text.Get(Live() && playing ? "replay.pause" : "replay.play");
         string sp = game.text.F1("replay.speed", speed.ToString());   // (a string row, so the text bake gives the font its ×)
-        string su = game.text.Get("replay.summary");
         for (int b = 0; b < playLabel.Length; b++) if (playLabel[b] != null) playLabel[b].text = pl;
         for (int b = 0; b < speedLabel.Length; b++) if (speedLabel[b] != null) speedLabel[b].text = sp;
-        for (int b = 0; b < summaryLabel.Length; b++) if (summaryLabel[b] != null) summaryLabel[b].text = su;
     }
 
     string Clock(float t)

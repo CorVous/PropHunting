@@ -44,6 +44,13 @@ public static partial class LobbyBuilder
         if (dioMat == null) { dioMat = new Material(Shader.Find("PropHunt/Diorama")) { name = "Diorama" }; AssetDatabase.CreateAsset(dioMat, "Assets/Udon/Generated/Diorama.mat"); }
         dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.SetVector("_Box", new Vector4(-100000f, -100000f, 100000f, 100000f)); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
         mm.dioMat = dioMat;
+        // the props' material and its screened twin (PropHunt/LitDither): the upper floors in the replay with them off (Cor)
+        mm.propLit = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
+        var litDither = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLitDither.mat");
+        if (litDither == null) { litDither = new Material(Shader.Find("PropHunt/LitDither")) { name = "PropLitDither" }; AssetDatabase.CreateAsset(litDither, "Assets/Udon/Generated/PropLitDither.mat"); }
+        if (mm.propLit != null) litDither.CopyPropertiesFromMaterial(mm.propLit);
+        litDither.shader = Shader.Find("PropHunt/LitDither"); litDither.enableInstancing = true; EditorUtility.SetDirty(litDither);
+        mm.propLitDither = litDither;
         var olMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/DioramaOutline.mat");
         if (olMat == null) { olMat = new Material(Shader.Find("PropHunt/DioramaOutline")) { name = "DioramaOutline" }; AssetDatabase.CreateAsset(olMat, "Assets/Udon/Generated/DioramaOutline.mat"); }
         olMat.shader = Shader.Find("PropHunt/DioramaOutline"); olMat.enableInstancing = false; EditorUtility.SetDirty(olMat);
@@ -96,6 +103,7 @@ public static partial class LobbyBuilder
         // (no card: Cor, the names are on the pins). Two buttons on the near edge: the upper floors on or off, and
         // everyone or one player alone (Cor)
         var cv = Canvas(table.transform, "Buttons", new Vector3(0f, top + 0.12f, -side / 2 - 0.1f), Quaternion.Euler(35f, 0f, 0f), new Vector2(600f, 80f), 0.002f, true);
+        cv.GetComponent<BoxCollider>().isTrigger = true;   // (as the replay's rows under it: pressable, never in the way)
         mm.upperLabel = DebugButton(cv, game, "Upper floors: shown", nameof(PHMiniMap.ToggleUpper), new Vector2(0, 0), C("f2c45a"), mm);
         // (one player alone: press their name tag)
         UdonSharpEditorUtility.CopyProxyToUdon(mm);
