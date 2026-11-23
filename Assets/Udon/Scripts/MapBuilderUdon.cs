@@ -1668,14 +1668,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
                 Trim(horizontal, ex, ez, w0 + 2 * e, m - 0.02f - e, ty - 0.015f, ty + 0.015f, windowFrame);
                 Trim(horizontal, ex, ez, m + 0.02f + e, w1 - 2 * e, ty - 0.015f, ty + 0.015f, windowFrame);
             }
-            // the window's hole is open (Cor: small props should fit through a window): solid either side, under the
-            // sill and over the head, and the mullion between the two lights
-            float mm = (w0 + w1) / 2;
-            WallBox(horizontal, ex, ez, lo, w0, 0f, h);
-            WallBox(horizontal, ex, ez, w1, hi, 0f, h);
-            WallBox(horizontal, ex, ez, w0, w1, 0f, sill);
-            WallBox(horizontal, ex, ez, w0, w1, head, h);
-            WallBox(horizontal, ex, ez, mm - 0.02f, mm + 0.02f, sill, head);
+            // the window's hole is solid (Cor 11-22: hiders could get out of a window where a hunter can't follow)
+            WallBox(horizontal, ex, ez, lo, hi, 0f, h);
         }
     }
 
@@ -1703,14 +1697,6 @@ public class MapBuilderUdon : UdonSharpBehaviour
             FacadeBox(horizontal, ex, ez, 0f, d0, 0f, h, n0, n1, side);
             FacadeBox(horizontal, ex, ez, d1, CELL, 0f, h, n0, n1, side);
             FacadeBox(horizontal, ex, ez, d0, d1, dh, h, n0, n1, side);
-        }
-        else if (type == GenData.E_WINDOW && fW1 > fW0 + 0.1f)
-        {
-            // the facade's window hole stays open like the wall's (Facade has set fW0..fW1 and fSill..fHead)
-            FacadeBox(horizontal, ex, ez, 0f, fW0, 0f, h, n0, n1, side);
-            FacadeBox(horizontal, ex, ez, fW1, CELL, 0f, h, n0, n1, side);
-            FacadeBox(horizontal, ex, ez, fW0, fW1, 0f, fSill, n0, n1, side);
-            FacadeBox(horizontal, ex, ez, fW0, fW1, fHead, h, n0, n1, side);
         }
         else FacadeBox(horizontal, ex, ez, 0f, CELL, 0f, h, n0, n1, side);
     }
