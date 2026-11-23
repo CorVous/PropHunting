@@ -873,7 +873,8 @@ public class PHLocal : UdonSharpBehaviour
         bool eg = game.Endgame;
         if (eg && !wasEndgame && role != PHGame.ROLE_NONE)
         {
-            sound.Play("jingles_HIT03", 0.6f);   // (the old synthesized "hurry up" is gone: Cor's takes only)
+            // the hit, then one of Cor's overtime takes (Audio/Voice/vo_overtime_*), as the final stand starts
+            PlayThen("jingles_HIT03", 0.6f, sound.Voice("overtime", ""), 0.8f);
             Say(T("say.final"), 4f);
             float iv = game.tauntInterval * 0.5f;
             if (nextForced > Time.time + iv) nextForced = Time.time + iv;
