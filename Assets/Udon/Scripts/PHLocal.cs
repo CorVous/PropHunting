@@ -56,12 +56,11 @@ public class PHLocal : UdonSharpBehaviour
     int hidersAtStart;        // uncaught hiders when the hunt began (the "one left" call)
     bool oneLeftSaid;
     float caughtAt = -100f;
-    // forced taunts (6.4, G47): every hider's own clock from the release of the hunters; a hider that has moved
-    // 4 m (straight line) since the last check skips it
+    // forced taunts (6.4, G47): every hider's own clock from the release of the hunters. Moving no longer skips one
+    // (Cor, 11-22): only a taunt of their own puts the clock back
     float nextForced = -1f;
     bool warned;
-    Vector3 checkPos;
-    public const float FORCED_WARNING = 3f, FORCED_MOVED = 4f;
+    public const float FORCED_WARNING = 3f;
 
     // the slot the host gave this player (it can arrive after the phase that needs it)
     PHSlot Me() { slotIndex = game.SlotOf(Networking.LocalPlayer.playerId); return slotIndex >= 0 ? game.slots[slotIndex] : null; }
@@ -146,7 +145,7 @@ public class PHLocal : UdonSharpBehaviour
                     if (s != null && s.def < 0 && !s.caught && !s.ghost) StartingDisguise();
                     Say(T("say.released"), 5f);
                     nextForced = Time.time + ForcedInterval() * Random.Range(0.35f, 1f);
-                    checkPos = me.GetPosition(); warned = false;
+                    warned = false;
                 }
                 break;
             case PHGame.PH_END:
@@ -980,8 +979,8 @@ public class PHLocal : UdonSharpBehaviour
         return game.Participants() < 6 ? game.tauntInterval * 0.75f : game.tauntInterval;
     }
 
-    // how far the forced taunt's clock has run for this hider: 0 just after a taunt (their own, or a forced one, or a
-    // skip for having moved) .. 1 as the forced one comes; -1 while there is none (not a hider in the hunt). PHView
+    // how far the forced taunt's clock has run for this hider: 0 just after a taunt (their own or a forced
+    // one) .. 1 as the forced one comes; -1 while there is none (not a hider in the hunt). PHView
     // draws it as the ring round the taunt button (VR) and the small ring on the desktop HUD (hop playtest, Cor)
     public float ForcedProgress(PHSlot s)
     {
@@ -1008,20 +1007,16 @@ public class PHLocal : UdonSharpBehaviour
     {
         PHSlot s = Me();
         if (role != PHGame.ROLE_HIDER || game.phase != PHGame.PH_HUNT || s == null || s.caught || nextForced < 0f) return;
-        Vector3 d = Networking.LocalPlayer.GetPosition() - checkPos; d.y = 0f;
-        bool skip = d.magnitude >= FORCED_MOVED;
         float t = nextForced - Time.time;
-        if (t <= FORCED_WARNING && !warned && !skip)
+        if (t <= FORCED_WARNING && !warned)
         {
             warned = true;
             sound.Play("tick_001", 0.8f);
             Say(T("say.forced"), 3f);
         }
         if (t > 0f) return;
-        checkPos = Networking.LocalPlayer.GetPosition();
         nextForced = Time.time + ForcedInterval();
         warned = false;
-        if (skip) { Say(T("say.moved"), 2f); return; }
         lastTaunt = -99f;
         Taunt();
     }
@@ -1572,7 +1567,7 @@ public class PHLocal : UdonSharpBehaviour
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.PlayTaunt), Random.Range(0, 1000));
         if (view != null) view.ShowTauntBolts();   // (VR: bolts fly out of the screen device's speaker grill)
         // a taunt of their own counts as the forced one (the warning says "or taunt now"): its clock starts again
-        if (nextForced >= 0f) { nextForced = Time.time + ForcedInterval(); warned = false; checkPos = Networking.LocalPlayer.GetPosition(); }
+        if (nextForced >= 0f) { nextForced = Time.time + ForcedInterval(); warned = false; }
     }
 
     // a hunter's dart reached this player's prop (PHSlot.TakeHit, on the owner)
@@ -1619,7 +1614,6 @@ public class PHLocal : UdonSharpBehaviour
     void ShiftLocal(Vector3 d, Vector3 was)
     {
         if (body.active) body.MoveBy(d);
-        checkPos += d;
         ShiftRocks(d);
         VRCPlayerApi me = Networking.LocalPlayer;
         // (a move still waiting: from where it goes, so two moves close together end on the right copy)
