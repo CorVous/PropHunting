@@ -784,7 +784,7 @@ public class PHGame : UdonSharpBehaviour
         if (phase == seenPhase && round == seenRound) return;
         // A new round arriving while this client still sees the last one (the host went back to the lobby and on to
         // the next round within one sync): the lobby's tidy-up runs first, or the player stayed seated, frozen, at
-        // the prop's eye height, with the roofs off, all through the next round.
+        // the prop's eye height, with the reveal up, all through the next round.
         bool missedLobby = round != seenRound && seenRound >= 0 && seenPhase > PH_LOBBY && phase != PH_LOBBY;
         seenPhase = phase; seenRound = round;
         if (missedLobby && local != null) local.OnPhase(PH_LOBBY);

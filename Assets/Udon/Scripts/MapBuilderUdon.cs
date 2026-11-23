@@ -3141,8 +3141,8 @@ public class MapBuilderUdon : UdonSharpBehaviour
             int sb = StairBelow(c);
             if (sb >= 0) StairHole(sb, c, out hx0, out hx1, out hz0, out hz1);
             if (!top) rc = ceiling;
-            // a slab with a level over it is that level's floor, not a roof: it goes with the walls, so the END reveal
-            // (which takes the roofs off) leaves it (Cor: floors lost their underside at round end)
+            // a slab with a level over it is that level's floor, not a roof: it goes with the walls, so anything that
+            // hides the roofs leaves it (Cor: floors lost their underside at round end)
             int sbuf = top ? B_ROOFS : B_WALLS;
             Slab(sbuf, x0, x1, z * CELL, (z + 1) * CELL, h, t, hx0, hx1, hz0, hz1, rc, rc, ceiling);
             // a basement's floor

@@ -437,11 +437,12 @@ public class PHLocal : UdonSharpBehaviour
     float voiceResetAt;
 
     // ------------------------------------------------------------------ the reveal (prototype Round.EndRound)
-    // The roofs come off and a beam marks every hider: green survived, red caught. The results go on the HUD for
-    // the reveal and stay on the lobby wall.
+    // A beam marks every hider: green survived, red caught. The results go on the HUD for the reveal and stay on
+    // the lobby wall. The roofs stay on (Cor, 2026-11-22: they vanished at round end); the hiders' props show
+    // through walls and roofs anyway (PHSlot, PropHunt/Reveal).
     void ShowReveal(bool on)
     {
-        game.builder.ShowRoofs(!on);
+        game.builder.ShowRoofs(true);
         for (int i = 0; i < game.slots.Length; i++)
         {
             PHSlot s = game.slots[i];
