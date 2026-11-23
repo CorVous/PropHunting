@@ -130,9 +130,10 @@ public static class PropPrefabBaker
         go.layer = LAYER_PROP;
         BuildColliders(go, def, model, sc);
         // knockable props carry a kinematic rigidbody that a blow's knock switches on (PHKnock): every prop but the
-        // ground cover and the fixed dressing (Cor: most things knockable, heavy furniture and trees too)
+        // ground cover (Cor: most things knockable, heavy furniture too; 11-22: the fixed dressing shoves like heavy
+        // furniture)
         int fl = GenData.defFlags[def];
-        if ((fl & (GenData.FL_DECOR | GenData.FL_FIXTURE)) == 0)
+        if ((fl & GenData.FL_DECOR) == 0)
         {
             var rb = go.AddComponent<Rigidbody>();
             rb.isKinematic = true;

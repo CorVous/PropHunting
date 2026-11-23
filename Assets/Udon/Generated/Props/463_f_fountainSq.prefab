@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 1394059369361572665}
   - component: {fileID: 7964924227471473032}
   - component: {fileID: 6869235658599509623}
+  - component: {fileID: 1537715230130490529}
   m_Layer: 11
   m_Name: 463_f_fountainSq
   m_TagString: Untagged
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.29999995, y: 0.038181797, z: 1.1418004}
   m_Center: {x: -0.85, y: 0.26090908, z: -0.0003119707}
+--- !u!54 &1537715230130490529
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6330196606069143523}
+  serializedVersion: 4
+  m_Mass: 40
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &7924839925446875430
 GameObject:
   m_ObjectHideFlags: 0

@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 7237803449669735132}
   - component: {fileID: 229115549099749203}
   - component: {fileID: 2443669658132626481}
+  - component: {fileID: 6436294836265983533}
   m_Layer: 11
   m_Name: 815_sp_podC
   m_TagString: Untagged
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.9, y: 0.07273096, z: 0.072731376}
   m_Center: {x: -0.00000011920929, y: 0.3118105, z: 0.45681286}
+--- !u!54 &6436294836265983533
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5290127568788264611}
+  serializedVersion: 4
+  m_Mass: 40
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &5582992120874678007
 GameObject:
   m_ObjectHideFlags: 0

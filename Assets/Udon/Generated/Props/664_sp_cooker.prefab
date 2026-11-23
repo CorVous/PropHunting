@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 4794699484837886518}
   - component: {fileID: 693162397015656334}
   - component: {fileID: 2220780357915611422}
+  - component: {fileID: 8042769372263771323}
   m_Layer: 11
   m_Name: 664_sp_cooker
   m_TagString: Untagged
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.044444427, y: 0.14122283, z: 0.120446384}
   m_Center: {x: 0.1777778, y: 0.54286677, z: -0.036107197}
+--- !u!54 &8042769372263771323
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3427252324095759567}
+  serializedVersion: 4
+  m_Mass: 32
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &4475943313671302636
 GameObject:
   m_ObjectHideFlags: 0

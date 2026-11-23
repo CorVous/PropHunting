@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 4448666252307116660}
   - component: {fileID: 4798394971082839495}
   - component: {fileID: 2568371166285860369}
+  - component: {fileID: 4442933716659483572}
   m_Layer: 11
   m_Name: 767_sp_console
   m_TagString: Untagged
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.07499999, y: 0.16666666, z: 0.08166665}
   m_Center: {x: -0.3375, y: 0.08333333, z: 0.25083333}
+--- !u!54 &4442933716659483572
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4168431108219193686}
+  serializedVersion: 4
+  m_Mass: 36
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &8474225174708324117
 GameObject:
   m_ObjectHideFlags: 0

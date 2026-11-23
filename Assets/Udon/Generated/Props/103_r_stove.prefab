@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 8038240810027471382}
   - component: {fileID: 3369072063609531641}
   - component: {fileID: 1560094479519337961}
+  - component: {fileID: 2823716367820023071}
   m_Layer: 11
   m_Name: 103_r_stove
   m_TagString: Untagged
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.09567088, y: 0.028571486, z: 0.046987057}
   m_Center: {x: 0.29998776, y: 0.8551389, z: 1.0495019}
+--- !u!54 &2823716367820023071
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3380785492508559458}
+  serializedVersion: 4
+  m_Mass: 40
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &5647720894054915693
 GameObject:
   m_ObjectHideFlags: 0

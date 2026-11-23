@@ -43,8 +43,9 @@ public class PHKnock : UdonSharpBehaviour
         body.isKinematic = false;
         int fl = game.gen.defFlags[game.gen.emitDef[e]];
         bool light = (fl & GenData.FL_LIGHT) != 0;
-        // heavy furniture and trees (Cor: most things knockable) are shoved, not thrown: slower, low, no spin
-        bool heavy = (fl & (GenData.FL_HEAVY | GenData.FL_SCENERY)) != 0;
+        // heavy furniture, trees and the fixed dressing (Cor: most things knockable; 11-22: fixtures shove like heavy
+        // furniture) are shoved, not thrown: slower, low, no spin
+        bool heavy = (fl & (GenData.FL_HEAVY | GenData.FL_SCENERY | GenData.FL_FIXTURE)) != 0;
         float mass = body.mass;
         float speed = heavy ? KNOCK_SPEED_HEAVY : (light ? KNOCK_SPEED_LIGHT : KNOCK_SPEED) * Mathf.Clamp(8f / (mass + 4f), 0.5f, 1.2f);
         Vector3 push = (dir.normalized + Vector3.up * (heavy ? 0.12f : 0.45f)).normalized * speed;

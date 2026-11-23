@@ -102,6 +102,7 @@ GameObject:
   - component: {fileID: 7629215419233777206}
   - component: {fileID: 7401977324632111208}
   - component: {fileID: 2658164768070258025}
+  - component: {fileID: 6657308486382214422}
   m_Layer: 11
   m_Name: 494_k_stoveElectric
   m_TagString: Untagged
@@ -343,3 +344,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.023243263, y: 0.024999976, z: 0.030000001}
   m_Center: {x: 0.20337838, y: 0.4375, z: -0.21}
+--- !u!54 &6657308486382214422
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8482787320624659659}
+  serializedVersion: 4
+  m_Mass: 24
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3

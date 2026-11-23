@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 3131749049366530428}
   - component: {fileID: 9104760154742925023}
   - component: {fileID: 5985769046306283371}
+  - component: {fileID: 2754300579142023459}
   m_Layer: 11
   m_Name: 220_k_bar
   m_TagString: Untagged
@@ -128,6 +129,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.43, y: 0.049411763, z: 0.13}
   m_Center: {x: 0, y: 0.024705881, z: 0}
+--- !u!54 &2754300579142023459
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5261138958017446909}
+  serializedVersion: 4
+  m_Mass: 10
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &8795688565088723966
 GameObject:
   m_ObjectHideFlags: 0

@@ -102,6 +102,7 @@ GameObject:
   - component: {fileID: 6714933559927455453}
   - component: {fileID: 3676828645720662072}
   - component: {fileID: 7792979494444455680}
+  - component: {fileID: 3271999819884488878}
   m_Layer: 11
   m_Name: 680_sp_pod
   m_TagString: Untagged
@@ -343,3 +344,30 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.2744103, y: 0.39019305, z: 0.09655362}
   m_Center: {x: 0.16161257, y: 0.40291396, z: 0.3494614}
+--- !u!54 &3271999819884488878
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5342634786387364082}
+  serializedVersion: 4
+  m_Mass: 40
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3

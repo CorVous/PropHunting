@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 1574487284350792494}
   - component: {fileID: 7044766758054185024}
   - component: {fileID: 5241296970256326944}
+  - component: {fileID: 2078905948806141201}
   m_Layer: 11
   m_Name: 665_sp_sink
   m_TagString: Untagged
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.15, y: 0.21993405, z: 0.05476764}
   m_Center: {x: 0.24999999, y: 0.27518526, z: -0.082151465}
+--- !u!54 &2078905948806141201
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2770724695107486849}
+  serializedVersion: 4
+  m_Mass: 32
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &5972154102148129523
 GameObject:
   m_ObjectHideFlags: 0

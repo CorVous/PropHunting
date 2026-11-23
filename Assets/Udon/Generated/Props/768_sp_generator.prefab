@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 1788396075060647734}
   - component: {fileID: 5966100419871357134}
   - component: {fileID: 1536271127091230972}
+  - component: {fileID: 884932794057490959}
   m_Layer: 11
   m_Name: 768_sp_generator
   m_TagString: Untagged
@@ -260,6 +261,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.028571427, y: 0.15153968, z: 0.5128236}
   m_Center: {x: -0.33571428, y: 0.3436939, z: 0.0022996664}
+--- !u!54 &884932794057490959
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 170239533457028286}
+  serializedVersion: 4
+  m_Mass: 29
+  m_Drag: 0.2
+  m_AngularDrag: 0.6
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 3
 --- !u!1 &2135180277882123981
 GameObject:
   m_ObjectHideFlags: 0

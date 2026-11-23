@@ -1418,12 +1418,17 @@ public class PHLocal : UdonSharpBehaviour
             s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(point), 1);
             return;
         }
+        // scenery and ground cover (Cor 11-22: what can't be picked is not hit): a tree, a bush, a rock is like a
+        // wall, sparks only, no knock, no rock and no wear
+        int ed = game.gen.emitDef[e];
+        if (ed < 0 || ed >= game.gen.defDisguise.Length || game.gen.defDisguise[ed] <= 0)
+        {
+            s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(point), 1);
+            return;
+        }
         KnockProp(e, dir, point);
         statPropHits++;
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Swung), game.builder.ToLocal(point), 2);
-        // scenery (Cor): what no person placed is no disguise, and a swing at it wears nothing
-        int ed = game.gen.emitDef[e];
-        if (ed >= 0 && ed < game.gen.defDisguise.Length && game.gen.defDisguise[ed] <= 0) return;
         // a real prop: it wears the weapon (G17), but the same prop again within 5 s costs nothing
         if (e == lastCharged && Time.time - lastChargedAt < WRONG_SAME_WINDOW) return;
         lastCharged = e; lastChargedAt = Time.time;
@@ -1449,17 +1454,18 @@ public class PHLocal : UdonSharpBehaviour
         return (me.IsUserInVR() ? me.GetTrackingData(GunHand() == 0 ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand) : me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head)).position;
     }
 
-    // a blow knocks a real prop (04 section 4.8): light ones fly, heavy ones and trees are shoved (Cor: most things
-    // knockable, trees too); only the fixed dressing (kitchen units, fountains) rocks where it stands
+    // a blow knocks a real prop (04 section 4.8): light ones fly, heavy ones are shoved (Cor: most things knockable);
+    // the fixed dressing (kitchen units, fountains) shoves like heavy furniture too (Cor 11-22). Only a prop without a
+    // rigidbody rocks where it stands
     void KnockProp(int e, Vector3 dir, Vector3 point)
     {
         int fl = game.gen.defFlags[game.gen.emitDef[e]];
         GameObject[] objs = game.builder.objects;
         bool body = objs != null && e < objs.Length && objs[e] != null && objs[e].GetComponent<Rigidbody>() != null;
-        if ((fl & GenData.FL_FIXTURE) != 0 || !body)
+        if (!body)
         {
-            // a fixed thing does not move, but it rocks where it stands, for everyone (Cor: some props did not move
-            // when hit)
+            // a prop with no rigidbody does not move, but it rocks where it stands, for everyone (Cor: some props did
+            // not move when hit)
             PHSlot s = Me();
             if (s != null) s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Rocked), e, dir);
             return;
