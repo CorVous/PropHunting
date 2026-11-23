@@ -50,6 +50,7 @@ public class PHReplay : UdonSharpBehaviour
     // hit something (LobbyBuilder.BuildReplay); its body leans with the swing, the hands turn the weapon
     public Transform[] meeples, meepleBody, meepleHand, meepleOffHand;
     public MeshFilter[] meepleWeapon, meepleOff;
+    public MeshRenderer[] meepleFig;
     // the controls, a row on each side of the table (Cor: a seek bar on every side), index 0 the near edge's under
     // the diorama's buttons
     public GameObject[] bar;
@@ -102,6 +103,8 @@ public class PHReplay : UdonSharpBehaviour
     GameObject[] prop; int[] propDef;
     int[] lastK, weaponShown;
     float[] popAt, swingAt, tauntAt; Color[] colour;
+    bool[] screened;                      // drawn as a see-through screen (up on a floor that is switched off)
+    MaterialPropertyBlock wblock;
     Vector3[] tailBuf;
     MaterialPropertyBlock block;
     bool shownOpen;
@@ -115,7 +118,8 @@ public class PHReplay : UdonSharpBehaviour
         tPos = new Vector3[n * MAXT]; tYaw = new float[n * MAXT]; tDef = new int[n * MAXT]; tFlag = new int[n * MAXT];
         tFirst = new int[n]; tCount = new int[n]; tRole = new int[n]; tRound = new int[n]; tWeapon = new int[n]; tWho = new string[n]; dirty = new bool[n];
         prop = new GameObject[n]; propDef = new int[n]; lastK = new int[n]; popAt = new float[n]; colour = new Color[n];
-        weaponShown = new int[n]; swingAt = new float[n]; tauntAt = new float[n];
+        weaponShown = new int[n]; swingAt = new float[n]; tauntAt = new float[n]; screened = new bool[n];
+        wblock = new MaterialPropertyBlock();
         for (int i = 0; i < n; i++) { tRound[i] = -1; propDef[i] = -2; lastK[i] = -1; popAt[i] = -9f; tWho[i] = ""; weaponShown[i] = -2; swingAt[i] = -9f; tauntAt[i] = -9f; }
         tailBuf = new Vector3[TAIL];
         block = new MaterialPropertyBlock();
@@ -364,7 +368,9 @@ public class PHReplay : UdonSharpBehaviour
             float frac = k < n - 1 ? Mathf.Clamp01(u - k) : 0f;
             Vector3 rel = k < n - 1 ? Vector3.Lerp(tPos[b + k], tPos[b + k + 1], frac) : tPos[b + k];
             Vector3 at = rel + off;
-            bool shown = upper || rel.y <= UPPER_Y;
+            // above the ground floor with the upper floors off: still shown, as a see-through screen (Cor, as the floors)
+            bool shown = true;
+            bool screen = !upper && rel.y > UPPER_Y;
             int def = tDef[b + k];
             bool asProp = tRole[i] == PHGame.ROLE_HIDER && def >= 0 && def < builder.propPrefabs.Length && builder.propPrefabs[def] != null;
             // the hider as their prop of the moment (a fresh copy when it changes)
@@ -373,6 +379,8 @@ public class PHReplay : UdonSharpBehaviour
                 if (prop[i] != null) Destroy(prop[i]);
                 prop[i] = Copy(builder.propPrefabs[def]);
                 propDef[i] = def;
+                screened[i] = false;
+                if (screen) Screen(i, true);
             }
             if (prop[i] != null)
             {
@@ -383,12 +391,13 @@ public class PHReplay : UdonSharpBehaviour
             // a hunter: the red meeple with their weapon (a capsule only if the scene has no meeple)
             bool meeple = tRole[i] == PHGame.ROLE_HUNTER && meeples != null && i < meeples.Length && meeples[i] != null;
             if (meeple) Meeple(i, at, tYaw[b + k], shown);
+            if (screen != screened[i]) Screen(i, screen);
             Transform pw = pawns[i];
             bool pawnOn = !asProp && !meeple && shown;
             if (pw.gameObject.activeSelf != pawnOn)
             {
                 pw.gameObject.SetActive(pawnOn);
-                block.SetColor("_Color", colour[i]); pawnRenderer[i].SetPropertyBlock(block);
+                PawnColour(i);
             }
             if (pawnOn) { pw.localPosition = at; pw.localRotation = Quaternion.Euler(0f, tYaw[b + k], 0f); }
             // the name over them, turned to the viewer
@@ -483,6 +492,40 @@ public class PHReplay : UdonSharpBehaviour
         block.SetColor("_Color", c); tauntRenderer[i].SetPropertyBlock(block);
     }
 
+    // a player up on a floor switched off: the hider's prop, the meeple, its weapon and the pawn as a see-through
+    // screen of every other pixel (PropHunt/LitDither, the Weapon shader's _Dither, the pawn's half fill)
+    void Screen(int i, bool on)
+    {
+        screened[i] = on;
+        Material lit = mini.propLit, dit = mini.propLitDither;
+        if (lit != null && dit != null)
+        {
+            if (prop[i] != null)
+            {
+                MeshRenderer[] rs = prop[i].GetComponentsInChildren<MeshRenderer>(true);
+                for (int q = 0; q < rs.Length; q++)
+                {
+                    if (on && rs[q].sharedMaterial == lit) rs[q].sharedMaterial = dit;
+                    else if (!on && rs[q].sharedMaterial == dit) rs[q].sharedMaterial = lit;
+                }
+            }
+            if (meepleFig != null && i < meepleFig.Length && meepleFig[i] != null) meepleFig[i].sharedMaterial = on ? dit : lit;
+        }
+        if (meepleWeapon != null && i < meepleWeapon.Length && meepleWeapon[i] != null)
+        {
+            wblock.SetFloat("_Dither", on ? 1f : 0f);
+            meepleWeapon[i].GetComponent<MeshRenderer>().SetPropertyBlock(wblock);
+            meepleOff[i].GetComponent<MeshRenderer>().SetPropertyBlock(wblock);
+        }
+        PawnColour(i);
+    }
+
+    void PawnColour(int i)
+    {
+        Color c = colour[i]; c.a = screened[i] ? 0.5f : 1f;
+        block.SetColor("_Color", c); pawnRenderer[i].SetPropertyBlock(block);
+    }
+
     void Hide(int i)
     {
         if (pawns[i].gameObject.activeSelf) pawns[i].gameObject.SetActive(false);
@@ -554,6 +597,7 @@ public class PHReplay : UdonSharpBehaviour
             pawns[i].gameObject.SetActive(false); tags[i].gameObject.SetActive(false); tails[i].gameObject.SetActive(false); pops[i].gameObject.SetActive(false);
             if (meeples != null && i < meeples.Length && meeples[i] != null) meeples[i].gameObject.SetActive(false);
             swingAt[i] = -9f; tauntAt[i] = -9f;
+            if (screened[i]) Screen(i, false);
             if (taunts != null && i < taunts.Length && taunts[i] != null) taunts[i].gameObject.SetActive(false);
             if (prop[i] != null) { Destroy(prop[i]); prop[i] = null; }
             propDef[i] = -2; tagLabel[i].text = "";

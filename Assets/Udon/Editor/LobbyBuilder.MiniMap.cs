@@ -44,6 +44,13 @@ public static partial class LobbyBuilder
         if (dioMat == null) { dioMat = new Material(Shader.Find("PropHunt/Diorama")) { name = "Diorama" }; AssetDatabase.CreateAsset(dioMat, "Assets/Udon/Generated/Diorama.mat"); }
         dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.SetVector("_Box", new Vector4(-100000f, -100000f, 100000f, 100000f)); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
         mm.dioMat = dioMat;
+        // the props' material and its screened twin (PropHunt/LitDither): the upper floors in the replay with them off (Cor)
+        mm.propLit = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");
+        var litDither = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLitDither.mat");
+        if (litDither == null) { litDither = new Material(Shader.Find("PropHunt/LitDither")) { name = "PropLitDither" }; AssetDatabase.CreateAsset(litDither, "Assets/Udon/Generated/PropLitDither.mat"); }
+        if (mm.propLit != null) litDither.CopyPropertiesFromMaterial(mm.propLit);
+        litDither.shader = Shader.Find("PropHunt/LitDither"); litDither.enableInstancing = true; EditorUtility.SetDirty(litDither);
+        mm.propLitDither = litDither;
         var olMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/DioramaOutline.mat");
         if (olMat == null) { olMat = new Material(Shader.Find("PropHunt/DioramaOutline")) { name = "DioramaOutline" }; AssetDatabase.CreateAsset(olMat, "Assets/Udon/Generated/DioramaOutline.mat"); }
         olMat.shader = Shader.Find("PropHunt/DioramaOutline"); olMat.enableInstancing = false; EditorUtility.SetDirty(olMat);

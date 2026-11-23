@@ -26,6 +26,9 @@ public class PHMiniMap : UdonSharpBehaviour
     public TextMeshPro[] pinLabel;
     public TextMeshProUGUI list, title, waiting;
     public float tableSize = 2.3f;       // the table top's usable side, metres
+    // (the round's replay with the upper floors off, Cor 2026-11-22: they stay, drawn as a see-through screen) the
+    // props' own material and its screened twin (PropHunt/LitDither), swapped on the upper floors' copies
+    public Material propLit, propLitDither;
     public Material dioMat;              // PropHunt/Diorama on the walls: cut above _ClipY when the upper floors are off
     public Transform propRoot;           // the map's props in miniature (under model)
     public Material outlineMat;          // PropHunt/DioramaOutline: a hiding spot's prop outlined in the player's colour
@@ -66,7 +69,9 @@ public class PHMiniMap : UdonSharpBehaviour
     int solo = -1;                       // the one player shown alone, -1 everyone
     const float LONG_STAY = 15f, UPPER_Y = 2.0f, CLIP_Y = 2.45f;   // (the cut under the slab between floors: the lowest walls stand 2.6 m)
     const int PROPS_A_FRAME = 6, SCAN_A_FRAME = 200;   // copies a frame, and emits looked at a frame (grass tufts skipped)
-    bool propsUpperOn = true;            // the upper floors' map props as Apply last left them
+    bool propsUpperOn = true;
+    bool propsDither;                    // the upper floors' props as Apply last left them: screened
+    MeshRenderer[] upperR = new MeshRenderer[0]; int nUpperR;   // the upper floors' copies' PropLit renderers            // the upper floors' map props as Apply last left them
     Color[] palette;
 
     void Start()
@@ -297,7 +302,7 @@ public class PHMiniMap : UdonSharpBehaviour
         for (int i = 0; i < shownProp.Length; i++) if (shownProp[i] != null) { Destroy(shownProp[i]); shownProp[i] = null; }
         for (int i = 0; i < shownOutline.Length; i++) if (shownOutline[i] != null) { Destroy(shownOutline[i]); shownOutline[i] = null; }
         for (int i = 0; i < nMapProp; i++) if (mapProp[i] != null) { Destroy(mapProp[i]); mapProp[i] = null; }
-        nMapProp = 0; propNext = 99999; solo = -1;
+        nMapProp = 0; propNext = 99999; solo = -1; nUpperR = 0;
         for (int i = 0; i < nFence; i++) if (fence[i] != null) { Destroy(fence[i]); fence[i] = null; }
         nFence = 0; fenceNext = 99999;
         for (int i = 0; i < pins.Length; i++) { pins[i].gameObject.SetActive(false); pinLabel[i].text = ""; }
@@ -439,7 +444,18 @@ public class PHMiniMap : UdonSharpBehaviour
             Transform st = src.transform;
             GameObject go = Copy(builder.propPrefabs[def], builder.ToLocal(st.position), st.eulerAngles.y, 1f);
             mapUpper[nMapProp] = st.position.y - origin.y > UPPER_Y;
-            go.SetActive(upperOn || !mapUpper[nMapProp]);
+            go.SetActive(upperOn || propsDither || !mapUpper[nMapProp]);
+            if (mapUpper[nMapProp] && propLit != null)
+            {
+                MeshRenderer[] rs = go.GetComponentsInChildren<MeshRenderer>(true);
+                for (int q = 0; q < rs.Length; q++)
+                {
+                    if (rs[q].sharedMaterial != propLit) continue;
+                    if (nUpperR >= upperR.Length) { MeshRenderer[] more = new MeshRenderer[Mathf.Max(64, upperR.Length * 2)]; System.Array.Copy(upperR, more, nUpperR); upperR = more; }
+                    upperR[nUpperR++] = rs[q];
+                    if (propsDither) rs[q].sharedMaterial = propLitDither;
+                }
+            }
             mapProp[nMapProp++] = go;
             n++;
         }
@@ -456,6 +472,7 @@ public class PHMiniMap : UdonSharpBehaviour
             nMapProp--;
             if (mapProp[nMapProp] != null) { Destroy(mapProp[nMapProp]); mapProp[nMapProp] = null; }
         }
+        if (nMapProp == 0) nUpperR = 0;
     }
 
     // the map's fences, as they stand (Cor: include the fences), a few a frame; only those on the map itself
@@ -497,6 +514,7 @@ public class PHMiniMap : UdonSharpBehaviour
     public void SetReplay(bool on) { replaying = on; Apply(); }
     public Vector3 Origin() { return origin; }
     public bool UpperOn() { return upperOn; }
+    public float UpperY() { return UPPER_Y; }
 
     // the buttons: the upper floors on or off; everyone, or one player alone (each press the next one)
     public void ToggleUpper() { upperOn = !upperOn; Apply(); }
@@ -523,7 +541,10 @@ public class PHMiniMap : UdonSharpBehaviour
 
     void Apply()
     {
-        if (dioMat != null) dioMat.SetFloat("_ClipY", upperOn ? 100000f : model.position.y + CLIP_Y * model.localScale.x);
+        // the upper floors off: cut away; but in the replay they stay, screened (Cor), the players on them too (PHReplay)
+        bool dither = replaying && !upperOn, upperShown = upperOn || dither;
+        float cut = model.position.y + CLIP_Y * model.localScale.x;
+        if (dioMat != null) { dioMat.SetFloat("_ClipY", upperShown ? 100000f : cut); dioMat.SetFloat("_DitherY", dither ? cut : 100000f); }
         SetBox();
         for (int i = 0; i < paths.Length; i++)
         {
@@ -545,10 +566,15 @@ public class PHMiniMap : UdonSharpBehaviour
             }
         }
         // (only when the upper floors switch: with every prop shown that is thousands of switches, not for a name tag)
-        if (propsUpperOn != upperOn)
+        if (propsUpperOn != upperShown)
         {
-            propsUpperOn = upperOn;
-            for (int i = 0; i < nMapProp; i++) if (mapUpper[i] && mapProp[i] != null) mapProp[i].SetActive(upperOn);
+            propsUpperOn = upperShown;
+            for (int i = 0; i < nMapProp; i++) if (mapUpper[i] && mapProp[i] != null) mapProp[i].SetActive(upperShown);
+        }
+        if (propsDither != dither && propLitDither != null)
+        {
+            propsDither = dither;
+            for (int i = 0; i < nUpperR; i++) if (upperR[i] != null) upperR[i].sharedMaterial = dither ? propLitDither : propLit;
         }
         SetTitle();
     }

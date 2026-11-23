@@ -6,6 +6,7 @@ Shader "PropHunt/DitherPulse"
     Properties
     {
         _Color ("Colour (a: how full)", Color) = (1,1,1,1)
+        _Flat ("Flat: as full everywhere, no rim (the replay's pawns and bursts)", Float) = 0
     }
     SubShader
     {
@@ -20,6 +21,7 @@ Shader "PropHunt/DitherPulse"
             #include "UnityCG.cginc"
 
             fixed4 _Color;
+            float _Flat;
 
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f
@@ -47,7 +49,7 @@ Shader "PropHunt/DitherPulse"
                 int2 p = int2(i.pos.xy) & 3;
                 const float b[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
                 float th = (b[p.y * 4 + p.x] + 0.5) / 16.0;
-                float fill = _Color.a * lerp(0.25, 1.0, saturate(i.rim * 1.4));
+                float fill = _Flat > 0.5 ? _Color.a : _Color.a * lerp(0.25, 1.0, saturate(i.rim * 1.4));
                 if (fill <= th) discard;
                 return fixed4(_Color.rgb, 1);
             }

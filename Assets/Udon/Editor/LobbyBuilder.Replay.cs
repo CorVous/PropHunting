@@ -39,8 +39,9 @@ public static partial class LobbyBuilder
         // the markers, in the model's space (the map's metres): a pawn for a hunter or a hider out of a prop, a burst,
         // a tail and the name
         var pawnMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/ReplayPawn.mat");
-        if (pawnMat == null) { pawnMat = new Material(Shader.Find("Unlit/Color")) { name = "ReplayPawn" }; AssetDatabase.CreateAsset(pawnMat, "Assets/Udon/Generated/ReplayPawn.mat"); }
-        pawnMat.color = Color.white; EditorUtility.SetDirty(pawnMat);
+        if (pawnMat == null) { pawnMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayPawn" }; AssetDatabase.CreateAsset(pawnMat, "Assets/Udon/Generated/ReplayPawn.mat"); }
+        // (flat colour, solid at alpha 1; at 0.5 a see-through screen: a pawn up on a floor switched off, PHReplay.Screen)
+        pawnMat.shader = Shader.Find("PropHunt/DitherPulse"); pawnMat.SetFloat("_Flat", 1f); pawnMat.color = Color.white; EditorUtility.SetDirty(pawnMat);
         var lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/MiniMapLine.mat");
         rp.pawns = new Transform[n]; rp.pawnRenderer = new Renderer[n]; rp.pops = new Transform[n]; rp.popRenderer = new Renderer[n];
         rp.tails = new LineRenderer[n]; rp.tags = new Transform[n]; rp.tagLabel = new TextMeshPro[n];
@@ -63,7 +64,7 @@ public static partial class LobbyBuilder
         float msc = 1f; Vector3 mc = Vector3.zero, me = Vector3.one;
         if (meepleMesh != null) { var bb = meepleMesh.bounds; msc = MEEPLE_H / Mathf.Max(0.01f, bb.size.y); mc = bb.center; me = bb.extents; }
         rp.meeples = new Transform[n]; rp.meepleBody = new Transform[n]; rp.meepleHand = new Transform[n]; rp.meepleOffHand = new Transform[n];
-        rp.meepleWeapon = new MeshFilter[n]; rp.meepleOff = new MeshFilter[n];
+        rp.meepleWeapon = new MeshFilter[n]; rp.meepleOff = new MeshFilter[n]; rp.meepleFig = new MeshRenderer[n];
         for (int i = 0; i < n && meepleMesh != null; i++)
         {
             var mp = new GameObject("ReplayMeeple" + i);
@@ -77,6 +78,7 @@ public static partial class LobbyBuilder
             fig.AddComponent<MeshFilter>().sharedMesh = meepleMesh;
             var fr = fig.AddComponent<MeshRenderer>(); fr.sharedMaterial = meepleMat;
             fr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; fr.receiveShadows = false;
+            rp.meepleFig[i] = fr;
             // the hands at the arms' ends, a little over half way up
             float hx = me.x * msc * 0.85f, hy = MEEPLE_H * 0.58f;
             for (int h = 0; h < 2; h++)

@@ -6,6 +6,7 @@ Shader "PropHunt/Diorama"
     Properties
     {
         _ClipY ("Cut above (world y)", Float) = 100000
+        _DitherY ("See-through screen above (world y)", Float) = 100000
         _Box ("Kept: world x min, z min, x max, z max", Vector) = (-100000, -100000, 100000, 100000)
     }
     SubShader
@@ -19,7 +20,7 @@ Shader "PropHunt/Diorama"
             #pragma fragment frag
             #pragma multi_compile_instancing
             #include "UnityCG.cginc"
-            float _ClipY;
+            float _ClipY, _DitherY;
             float4 _Box;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f { float4 pos : SV_POSITION; float3 wp : TEXCOORD0; float3 n : TEXCOORD1; fixed4 color : COLOR; UNITY_VERTEX_OUTPUT_STEREO };
@@ -38,6 +39,8 @@ Shader "PropHunt/Diorama"
             fixed4 frag (v2f i, fixed facing : VFACE) : SV_Target
             {
                 clip(_ClipY - i.wp.y);
+                // (the round's replay with the upper floors off, Cor: the upper floors drawn as a screen of every other pixel)
+                if (i.wp.y > _DitherY && (((int)i.pos.x + (int)i.pos.y) & 1) == 0) discard;
                 clip(float4(i.wp.x - _Box.x, i.wp.z - _Box.y, _Box.z - i.wp.x, _Box.w - i.wp.z));   // (the ground runs far past the map: only the map's own)
                 float3 n = normalize(i.n) * (facing > 0 ? 1.0 : -1.0);
                 float l = 0.62 + 0.38 * saturate(dot(n, normalize(float3(0.4, 0.85, -0.35))));
