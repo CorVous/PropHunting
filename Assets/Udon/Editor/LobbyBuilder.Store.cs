@@ -240,8 +240,9 @@ public static partial class LobbyBuilder
                 float ex = (e == 0 ? 1f : -1f) * (halfW - 0.085f), lz = Depth / 2f + 0.005f;
                 var tag = new GameObject(e == 0 ? "RowTagL" : "RowTagR").transform; tag.SetParent(row, false);
                 tag.localPosition = new Vector3(ex, 0f, Depth / 2f);   // (as a place: the lip at Depth / 2 + 0.005 from there)
-                Slab(tag, "Tag", new Vector3(0f, -0.05f, lz), new Vector3(0.15f, 0.12f, 0.012f), cream);   // bigger than a price: read from the floor
-                var nt = WorldText(tag, "Number", new Vector3(0f, -0.05f, lz + 0.008f), Quaternion.Euler(0f, 180f, 0f), (r + 1).ToString(), 1.1f, C("24604a"), new Vector2(0.14f, 0.11f));
+                Slab(tag, "Tag", new Vector3(0f, 0.05f, lz), new Vector3(0.15f, 0.12f, 0.012f), cream);   // bigger than a price: read from the floor;
+                // standing up from the board's top (hanging under it, the lowest row's tag was behind the green plinth)
+                var nt = WorldText(tag, "Number", new Vector3(0f, 0.05f, lz + 0.008f), Quaternion.Euler(0f, 180f, 0f), (r + 1).ToString(), 1.1f, C("24604a"), new Vector2(0.14f, 0.11f));
                 nt.font = future;
                 shelf.rowNum[r * 2 + e] = nt;
             }
