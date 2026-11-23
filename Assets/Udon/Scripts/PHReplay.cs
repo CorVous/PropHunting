@@ -495,7 +495,7 @@ public class PHReplay : UdonSharpBehaviour
             float age = Time.time - popAt[i];
             bool popOn = age < 0.5f && shown;
             if (pp.gameObject.activeSelf != popOn) pp.gameObject.SetActive(popOn);
-            if (popOn) { pp.localPosition = at + new Vector3(0f, 1f, 0f); pp.localScale = Vector3.one * (1f + age * 6f); }
+            if (popOn) { pp.localPosition = at + new Vector3(0f, 1f, 0f); pp.localScale = Vector3.one * (0.6f + age * 3f); }   // (Cor: it was a big disc; now at most ~2 m)
             Taunt(i, at, shown);
             Gun(i, at, tYaw[b + k], def, asProp && tFirstShot[i] >= 0 && k >= tFirstShot[i]);
         }
