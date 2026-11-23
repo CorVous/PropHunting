@@ -96,6 +96,7 @@ public static partial class LobbyBuilder
         // (no card: Cor, the names are on the pins). Two buttons on the near edge: the upper floors on or off, and
         // everyone or one player alone (Cor)
         var cv = Canvas(table.transform, "Buttons", new Vector3(0f, top + 0.12f, -side / 2 - 0.1f), Quaternion.Euler(35f, 0f, 0f), new Vector2(600f, 80f), 0.002f, true);
+        cv.GetComponent<BoxCollider>().isTrigger = true;   // (as the replay's rows under it: pressable, never in the way)
         mm.upperLabel = DebugButton(cv, game, "Upper floors: shown", nameof(PHMiniMap.ToggleUpper), new Vector2(0, 0), C("f2c45a"), mm);
         // (one player alone: press their name tag)
         UdonSharpEditorUtility.CopyProxyToUdon(mm);

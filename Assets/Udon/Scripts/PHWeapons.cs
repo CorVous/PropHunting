@@ -689,6 +689,7 @@ public class PHWeapons : UdonSharpBehaviour
         if (Time.time - mySwingAt < SWING_TIME * 0.85f) return false;
         mySwingAt = Time.time;
         local.statSwings++;
+        if (game.replay != null) game.replay._Swung();   // (the round's replay: the meeple swings here)
         mySwingStruck = false;
         int mine = game.SlotOf(Networking.LocalPlayer.playerId);
         if (mine >= 0) { trailUntil[mine] = Time.time + SWING_HIT_AT + 0.12f; }
@@ -722,6 +723,7 @@ public class PHWeapons : UdonSharpBehaviour
             if (pc == 0 && whooshArmed && speed > WHOOSH_SPEED * sc && handSpeed > WHOOSH_HAND * sc)
             {
                 whooshArmed = false;   // (a real swing; no sound for it any more, Cor's group playtest)
+                if (game.replay != null) game.replay._Swung();   // (a real swing: marked in the round's replay)
             }
             else if (pc == 0 && speed < WHOOSH_REARM * sc) whooshArmed = true;
             // (not while a trigger slash chops the weapon in the hand: that one strikes by itself, and the chop's own

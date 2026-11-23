@@ -1390,6 +1390,7 @@ public class PHLocal : UdonSharpBehaviour
     {
         PHSlot s = Me();
         if (s == null || role != PHGame.ROLE_HUNTER || game.phase != PHGame.PH_HUNT || s.hunterOut || c == null) return;
+        if (game.replay != null) game.replay._Swung();   // (anything struck: the meeple swings in the round's replay)
         lastHitName = c.gameObject.name + " (" + c.transform.root.name + ")";
         int h = HiderOf(c.transform);
         if (h >= 0)

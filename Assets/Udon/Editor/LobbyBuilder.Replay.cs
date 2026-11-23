@@ -44,6 +44,52 @@ public static partial class LobbyBuilder
         var lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/MiniMapLine.mat");
         rp.pawns = new Transform[n]; rp.pawnRenderer = new Renderer[n]; rp.pops = new Transform[n]; rp.popRenderer = new Renderer[n];
         rp.tails = new LineRenderer[n]; rp.tags = new Transform[n]; rp.tagLabel = new TextMeshPro[n];
+        // a hunter (Cor, 2026-11-22): the red meeple (the board game toys' meeple_red, as the props bake it), holding the
+        // weapon they had (PHReplay fills the mesh), swinging it hard each time they swung or hit something. A body
+        // to lean the swing, a hand each side to hold the weapon and a two-piece set's other piece. No colliders.
+        var meepleSrc = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Udon/Generated/Props/445_bg_meeple.prefab");
+        Mesh meepleMesh = null; Material meepleMat = null;
+        if (meepleSrc != null)
+            foreach (var mf in meepleSrc.GetComponentsInChildren<MeshFilter>(true))
+                if (mf.gameObject.name != "Shade" && mf.sharedMesh != null) { meepleMesh = mf.sharedMesh; meepleMat = mf.GetComponent<MeshRenderer>().sharedMaterial; break; }
+        if (meepleMesh == null) Debug.LogWarning("[prophunt] replay: the meeple prop is missing; hunters stay capsules");
+        var weaponMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/Weapon.mat");
+        const float MEEPLE_H = 1.8f;
+        float msc = 1f; Vector3 mc = Vector3.zero, me = Vector3.one;
+        if (meepleMesh != null) { var bb = meepleMesh.bounds; msc = MEEPLE_H / Mathf.Max(0.01f, bb.size.y); mc = bb.center; me = bb.extents; }
+        rp.meeples = new Transform[n]; rp.meepleBody = new Transform[n]; rp.meepleHand = new Transform[n]; rp.meepleOffHand = new Transform[n];
+        rp.meepleWeapon = new MeshFilter[n]; rp.meepleOff = new MeshFilter[n];
+        for (int i = 0; i < n && meepleMesh != null; i++)
+        {
+            var mp = new GameObject("ReplayMeeple" + i);
+            mp.transform.SetParent(mm.model, false);
+            var body = new GameObject("Body").transform;
+            body.SetParent(mp.transform, false);
+            var fig = new GameObject("Meeple");
+            fig.transform.SetParent(body, false);
+            fig.transform.localScale = Vector3.one * msc;
+            fig.transform.localPosition = new Vector3(-mc.x, me.y - mc.y, -mc.z) * msc;   // (feet at the origin, centred)
+            fig.AddComponent<MeshFilter>().sharedMesh = meepleMesh;
+            var fr = fig.AddComponent<MeshRenderer>(); fr.sharedMaterial = meepleMat;
+            fr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; fr.receiveShadows = false;
+            // the hands at the arms' ends, a little over half way up
+            float hx = me.x * msc * 0.85f, hy = MEEPLE_H * 0.58f;
+            for (int h = 0; h < 2; h++)
+            {
+                var hand = new GameObject(h == 0 ? "Hand" : "OffHand").transform;
+                hand.SetParent(body, false);
+                hand.localPosition = new Vector3(h == 0 ? hx : -hx, hy, 0.05f);
+                var wgo = new GameObject("Weapon");
+                wgo.transform.SetParent(hand, false);
+                var wf = wgo.AddComponent<MeshFilter>();
+                var wr = wgo.AddComponent<MeshRenderer>(); wr.sharedMaterial = weaponMat;
+                wr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; wr.receiveShadows = false;
+                if (h == 0) { rp.meepleHand[i] = hand; rp.meepleWeapon[i] = wf; }
+                else { rp.meepleOffHand[i] = hand; rp.meepleOff[i] = wf; wgo.SetActive(false); }
+            }
+            mp.SetActive(false);
+            rp.meeples[i] = mp.transform; rp.meepleBody[i] = body;
+        }
         for (int i = 0; i < n; i++)
         {
             var pawn = new GameObject("ReplayPawn" + i);
@@ -93,6 +139,7 @@ public static partial class LobbyBuilder
             var turn = Quaternion.Euler(0f, sd * 90f, 0f);
             var near = new Vector3(0f, top + 0.12f - down * Mathf.Cos(a), -side / 2 - 0.1f - down * Mathf.Sin(a));
             var cv = Canvas(table, "ReplayControls" + sd, turn * near, turn * Quaternion.Euler(35f, 0f, 0f), new Vector2(1400f, 80f), 0.002f, true);
+            cv.GetComponent<BoxCollider>().isTrigger = true;   // (Cor: no colliders on the seek bars; still pressable, nothing bumps or strikes it)
             var bar = new GameObject("Bar", typeof(RectTransform));
             bar.transform.SetParent(cv, false);
             ((RectTransform)bar.transform).sizeDelta = new Vector2(1400f, 80f);
