@@ -36,7 +36,7 @@ public class PHLocal : UdonSharpBehaviour
     float nextPanel;
 
     // ---- balance (Balance.cs)
-    public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 3f;   // (group playtest: a short cooldown, taunts back to back got annoying)
+    public const float TAKE_RANGE = 4f, WRONG_SAME_WINDOW = 5f, TAUNT_COOLDOWN = 1.5f;   // (group playtest: a short cooldown, taunts back to back got annoying; Cor 11-22: halved from 3 s)
     public const int HIT_DAMAGE = 25, HUNTER_HEALTH = 100, HUNT_CHANGES = 3;   // HUNTER_HEALTH: a new weapon's condition
     public const float HUNT_CHANGE_COOLDOWN = SHOT_INTERVAL;   // a prop change in the hunt waits as long as a final stand shot (Cor; was 5 s)
     public const int LAYER_PROPS_SOLID = 11, LAYER_PROPS_WALKTHROUGH = 17;
