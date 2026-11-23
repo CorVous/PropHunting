@@ -62,10 +62,16 @@ public static partial class GenData
         }
         int[] usedX = new int[64], usedY = new int[64];
         int nUsed = 0;
+        // a table whose twin lies the other way (the Kenney table is long across, the dungeon's long table along):
+        // its places turn a quarter with it, so the chairs stand at the long sides, not two by two at the ends
+        bool turn = defAnchor[b] == A_CENTER && ((defSx[b] * 10 > defSz[b] * 12 && defSz[d] * 10 > defSx[d] * 12)
+            || (defSz[b] * 10 > defSx[b] * 12 && defSx[d] * 10 > defSz[d] * 12));
         for (int k = 0; k < defSlotCount[b]; k++)
         {
             int bs = defSlotStart[b] + k;
-            int x = Fit(slotX[bs], defSx[b], defSx[d]);
+            int x = turn ? Fit(-slotZ[bs], defSz[b], defSx[d]) : Fit(slotX[bs], defSx[b], defSx[d]);
+            int z = turn ? Fit(slotX[bs], defSx[b], defSz[d]) : Fit(slotZ[bs], defSz[b], defSz[d]);
+            int yaw = turn ? (slotYaw[bs] + 270) % 360 : slotYaw[bs];
             int y = slotY[bs] == defTopY[b] ? defTopY[d] : (defSy[b] > 0 ? slotY[bs] * defSy[d] / defSy[b] : slotY[bs]);
             int size = slotSize[bs];
             if (slotType[bs] == S_INSIDE)
@@ -85,7 +91,7 @@ public static partial class GenData
                 if (taken) continue;
                 if (nUsed < usedX.Length) { usedX[nUsed] = x; usedY[nUsed] = y; nUsed++; }
             }
-            Slot(slotGroup[bs], slotType[bs], x, y, Fit(slotZ[bs], defSz[b], defSz[d]), slotYaw[bs], size, slotAccept[bs], slotFill[bs]);
+            Slot(slotGroup[bs], slotType[bs], x, y, z, yaw, size, slotAccept[bs], slotFill[bs]);
             if (slotHiding[bs]) Hiding();
         }
     }

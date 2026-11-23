@@ -679,6 +679,7 @@ public static class PropPrefabBaker
     // Small corrections to the models as they come from the packs (Cor's playtest):
     //   crop_carrot, crop_turnip: the root stood on the ground; it goes into it (the leaves and its shoulder show)
     //   gen_laundrybasket: the lining's top lay in the rim's plane and flickered; it sits a little lower
+    //   dungeon_chair: faced +X, not +Z like every other seat; turned a quarter (Cor: chairs did not face the table)
     static void FixModels()
     {
         for (int m = 0; m < mesh.Length; m++)
@@ -702,6 +703,18 @@ public static class PropPrefabBaker
                     if (lining && v[i].y > 0.35f) v[i].y -= 0.008f;
                 }
                 mesh[m].vertices = v; mesh[m].RecalculateBounds(); bounds[m] = mesh[m].bounds;
+            }
+            else if (n == "dungeon_chair")
+            {
+                // the pack's chair faces +X where every other seat faces +Z: turned a quarter so its seat faces the
+                // table (Cor: medieval chairs stood sideways). Its footprint is square, so the generator is unchanged.
+                Vector3[] v = mesh[m].vertices, nr = mesh[m].normals;
+                for (int i = 0; i < v.Length; i++)
+                {
+                    v[i] = new Vector3(-v[i].z, v[i].y, v[i].x);
+                    nr[i] = new Vector3(-nr[i].z, nr[i].y, nr[i].x);
+                }
+                mesh[m].vertices = v; mesh[m].normals = nr; mesh[m].RecalculateBounds(); bounds[m] = mesh[m].bounds;
             }
         }
     }
