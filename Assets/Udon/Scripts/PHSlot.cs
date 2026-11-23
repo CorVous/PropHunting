@@ -28,6 +28,9 @@ public class PHSlot : UdonSharpBehaviour
     public TMPro.TextMeshPro mateName;  // SEE HIDERS (Cor, 2026-11-22): this hider's name over their prop, for the other hiders and ghosts
 
     // ---- synced, written by the owner
+    // (keep these 27 fields, 140 bytes: a 28th synced field, the first try at `afoot`, made every slot's data arrive as
+    // the defaults in the real client, with no error on either side; found 2026-11-22. Carry anything new in a field
+    // that is already here, as `afoot` rides on walkYaw)
     [UdonSynced] public bool inZone;
     [UdonSynced] public int readyRound = -1;
     [UdonSynced] public int def = -1;                 // disguise, -1 = none
@@ -46,7 +49,8 @@ public class PHSlot : UdonSharpBehaviour
     // other client holds the station fixed and moves it to walkPos in its own copy, so the hunter's real avatar, name
     // plate and voice are there (VRCLibrary, "Repositioning Remote Players"). True only while they really sit: a
     // hunter who cannot be seated (not a humanoid avatar) is drawn as a stand-in instead (PHLocal.UpdateStandIns).
-    [UdonSynced] public bool afoot;
+    // Not a synced field of its own (see above): sent as walkYaw + 1000 (WireYaw), read back in OnDeserialization.
+    [HideInInspector] public bool afoot;
     [HideInInspector] public bool wantAfoot;          // owner: a hunter in the hunt with the copies on
     [UdonSynced] public int scrapVote, undoVote;      // PHGame.voteId when this player votes to scrap the last map / undo a scrap
     [UdonSynced] public Vector3 walkPos;
@@ -348,12 +352,13 @@ public class PHSlot : UdonSharpBehaviour
         SeatCheck(me);
         // (not while the player is being moved to another copy of the map, PHLocal.ShiftLocal: the place is in flux)
         if (wantAfoot && !game.LayersOn()) StopAfoot();   // (the copies went off under them: the round's end)
-        if (afoot != (wantAfoot && seated)) { afoot = wantAfoot && seated; Send(); }
+        bool sit = wantAfoot && seated;
+        if (afoot != sit || (walkYaw >= 1000f) != sit) { afoot = sit; walkYaw = WireYaw(Yaw(), sit); Send(); }
         if ((ghost || wantAfoot) && (game.local == null || Time.time >= game.local.moveUntil))
         {
             Vector3 p = game.builder.ToLocal(me.GetPosition());
             float y = me.GetRotation().eulerAngles.y;
-            if ((p - walkPos).sqrMagnitude > 0.0025f || Mathf.Abs(Mathf.DeltaAngle(y, walkYaw)) > 5f) { walkPos = p; walkYaw = y; Send(); }
+            if ((p - walkPos).sqrMagnitude > 0.0025f || Mathf.Abs(Mathf.DeltaAngle(y, Yaw())) > 5f) { walkPos = p; walkYaw = WireYaw(y, afoot); Send(); }
         }
         // (not during the END reveal: everyone walks free then, Cor)
         if ((hiding || ghost || wantAfoot) && !seated && Time.time >= nextSit && game.phase != PHGame.PH_END)
@@ -419,7 +424,7 @@ public class PHSlot : UdonSharpBehaviour
                 Vector3 at = station.transform.position, wp = game.builder.ToWorld(walkPos);
                 if ((at - wp).sqrMagnitude > 25f) at = wp;
                 float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
-                station.transform.SetPositionAndRotation(Vector3.Lerp(at, wp, k), Quaternion.Euler(0f, walkYaw, 0f));
+                station.transform.SetPositionAndRotation(Vector3.Lerp(at, wp, k), Quaternion.Euler(0f, Yaw(), 0f));
                 parked = false;
             }
             else Park();
@@ -431,7 +436,7 @@ public class PHSlot : UdonSharpBehaviour
             Vector3 at = station.transform.position, wp = game.builder.ToWorld(walkPos);
             if ((at - wp).sqrMagnitude > 25f) at = wp;
             float k = 1f - Mathf.Exp(-14f * Time.deltaTime);
-            station.transform.SetPositionAndRotation(Vector3.Lerp(at, wp, k), Quaternion.Euler(0f, Mathf.LerpAngle(station.transform.eulerAngles.y, walkYaw, k), 0f));
+            station.transform.SetPositionAndRotation(Vector3.Lerp(at, wp, k), Quaternion.Euler(0f, Mathf.LerpAngle(station.transform.eulerAngles.y, Yaw(), k), 0f));
             parked = false;
         }
     }
@@ -868,8 +873,14 @@ public class PHSlot : UdonSharpBehaviour
         }
     }
 
+    // afoot rides on walkYaw (a 28th synced field broke every slot's sync, see the synced block): the yaw plus 1000
+    // while the hunter really sits afoot; a yaw is 0..360, so the two never mix
+    float WireYaw(float yaw, bool on) { return on ? yaw + 1000f : yaw; }
+    public float Yaw() { return walkYaw >= 1000f ? walkYaw - 1000f : walkYaw; }
+
     public override void OnDeserialization()
     {
+        afoot = walkYaw >= 1000f;
         if (game != null && game.local != null) game.local.OnSlotChanged(this);
     }
 }
