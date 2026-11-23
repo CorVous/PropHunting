@@ -1,0 +1,30 @@
+// Feed tracks.txt to PHReplay as this round's recordings (lobby, after the round). Clears every other slot.
+VRC.Udon.UdonBehaviour U(string prog) { foreach (var ub in UnityEngine.Object.FindObjectsOfType<VRC.Udon.UdonBehaviour>()) if (ub.programSource != null && ub.programSource.name == prog) return ub; return null; }
+string DIR = @"D:\VRChat Worlds\_bugfix_scratch\demo\";
+var r = U("PHReplay"); var g = U("PHGame");
+var tracksObj = (System.Array)r.GetProgramVariable("tracks");
+int round = (int)g.GetProgramVariable("round");
+int now = VRC.SDKBase.Networking.GetServerTimeInMilliseconds();
+const int T = 640;
+int first = now / 250 - T - 20;
+var lines = System.IO.File.ReadAllLines(DIR + "tracks.txt");
+var dirty = (bool[])r.GetProgramVariable("dirty");
+var sb = new System.Text.StringBuilder();
+for (int i = 0; i < tracksObj.Length; i++)
+{
+    var tr = (Component)tracksObj.GetValue(i);
+    var ub = tr as VRC.Udon.UdonBehaviour;
+    if (ub == null) { sb.Append("slot " + i + " not an UdonBehaviour (" + (tr == null ? "null" : tr.GetType().Name) + ") "); continue; }
+    if (i < lines.Length && lines[i].Trim().Length > 0)
+    {
+        var parts = lines[i].Split('|');
+        byte[] data = System.Convert.FromBase64String(parts[2]);
+        data[3] = (byte)(first & 255); data[4] = (byte)((first >> 8) & 255); data[5] = (byte)((first >> 16) & 255); data[6] = (byte)((first >> 24) & 255);
+        ub.SetProgramVariable("data", data); ub.SetProgramVariable("round", round); ub.SetProgramVariable("who", parts[1]);
+    }
+    else { ub.SetProgramVariable("round", -1); ub.SetProgramVariable("data", new byte[0]); }
+    dirty[i] = true;
+}
+g.SetProgramVariable("huntStartMs", (first + 120) * 250);
+r.SetProgramVariable("open", false); r.SetProgramVariable("playing", false); r.SetProgramVariable("atSec", 0f);
+return sb + "injected " + lines.Length + " tracks for round " + round + " first tick " + first + " now " + now;

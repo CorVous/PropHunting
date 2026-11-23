@@ -1,0 +1,352 @@
+﻿// Demo match generator: run in Play mode while a real map is built (HUNT). Writes tracks.txt and gen_log.txt.
+VRC.Udon.UdonBehaviour U(string prog) { foreach (var ub in UnityEngine.Object.FindObjectsOfType<VRC.Udon.UdonBehaviour>()) if (ub.programSource != null && ub.programSource.name == prog) return ub; return null; }
+string DIR = @"D:\VRChat Worlds\_bugfix_scratch\demo\";
+var log = new System.Text.StringBuilder();
+var bld = U("MapBuilderUdon"); var wpn = U("PHWeapons");
+var propRoot = (Transform)bld.GetProgramVariable("propRoot");
+var fenceRoot = (Transform)bld.GetProgramVariable("fenceRoot");
+var lp = VRC.SDKBase.Networking.LocalPlayer;
+Vector3 spawn = lp.GetPosition();
+var rng = new System.Random(11);
+
+// ---------------- props on the map
+var pDef = new System.Collections.Generic.List<int>(); var pPos = new System.Collections.Generic.List<Vector3>(); var pB = new System.Collections.Generic.List<Bounds>(); var pName = new System.Collections.Generic.List<string>();
+var rx = new System.Text.RegularExpressions.Regex(@"^(\d+)_");
+foreach (var t in propRoot.GetComponentsInChildren<Transform>(false))
+{
+    if (t == propRoot) continue;
+    var m = rx.Match(t.name); if (!m.Success || !t.name.EndsWith("(Clone)")) continue;
+    if (t.parent != null && rx.IsMatch(t.parent.name) && t.parent.name.EndsWith("(Clone)")) continue;
+    var rs = t.GetComponentsInChildren<Renderer>(); if (rs.Length == 0) continue;
+    Bounds b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
+    pDef.Add(int.Parse(m.Groups[1].Value)); pPos.Add(t.position); pB.Add(b); pName.Add(t.name.Replace("(Clone)", ""));
+}
+bool Hideable(int i) { var s = pB[i].size; return s.y > 0.25f && s.y < 1.3f && s.x < 1.4f && s.z < 1.4f && s.x > 0.2f && s.z > 0.2f; }
+Vector3 mn = new Vector3(1e9f, 1e9f, 1e9f), mx = -mn;
+for (int i = 0; i < pPos.Count; i++) { mn = Vector3.Min(mn, pPos[i]); mx = Vector3.Max(mx, pPos[i]); }
+mn -= new Vector3(4, 0, 4); mx += new Vector3(4, 0, 4);
+mn = Vector3.Min(mn, spawn - new Vector3(4, 0, 4)); mx = Vector3.Max(mx, spawn + new Vector3(4, 0, 4));
+log.AppendLine("props " + pPos.Count + " area " + mn.ToString("F0") + ".." + mx.ToString("F0") + " spawn " + spawn.ToString("F1"));
+
+// ---------------- walk grid: floors per column, a body's clearance, steps up to 0.35 m
+const float G = 0.25f;
+int nx = Mathf.CeilToInt((mx.x - mn.x) / G), nz = Mathf.CeilToInt((mx.z - mn.z) / G);
+var nodeP = new System.Collections.Generic.List<Vector3>();
+var colStart = new int[nx * nz + 1];
+bool Skip(Collider c) { var tr = c.transform; return c.isTrigger || tr.IsChildOf(propRoot) || (fenceRoot != null && tr.IsChildOf(fenceRoot)); }
+float top = mx.y + 12f;
+for (int ix = 0; ix < nx; ix++) for (int iz = 0; iz < nz; iz++)
+{
+    colStart[ix * nz + iz] = nodeP.Count;
+    Vector3 o = new Vector3(mn.x + (ix + 0.5f) * G, top, mn.z + (iz + 0.5f) * G);
+    for (int n = 0; n < 8; n++)
+    {
+        RaycastHit h;
+        if (!Physics.Raycast(o, Vector3.down, out h, 60f, ~0, QueryTriggerInteraction.Ignore)) break;
+        o = h.point + Vector3.down * 0.03f;
+        if (h.normal.y < 0.75f || Skip(h.collider)) continue;
+        Vector3 p = h.point;
+        if (Physics.CheckCapsule(p + Vector3.up * 0.45f, p + Vector3.up * 1.6f, 0.2f, ~0, QueryTriggerInteraction.Ignore)) continue;
+        nodeP.Add(p);
+    }
+}
+colStart[nx * nz] = nodeP.Count;
+int N = nodeP.Count;
+log.AppendLine("grid " + nx + "x" + nz + " nodes " + N);
+int ColOf(Vector3 p) { int ix = Mathf.FloorToInt((p.x - mn.x) / G), iz = Mathf.FloorToInt((p.z - mn.z) / G); if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) return -1; return ix * nz + iz; }
+int NodeAt(Vector3 p, float dyMax)
+{
+    int best = -1; float bd = 1e9f;
+    int ix0 = Mathf.FloorToInt((p.x - mn.x) / G), iz0 = Mathf.FloorToInt((p.z - mn.z) / G);
+    for (int r = 0; r < 12 && best < 0; r++)
+        for (int ix = ix0 - r; ix <= ix0 + r; ix++) for (int iz = iz0 - r; iz <= iz0 + r; iz++)
+        {
+            if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) continue;
+            int c = ix * nz + iz;
+            for (int k = colStart[c]; k < colStart[c + 1]; k++)
+            {
+                if (Mathf.Abs(nodeP[k].y - p.y) > dyMax) continue;
+                float d = (nodeP[k] - p).sqrMagnitude; if (d < bd) { bd = d; best = k; }
+            }
+        }
+    return best;
+}
+// neighbours (8 directions; diagonals need both sides open; a chest-high line must be clear)
+var nb = new int[N * 8]; for (int i = 0; i < nb.Length; i++) nb[i] = -1;
+int[] DX = { 1, -1, 0, 0, 1, 1, -1, -1 }, DZ = { 0, 0, 1, -1, 1, -1, 1, -1 };
+for (int ix = 0; ix < nx; ix++) for (int iz = 0; iz < nz; iz++)
+{
+    int c = ix * nz + iz;
+    for (int k = colStart[c]; k < colStart[c + 1]; k++)
+        for (int d = 0; d < 8; d++)
+        {
+            int jx = ix + DX[d], jz = iz + DZ[d];
+            if (jx < 0 || jz < 0 || jx >= nx || jz >= nz) continue;
+            int cj = jx * nz + jz, best = -1; float bdy = 0.36f;
+            for (int q = colStart[cj]; q < colStart[cj + 1]; q++) { float dy = Mathf.Abs(nodeP[q].y - nodeP[k].y); if (dy < bdy) { bdy = dy; best = q; } }
+            if (best < 0) continue;
+            if (Physics.Linecast(nodeP[k] + Vector3.up * 0.9f, nodeP[best] + Vector3.up * 0.9f, ~0, QueryTriggerInteraction.Ignore)) continue;
+            nb[k * 8 + d] = best;
+        }
+}
+for (int k = 0; k < N; k++) for (int d = 4; d < 8; d++) if (nb[k * 8 + d] >= 0)
+{
+    int a = -1, b2 = -1;
+    for (int e = 0; e < 4; e++) { if (DX[e] == DX[d] && DZ[e] == 0) a = nb[k * 8 + e]; if (DZ[e] == DZ[d] && DX[e] == 0) b2 = nb[k * 8 + e]; }
+    if (a < 0 || b2 < 0) nb[k * 8 + d] = -1;
+}
+// A*
+var gS = new float[N]; var from = new int[N]; var stamp = new int[N]; int cur = 0;
+var heapN = new System.Collections.Generic.List<int>(); var heapF = new System.Collections.Generic.List<float>();
+void Push(int n, float f) { heapN.Add(n); heapF.Add(f); int i = heapN.Count - 1; while (i > 0) { int p = (i - 1) / 2; if (heapF[p] <= heapF[i]) break; int tn = heapN[p]; heapN[p] = heapN[i]; heapN[i] = tn; float tf = heapF[p]; heapF[p] = heapF[i]; heapF[i] = tf; i = p; } }
+int Pop() { int r = heapN[0]; int last = heapN.Count - 1; heapN[0] = heapN[last]; heapF[0] = heapF[last]; heapN.RemoveAt(last); heapF.RemoveAt(last); int i = 0; for (int guard = 0; guard < 64; guard++) { int l = 2 * i + 1, rr = l + 1, s = i; if (l < heapN.Count && heapF[l] < heapF[s]) s = l; if (rr < heapN.Count && heapF[rr] < heapF[s]) s = rr; if (s == i) break; int tn = heapN[s]; heapN[s] = heapN[i]; heapN[i] = tn; float tf = heapF[s]; heapF[s] = heapF[i]; heapF[i] = tf; i = s; } return r; }
+System.Collections.Generic.List<Vector3> Path(int a, int b)
+{
+    cur++; heapN.Clear(); heapF.Clear();
+    gS[a] = 0; from[a] = -1; stamp[a] = cur; Push(a, 0);
+    var closed = new System.Collections.Generic.HashSet<int>();
+    while (heapN.Count > 0)
+    {
+        int n = Pop(); if (n == b) break; if (!closed.Add(n)) continue;
+        for (int d = 0; d < 8; d++)
+        {
+            int m = nb[n * 8 + d]; if (m < 0) continue;
+            float ng = gS[n] + (nodeP[m] - nodeP[n]).magnitude;
+            if (stamp[m] == cur && ng >= gS[m]) continue;
+            stamp[m] = cur; gS[m] = ng; from[m] = n; Push(m, ng + (nodeP[b] - nodeP[m]).magnitude);
+        }
+    }
+    if (stamp[b] != cur) return null;
+    var pts = new System.Collections.Generic.List<Vector3>();
+    for (int n = b; n >= 0; n = from[n]) pts.Add(nodeP[n]);
+    pts.Reverse();
+    // a light smoothing in plan (the floor height kept)
+    var sm = new System.Collections.Generic.List<Vector3>();
+    for (int i = 0; i < pts.Count; i++)
+    {
+        Vector3 s = Vector3.zero; int c = 0;
+        for (int j = Mathf.Max(0, i - 2); j <= Mathf.Min(pts.Count - 1, i + 2); j++) { s += pts[j]; c++; }
+        s /= c; s.y = pts[i].y; sm.Add(i == 0 || i == pts.Count - 1 ? pts[i] : s);
+    }
+    return sm;
+}
+// reachability from spawn (one wide search)
+int sNode = NodeAt(spawn, 1f);
+var reach = new float[N]; for (int i = 0; i < N; i++) reach[i] = -1;
+{
+    var q = new System.Collections.Generic.Queue<int>(); q.Enqueue(sNode); reach[sNode] = 0;
+    while (q.Count > 0) { int n = q.Dequeue(); for (int d = 0; d < 8; d++) { int m = nb[n * 8 + d]; if (m >= 0 && reach[m] < 0) { reach[m] = reach[n] + 1; q.Enqueue(m); } } }
+}
+int nReach = 0; float ground = 1e9f; for (int i = 0; i < N; i++) if (reach[i] >= 0) { nReach++; ground = Mathf.Min(ground, nodeP[i].y); }
+log.AppendLine("spawn node " + sNode + " reachable " + nReach + " ground y " + ground.ToString("F2"));
+bool Outdoor(Vector3 p) { return !Physics.Raycast(p + Vector3.up * 0.5f, Vector3.up, 20f, ~0, QueryTriggerInteraction.Ignore); }
+// a stand spot by a prop: a reachable node at 0.7-1.6 m on the prop's own floor
+int StandBy(int pi, float near, float far)
+{
+    Vector3 c = pPos[pi]; int best = -1; float bd = 1e9f;
+    int c0 = ColOf(c); if (c0 < 0) return -1;
+    int ix0 = c0 / nz, iz0 = c0 % nz, R = Mathf.CeilToInt(far / G) + 1;
+    for (int ix = ix0 - R; ix <= ix0 + R; ix++) for (int iz = iz0 - R; iz <= iz0 + R; iz++)
+    {
+        if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) continue;
+        int cc = ix * nz + iz;
+        for (int k = colStart[cc]; k < colStart[cc + 1]; k++)
+        {
+            if (reach[k] < 0 || Mathf.Abs(nodeP[k].y - c.y) > 0.3f) continue;
+            float d = new Vector2(nodeP[k].x - c.x, nodeP[k].z - c.z).magnitude;
+            if (d < near || d > far) continue;
+            float score = Mathf.Abs(d - (near + far) * 0.5f);
+            if (score < bd) { bd = score; best = k; }
+        }
+    }
+    return best;
+}
+// candidate props by zone
+var outP = new System.Collections.Generic.List<int>(); var inP = new System.Collections.Generic.List<int>(); var upP = new System.Collections.Generic.List<int>();
+for (int i = 0; i < pPos.Count; i++)
+{
+    if (!Hideable(i)) continue;
+    if (StandBy(i, 0.7f, 1.6f) < 0) continue;
+    float h = pPos[i].y - ground;
+    if (h > 2.2f) upP.Add(i);
+    else if (Outdoor(new Vector3(pB[i].center.x, pB[i].max.y + 0.1f, pB[i].center.z) - Vector3.up * 0.5f)) outP.Add(i);
+    else inP.Add(i);
+}
+log.AppendLine("hideable reachable props: outdoor " + outP.Count + ", indoor ground " + inP.Count + ", upstairs " + upP.Count);
+float PlanD(int a, int b) { return new Vector2(pPos[a].x - pPos[b].x, pPos[a].z - pPos[b].z).magnitude; }
+float SpawnD(int a) { return new Vector2(pPos[a].x - spawn.x, pPos[a].z - spawn.z).magnitude; }
+int Pick(System.Collections.Generic.List<int> L, System.Func<int, bool> ok) { var c = new System.Collections.Generic.List<int>(); foreach (var i in L) if (ok(i)) c.Add(i); return c.Count == 0 ? -1 : c[rng.Next(c.Count)]; }
+int pA = Pick(outP, i => SpawnD(i) > 10f && SpawnD(i) < 30f);
+int pC = Pick(outP, i => pA >= 0 && PlanD(i, pA) > 12f && SpawnD(i) > 8f);
+int pB2 = Pick(inP, i => true);
+int pD = Pick(upP, i => true);
+int pBswap = Pick(inP, i => pB2 >= 0 && PlanD(i, pB2) > 2.5f && PlanD(i, pB2) < 9f && pDef[i] != pDef[pB2]);
+int pDswap = Pick(upP, i => pD >= 0 && PlanD(i, pD) > 2f && PlanD(i, pD) < 9f && pDef[i] != pDef[pD] && Mathf.Abs(pPos[i].y - pPos[pD].y) < 0.5f);
+// wrong props the hunter tries
+int wA1 = Pick(outP, i => pA >= 0 && i != pA && PlanD(i, pA) < 8f);
+int wA2 = Pick(outP, i => pA >= 0 && i != pA && i != wA1 && PlanD(i, pA) < 9f);
+int wB = Pick(inP, i => pB2 >= 0 && i != pB2 && i != pBswap && PlanD(i, pBswap >= 0 ? pBswap : pB2) < 8f);
+int wD = Pick(upP, i => pD >= 0 && i != pD && i != pDswap && PlanD(i, pDswap >= 0 ? pDswap : pD) < 9f);
+int wC = Pick(outP, i => pC >= 0 && i != pC && PlanD(i, pC) < 9f && PlanD(i, pC) > 3f);
+string PN(int i) { return i < 0 ? "none" : pName[i] + "@" + pPos[i].ToString("F1"); }
+log.AppendLine("A " + PN(pA) + " | C " + PN(pC) + " | B " + PN(pB2) + " -> " + PN(pBswap) + " | D " + PN(pD) + " -> " + PN(pDswap));
+log.AppendLine("wrong: " + PN(wA1) + ", " + PN(wA2) + ", " + PN(wB) + ", " + PN(wD) + ", " + PN(wC));
+if (pA < 0 || pC < 0 || pB2 < 0 || pD < 0) { System.IO.File.WriteAllText(DIR + "gen_log.txt", log.ToString()); return "MISSING ZONE\n" + log; }
+
+// ---------------- timelines (a sample every 0.25 s)
+const int T = 640, HUNT = 120, ENDG = T - 180;   // 160 s: 30 s hide, 130 s hunt, the final stand in the last 45 s
+// per actor: pos, yaw, def, flags, aim per tick
+Vector3[][] P = new Vector3[5][]; float[][] Y = new float[5][]; int[][] D = new int[5][]; int[][] F = new int[5][]; int[][] AIM = new int[5][]; int[] len = new int[5]; int[] at = new int[5]; int[] node = new int[5];
+for (int a = 0; a < 5; a++) { P[a] = new Vector3[T]; Y[a] = new float[T]; D[a] = new int[T]; F[a] = new int[T]; AIM[a] = new int[T]; for (int k = 0; k < T; k++) D[a][k] = -1; len[a] = T; }
+const int F_EV1 = 16, F_EV2 = 32, F_CATCH = 64, F_END = 128, F_DEF = 8;
+float lastYaw = 0f;
+void Put(int a, Vector3 p, float y) { if (at[a] >= T) return; P[a][at[a]] = p; Y[a][at[a]] = y; if (at[a] > 0 && D[a][at[a]] < 0) D[a][at[a]] = D[a][at[a] - 1]; at[a]++; }
+float YawTo(Vector3 from2, Vector3 to2) { Vector3 d = to2 - from2; return Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; }
+void Wait(int a, int ticks, float yaw) { Vector3 p = at[a] > 0 ? P[a][at[a] - 1] : nodeP[node[a]]; for (int i = 0; i < ticks; i++) Put(a, p, yaw); }
+float CurYaw(int a) { return at[a] > 0 ? Y[a][at[a] - 1] : 0f; }
+bool Walk(int a, int target, float speed)
+{
+    var path = Path(node[a], target);
+    if (path == null) { log.AppendLine("NO PATH actor " + a + " to " + nodeP[target]); return false; }
+    float step = speed * 0.25f, carry = 0f; Vector3 last = path[0]; float yaw = CurYaw(a);
+    for (int i = 1; i < path.Count; i++)
+    {
+        Vector3 s0 = path[i - 1], s1 = path[i]; float L = (s1 - s0).magnitude; float u = carry;
+        while (u <= L) { Vector3 p = Vector3.Lerp(s0, s1, u / Mathf.Max(1e-4f, L)); if ((p - last).sqrMagnitude > 0.0004f) yaw = YawTo(last, p); Put(a, p, yaw); last = p; u += step; }
+        carry = u - L;
+    }
+    Put(a, nodeP[target], yaw);
+    node[a] = target; return true;
+}
+void Flag(int a, int f) { if (at[a] > 0) F[a][at[a] - 1] |= f; }
+void Disguise(int a, int def) { if (at[a] > 0) D[a][at[a] - 1] = def; }
+void Idle(int a, int ticks) { float y0 = CurYaw(a); for (int i = 0; i < ticks; i++) Wait(a, 1, y0 + 25f * Mathf.Sin(i * 0.07f + a)); }
+void SwingAt(int a, Vector3 target, int extra) { Vector3 p = P[a][at[a] - 1]; float y = YawTo(p, target); Wait(a, 1, y); Flag(a, F_DEF | extra); Wait(a, 5, y); }
+
+for (int a = 0; a < 5; a++) node[a] = sNode;
+// hiders leave the spawn spread a little
+Vector3[] off = { Vector3.zero, new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 0, -1) };
+for (int a = 1; a < 5; a++) { int n0 = NodeAt(spawn + off[a], 0.5f); if (n0 >= 0 && reach[n0] >= 0) node[a] = n0; }
+// --- hiders: 1 A outdoor, 2 B indoor (swaps), 3 C outdoor (shoots), 4 D upstairs (swaps)
+int[] hp = { -1, pA, pB2, pC, pD };
+int[] settleTick = new int[5];
+for (int a = 1; a < 5; a++)
+{
+    Wait(a, 4 + a * 3, CurYaw(a));
+    int st = StandBy(hp[a], 0.0f, 1.2f);
+    Walk(a, st, 3.6f);
+    Idle(a, 6);
+    float yaw = rng.Next(0, 4) * 90f + 10f;
+    Wait(a, 1, yaw); Disguise(a, pDef[hp[a]]);
+    settleTick[a] = at[a];
+}
+// --- the hunter: held at the spawn for the hide (a look round), then out
+int H = 0;
+Idle(H, HUNT);
+int huntFrom = at[H];
+// to A's yard: two wrong props, then A
+int s1 = wA1 >= 0 ? StandBy(wA1, 0.8f, 1.3f) : -1; if (s1 >= 0 && Walk(H, s1, 3.6f)) { SwingAt(H, pPos[wA1], F_EV1); Idle(H, 4); }
+int s2 = wA2 >= 0 ? StandBy(wA2, 0.8f, 1.3f) : -1; if (s2 >= 0 && Walk(H, s2, 3.4f)) { SwingAt(H, pPos[wA2], F_EV1); Idle(H, 6); }
+int sAh = StandBy(pA, 0.8f, 1.3f);
+// A's spot (where the hider stands as the prop)
+Vector3 aSpot = P[1][settleTick[1] - 1];
+int sAhit = NodeAt(aSpot + (nodeP[node[H]] - aSpot).normalized * 1.0f, 0.4f); if (sAhit < 0 || reach[sAhit] < 0) sAhit = sAh;
+Walk(H, sAhit, 3.2f); SwingAt(H, aSpot, F_EV2); int hitTick = at[H] - 6;
+// A flees, hunter chases, the catch
+int flee = -1; { float bd = 0; for (int k = 0; k < N; k++) { if (reach[k] < 0 || Mathf.Abs(nodeP[k].y - aSpot.y) > 0.3f) continue; float d = (nodeP[k] - aSpot).magnitude; if (d > 5f && d < 7f && (nodeP[k] - nodeP[node[H]]).magnitude > d) { if (bd == 0 || rng.Next(3) == 0) { bd = d; flee = k; } } } }
+int catchTick;
+{
+    // A's own timeline from settle to hit: idles (a taunt early on); then flees
+    int a = 1; Idle(a, Mathf.Max(0, 150 - at[a])); Flag(a, F_EV1); Idle(a, Mathf.Max(1, hitTick - at[a])); Flag(a, F_EV2);
+    if (flee >= 0) { Walk(a, flee, 4.2f); }
+    int fleeEnd = at[a];
+    // hunter follows A
+    Idle(H, 2);
+    int near = NodeAt(P[a][fleeEnd - 1] + (nodeP[node[H]] - P[a][fleeEnd - 1]).normalized * 1.0f, 0.4f); if (near < 0 || reach[near] < 0) near = StandBy(pA, 0.8f, 1.5f);
+    Walk(H, near, 4.0f); SwingAt(H, P[a][Mathf.Min(fleeEnd, at[a]) - 1], F_CATCH); catchTick = at[H] - 6;
+    Idle(a, Mathf.Max(0, catchTick - at[a])); Flag(a, F_END); len[a] = at[a];
+}
+Idle(H, 6);
+// into the house: B (B swapped to its second prop meanwhile), a wrong prop first, then the catch
+{
+    int a = 2;
+    Idle(a, Mathf.Max(0, 190 - at[a])); Flag(a, F_EV1);
+    Idle(a, Mathf.Max(0, 215 - at[a]));
+    if (pBswap >= 0) { int sb = StandBy(pBswap, 0.0f, 1.2f); if (sb >= 0) { Disguise(a, -1); Walk(a, sb, 3.6f); Idle(a, 3); Wait(a, 1, rng.Next(0, 4) * 90f + 20f); Disguise(a, pDef[pBswap]); } }
+}
+if (wB >= 0) { int sw = StandBy(wB, 0.8f, 1.3f); if (sw >= 0 && Walk(H, sw, 3.6f)) { SwingAt(H, pPos[wB], F_EV1); Idle(H, 5); } }
+{
+    int a = 2;
+    Vector3 bSpot = P[a][Mathf.Min(at[a], at[H]) - 1];
+    int nb2 = NodeAt(bSpot + (nodeP[node[H]] - bSpot).normalized * 1.0f, 0.4f); if (nb2 < 0 || reach[nb2] < 0) nb2 = StandBy(pBswap >= 0 ? pBswap : pB2, 0.8f, 1.4f);
+    Walk(H, nb2, 3.4f);
+    Idle(a, Mathf.Max(0, at[H] - at[a]));
+    bSpot = P[a][at[a] - 1];
+    SwingAt(H, bSpot, F_EV2 | F_CATCH); int ct = at[H] - 6;
+    Idle(a, Mathf.Max(1, ct - at[a] + 1)); Flag(a, F_EV2 | F_END); len[a] = at[a];
+}
+Idle(H, 8);
+// up the stairs: past D, one wrong prop, a look round
+{
+    int a = 4;
+    Idle(a, Mathf.Max(0, 170 - at[a])); Flag(a, F_EV1);
+    Idle(a, Mathf.Max(0, 260 - at[a])); Flag(a, F_EV1);
+    Idle(a, Mathf.Max(0, 300 - at[a]));
+    if (pDswap >= 0) { int sd = StandBy(pDswap, 0.0f, 1.2f); if (sd >= 0) { Disguise(a, -1); Walk(a, sd, 3.4f); Idle(a, 3); Wait(a, 1, rng.Next(0, 4) * 90f); Disguise(a, pDef[pDswap]); } }
+}
+if (wD >= 0) { int sw = StandBy(wD, 0.8f, 1.3f); if (sw >= 0 && Walk(H, sw, 3.4f)) { SwingAt(H, pPos[wD], F_EV1); Idle(H, 10); } }
+else { int sd = StandBy(pD, 2.0f, 3.5f); if (sd >= 0) { Walk(H, sd, 3.4f); Idle(H, 12); } }
+// back down and out towards C for the final stand
+int sC = wC >= 0 ? StandBy(wC, 0.8f, 1.3f) : StandBy(pC, 3f, 5f);
+Walk(H, sC, 3.6f);
+if (wC >= 0) { SwingAt(H, pPos[wC], F_EV1); }
+// the hunter looks round near C to the end, edging closer
+while (at[H] < T) { Idle(H, 8); int k2 = StandBy(pC, 2.0f, 3.2f); if (k2 >= 0 && at[H] < T - 40) Walk(H, k2, 1.5f); else Idle(H, 20); }
+{
+    int a = 4; Idle(a, Mathf.Max(0, 440 - at[a])); Flag(a, F_EV1); Idle(a, T - at[a]);
+    a = 3; Idle(a, Mathf.Max(0, 200 - at[a])); Flag(a, F_EV1); Idle(a, Mathf.Max(0, 330 - at[a])); Flag(a, F_EV1);
+    // the final stand: C fires at the hunter
+    int[] shots = { ENDG + 30, ENDG + 42, ENDG + 52, ENDG + 66, ENDG + 80 };
+    foreach (int s in shots)
+    {
+        Idle(a, Mathf.Max(0, s - at[a]));
+        Vector3 h = P[H][Mathf.Min(at[a], T - 1)];
+        float y = YawTo(P[a][at[a] - 1], h);
+        Flag(a, F_CATCH); AIM[a][at[a] - 1] = Mathf.RoundToInt(Mathf.Repeat(y, 360f) / 360f * 256f) & 255;
+    }
+    Idle(a, T - at[a]);
+}
+for (int a = 0; a < 5; a++) if (len[a] == T && at[a] < T) Wait(a, T - at[a], CurYaw(a));
+
+// ---------------- encode (version 2, every sample absolute)
+var meleeMesh = (Mesh[])wpn.GetProgramVariable("meleeMesh"); var gunMesh = (Mesh[])wpn.GetProgramVariable("gunMesh");
+int melee = 0; for (int i = 0; i < meleeMesh.Length; i++) if (meleeMesh[i] != null && meleeMesh[i].name.ToLower().Contains("hammer")) { melee = i; break; }
+string[] who = { "Hawk", "Juniper", "Pickle", "Wren", "Bramble" };
+var outS = new System.Text.StringBuilder();
+for (int a = 0; a < 5; a++)
+{
+    var buf = new System.Collections.Generic.List<byte>();
+    int role = a == 0 ? 2 : 1; int n = len[a];
+    int weapon = a == 0 ? melee + 1 : 1 + ((a * 3) % Mathf.Max(1, gunMesh.Length));
+    buf.Add(82); buf.Add(2); buf.Add((byte)role); buf.Add(0); buf.Add(0); buf.Add(0); buf.Add(0); buf.Add((byte)(n & 255)); buf.Add((byte)(n >> 8)); buf.Add((byte)weapon);
+    for (int k = 0; k < n; k++)
+    {
+        int f = F[a][k] | 1 | 4;   // F_ABS | F_YAW
+        if (role == 1) f |= F_DEF; else f &= ~0;   // a hider's def every tick; the hunter's F_DEF is a swing
+        buf.Add((byte)f);
+        Vector3 p = P[a][k];
+        int x = Mathf.RoundToInt(p.x / 0.02f), y = Mathf.RoundToInt(p.y / 0.02f), z = Mathf.RoundToInt(p.z / 0.02f);
+        foreach (int v in new[] { x, y, z }) { buf.Add((byte)(v & 255)); buf.Add((byte)((v >> 8) & 255)); }
+        buf.Add((byte)(Mathf.RoundToInt(Mathf.Repeat(Y[a][k], 360f) / 360f * 256f) & 255));
+        if (role == 1) { int dv = D[a][k] + 1; buf.Add((byte)(dv & 255)); buf.Add((byte)(dv >> 8)); }
+        if (role == 1 && (f & F_CATCH) != 0) buf.Add((byte)AIM[a][k]);
+    }
+    outS.AppendLine(a + "|" + who[a] + "|" + System.Convert.ToBase64String(buf.ToArray()));
+    int ev = 0; for (int k = 0; k < n; k++) if ((F[a][k] & ~7) != 0) ev++;
+    log.AppendLine("actor " + a + " " + who[a] + " ticks " + n + " events " + ev + " bytes " + buf.Count + " weapon " + (weapon - 1) + " " + (a == 0 ? meleeMesh[melee].name : gunMesh[weapon - 1].name));
+}
+log.AppendLine("hunt from tick " + huntFrom + ", A hit " + hitTick + ", A caught " + catchTick + ", endgame " + ENDG);
+System.IO.File.WriteAllText(DIR + "tracks.txt", outS.ToString());
+System.IO.File.WriteAllText(DIR + "gen_log.txt", log.ToString());
+return log.ToString();
+

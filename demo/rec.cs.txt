@@ -1,0 +1,73 @@
+﻿// Record the diorama replay: a slowly orbiting camera, 30 fps fixed (Time.captureFramerate), JPEG frames to demo\frames.
+// Schedule (video): 0-3 s paused at 0:00; Play at 4x through the hide; 2x in the hunt; 1x for the final stand's shots;
+// 2x to the end. Upper floors off while the hunter is upstairs.
+VRC.Udon.UdonBehaviour U(string prog) { foreach (var ub in UnityEngine.Object.FindObjectsOfType<VRC.Udon.UdonBehaviour>()) if (ub.programSource != null && ub.programSource.name == prog) return ub; return null; }
+string DIR = @"D:\VRChat Worlds\_bugfix_scratch\demo\frames\";
+System.IO.Directory.CreateDirectory(DIR);
+foreach (var f in System.IO.Directory.GetFiles(DIR, "*.jpg")) System.IO.File.Move(f, f + "." + System.DateTime.Now.Ticks + ".old");
+var r = U("PHReplay"); var mm = U("PHMiniMap");
+var model = (Transform)mm.GetProgramVariable("model");
+// the model's bounds (the map copy on the table)
+Bounds mb = new Bounds(model.position, Vector3.zero); bool any = false;
+foreach (var rr in model.GetComponentsInChildren<Renderer>()) { if (!rr.enabled || !rr.gameObject.activeInHierarchy || rr is LineRenderer) continue; if (rr.name.StartsWith("Replay")) continue; if (!any) { mb = rr.bounds; any = true; } else mb.Encapsulate(rr.bounds); }
+Vector3 c = model.position + Vector3.up * 0.12f; float R = 15.5f * model.lossyScale.x;
+var table = GameObject.Find("World/Lobby/Diorama").transform;
+var rc0 = table.Find("ReplayControls0");
+Vector3 front = rc0.position - c; front.y = 0; front.Normalize();
+float az0 = Mathf.Atan2(front.x, front.z) * Mathf.Rad2Deg - 35f;
+// the hunter upstairs: from its decoded track
+var tPos = (Vector3[])r.GetProgramVariable("tPos"); var tCount = (int[])r.GetProgramVariable("tCount");
+int upFrom = -1, upTo = -1;
+for (int k = 0; k < tCount[0]; k++) if (tPos[k].y > 2.0f) { if (upFrom < 0) upFrom = k; upTo = k; }
+float upOn = upFrom >= 0 ? upFrom * 0.25f - 4f : 1e9f, upOff = upTo >= 0 ? upTo * 0.25f + 3f : 1e9f;
+const float DUR = 160f, ENDG = (640 - 180) * 0.25f;
+var go = new GameObject("DemoCam"); var cam = go.AddComponent<Camera>(); cam.CopyFrom(Camera.main); cam.cullingMask = ~0; cam.nearClipPlane = 0.01f; cam.fieldOfView = 34f; cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.12f, 0.24f, 0.2f); cam.farClipPlane = 200f; cam.rect = new Rect(0f, 0f, 1f, 1f);
+var rt = new RenderTexture(1920, 1080, 24); rt.antiAliasing = 8; cam.targetTexture = rt;
+var tex = new Texture2D(1920, 1080, TextureFormat.RGB24, false);
+int frame = 0; int stage = 0; int tail = -1; bool upperOff = false; int now0 = VRC.SDKBase.Networking.GetServerTimeInMilliseconds(); float time0 = Time.time;
+UnityEngine.UI.Button upperBtn = null;
+foreach (var b in table.GetComponentsInChildren<UnityEngine.UI.Button>(true)) if (b.transform.parent != null && b.transform.parent.name == "Buttons") upperBtn = b;
+float RT()
+{
+    float atSec = (float)r.GetProgramVariable("atSec"); int atMs = (int)r.GetProgramVariable("atMs"); int sp = (int)r.GetProgramVariable("speed");
+    bool pl = (bool)r.GetProgramVariable("playing"), op = (bool)r.GetProgramVariable("open");
+    if (!op) return 0f;
+    return atSec + (pl ? (VRC.SDKBase.Networking.GetServerTimeInMilliseconds() - atMs) * 0.001f * sp : 0f);
+}
+void SpeedTo(int want) { for (int i = 0; i < 3 && (int)r.GetProgramVariable("speed") != want; i++) r.SendCustomEvent("Speed"); }
+var log = new System.Text.StringBuilder();
+bool done = false; GameObject host = null;
+System.Collections.IEnumerator Loop()
+{
+    for (int guard = 0; guard < 30 * 120 && !done; guard++)
+    {
+        yield return new WaitForEndOfFrame();
+        float vt = frame / 30f, rtm = RT();
+        if (stage == 0 && vt >= 3f) { r.SendCustomEvent("PlayPause"); SpeedTo(4); stage = 1; log.AppendLine("play at frame " + frame); }
+        if (stage == 1 && rtm >= 30f) { SpeedTo(2); stage = 2; log.AppendLine("2x at " + frame); }
+        if (stage == 2 && rtm >= ENDG + 6f) { SpeedTo(1); stage = 3; log.AppendLine("1x at " + frame); }
+        if (stage == 3 && rtm >= ENDG + 22f) { SpeedTo(2); stage = 4; log.AppendLine("2x at " + frame); }
+        if (!upperOff && rtm >= upOn && rtm < upOff && upperBtn != null) { upperBtn.onClick.Invoke(); upperOff = true; log.AppendLine("floors off at " + frame + " rt " + rtm); }
+        if (upperOff && rtm >= upOff && upperBtn != null) { upperBtn.onClick.Invoke(); upperOff = false; upOn = 1e9f; log.AppendLine("floors on at " + frame + " rt " + rtm); }
+        float az = (az0 + vt * 0.85f) * Mathf.Deg2Rad, el = (44f + 5f * Mathf.Sin(vt * 0.06f)) * Mathf.Deg2Rad, dist = R * 1.95f;
+        Vector3 dir = new Vector3(Mathf.Sin(az) * Mathf.Cos(el), Mathf.Sin(el), Mathf.Cos(az) * Mathf.Cos(el));
+        cam.transform.position = c + dir * dist; cam.transform.LookAt(c + Vector3.up * R * 0.02f);
+        cam.Render();
+        RenderTexture.active = rt; tex.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0); tex.Apply(); RenderTexture.active = null;
+        System.IO.File.WriteAllBytes(DIR + "f_" + frame.ToString("D5") + ".jpg", tex.EncodeToJPG(93));
+        frame++;
+        if (tail < 0 && stage >= 4 && rtm >= DUR - 0.01f) tail = frame;
+        if ((tail >= 0 && frame >= tail + 60) || frame > 30 * 110) done = true;
+    }
+    log.AppendLine("end frame " + frame + "; server ms " + (VRC.SDKBase.Networking.GetServerTimeInMilliseconds() - now0) + " vs time " + ((Time.time - time0) * 1000f).ToString("F0"));
+    Time.captureFramerate = 0;
+    System.IO.File.WriteAllText(DIR + "..\\rec_log.txt", log.ToString());
+    UnityEngine.Object.Destroy(go); UnityEngine.Object.Destroy(host);
+}
+cam.enabled = false;
+host = new GameObject("DemoHost");
+var mb2 = host.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+Time.captureFramerate = 30;
+mb2.StartCoroutine(Loop());
+return "recording: model c " + c.ToString("F2") + " R " + R.ToString("F2") + " hunter upstairs ticks " + upFrom + ".." + upTo;
+

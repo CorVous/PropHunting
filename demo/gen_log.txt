@@ -1,0 +1,12 @@
+props 120 area (-3, 0, -3)..(28, 4, 26) spawn (6.0, 0.0, 22.0)
+grid 123x118 nodes 17830
+spawn node 3765 reachable 5075 ground y 0.00
+hideable reachable props: outdoor 33, indoor ground 15, upstairs 16
+A 214_n_flowerYellowB@(23.5, 0.0, 14.5) | C 215_n_flowerPurpleB@(12.9, 0.0, 4.6) | B 380_q_cabinetSmallDeco@(14.4, 0.0, 12.6) -> 391_q_bedside@(12.4, 0.0, 9.5) | D 037_k_trashcan@(19.6, 2.8, 18.1) -> 048_k_speaker@(15.4, 2.8, 15.7)
+wrong: 165_n_rockSmall@(23.5, 0.0, 17.4), 410_mb_plushB@(23.7, 0.0, 19.7), 045_k_bench@(8.3, 0.0, 14.4), 190_toy_panda@(14.0, 2.8, 10.3), 161_n_flowerYellow@(17.5, 0.0, 5.2)
+actor 0 Hawk ticks 640 events 8 bytes 5130 weapon 0 melee_kenney-survival-kit_tool-hammer
+actor 1 Juniper ticks 195 events 3 bytes 1960 weapon 3 gun_quaternius-scifimodularguns_Grenade_3
+actor 2 Pickle ticks 253 events 2 bytes 2540 weapon 6 gun_quaternius-scifimodularguns_Crossbow_1
+actor 3 Wren ticks 640 events 7 bytes 6415 weapon 9 gun_quaternius-scifimodularguns_Pistol_3
+actor 4 Bramble ticks 640 events 3 bytes 6410 weapon 12 gun_quaternius-scifigun_Pistol
+hunt from tick 120, A hit 182, A caught 195, endgame 460
