@@ -290,17 +290,16 @@ public class PHWeapons : UdonSharpBehaviour
     public void WatchBreak(int slot) { watchSlot = slot; watchUntil = Time.time + 2.5f; }
 
     // a hider's gun, at their prop: above its top, turned as the prop faces, or at what it last shot for a moment.
-    // The owner sees their own too (hop playtest: hiders did not know their gun gives them away), solid, from the
-    // moment the others do, but only in their third-person view (on PHSlot.HIDER_SELF: the first-person camera leaves
-    // it out; PHView's pip draws it)
+    // Never shown to its owner, not even in their third-person view (Cor, 11-22: the hider should not see it); the
+    // HUD line on the first shot (say.gunSeen) still tells them the others can
     int[] hiderGunLayer;
     void UpdateHiderGun(int i, PHSlot s, bool mine)
     {
         if (hiderGun == null || i >= hiderGun.Length) return;
-        bool show = s != null && s.armed && !s.caught && s.def >= 0 && game.phase == PHGame.PH_HUNT
+        bool show = s != null && !mine && s.armed && !s.caught && s.def >= 0 && game.phase == PHGame.PH_HUNT
             && game.RoleOf(i) == PHGame.ROLE_HIDER && s.round == game.round;
         Transform g = hiderGun[i];
-        if (show) SetGunLayer(i, mine ? PHSlot.HIDER_SELF : 0);
+        if (show) SetGunLayer(i, 0);
         if (g.gameObject.activeSelf != show)
         {
             g.gameObject.SetActive(show);
