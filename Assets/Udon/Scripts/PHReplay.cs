@@ -134,7 +134,7 @@ public class PHReplay : UdonSharpBehaviour
         tailBuf = new Vector3[TAIL];
         block = new MaterialPropertyBlock();
         palette = new Color[] {
-            new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
+            new Color(0.5f, 0.45f, 0.95f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),   // (slot 0 indigo, was salmon: Cor, it read as a second hunter)
             new Color(0.85f, 0.5f, 0.9f), new Color(1f, 0.62f, 0.2f), new Color(0.4f, 0.9f, 0.8f), new Color(0.95f, 0.55f, 0.7f) };
         if (game.text != null) game.text.Register(this);
         HideMarkers();

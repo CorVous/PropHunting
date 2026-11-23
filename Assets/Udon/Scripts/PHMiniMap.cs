@@ -86,7 +86,7 @@ public class PHMiniMap : UdonSharpBehaviour
         mapProp = new GameObject[0]; mapUpper = new bool[0];   // (sized to the map's objects when they are placed)
         segAt = new int[n * MAXSEG]; nSeg = new int[n]; segLine = new LineRenderer[n * MAXSEG];
         palette = new Color[] {
-            new Color(0.95f, 0.45f, 0.35f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
+            new Color(0.5f, 0.45f, 0.95f), new Color(0.35f, 0.75f, 0.95f), new Color(0.98f, 0.8f, 0.3f), new Color(0.55f, 0.85f, 0.45f),
             new Color(0.85f, 0.5f, 0.9f), new Color(1f, 0.62f, 0.2f), new Color(0.4f, 0.9f, 0.8f), new Color(0.95f, 0.55f, 0.7f) };
         if (game.text != null) game.text.Register(this);
         Show(false);
