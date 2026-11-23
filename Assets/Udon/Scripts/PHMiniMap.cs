@@ -118,8 +118,8 @@ public class PHMiniMap : UdonSharpBehaviour
             if (phase == PHGame.PH_HUNT) huntStart = Time.time;
             lastPhase = phase;
         }
-        bool rec = recRound == game.round && (phase == PHGame.PH_HIDE || phase == PHGame.PH_HUNT);
-        if (rec && Time.time >= nextSample) { nextSample = Time.time + STEP; Sample(phase == PHGame.PH_HUNT); }
+        // (Cor, 2026-11-22: the old summary is gone, the paths, the pins and the hiding spots; the round's replay
+        // (PHReplay) is the diorama's view now, so nothing is sampled for it any more)
         // shown from the reveal until the next map starts loading (and only while the miniature has its map)
         bool show = hasData && snapRound == recRound && dioWalls.sharedMesh != null && (phase == PHGame.PH_END || phase == PHGame.PH_LOBBY);
         if (show && shownRound != recRound)
@@ -131,7 +131,7 @@ public class PHMiniMap : UdonSharpBehaviour
         if (content.activeSelf != show) Show(show);
         if (!show && nMapProp > 0) DropSomeProps();
         // Perf: a path or a prop a frame (all at once was a hitch at END)
-        if (show && drawNext < paths.Length) { DrawOne(drawNext); drawNext++; if (drawNext >= paths.Length) { propNext = 0; fenceNext = 0; Apply(); } }
+        if (show && drawNext < paths.Length) { drawNext = paths.Length; propNext = 0; fenceNext = 0; Apply(); }
         else if (show && builder.objects != null && propNext < builder.objects.Length) PlaceMapProps();
         else if (show && builder.fenceRoot != null && fenceNext < builder.fenceRoot.childCount) PlaceFences();
         if (show) FaceLabels();
@@ -548,7 +548,7 @@ public class PHMiniMap : UdonSharpBehaviour
         SetBox();
         for (int i = 0; i < paths.Length; i++)
         {
-            bool mine = !replaying && (solo < 0 || solo == i);
+            bool mine = false;   // (the old summary's paths and pins: never, Cor)
             bool has = roleOf[i] != 0 && npts[i] > 0;
             paths[i].gameObject.SetActive(has && mine);
             for (int s = 1; s < MAXSEG; s++) { LineRenderer e = segLine[i * MAXSEG + s]; if (e != null) e.gameObject.SetActive(has && mine && s < nSeg[i]); }
@@ -560,7 +560,7 @@ public class PHMiniMap : UdonSharpBehaviour
                 if (go == null) continue;
                 // everyone: each player's longest hide; one player alone: all of their hiding spots (Cor)
                 bool spot = solo == i || (solo < 0 && longestStay[i] == i * MAXS + j);
-                bool on = !replaying && spot && (upperOn || go.transform.localPosition.y <= UPPER_Y);
+                bool on = false;   // (the old summary's hiding spots: never, Cor)
                 go.SetActive(on);
                 if (shownOutline[i * MAXS + j] != null) shownOutline[i * MAXS + j].SetActive(on);
             }

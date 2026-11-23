@@ -165,7 +165,7 @@ public static partial class LobbyBuilder
         const float barW = 760f; const int segs = 20; const int sides = 4;
         rp.bar = new GameObject[sides];
         rp.playLabel = new TextMeshProUGUI[sides]; rp.speedLabel = new TextMeshProUGUI[sides];
-        rp.clock = new TextMeshProUGUI[sides]; rp.summaryLabel = new TextMeshProUGUI[sides];
+        rp.clock = new TextMeshProUGUI[sides];
         rp.playhead = new Transform[sides]; rp.huntMark = new Transform[sides];
         var only = new System.Collections.Generic.List<GameObject>();
         for (int sd = 0; sd < sides; sd++)
@@ -178,7 +178,7 @@ public static partial class LobbyBuilder
             bar.transform.SetParent(cv, false);
             ((RectTransform)bar.transform).sizeDelta = new Vector2(1400f, 80f);
             rp.bar[sd] = bar;
-            rp.playLabel[sd] = ReplayButton(bar.transform, game, "Watch replay", new Vector2(-580f, 0f), new Vector2(220f, 64f), C("f2c45a"), rp, nameof(PHReplay.PlayPause), 0);
+            rp.playLabel[sd] = ReplayButton(bar.transform, game, "Play", new Vector2(-580f, 0f), new Vector2(220f, 64f), C("f2c45a"), rp, nameof(PHReplay.PlayPause), 0);
             rp.speedLabel[sd] = ReplayButton(bar.transform, game, "1×", new Vector2(-415f, 0f), new Vector2(90f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Speed), 0);
             only.Add(rp.speedLabel[sd].transform.parent.parent.gameObject);
             // the scrub bar: a track, the hunt's start on it, the playhead, and pressable pieces over it
@@ -202,8 +202,7 @@ public static partial class LobbyBuilder
             only.Add(track.gameObject);
             rp.clock[sd] = Txt(bar.transform, "Clock", new Vector2(470f, 3f), new Vector2(120f, 40f), "0:00 / 0:00", future, 16, C("f6ecd4"), TextAlignmentOptions.Center);
             only.Add(rp.clock[sd].gameObject);
-            rp.summaryLabel[sd] = ReplayButton(bar.transform, game, "Summary", new Vector2(610f, 0f), new Vector2(160f, 64f), C("e8dcc0"), rp, nameof(PHReplay.Close), 0);
-            only.Add(rp.summaryLabel[sd].transform.parent.parent.gameObject);
+            // (no summary button any more, Cor 2026-11-22: the replay is the diorama's view)
             bar.SetActive(false);
         }
         rp.barWidth = barW; rp.segments = segs;

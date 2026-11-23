@@ -60,8 +60,8 @@ public class PHReplay : UdonSharpBehaviour
     // the controls, a row on each side of the table (Cor: a seek bar on every side), index 0 the near edge's under
     // the diorama's buttons
     public GameObject[] bar;
-    public GameObject[] playingOnly;      // the controls shown only while the replay is open (speed, scrub, clock, summary; every side's)
-    public TextMeshProUGUI[] playLabel, speedLabel, clock, summaryLabel;
+    public GameObject[] playingOnly;      // the controls shown only while the replay is open (speed, scrub, clock; every side's)
+    public TextMeshProUGUI[] playLabel, speedLabel, clock;
     public Transform[] playhead, huntMark;   // on the scrub bars (canvas units, the middle at 0)
     public float barWidth = 760f;
     public int segments = 20;             // the scrub bar's pressable pieces
@@ -151,7 +151,9 @@ public class PHReplay : UdonSharpBehaviour
         if (!timeline) Timeline();
         bool avail = Available();
         for (int b = 0; b < bar.Length; b++) if (bar[b] != null && bar[b].activeSelf != avail) bar[b].SetActive(avail);
-        bool on = avail && open && viewRound == game.round;
+        // (Cor, 2026-11-22: no summary any more) the replay is the diorama's view whenever it can be watched, paused at
+        // the round's start until someone presses play
+        bool on = avail;
         if (on != shownOpen)
         {
             shownOpen = on;
@@ -399,8 +401,11 @@ public class PHReplay : UdonSharpBehaviour
     }
 
     // ------------------------------------------------------------------ playback
+    bool Live() { return open && viewRound == game.round; }   // (not yet pressed this round: paused at the start)
+
     float Pos()
     {
+        if (!Live()) return 0f;
         float t = atSec;
         if (playing) t += (game.Now - atMs) * 0.001f * speed;
         return Mathf.Clamp(t, 0f, Duration());
@@ -505,7 +510,7 @@ public class PHReplay : UdonSharpBehaviour
             for (int b = 0; b < clock.Length; b++) if (clock[b] != null) clock[b].text = ct;
         }
         bool atEnd = t >= dur - 0.01f;
-        string pl = game.text != null ? game.text.Get(playing && !atEnd ? "replay.pause" : "replay.play") : "";
+        string pl = game.text != null ? game.text.Get(playing && Live() && !atEnd ? "replay.pause" : "replay.play") : "";
         for (int b = 0; b < playLabel.Length; b++) if (playLabel[b] != null && playLabel[b].text != pl) playLabel[b].text = pl;
     }
 
@@ -737,10 +742,19 @@ public class PHReplay : UdonSharpBehaviour
         Send();
     }
 
+    // the first press of the round on speed or the scrub bar: the replay taken from its paused start
+    void Begin()
+    {
+        if (Live()) return;
+        open = true; playing = false; atSec = 0f; atMs = game.Now; speed = 1;
+        for (int i = 0; i < lastK.Length; i++) lastK[i] = -1;
+    }
+
     public void Speed()
     {
-        if (!open) return;
+        if (!Available()) return;
         Take();
+        Begin();
         atSec = Pos(); atMs = game.Now;
         speed = speed >= 4 ? 1 : speed * 2;
         Send();
@@ -749,17 +763,10 @@ public class PHReplay : UdonSharpBehaviour
     // a piece of a scrub bar (buttonArg = side * SIDE_ARG + the piece + 1): the replay from there
     public void Seek()
     {
-        if (!open) return;
+        if (!Available()) return;
         Take();
+        Begin();
         atSec = Duration() * Mathf.Clamp01(((buttonArg - 1) % SIDE_ARG) / (float)Mathf.Max(1, segments - 1)); atMs = game.Now;
-        Send();
-    }
-
-    // back to the diorama's summary
-    public void Close()
-    {
-        Take();
-        open = false; playing = false;
         Send();
     }
 
@@ -768,12 +775,10 @@ public class PHReplay : UdonSharpBehaviour
     void Labels()
     {
         if (game.text == null) return;
-        string pl = game.text.Get(open && viewRound == game.round ? (playing ? "replay.pause" : "replay.play") : "replay.watch");
+        string pl = game.text.Get(Live() && playing ? "replay.pause" : "replay.play");
         string sp = game.text.F1("replay.speed", speed.ToString());   // (a string row, so the text bake gives the font its ×)
-        string su = game.text.Get("replay.summary");
         for (int b = 0; b < playLabel.Length; b++) if (playLabel[b] != null) playLabel[b].text = pl;
         for (int b = 0; b < speedLabel.Length; b++) if (speedLabel[b] != null) speedLabel[b].text = sp;
-        for (int b = 0; b < summaryLabel.Length; b++) if (summaryLabel[b] != null) summaryLabel[b].text = su;
     }
 
     string Clock(float t)
