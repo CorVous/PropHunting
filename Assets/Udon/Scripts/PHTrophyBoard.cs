@@ -6,9 +6,8 @@ using UnityEngine.UI;
 // The Trophies board on the spawn wall (Cor, 2026-11-19): hunter trophies on the left, hider trophies on the
 // right, 40 each, every card with its name, its goal written out and, for the ones that count up, a
 // bar (no rounds estimate: Cor). Each player sees their own: each half is sorted closest-to-done first, the earned ones
-// at the end (sortByProgress; off: every card at its own number's place). So that players can name a card to each
-// other (hop playtest), the builder numbers the rows at the board's edges and puts each trophy's fixed number (#1 ..
-// #44) on its card. The cards are built by the scene builder; this only moves and colours them.
+// at the end (sortByProgress; off: every card at its own number's place). The cards are built by the scene builder;
+// this only moves and colours them.
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class PHTrophyBoard : UdonSharpBehaviour
 {
