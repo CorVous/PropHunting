@@ -1195,7 +1195,7 @@ public static partial class LobbyBuilder
         Piece(root, "board-game-bits/D6_A_red", L(20.4f, 16.0f), 2.3f, 20f, true);   // south of the ready area, clear of the weapon wall's panel
         // the rest spread around the room's floor (Cor: not bunched up along the south wall), clear of the PLAY mat,
         // the track along the walls, the weapon wall's walkway and the spawn's path
-        Piece(root, "board-game-bits/D20_blue", L(17.5f, 17.0f), 1.8f, -15f, true);
+        Piece(root, "board-game-bits/D20_blue", L(17.5f, 17.0f), 1.8f, -15f, true, D20FaceDown);   // lying on a face (Cor), not on its point
         Stack(root, L(4.0f, 13.4f), 3, 1.6f); Stack(root, L(5.8f, 15.2f), 2, 1.5f); Stack(root, L(7.4f, 17.6f), 1, 1.4f);
         Piece(root, "furniture-bits/couch_pillows", L(0.95f, 17.76f), 2.6f, 90f, true);   // backs to the west wall, facing the room, where Cor placed them by hand
         Piece(root, "furniture-bits/armchair", L(1.0f, 21.06f), 1.5f, 90f, true);
@@ -1331,14 +1331,27 @@ public static partial class LobbyBuilder
         }
     }
 
-    // a KayKit model, scaled so its largest dimension is `size` metres, standing on `at`, turned by `yaw`
-    static GameObject Piece(Transform root, string model, Vector3 at, float size, float yaw, bool collider)
+    // the D20 model stands on a corner; tipped by the angle between a corner and the middle of a face next to it, it
+    // rests flat on that face
+    const float D20FaceDown = 37.3774f;
+
+    // a KayKit model, scaled so its largest dimension is `size` metres, standing on `at`, turned by `yaw` (and first
+    // tipped forward by `tilt`)
+    static GameObject Piece(Transform root, string model, Vector3 at, float size, float yaw, bool collider, float tilt = 0f)
     {
         string path = Root + "Models/" + model + ".fbx";
         var asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         if (asset == null) { Debug.LogWarning("[lobby] missing model " + path); return new GameObject("Missing"); }
         var go = (GameObject)Object.Instantiate(asset);
         go.name = System.IO.Path.GetFileName(model);
+        if (tilt != 0f)
+        {
+            // tipped inside an upright holder, so the yaw, the feet on the floor and the box collider all stay upright
+            var holder = new GameObject(go.name);
+            go.transform.SetParent(holder.transform, false);
+            go.transform.localRotation = Quaternion.Euler(tilt, 0f, 0f);
+            go = holder;
+        }
         go.transform.SetParent(root, false);
         go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
         var mat = PackMat(model);
@@ -1348,11 +1361,14 @@ public static partial class LobbyBuilder
             for (int i = 0; i < ms.Length; i++) ms[i] = mat;
             r.sharedMaterials = ms;
         }
-        var b = Bounds(go);
+        // a tipped model measured by its vertices: the renderers' boxes of a tipped mesh are too big (the D20 floated
+        // 0.31 m over the floor on them)
+        System.Func<GameObject, Bounds> measure = tilt != 0f ? (System.Func<GameObject, Bounds>)VertexBounds : Bounds;
+        var b = measure(go);
         float k = size / Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
         go.transform.localScale *= k;
         go.transform.localPosition = Vector3.zero;
-        b = Bounds(go);
+        b = measure(go);
         go.transform.position += root.TransformPoint(at) - new Vector3(b.center.x, b.min.y, b.center.z);
         if (collider)
         {
@@ -1360,7 +1376,7 @@ public static partial class LobbyBuilder
             // the couch at 270 degrees had its length across, Cor: a weird hitbox), then turned back
             Quaternion turned = go.transform.rotation;
             go.transform.rotation = Quaternion.identity;
-            b = Bounds(go);
+            b = measure(go);
             var col = go.AddComponent<BoxCollider>();
             col.center = go.transform.InverseTransformPoint(b.center);
             var ls = go.transform.lossyScale;
@@ -1377,6 +1393,24 @@ public static partial class LobbyBuilder
         var b = rs[0].bounds;
         foreach (var r in rs) b.Encapsulate(r.bounds);
         return b;
+    }
+
+    // the world box of a model's mesh vertices (tight, unlike Renderer.bounds of a turned mesh)
+    static Bounds VertexBounds(GameObject go)
+    {
+        var mfs = go.GetComponentsInChildren<MeshFilter>();
+        if (mfs.Length == 0) return Bounds(go);
+        bool any = false; var b = new Bounds();
+        foreach (var mf in mfs)
+        {
+            if (mf.sharedMesh == null) continue;
+            foreach (var v in mf.sharedMesh.vertices)
+            {
+                var p = mf.transform.TransformPoint(v);
+                if (!any) { b = new Bounds(p, Vector3.zero); any = true; } else b.Encapsulate(p);
+            }
+        }
+        return any ? b : Bounds(go);
     }
 
     static Material PackMat(string model)
