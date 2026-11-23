@@ -1194,6 +1194,7 @@ public class PHLocal : UdonSharpBehaviour
         if (!s.armed) { s.armed = true; s.Send(); Say(T("say.gunSeen"), 4f); }
         if (weapons != null) weapons.FireSelector();
         statShots++;
+        if (game.replay != null) game.replay._Shot(dir);   // (the round's replay: the gun shows from here, and fires)
         s.SendCustomNetworkEvent(NetworkEventTarget.All, nameof(PHSlot.Shot), game.builder.ToLocal(end), best);   // (map-local)
         if (best >= 0)
         {

@@ -50,6 +50,10 @@ public static partial class LobbyBuilder
         if (tauntMat == null) { tauntMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayTaunt" }; AssetDatabase.CreateAsset(tauntMat, "Assets/Udon/Generated/ReplayTaunt.mat"); }
         tauntMat.shader = Shader.Find("PropHunt/DitherPulse"); tauntMat.enableInstancing = true; EditorUtility.SetDirty(tauntMat);
         rp.taunts = new Transform[n]; rp.tauntRenderer = new Renderer[n];
+        rp.guns = new Transform[n]; rp.gunModel = new MeshFilter[n]; rp.gunFlash = new Transform[n]; rp.gunFlashRenderer = new Renderer[n];
+        var flashMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/ReplayGunFlash.mat");
+        if (flashMat == null) { flashMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayGunFlash" }; AssetDatabase.CreateAsset(flashMat, "Assets/Udon/Generated/ReplayGunFlash.mat"); }
+        flashMat.shader = Shader.Find("PropHunt/DitherPulse"); flashMat.SetFloat("_Flat", 1f); flashMat.color = new Color(1f, 0.85f, 0.35f, 1f); EditorUtility.SetDirty(flashMat);
         // a hunter (Cor, 2026-11-22): the red meeple (the board game toys' meeple_red, as the props bake it), holding the
         // weapon they had (PHReplay fills the mesh), swinging it hard each time they swung or hit something. A body
         // to lean the swing, a hand each side to hold the weapon and a two-piece set's other piece. No colliders.
@@ -116,6 +120,23 @@ public static partial class LobbyBuilder
             rp.tauntRenderer[i] = Shape(taunt.transform, PrimitiveType.Sphere, Vector3.zero, Vector3.one, tauntMat);
             taunt.SetActive(false);
             rp.taunts[i] = taunt.transform;
+
+            // a hider's gun in the final stand (PHReplay.Gun): a holder turned to the shot, the model under it (its grip,
+            // turn and size set at run time, PHWeapons.PutGunModel), and a flash at the muzzle
+            var gun = new GameObject("ReplayGun" + i);
+            gun.transform.SetParent(mm.model, false);
+            var gmo = new GameObject("Gun");
+            gmo.transform.SetParent(gun.transform, false);
+            var gmf = gmo.AddComponent<MeshFilter>();
+            var gmr = gmo.AddComponent<MeshRenderer>(); gmr.sharedMaterial = weaponMat;
+            gmr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; gmr.receiveShadows = false;
+            gun.SetActive(false);
+            rp.guns[i] = gun.transform; rp.gunModel[i] = gmf;
+            var flash = new GameObject("ReplayGunFlash" + i);
+            flash.transform.SetParent(mm.model, false);
+            rp.gunFlashRenderer[i] = Shape(flash.transform, PrimitiveType.Sphere, Vector3.zero, Vector3.one, flashMat);
+            flash.SetActive(false);
+            rp.gunFlash[i] = flash.transform;
 
             var tail = new GameObject("ReplayTail" + i);
             tail.transform.SetParent(mm.model, false);
