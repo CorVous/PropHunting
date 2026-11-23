@@ -286,22 +286,38 @@ public static class WorldSceneBuilder
             UdonSharpEditorUtility.CopyProxyToUdon(dwell);
         }
         game.revealMat = Mat2("Reveal", Shader.Find("PropHunt/Reveal"));   // the END reveal's striped highlight (PHSlot)
-        // the hunters' stand-ins (PHGame.layers, PHLocal.UpdateStandIns): with the teams on copies of their own, a hider
-        // or a ghost sees each hunter as a plain body where they stand on the map. A capsule each, no collider, off
+        // the hunters' stand-ins (PHGame.layers, PHLocal.UpdateStandIns): with the hiders and ghosts on copies of the map
+        // of their own (HIDE CAMERAS), a hunter is carried there as themselves through their seat (PHSlot.afoot). One who
+        // cannot be seated (not a humanoid avatar) is drawn instead as the hunters' meeple, as tall as they are, with
+        // their name over it (Cor, 2026-11-22). A flat picture each, turned to the viewer, no collider, off
         {
             var standRoot = new GameObject("StandIns").transform;
             standRoot.SetParent(gameGo.transform, false);
-            var standMat = Mat("StandInHunter", new Color(0.86f, 0.26f, 0.22f));
+            var standMat = Mat2("StandInMeeple", Shader.Find("Unlit/Transparent Cutout"));
+            standMat.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Lobby/Icons/meeple_hunt.png");
+            standMat.SetFloat("_Cutoff", 0.5f);
+            var nameFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Lobby/Fonts/KenneyFuture SDF.asset");
             local.standIns = new Transform[SLOTS];
+            local.standInNames = new TextMeshPro[SLOTS];
             for (int i = 0; i < SLOTS; i++)
             {
-                var c = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                var c = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 c.name = "StandIn" + i;
                 Object.DestroyImmediate(c.GetComponent<Collider>());
                 c.transform.SetParent(standRoot, false);
                 var cr = c.GetComponent<MeshRenderer>(); cr.sharedMaterial = standMat; cr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 c.SetActive(false);
                 local.standIns[i] = c.transform;
+                var nameGo = new GameObject("StandInName" + i);
+                nameGo.transform.SetParent(standRoot, false);
+                var tmp = nameGo.AddComponent<TextMeshPro>();
+                if (nameFont != null) tmp.font = nameFont;
+                tmp.fontSize = 2.2f; tmp.alignment = TextAlignmentOptions.Bottom; tmp.enableWordWrapping = false;
+                tmp.color = new Color(1f, 0.72f, 0.66f);   // the hunters' red, pale enough to read
+                tmp.rectTransform.sizeDelta = new Vector2(4f, 0.5f); tmp.text = "";
+                tmp.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                nameGo.SetActive(false);
+                local.standInNames[i] = tmp;
             }
         }
 

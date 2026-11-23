@@ -129,8 +129,11 @@ public class PHGame : UdonSharpBehaviour
     // (hop playtest, Cor: host settings, both off by default)
     [UdonSynced] public bool seeHiders;   // hiders (and ghosts) see the other hiders' props as edge cages (PHSlot, MapBuilderUdon.MateCage)
     [UdonSynced] public bool noPlacing;   // NO PLACING (Cor, 2026-11-22): no stickers or VRChat items on the map (PHLocal.UpdatePlacement)
-    // "anti troll" (Strelia): each team plays on its own copy of the map (TeamOf). Its switch made way for NO PLACING
-    // (Cor, 2026-11-22), so nothing turns it on now; the copies' code is kept for a later try.
+    // The teams' copies of the map (Strelia's idea; TeamOf). First a host switch of its own, which made way for NO PLACING
+    // (Cor, 2026-11-22) and came back the same day as the experimental HIDE CAMERAS switch: a hider's VRChat camera,
+    // stream camera and drone are drawn at the hider's true place (memory: vrchat-station-info-leak), which with the
+    // copies on is 900 m from where the hunters play. Hunters are then carried into the other copies as themselves
+    // (PHSlot.afoot: their real avatar, name plate and voice).
     [UdonSynced] public bool layers;
 
     // ---- the teams' copies of the map (layers). Every client builds one copy of the map; with layers on, where it
@@ -176,8 +179,20 @@ public class PHGame : UdonSharpBehaviour
 
     // a place another player's client put them at (their avatar, their hand) as a place on the map, and as a place in
     // this client's copy (the stand-ins, the hunters' weapons, a hider's shot at a hunter)
-    public Vector3 MapLocalOf(int slot, Vector3 world) { return world - SlotOrigin(slot); }
-    public Vector3 SeenHere(int slot, Vector3 world) { return builder.ToWorld(world - SlotOrigin(slot)); }
+    // (by the place itself, not the slot's team: a hunter carried into this client's copy, PHSlot.afoot, is already
+    // here, and for a moment around sitting down either may be true)
+    public Vector3 MapLocalOf(int slot, Vector3 world) { return world - OriginAt(world); }
+    public Vector3 SeenHere(int slot, Vector3 world) { return builder.ToWorld(world - OriginAt(world)); }
+
+    // the copy a world place lies in: the copies stand LAYER_GAP apart along x, the map and the lobby well within half
+    // of that of the origin's. Zero with the copies off.
+    public Vector3 OriginAt(Vector3 world)
+    {
+        if (!LayersOn()) return Vector3.zero;
+        if (world.x > LAYER_GAP * 0.5f) return new Vector3(LAYER_GAP, 0f, 0f);
+        if (world.x < -LAYER_GAP * 0.5f) return new Vector3(-LAYER_GAP, 0f, 0f);
+        return Vector3.zero;
+    }
 
     // ---- balance (Balance.cs)
     readonly float[] hidePhase = { 35f, 40f, 45f, 50f, 30f };       // S, M, L, XL, XS (size 4: GenData.SIZE_XS)
@@ -382,7 +397,8 @@ public class PHGame : UdonSharpBehaviour
     public void PanelTaunt() { SetTauntInterval(panelArg); }
     public void PanelPenalty() { SetWrongPenalty(panelArg); }
     public void PanelSeeHiders() { SetSeeHiders(panelArg != 0); }
-    public void _PanelNoPlacing() { SetNoPlacing(panelArg != 0); }   // ("_": no player can call it over the network)
+    public void _PanelNoPlacing() { SetNoPlacing(panelArg != 0); }
+    public void _PanelLayers() { SetLayers(panelArg != 0); }   // ("_": no player can call it over the network)
 
     public readonly string[] sizeName = { "S", "M", "L", "XL", "XS" };   // (XS is 4: the codes and trail of S to XL keep their numbers)
     public readonly string[] densityName = { "Normal", "Sparse", "Dense", "Very sparse", "Very dense", "Minimal" };
@@ -408,6 +424,7 @@ public class PHGame : UdonSharpBehaviour
     public void SetWrongPenalty(int v) { if (!IsHost || phase != PH_LOBBY) return; wrongPenalty = v; RequestSerialization(); }
     public void SetSeeHiders(bool v) { if (!IsHost || phase != PH_LOBBY) return; seeHiders = v; RequestSerialization(); }
     public void SetNoPlacing(bool v) { if (!IsHost || phase != PH_LOBBY) return; noPlacing = v; RequestSerialization(); }
+    public void SetLayers(bool v) { if (!IsHost || phase != PH_LOBBY) return; layers = v; RequestSerialization(); }
 
     // the host enters a seed code for the next map (the panel's text field)
     public void SubmitSeed(string text)
