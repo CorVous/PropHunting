@@ -7,7 +7,7 @@ var propRoot = (Transform)bld.GetProgramVariable("propRoot");
 var fenceRoot = (Transform)bld.GetProgramVariable("fenceRoot");
 var lp = VRC.SDKBase.Networking.LocalPlayer;
 Vector3 spawn = lp.GetPosition();
-var rng = new System.Random(11);
+var rng = new System.Random(29);
 
 // ---------------- props on the map
 var pDef = new System.Collections.Generic.List<int>(); var pPos = new System.Collections.Generic.List<Vector3>(); var pB = new System.Collections.Generic.List<Bounds>(); var pName = new System.Collections.Generic.List<string>();
@@ -177,17 +177,22 @@ float PlanD(int a, int b) { return new Vector2(pPos[a].x - pPos[b].x, pPos[a].z 
 float SpawnD(int a) { return new Vector2(pPos[a].x - spawn.x, pPos[a].z - spawn.z).magnitude; }
 int Pick(System.Collections.Generic.List<int> L, System.Func<int, bool> ok) { var c = new System.Collections.Generic.List<int>(); foreach (var i in L) if (ok(i)) c.Add(i); return c.Count == 0 ? -1 : c[rng.Next(c.Count)]; }
 int pA = Pick(outP, i => SpawnD(i) > 10f && SpawnD(i) < 30f);
+var allP = new System.Collections.Generic.List<int>(); allP.AddRange(outP); allP.AddRange(inP); allP.AddRange(upP);
+if (pA < 0) pA = Pick(allP, i => SpawnD(i) > 6f);
 int pC = Pick(outP, i => pA >= 0 && PlanD(i, pA) > 12f && SpawnD(i) > 8f);
-int pB2 = Pick(inP, i => true);
+if (pC < 0) pC = Pick(allP, i => pA >= 0 && i != pA && PlanD(i, pA) > 6f);
+int pB2 = Pick(inP, i => true); if (pB2 < 0) pB2 = Pick(allP, i => i != pA && i != pC);
 int pD = Pick(upP, i => true);
+if (pD < 0) pD = Pick(outP, i => i != pA && i != pC);
+if (pD < 0) pD = Pick(inP, i => i != pB2);
 int pBswap = Pick(inP, i => pB2 >= 0 && PlanD(i, pB2) > 2.5f && PlanD(i, pB2) < 9f && pDef[i] != pDef[pB2]);
 int pDswap = Pick(upP, i => pD >= 0 && PlanD(i, pD) > 2f && PlanD(i, pD) < 9f && pDef[i] != pDef[pD] && Mathf.Abs(pPos[i].y - pPos[pD].y) < 0.5f);
 // wrong props the hunter tries
-int wA1 = Pick(outP, i => pA >= 0 && i != pA && PlanD(i, pA) < 8f);
-int wA2 = Pick(outP, i => pA >= 0 && i != pA && i != wA1 && PlanD(i, pA) < 9f);
+int wA1 = Pick(allP, i => pA >= 0 && i != pA && PlanD(i, pA) < 8f);
+int wA2 = Pick(allP, i => pA >= 0 && i != pA && i != wA1 && PlanD(i, pA) < 9f);
 int wB = Pick(inP, i => pB2 >= 0 && i != pB2 && i != pBswap && PlanD(i, pBswap >= 0 ? pBswap : pB2) < 8f);
 int wD = Pick(upP, i => pD >= 0 && i != pD && i != pDswap && PlanD(i, pDswap >= 0 ? pDswap : pD) < 9f);
-int wC = Pick(outP, i => pC >= 0 && i != pC && PlanD(i, pC) < 9f && PlanD(i, pC) > 3f);
+int wC = Pick(allP, i => pC >= 0 && i != pC && PlanD(i, pC) < 9f && PlanD(i, pC) > 3f);
 string PN(int i) { return i < 0 ? "none" : pName[i] + "@" + pPos[i].ToString("F1"); }
 log.AppendLine("A " + PN(pA) + " | C " + PN(pC) + " | B " + PN(pB2) + " -> " + PN(pBswap) + " | D " + PN(pD) + " -> " + PN(pDswap));
 log.AppendLine("wrong: " + PN(wA1) + ", " + PN(wA2) + ", " + PN(wB) + ", " + PN(wD) + ", " + PN(wC));
@@ -206,6 +211,7 @@ void Wait(int a, int ticks, float yaw) { Vector3 p = at[a] > 0 ? P[a][at[a] - 1]
 float CurYaw(int a) { return at[a] > 0 ? Y[a][at[a] - 1] : 0f; }
 bool Walk(int a, int target, float speed)
 {
+    if (target < 0 || node[a] < 0) { log.AppendLine("NO PATH actor " + a + " (no stand spot)"); return false; }
     var path = Path(node[a], target);
     if (path == null) { log.AppendLine("NO PATH actor " + a + " to " + nodeP[target]); return false; }
     float step = speed * 0.25f, carry = 0f; Vector3 last = path[0]; float yaw = CurYaw(a);
@@ -321,7 +327,7 @@ for (int a = 0; a < 5; a++) if (len[a] == T && at[a] < T) Wait(a, T - at[a], Cur
 // ---------------- encode (version 2, every sample absolute)
 var meleeMesh = (Mesh[])wpn.GetProgramVariable("meleeMesh"); var gunMesh = (Mesh[])wpn.GetProgramVariable("gunMesh");
 int melee = 0; for (int i = 0; i < meleeMesh.Length; i++) if (meleeMesh[i] != null && meleeMesh[i].name.ToLower().Contains("hammer")) { melee = i; break; }
-string[] who = { "Hawk", "Juniper", "Pickle", "Wren", "Bramble" };
+string[] who = { "Rook", "Moss", "Pip", "Clover", "Fennel" };
 var outS = new System.Text.StringBuilder();
 for (int a = 0; a < 5; a++)
 {

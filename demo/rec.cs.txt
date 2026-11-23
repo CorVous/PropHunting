@@ -2,7 +2,7 @@
 // Schedule (video): 0-3 s paused at 0:00; Play at 4x through the hide; 2x in the hunt; 1x for the final stand's shots;
 // 2x to the end. Upper floors off while the hunter is upstairs.
 VRC.Udon.UdonBehaviour U(string prog) { foreach (var ub in UnityEngine.Object.FindObjectsOfType<VRC.Udon.UdonBehaviour>()) if (ub.programSource != null && ub.programSource.name == prog) return ub; return null; }
-string DIR = @"D:\VRChat Worlds\_bugfix_scratch\demo\frames\";
+string DIR = @"D:\VRChat Worlds\_bugfix_scratch\demo\frames2\";
 System.IO.Directory.CreateDirectory(DIR);
 foreach (var f in System.IO.Directory.GetFiles(DIR, "*.jpg")) System.IO.File.Move(f, f + "." + System.DateTime.Now.Ticks + ".old");
 var r = U("PHReplay"); var mm = U("PHMiniMap");
@@ -37,6 +37,9 @@ float RT()
 void SpeedTo(int want) { for (int i = 0; i < 3 && (int)r.GetProgramVariable("speed") != want; i++) r.SendCustomEvent("Speed"); }
 var log = new System.Text.StringBuilder();
 bool done = false; GameObject host = null;
+var tFirstA = (int[])r.GetProgramVariable("tFirst"); int originTickA = (int)r.GetProgramVariable("originTick"); var originA = (Vector3)mm.GetProgramVariable("origin");
+float azCur = az0;
+Vector3 PosOf(int slot, float rt) { int k = Mathf.Clamp(Mathf.FloorToInt(originTickA + rt / 0.25f) - tFirstA[slot], 0, Mathf.Max(0, tCount[slot] - 1)); return model.TransformPoint(tPos[slot * 2400 + k] - originA); }
 System.Collections.IEnumerator Loop()
 {
     for (int guard = 0; guard < 30 * 120 && !done; guard++)
@@ -49,9 +52,18 @@ System.Collections.IEnumerator Loop()
         if (stage == 3 && rtm >= ENDG + 22f) { SpeedTo(2); stage = 4; log.AppendLine("2x at " + frame); }
         if (!upperOff && rtm >= upOn && rtm < upOff && upperBtn != null) { upperBtn.onClick.Invoke(); upperOff = true; log.AppendLine("floors off at " + frame + " rt " + rtm); }
         if (upperOff && rtm >= upOff && upperBtn != null) { upperBtn.onClick.Invoke(); upperOff = false; upOn = 1e9f; log.AppendLine("floors on at " + frame + " rt " + rtm); }
-        float az = (az0 + vt * 0.85f) * Mathf.Deg2Rad, el = (44f + 5f * Mathf.Sin(vt * 0.06f)) * Mathf.Deg2Rad, dist = R * 1.95f;
+        // follow the action: the camera drifts round to the hunter's side (the final stand: between the hunter and the shooter)
+        Vector3 hp = PosOf(0, rtm);
+        if (rtm >= ENDG && tCount[3] > 0) hp = (hp + PosOf(3, rtm)) * 0.5f;
+        Vector3 dv = hp - c; dv.y = 0f;
+        if (dv.magnitude > R * 0.15f) azCur = Mathf.MoveTowardsAngle(azCur, Mathf.Atan2(dv.x, dv.z) * Mathf.Rad2Deg, 9f / 30f);
+        float az = azCur * Mathf.Deg2Rad, el = (50f + 4f * Mathf.Sin(vt * 0.06f)) * Mathf.Deg2Rad, dist = R * 1.9f;
         Vector3 dir = new Vector3(Mathf.Sin(az) * Mathf.Cos(el), Mathf.Sin(el), Mathf.Cos(az) * Mathf.Cos(el));
-        cam.transform.position = c + dir * dist; cam.transform.LookAt(c + Vector3.up * R * 0.02f);
+        Vector3 look = Vector3.Lerp(c, new Vector3(hp.x, c.y, hp.z), 0.3f);
+        cam.transform.position = look + dir * dist; cam.transform.LookAt(look);
+        // the name tags turned to this camera (the game turns them to the local player's head)
+        var tagsA = (Transform[])r.GetProgramVariable("tags");
+        for (int q = 0; q < tagsA.Length; q++) { if (tagsA[q] == null || !tagsA[q].gameObject.activeInHierarchy) continue; Vector3 dd = tagsA[q].position - cam.transform.position; dd.y = 0f; if (dd.sqrMagnitude > 1e-6f) tagsA[q].rotation = Quaternion.LookRotation(dd, Vector3.up); }
         cam.Render();
         RenderTexture.active = rt; tex.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0); tex.Apply(); RenderTexture.active = null;
         System.IO.File.WriteAllBytes(DIR + "f_" + frame.ToString("D5") + ".jpg", tex.EncodeToJPG(93));
@@ -61,7 +73,7 @@ System.Collections.IEnumerator Loop()
     }
     log.AppendLine("end frame " + frame + "; server ms " + (VRC.SDKBase.Networking.GetServerTimeInMilliseconds() - now0) + " vs time " + ((Time.time - time0) * 1000f).ToString("F0"));
     Time.captureFramerate = 0;
-    System.IO.File.WriteAllText(DIR + "..\\rec_log.txt", log.ToString());
+    System.IO.File.WriteAllText(DIR + "..\\rec_log2.txt", log.ToString());
     UnityEngine.Object.Destroy(go); UnityEngine.Object.Destroy(host);
 }
 cam.enabled = false;
