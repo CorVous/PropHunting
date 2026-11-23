@@ -43,6 +43,10 @@ public static partial class LobbyBuilder
         // (flat colour, solid at alpha 1; at 0.5 a see-through screen: a pawn up on a floor switched off, PHReplay.Screen)
         pawnMat.shader = Shader.Find("PropHunt/DitherPulse"); pawnMat.SetFloat("_Flat", 1f); pawnMat.color = Color.white; EditorUtility.SetDirty(pawnMat);
         var lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/MiniMapLine.mat");
+        // a hider's meeple: flat in their colour (block), shaded by a fixed light so its shape reads (DitherPulse _Lit)
+        var hiderMeepleMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/ReplayHiderMeeple.mat");
+        if (hiderMeepleMat == null) { hiderMeepleMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayHiderMeeple" }; AssetDatabase.CreateAsset(hiderMeepleMat, "Assets/Udon/Generated/ReplayHiderMeeple.mat"); }
+        hiderMeepleMat.shader = Shader.Find("PropHunt/DitherPulse"); hiderMeepleMat.SetFloat("_Flat", 1f); hiderMeepleMat.SetFloat("_Lit", 1f); hiderMeepleMat.color = Color.white; EditorUtility.SetDirty(hiderMeepleMat);
         rp.pawns = new Transform[n]; rp.pawnRenderer = new Renderer[n]; rp.pops = new Transform[n]; rp.popRenderer = new Renderer[n];
         rp.tails = new LineRenderer[n]; rp.tags = new Transform[n]; rp.tagLabel = new TextMeshPro[n];
         // a hider's taunt (Cor, 2026-11-22): a dithered pulse around them, in their colour (PropHunt/DitherPulse)
@@ -105,7 +109,19 @@ public static partial class LobbyBuilder
         {
             var pawn = new GameObject("ReplayPawn" + i);
             pawn.transform.SetParent(mm.model, false);
-            rp.pawnRenderer[i] = Shape(pawn.transform, PrimitiveType.Capsule, new Vector3(0f, 0.9f, 0f), new Vector3(0.7f, 0.9f, 0.7f), pawnMat);
+            // (Cor: a hider before they take a prop is a meeple too, in their own colour; a capsule only without the meeple)
+            if (meepleMesh != null)
+            {
+                var hf = new GameObject("Meeple");
+                hf.transform.SetParent(pawn.transform, false);
+                hf.transform.localScale = Vector3.one * msc;
+                hf.transform.localPosition = new Vector3(-mc.x, me.y - mc.y, -mc.z) * msc;
+                hf.AddComponent<MeshFilter>().sharedMesh = meepleMesh;
+                var hr = hf.AddComponent<MeshRenderer>(); hr.sharedMaterial = hiderMeepleMat;
+                hr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; hr.receiveShadows = false;
+                rp.pawnRenderer[i] = hr;
+            }
+            else rp.pawnRenderer[i] = Shape(pawn.transform, PrimitiveType.Capsule, new Vector3(0f, 0.9f, 0f), new Vector3(0.7f, 0.9f, 0.7f), pawnMat);
             pawn.SetActive(false);
             rp.pawns[i] = pawn.transform;
 

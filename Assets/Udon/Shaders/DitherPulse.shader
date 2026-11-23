@@ -7,6 +7,7 @@ Shader "PropHunt/DitherPulse"
     {
         _Color ("Colour (a: how full)", Color) = (1,1,1,1)
         _Flat ("Flat: as full everywhere, no rim (the replay's pawns and bursts)", Float) = 0
+        _Lit ("Shaded by a fixed light (the replay's hider meeples)", Float) = 0
     }
     SubShader
     {
@@ -21,13 +22,14 @@ Shader "PropHunt/DitherPulse"
             #include "UnityCG.cginc"
 
             fixed4 _Color;
-            float _Flat;
+            float _Flat, _Lit;
 
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f
             {
                 float4 pos : SV_POSITION;
                 float rim : TEXCOORD0;
+                float3 n : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -40,6 +42,7 @@ Shader "PropHunt/DitherPulse"
                 float3 n = normalize(UnityObjectToWorldNormal(v.normal));
                 float3 view = normalize(WorldSpaceViewDir(v.vertex));
                 o.rim = 1.0 - abs(dot(n, view));
+                o.n = n;
                 return o;
             }
 
@@ -51,7 +54,8 @@ Shader "PropHunt/DitherPulse"
                 float th = (b[p.y * 4 + p.x] + 0.5) / 16.0;
                 float fill = _Flat > 0.5 ? _Color.a : _Color.a * lerp(0.25, 1.0, saturate(i.rim * 1.4));
                 if (fill <= th) discard;
-                return fixed4(_Color.rgb, 1);
+                float l = _Lit > 0.5 ? 0.62 + 0.38 * saturate(dot(normalize(i.n), normalize(float3(0.4, 0.85, -0.35)))) : 1.0;   // (as PropHunt/Diorama)
+                return fixed4(_Color.rgb * l, 1);
             }
             ENDCG
         }

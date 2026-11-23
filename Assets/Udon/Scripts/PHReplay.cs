@@ -356,6 +356,7 @@ public class PHReplay : UdonSharpBehaviour
         lastK[i] = -1;
         weaponShown[i] = -2;
         gunShown[i] = -2;
+        tagLabel[i].text = "";   // (the name again from this track: it was kept from an older one)
     }
 
     int S16(byte[] d, int p) { int v = (int)d[p] | ((int)d[p + 1] << 8); return v > 32767 ? v - 65536 : v; }
@@ -530,6 +531,8 @@ public class PHReplay : UdonSharpBehaviour
             // a hider's taunt: the dithered pulse, not a burst (a hit or a catch in the same tick still bursts red)
             if (tRole[i] == PHGame.ROLE_HIDER && (f & F_EV1) != 0) { tauntAt[i] = Time.time; f &= ~F_EV1; }
             if ((f & F_SHOT) != 0) { shotAt[i] = Time.time; aimYaw[i] = tAim[b + j]; }
+            // (Cor: the hunter does not burst on an attack; the swing shows it, and the hider hit bursts red)
+            if (tRole[i] == PHGame.ROLE_HUNTER) f &= ~(F_EV1 | F_EV2 | F_CATCH);
             if ((f & (F_EV1 | F_EV2 | F_CATCH | F_END)) == 0) continue;
             Color c = colour[i];
             if ((f & (F_EV2 | F_END)) != 0 && tRole[i] == PHGame.ROLE_HIDER) c = new Color(0.92f, 0.2f, 0.18f);   // hit, caught: red
@@ -615,6 +618,7 @@ public class PHReplay : UdonSharpBehaviour
         if (gunShown[i] != gm) { gunShown[i] = gm; gunModel[i].sharedMesh = w.gunMesh[gm]; }
         w.PutGunModel(gunModel[i].transform, gm, kick, kr, 1f);
         float h = def >= 0 && def < game.gen.defSy.Length ? game.gen.defSy[def] / 1000f : 1f;
+        h = Mathf.Max(h, 1.3f);   // (over a flower it hung at a meeple's knee)
         g.localPosition = at + new Vector3(0f, h + 0.25f + 0.04f * Mathf.Sin(Time.time * 2.4f + i), 0f);
         g.localRotation = Quaternion.Euler(0f, t >= 0f && t < 0.8f ? aimYaw[i] : yaw, 0f);
         g.localScale = Vector3.one * PHWeapons.GUN_SCALE;
