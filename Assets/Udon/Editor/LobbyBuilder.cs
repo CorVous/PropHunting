@@ -167,7 +167,7 @@ public static partial class LobbyBuilder
         int[][] args = { new[] { -1, 4, 0, 1, 2, 3 }, new[] { 5, 3, 1, 0, 2, 4 }, new[] { 0, 1, 2 }, new[] { 30, 40, 60 } };
         string[][] caps = { new[] { "Auto · S", "XS", "S", "M", "L", "XL" }, new[] { "Minimal", "V. sparse", "Sparse", "Normal", "Dense", "V. dense" },
                             new[] { "2:15", "3:00", "4:30" }, new[] { "30 s", "40 s", "60 s" } };
-        int total = 2;   // (and the two switches, SEE HIDERS and ANTI TROLL, below)
+        int total = 3;   // (and the three switches, SEE HIDERS, NO PLACING and HIDE CAMERAS, below)
         for (int row = 0; row < args.Length; row++) total += args[row].Length;
         panel.tileKind = new int[total]; panel.tileArg = new int[total];
         panel.tileMarker = new GameObject[total]; panel.tileAuto = new GameObject[total]; panel.tileRect = new RectTransform[total];
@@ -204,16 +204,19 @@ public static partial class LobbyBuilder
             }
         }
 
-        // the two switches (hop playtest, Cor: host settings), right of the short ROUND and TAUNT rows: a tile each that
+        // the three switches (hop playtest, Cor: host settings), right of the short ROUND and TAUNT rows: a tile each that
         // turns over with every press, shown by its picture alone (Cor, 2026-11-22).
         // SEE HIDERS: hiders see each other's props as outlines (PHGame.seeHiders); NO PLACING: no stickers or VRChat
         // items on the map (PHGame.noPlacing, Cor 2026-11-22: in place of ANTI TROLL, the teams' own copies of the map)
+        // HIDE CAMERAS (Cor, 2026-11-22, experimental): the hiders and ghosts play on copies of the map of their own
+        // (PHGame.layers), so a hider's VRChat camera, stream camera or drone is nowhere near the hunters. Right of
+        // NO PLACING.
         {
-            string[] swTitle = { "SEE HIDERS", "NO PLACING" };   // (the tiles' object names only)
-            panel.switchCaption = new TextMeshProUGUI[2];
-            for (int k = 0; k < 2; k++, t++)
+            string[] swTitle = { "SEE HIDERS", "NO PLACING", "HIDE CAMERAS" };   // (the tiles' object names only)
+            panel.switchCaption = new TextMeshProUGUI[3];
+            for (int k = 0; k < 3; k++, t++)
             {
-                float cy = 30 + (2 + k) * 97 + 44.5f, cx = 575f;
+                float cy = 30 + (2 + Mathf.Min(k, 1)) * 97 + 44.5f, cx = k == 2 ? 695f : 575f;
                 var tile = Img(cv, "Tile " + swTitle[k], P(cx, cy), new Vector2(110, 88), sTile, RowColour[k == 0 ? 2 : 3], 2f);
                 tile.raycastTarget = true;
                 var b = tile.gameObject.AddComponent<Button>();
@@ -227,7 +230,8 @@ public static partial class LobbyBuilder
                 TextMeshProUGUI cap = null;
                 var pic = Img(tile.transform, "Icon", Vector2.zero, new Vector2(80, 80), null, Color.white);
                 if (k == 0) { panel.seeHidersOn = Icon("see_hiders_on"); panel.seeHidersOff = Icon("see_hiders_off"); panel.seeHidersIcon = pic; pic.sprite = panel.seeHidersOff; }
-                else { panel.noPlacingOn = Icon("no_placing_on"); panel.noPlacingOff = Icon("no_placing_off"); panel.noPlacingIcon = pic; pic.sprite = panel.noPlacingOff; }
+                else if (k == 1) { panel.noPlacingOn = Icon("no_placing_on"); panel.noPlacingOff = Icon("no_placing_off"); panel.noPlacingIcon = pic; pic.sprite = panel.noPlacingOff; }
+                else { panel.hideCamsOn = Icon("hide_cams_on"); panel.hideCamsOff = Icon("hide_cams_off"); panel.hideCamsIcon = pic; pic.sprite = panel.hideCamsOff; }
                 pic.preserveAspect = true;
                 panel.switchCaption[k] = cap;
                 var mk = Img(tile.transform, "Marker", new Vector2(42, 47), new Vector2(54, 54), marker, Color.white);

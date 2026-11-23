@@ -133,6 +133,9 @@ public class PHLocal : UdonSharpBehaviour
                 {
                     movePending = false;   // (an explicit move wins over a copy move still waiting, ShiftLocal)
                     me.TeleportTo(game.builder.ToWorld(game.builder.ReleasePoint()) + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+                    // HIDE CAMERAS (PHGame.layers): the hiders and ghosts play on copies of their own, and see this
+                    // hunter as themselves through their seat (PHSlot.afoot)
+                    if (s != null && game.LayersOn()) s.StartAfoot();
                     game.builder.WriteMood();   // out of the lobby: the map's mood
                     SetFrozen(false);
                     Say(T("say.hunt"), 3f);
@@ -155,7 +158,7 @@ public class PHLocal : UdonSharpBehaviour
                 // the reveal (Cor): every hider's prop stays where it is, highlighted through walls (PHSlot), and
                 // everyone is out of the seats, walking as themselves, until the lobby (PHGame.ROUND_END, 30 s)
                 if (body.active) body.frozen = true;
-                if (s != null) s.LeaveSeatForReveal();
+                if (s != null) { s.StopAfoot(); s.LeaveSeatForReveal(); }
                 RestoreEye();
                 SetFrozen(false);
                 Say(game.text.F1(game.hidersWin ? "say.hidersWin" : "say.huntersWin", game.text.En(game.endReason)), 10f);
@@ -210,7 +213,17 @@ public class PHLocal : UdonSharpBehaviour
         }
         else if (r == PHGame.ROLE_HUNTER && phase == PHGame.PH_HUNT)
         {
-            me.TeleportTo(game.builder.ToWorld(game.builder.ReleasePoint()) + Vector3.up * 0.1f, Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f));
+            Vector3 rel = game.builder.ToWorld(game.builder.ReleasePoint()) + Vector3.up * 0.1f;
+            Quaternion relRot = Quaternion.Euler(0f, game.builder.ReleaseYaw(), 0f);
+            // (still in their seat, PHSlot.afoot: a teleport does not take a seated player; out first, as ShiftLocal)
+            if (s.seated)
+            {
+                s.LeaveSeatForMove();
+                moveTo = rel; moveRot = relRot;
+                movePending = true; moveUntil = Time.time + 1f;
+                SendCustomEventDelayedFrames(nameof(_ShiftMove), 2);
+            }
+            else me.TeleportTo(rel, relRot);
             game.Log("respawned in the hunt: back to the release");
         }
         else return;
@@ -386,7 +399,8 @@ public class PHLocal : UdonSharpBehaviour
             if (want == 1 && layered && slot >= 0 && game.TeamOf(slot) != myTeam)
             {
                 Vector3 pp = p.GetPosition();
-                float dw = Vector3.Distance(pp, myPos), dl = Vector3.Distance(pp - game.SlotOrigin(slot), myLocal);
+                // (a hunter carried into this copy, PHSlot.afoot, is heard from where they are drawn: VRChat's default)
+                float dw = Vector3.Distance(pp, myPos), dl = Vector3.Distance(game.MapLocalOf(slot, pp), myLocal);
                 int nearM = Mathf.Clamp(Mathf.RoundToInt(dw - dl), 0, 999);
                 if (nearM > 0) want = 10 + nearM;
             }
@@ -760,9 +774,12 @@ public class PHLocal : UdonSharpBehaviour
             // carried them 400 m under the map; PHLocal.UpdateStrayStation lets them out if it really is someone else's)
             if (pid == 0 || pid == myId || s.seated) { watchLeak[i] = 0; continue; }
             bool hidden = (s.hiding || (s.ghost && !meGhost)) && !reveal;
-            if (!hidden) { watchLeak[i] = 0; continue; }
-            Vector3 park = s.parkAt + new Vector3(i * 3f, 0f, 0f);
+            // (a hunter carried into this copy, PHSlot.afoot, is drawn at their seat here once this client has had
+            // their enter event; one it missed, a late joiner's, is asked for again the same way)
+            bool carried = !hidden && s.afoot && !reveal;
+            if (!hidden && !carried) { watchLeak[i] = 0; continue; }
             Transform st = s.station.transform;
+            Vector3 park = carried ? st.position : s.parkAt + new Vector3(i * 3f, 0f, 0f);
             if ((st.position - park).sqrMagnitude > 1f)
             {
                 st.SetPositionAndRotation(park, Quaternion.identity);
@@ -776,7 +793,7 @@ public class PHLocal : UdonSharpBehaviour
             if (watchLeak[i] < 2 || Time.time - watchAskAt[i] < WATCH_RETRY) continue;
             watchAskAt[i] = Time.time;
             s.leaksAsked++;
-            game.Warn("leak: slot " + i + " (player " + pid + ") drawn " + d.ToString("F1") + " m from its parking spot; asking them to sit again");
+            game.Warn("leak: slot " + i + " (player " + pid + ") drawn " + d.ToString("F1") + " m from its " + (carried ? "seat" : "parking spot") + "; asking them to sit again");
             if (game.leakHeal) s.SendCustomNetworkEvent(NetworkEventTarget.Owner, nameof(PHSlot.RequestReseat));
         }
     }
@@ -1681,12 +1698,22 @@ public class PHLocal : UdonSharpBehaviour
         if (placeBlock != null && placeBlock.activeSelf != game.noPlacing) placeBlock.SetActive(game.noPlacing);
     }
 
-    // ---- the hunters' stand-ins (PHGame.layers): a hider or a ghost plays on another copy of the map than the hunters,
-    // so the hunters' avatars are not there. Each hunter in the hunt is drawn there instead as a plain body of their
-    // height (one per slot, WorldSceneBuilder), where they stand on the map, facing their way; their weapon is drawn
-    // in the same place (PHWeapons.PlaceOther). No collider: nobody can be blocked by one.
+    // ---- the hunters' stand-ins (PHGame.layers, the experimental HIDE CAMERAS switch): a hider or a ghost plays on
+    // another copy of the map than the hunters. A hunter is carried there as themselves through their seat
+    // (PHSlot.afoot); one who cannot be seated (not a humanoid avatar) is drawn there instead as the hunters' meeple,
+    // as tall as they are, where they stand on the map, turned to this player, with their name over it (Cor,
+    // 2026-11-22). It stretches as they jump, flattens as they fall and bobs as they walk; their weapon is drawn in
+    // the same place (PHWeapons.PlaceOther). No collider: nobody can be blocked by one. Their voice cannot come from
+    // it (VRChat plays a voice from the avatar): it is only as loud as they are near (UpdateVoices).
     public Transform[] standIns;
+    public TMPro.TextMeshPro[] standInNames;
     bool standInsOut;
+
+    void StandInOff(int i)
+    {
+        if (standIns[i] != null && standIns[i].gameObject.activeSelf) standIns[i].gameObject.SetActive(false);
+        if (standInNames != null && i < standInNames.Length && standInNames[i] != null && standInNames[i].gameObject.activeSelf) standInNames[i].gameObject.SetActive(false);
+    }
 
     void UpdateStandIns()
     {
@@ -1697,25 +1724,39 @@ public class PHLocal : UdonSharpBehaviour
         {
             if (!standInsOut) return;
             standInsOut = false;
-            for (int i = 0; i < standIns.Length; i++) if (standIns[i] != null && standIns[i].gameObject.activeSelf) standIns[i].gameObject.SetActive(false);
+            for (int i = 0; i < standIns.Length; i++) StandInOff(i);
             return;
         }
         standInsOut = true;
+        Vector3 eye = Networking.LocalPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position;
         int n = Mathf.Min(standIns.Length, game.slots.Length);
         for (int i = 0; i < n; i++)
         {
             Transform t = standIns[i];
             if (t == null) continue;
             int pid = game.slotPlayer[i];
-            bool show = pid != 0 && game.slotRole[i] == PHGame.ROLE_HUNTER && !game.slots[i].hunterOut && game.TeamOf(i) == PHGame.TEAM_SHARED;
+            // (not one carried here as themselves, PHSlot.afoot: the stand-in is for a hunter who cannot be seated)
+            bool show = pid != 0 && game.slotRole[i] == PHGame.ROLE_HUNTER && !game.slots[i].hunterOut && !game.slots[i].afoot && game.TeamOf(i) == PHGame.TEAM_SHARED;
             VRCPlayerApi p = show ? VRCPlayerApi.GetPlayerById(pid) : null;
             if (show && (p == null || !Utilities.IsValid(p) || p.isLocal)) show = false;
-            if (t.gameObject.activeSelf != show) t.gameObject.SetActive(show);
-            if (!show) continue;
+            if (!show) { StandInOff(i); continue; }
+            if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
             Vector3 feet = p.GetPosition();
             float h = Mathf.Clamp(p.GetTrackingData(VRCPlayerApi.TrackingDataType.Head).position.y - feet.y + 0.12f, 0.5f, 3f);
-            t.SetPositionAndRotation(game.SeenHere(i, feet) + Vector3.up * (h * 0.5f), Quaternion.Euler(0f, p.GetRotation().eulerAngles.y, 0f));
-            t.localScale = new Vector3(0.45f, h * 0.5f, 0.45f);
+            // taller and thinner the faster they rise, flatter and wider as they fall; a small bob while they walk
+            Vector3 v = p.GetVelocity();
+            float walk = Mathf.Clamp01(new Vector2(v.x, v.z).magnitude / 3f);
+            float up = 1f + Mathf.Clamp(v.y * 0.04f, -0.18f, 0.16f) + 0.035f * walk * Mathf.Sin(Time.time * 11f + i);
+            float across = 1f / Mathf.Sqrt(up);
+            Vector3 at = game.SeenHere(i, feet);
+            Vector3 away = at - eye; away.y = 0f;
+            Quaternion face = away.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(away) : t.rotation;
+            t.SetPositionAndRotation(at + Vector3.up * (h * up * 0.5f), face);
+            t.localScale = new Vector3(h * across, h * up, 1f);
+            TMPro.TextMeshPro nm = standInNames != null && i < standInNames.Length ? standInNames[i] : null;
+            if (nm == null) continue;
+            if (!nm.gameObject.activeSelf) { nm.text = p.displayName; nm.gameObject.SetActive(true); }
+            nm.gameObject.transform.SetPositionAndRotation(at + Vector3.up * (h * up + 0.12f), face);   // (TextMeshPro.transform is not exposed to Udon)
         }
     }
 

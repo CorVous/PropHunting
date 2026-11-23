@@ -182,7 +182,7 @@ public class PHReplay : UdonSharpBehaviour
         if (count == 0) bufLen = HDR;
         VRCPlayerApi me = Networking.LocalPlayer;
         int flags = pendFlags; pendFlags = 0;
-        Vector3 at = game.MapLocalOf(recSlot, me.GetPosition());   // (map-local: with ANTI TROLL each team plays on its own copy)
+        Vector3 at = game.MapLocalOf(recSlot, me.GetPosition());   // (map-local: with HIDE CAMERAS each team plays on its own copy)
         float yaw = me.GetRotation().eulerAngles.y;
         int def = -1;
         if (recRole == PHGame.ROLE_HIDER)
