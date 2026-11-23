@@ -46,8 +46,10 @@ public static partial class LobbyBuilder
         root.SetParent(lobby, false);
         // the Trophies board (west wall): over each half, the side and a cup (hunters' half to the south, the
         // viewer's left)
+        // (Cor, 2026-11-22: the board is half size, 5.4 x 2.2 m centred 2.75 m up: the plaques sit as far over its
+        // top, 3.85 m, as they did over the big one, over each half's middle)
         float tx = -roomW / 2f + 0.06f;
-        Plaque(root, "PlaqueTrophiesHunt", new Vector3(tx, 5.38f, -2.7f), Quaternion.Euler(0f, -90f, 0f), 0.56f, new[] { hunt, trophy }, null);
-        Plaque(root, "PlaqueTrophiesHide", new Vector3(tx, 5.38f, 2.7f), Quaternion.Euler(0f, -90f, 0f), 0.56f, new[] { hide, trophy }, null);
+        Plaque(root, "PlaqueTrophiesHunt", new Vector3(tx, 4.28f, -1.34f), Quaternion.Euler(0f, -90f, 0f), 0.56f, new[] { hunt, trophy }, null);
+        Plaque(root, "PlaqueTrophiesHide", new Vector3(tx, 4.28f, 1.34f), Quaternion.Euler(0f, -90f, 0f), 0.56f, new[] { hide, trophy }, null);
     }
 }
