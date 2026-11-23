@@ -512,6 +512,23 @@ public class PHLocal : UdonSharpBehaviour
     const float HUNTER_JUMP = 5f;
     bool huntJump;
 
+    // HIDE CAMERAS (experimental): a hunter carried in their seat (PHSlot.StartAfoot) is never "grounded" to VRChat, so
+    // its own jump does nothing (3-client test, 2026-11-23). The same jump, given by hand: off the ground under the
+    // feet, at the hunt's impulse. Without the switch nobody is seated afoot and VRChat's jump is the only one.
+    public override void InputJump(bool value, VRC.Udon.Common.UdonInputEventArgs args) { if (value) SeatJump(); }
+
+    public void SeatJump()
+    {
+        PHSlot s = Me();
+        if (s == null || !s.wantAfoot || !s.seated) return;
+        VRCPlayerApi me = Networking.LocalPlayer;
+        if (me.IsPlayerGrounded()) return;                       // (VRChat's own jump has it)
+        Vector3 v = me.GetVelocity();
+        if (v.y > 0.5f || v.y < -0.5f) return;                   // (rising or falling: no jump in the air)
+        if (!Physics.Raycast(me.GetPosition() + Vector3.up * 0.3f, Vector3.down, 0.45f, (1 << 0) | (1 << 11), QueryTriggerInteraction.Ignore)) return;
+        me.SetVelocity(new Vector3(v.x, huntJump ? HUNTER_JUMP : 3f, v.z));
+    }
+
     // hunters pass through props (G45); hiders and everyone else collide with them
     void SetPropLayer(int layer)
     {
