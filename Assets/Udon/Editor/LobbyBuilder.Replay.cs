@@ -44,6 +44,11 @@ public static partial class LobbyBuilder
         var lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/MiniMapLine.mat");
         rp.pawns = new Transform[n]; rp.pawnRenderer = new Renderer[n]; rp.pops = new Transform[n]; rp.popRenderer = new Renderer[n];
         rp.tails = new LineRenderer[n]; rp.tags = new Transform[n]; rp.tagLabel = new TextMeshPro[n];
+        // a hider's taunt (Cor, 2026-11-22): a dithered pulse around them, in their colour (PropHunt/DitherPulse)
+        var tauntMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/ReplayTaunt.mat");
+        if (tauntMat == null) { tauntMat = new Material(Shader.Find("PropHunt/DitherPulse")) { name = "ReplayTaunt" }; AssetDatabase.CreateAsset(tauntMat, "Assets/Udon/Generated/ReplayTaunt.mat"); }
+        tauntMat.shader = Shader.Find("PropHunt/DitherPulse"); tauntMat.enableInstancing = true; EditorUtility.SetDirty(tauntMat);
+        rp.taunts = new Transform[n]; rp.tauntRenderer = new Renderer[n];
         // a hunter (Cor, 2026-11-22): the red meeple (the board game toys' meeple_red, as the props bake it), holding the
         // weapon they had (PHReplay fills the mesh), swinging it hard each time they swung or hit something. A body
         // to lean the swing, a hand each side to hold the weapon and a two-piece set's other piece. No colliders.
@@ -103,6 +108,12 @@ public static partial class LobbyBuilder
             rp.popRenderer[i] = Shape(pop.transform, PrimitiveType.Sphere, Vector3.zero, Vector3.one, pawnMat);
             pop.SetActive(false);
             rp.pops[i] = pop.transform;
+
+            var taunt = new GameObject("ReplayTaunt" + i);
+            taunt.transform.SetParent(mm.model, false);
+            rp.tauntRenderer[i] = Shape(taunt.transform, PrimitiveType.Sphere, Vector3.zero, Vector3.one, tauntMat);
+            taunt.SetActive(false);
+            rp.taunts[i] = taunt.transform;
 
             var tail = new GameObject("ReplayTail" + i);
             tail.transform.SetParent(mm.model, false);

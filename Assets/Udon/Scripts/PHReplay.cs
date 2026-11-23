@@ -41,6 +41,8 @@ public class PHReplay : UdonSharpBehaviour
     public Renderer[] pawnRenderer;
     public Transform[] pops;              // per slot: a burst for a taunt, a hit, a catch
     public Renderer[] popRenderer;
+    public Transform[] taunts;            // per slot: a hider's taunt, a dithered pulse round them (PropHunt/DitherPulse)
+    public Renderer[] tauntRenderer;
     public LineRenderer[] tails;          // per slot: the last few seconds of the path behind them
     public Transform[] tags;              // per slot: their name over them
     public TextMeshPro[] tagLabel;
@@ -64,7 +66,8 @@ public class PHReplay : UdonSharpBehaviour
     const int F_ABS = 1, F_DELTA = 2, F_YAW = 4, F_DEF = 8, F_EV1 = 16, F_EV2 = 32, F_CATCH = 64, F_END = 128;
     const int F_SWING = 256;              // (decoded only: a hunter's F_DEF in version 2)
     const float WEAPON_BIG = 1.5f;        // the weapon a bit larger than life, to read at the table's scale
-    const float SWING_S = 0.6f;           // a replayed swing, in real seconds (as a burst: the same at any speed)
+    const float SWING_S = 0.6f;
+    const float TAUNT_S = 1.4f;           // a taunt's pulse: two rings going out, in real seconds           // a replayed swing, in real seconds (as a burst: the same at any speed)
     const float Q = 0.02f;                // metres per step
     const int TAIL = 40;                  // ten seconds of trail
     const float UPPER_Y = 2.0f;           // (PHMiniMap's: above it a marker hides with the upper floors)
@@ -97,7 +100,7 @@ public class PHReplay : UdonSharpBehaviour
     // ---- shown
     GameObject[] prop; int[] propDef;
     int[] lastK, weaponShown;
-    float[] popAt, swingAt; Color[] colour;
+    float[] popAt, swingAt, tauntAt; Color[] colour;
     Vector3[] tailBuf;
     MaterialPropertyBlock block;
     bool shownOpen;
@@ -111,8 +114,8 @@ public class PHReplay : UdonSharpBehaviour
         tPos = new Vector3[n * MAXT]; tYaw = new float[n * MAXT]; tDef = new int[n * MAXT]; tFlag = new int[n * MAXT];
         tFirst = new int[n]; tCount = new int[n]; tRole = new int[n]; tRound = new int[n]; tWeapon = new int[n]; tWho = new string[n]; dirty = new bool[n];
         prop = new GameObject[n]; propDef = new int[n]; lastK = new int[n]; popAt = new float[n]; colour = new Color[n];
-        weaponShown = new int[n]; swingAt = new float[n];
-        for (int i = 0; i < n; i++) { tRound[i] = -1; propDef[i] = -2; lastK[i] = -1; popAt[i] = -9f; tWho[i] = ""; weaponShown[i] = -2; swingAt[i] = -9f; }
+        weaponShown = new int[n]; swingAt = new float[n]; tauntAt = new float[n];
+        for (int i = 0; i < n; i++) { tRound[i] = -1; propDef[i] = -2; lastK[i] = -1; popAt[i] = -9f; tWho[i] = ""; weaponShown[i] = -2; swingAt[i] = -9f; tauntAt[i] = -9f; }
         tailBuf = new Vector3[TAIL];
         block = new MaterialPropertyBlock();
         palette = new Color[] {
@@ -420,6 +423,7 @@ public class PHReplay : UdonSharpBehaviour
             bool popOn = age < 0.5f && shown;
             if (pp.gameObject.activeSelf != popOn) pp.gameObject.SetActive(popOn);
             if (popOn) { pp.localPosition = at + new Vector3(0f, 1f, 0f); pp.localScale = Vector3.one * (1f + age * 6f); }
+            Taunt(i, at, shown);
         }
         // the controls
         float dur = Duration();
@@ -450,6 +454,8 @@ public class PHReplay : UdonSharpBehaviour
             // a hunter swings hard when they swung, and when they struck a prop, a hider or a catch (an older track
             // has only the strikes)
             if (tRole[i] == PHGame.ROLE_HUNTER && (f & (F_SWING | F_EV1 | F_EV2 | F_CATCH)) != 0) swingAt[i] = Time.time;
+            // a hider's taunt: the dithered pulse, not a burst (a hit or a catch in the same tick still bursts red)
+            if (tRole[i] == PHGame.ROLE_HIDER && (f & F_EV1) != 0) { tauntAt[i] = Time.time; f &= ~F_EV1; }
             if ((f & (F_EV1 | F_EV2 | F_CATCH | F_END)) == 0) continue;
             Color c = colour[i];
             if ((f & (F_EV2 | F_END)) != 0 && tRole[i] == PHGame.ROLE_HIDER) c = new Color(0.92f, 0.2f, 0.18f);   // hit, caught: red
@@ -460,6 +466,22 @@ public class PHReplay : UdonSharpBehaviour
         }
     }
 
+    // a taunt's pulse: two rings, one after the other, each growing out from the hider and thinning to nothing
+    void Taunt(int i, Vector3 at, bool shown)
+    {
+        Transform tp = taunts != null && i < taunts.Length ? taunts[i] : null;
+        if (tp == null) return;
+        float age = Time.time - tauntAt[i];
+        bool on = shown && age >= 0f && age < TAUNT_S;
+        if (tp.gameObject.activeSelf != on) tp.gameObject.SetActive(on);
+        if (!on) return;
+        float u = (age % (TAUNT_S * 0.5f)) / (TAUNT_S * 0.5f);   // (each ring's own 0..1)
+        tp.localPosition = at + new Vector3(0f, 0.6f, 0f);
+        tp.localScale = Vector3.one * Mathf.Lerp(0.8f, 6f, u);
+        Color c = colour[i]; c.a = (1f - u) * (age < TAUNT_S * 0.5f ? 1f : 0.7f);
+        block.SetColor("_Color", c); tauntRenderer[i].SetPropertyBlock(block);
+    }
+
     void Hide(int i)
     {
         if (pawns[i].gameObject.activeSelf) pawns[i].gameObject.SetActive(false);
@@ -468,6 +490,7 @@ public class PHReplay : UdonSharpBehaviour
         if (pops[i].gameObject.activeSelf && Time.time - popAt[i] >= 0.5f) pops[i].gameObject.SetActive(false);
         if (prop[i] != null && prop[i].activeSelf) prop[i].SetActive(false);
         if (meeples != null && i < meeples.Length && meeples[i] != null && meeples[i].gameObject.activeSelf) meeples[i].gameObject.SetActive(false);
+        if (taunts != null && i < taunts.Length && taunts[i] != null && taunts[i].gameObject.activeSelf) taunts[i].gameObject.SetActive(false);
     }
 
     // the hunter's meeple at 'at', turned to yaw: their weapon in its hand (and a set's other piece in the other), raised
@@ -527,7 +550,8 @@ public class PHReplay : UdonSharpBehaviour
         {
             pawns[i].gameObject.SetActive(false); tags[i].gameObject.SetActive(false); tails[i].gameObject.SetActive(false); pops[i].gameObject.SetActive(false);
             if (meeples != null && i < meeples.Length && meeples[i] != null) meeples[i].gameObject.SetActive(false);
-            swingAt[i] = -9f;
+            swingAt[i] = -9f; tauntAt[i] = -9f;
+            if (taunts != null && i < taunts.Length && taunts[i] != null) taunts[i].gameObject.SetActive(false);
             if (prop[i] != null) { Destroy(prop[i]); prop[i] = null; }
             propDef[i] = -2; tagLabel[i].text = "";
         }
