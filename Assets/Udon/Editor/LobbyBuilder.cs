@@ -204,11 +204,10 @@ public static partial class LobbyBuilder
             }
         }
 
-        // the two switches (hop playtest, Cor: host settings), right of the short ROUND and TAUNT rows: a tile each that
+        // the three switches (hop playtest, Cor: host settings), right of the short ROUND and TAUNT rows: a tile each that
         // turns over with every press, shown by its picture alone (Cor, 2026-11-22).
         // SEE HIDERS: hiders see each other's props as outlines (PHGame.seeHiders); NO PLACING: no stickers or VRChat
         // items on the map (PHGame.noPlacing, Cor 2026-11-22: in place of ANTI TROLL, the teams' own copies of the map)
-        {
         // HIDE CAMERAS (Cor, 2026-11-22, experimental): the hiders and ghosts play on copies of the map of their own
         // (PHGame.layers), so a hider's VRChat camera, stream camera or drone is nowhere near the hunters. Right of
         // NO PLACING.
