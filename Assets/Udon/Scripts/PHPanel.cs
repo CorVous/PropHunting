@@ -15,8 +15,8 @@ public class PHPanel : UdonSharpBehaviour
 {
     public PHGame game;
 
-    // the tiles, in parallel arrays: kind 0 size, 1 props, 2 round, 3 taunt, 4 see hiders, 5 no placing (PHGame.noPlacing),
-    // 6 hide cameras (PHGame.layers, experimental); arg is the PHGame.Panel* argument (kinds 4 and up are switches: one
+    // the tiles, in parallel arrays: kind 0 size, 1 props, 2 round, 3 taunt, 4 see hiders, 5 no placing (PHGame.noPlacing);
+    // arg is the PHGame.Panel* argument (kinds 4 and up are switches: one
     // tile each, arg 1)
     public int[] tileKind;
     public int[] tileArg;
@@ -30,8 +30,6 @@ public class PHPanel : UdonSharpBehaviour
     public Sprite seeHidersOn, seeHidersOff;
     public Image noPlacingIcon;              // NO PLACING's picture (Cor): a sticker and an item, in a crossed-out circle while on
     public Sprite noPlacingOn, noPlacingOff;
-    public Image hideCamsIcon;               // HIDE CAMERAS' picture (experimental): a camera, in a crossed-out circle while on
-    public Sprite hideCamsOn, hideCamsOff;
 
     public TextMeshProUGUI benchText;    // "5 Props · 2 Hunters"
     public Image[] benchMeeples;
@@ -96,7 +94,6 @@ public class PHPanel : UdonSharpBehaviour
         if (kind == 2) return game.roundLength;
         if (kind == 4) return game.seeHiders ? 1 : 0;
         if (kind == 5) return game.noPlacing ? 1 : 0;
-        if (kind == 6) return game.layers ? 1 : 0;
         return game.tauntInterval;
     }
 
@@ -109,7 +106,7 @@ public class PHPanel : UdonSharpBehaviour
         {
             // a switch: each press turns it over
             game.panelArg = Value(kind) == 1 ? 0 : 1;
-            if (kind == 4) game.PanelSeeHiders(); else if (kind == 5) game._PanelNoPlacing(); else game._PanelLayers();
+            if (kind == 4) game.PanelSeeHiders(); else game._PanelNoPlacing();
             Refresh();
             return;
         }
@@ -363,11 +360,6 @@ public class PHPanel : UdonSharpBehaviour
         {
             Sprite want = game.noPlacing ? noPlacingOn : noPlacingOff;
             if (noPlacingIcon.sprite != want) noPlacingIcon.sprite = want;
-        }
-        if (hideCamsIcon != null)
-        {
-            Sprite want = game.layers ? hideCamsOn : hideCamsOff;
-            if (hideCamsIcon.sprite != want) hideCamsIcon.sprite = want;
         }
         int sizeNow = game.sizeAuto ? auto : game.sizeChoice;
         for (int r = 0; r < roundCaption.Length; r++)
