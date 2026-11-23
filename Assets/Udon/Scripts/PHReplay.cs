@@ -66,8 +66,9 @@ public class PHReplay : UdonSharpBehaviour
     const int F_ABS = 1, F_DELTA = 2, F_YAW = 4, F_DEF = 8, F_EV1 = 16, F_EV2 = 32, F_CATCH = 64, F_END = 128;
     const int F_SWING = 256;              // (decoded only: a hunter's F_DEF in version 2)
     const float WEAPON_BIG = 1.5f;        // the weapon a bit larger than life, to read at the table's scale
-    const float SWING_S = 0.6f;
-    const float TAUNT_S = 1.4f;           // a taunt's pulse: two rings going out, in real seconds           // a replayed swing, in real seconds (as a burst: the same at any speed)
+    const float SWING_S = 0.6f;           // a replayed swing, in real seconds (as a burst: the same at any speed)
+    const float TAUNT_S = 1.4f;           // a taunt's pulse: two rings going out, in real seconds
+    const float HAND_Y = 1.044f, HAND_Z = 0.05f;   // the meeple's hands at rest (LobbyBuilder.BuildReplay: 0.58 of its 1.8)
     const float Q = 0.02f;                // metres per step
     const int TAIL = 40;                  // ten seconds of trail
     const float UPPER_Y = 2.0f;           // (PHMiniMap's: above it a marker hides with the upper floors)
@@ -527,19 +528,21 @@ public class PHReplay : UdonSharpBehaviour
         }
         // the hand's turn about its x (the weapon's head along +z): -70 held up and a little forward
         float t = Time.time - swingAt[i];
-        float arm = -70f, lean = 0f, hop = 0f;
+        // (the wind-up lifts the hands over the head and the weapon points up and back; the slam reaches out in front)
+        float arm = -70f, lean = 0f, hop = 0f, lift = 0f, reach = 0f;
         if (t >= 0f && t < SWING_S)
         {
             float u = t / SWING_S;
-            if (u < 0.35f) { float k = Smooth(u / 0.35f); arm = Mathf.Lerp(-70f, -170f, k); lean = Mathf.Lerp(0f, -12f, k); hop = Mathf.Lerp(0f, 0.25f, k); }
-            else if (u < 0.5f) { float k = (u - 0.35f) / 0.15f; arm = Mathf.Lerp(-170f, 45f, k); lean = Mathf.Lerp(-12f, 28f, k); hop = Mathf.Lerp(0.25f, 0f, k); }
-            else { float k = Smooth((u - 0.5f) / 0.5f); arm = Mathf.Lerp(45f, -70f, k); lean = Mathf.Lerp(28f, 0f, k); }
+            if (u < 0.35f) { float k = Smooth(u / 0.35f); arm = Mathf.Lerp(-70f, -145f, k); lean = Mathf.Lerp(0f, -12f, k); hop = Mathf.Lerp(0f, 0.25f, k); lift = Mathf.Lerp(0f, 0.45f, k); reach = Mathf.Lerp(0f, -0.1f, k); }
+            else if (u < 0.5f) { float k = (u - 0.35f) / 0.15f; arm = Mathf.Lerp(-145f, 20f, k); lean = Mathf.Lerp(-12f, 28f, k); hop = Mathf.Lerp(0.25f, 0f, k); lift = Mathf.Lerp(0.45f, -0.1f, k); reach = Mathf.Lerp(-0.1f, 0.4f, k); }
+            else { float k = Smooth((u - 0.5f) / 0.5f); arm = Mathf.Lerp(20f, -70f, k); lean = Mathf.Lerp(28f, 0f, k); lift = Mathf.Lerp(-0.1f, 0f, k); reach = Mathf.Lerp(0.4f, 0f, k); }
         }
         meepleBody[i].localRotation = Quaternion.Euler(lean, 0f, 0f);
         meepleBody[i].localPosition = new Vector3(0f, hop, 0f);
         Quaternion hr = Quaternion.Euler(arm, 0f, 0f);
-        meepleHand[i].localRotation = hr;
-        meepleOffHand[i].localRotation = hr;
+        Transform hd = meepleHand[i], oh = meepleOffHand[i];
+        hd.localRotation = hr; hd.localPosition = new Vector3(hd.localPosition.x, HAND_Y + lift, HAND_Z + reach);
+        oh.localRotation = hr; oh.localPosition = new Vector3(oh.localPosition.x, HAND_Y + lift, HAND_Z + reach);
     }
 
     float Smooth(float k) { k = Mathf.Clamp01(k); return k * k * (3f - 2f * k); }
