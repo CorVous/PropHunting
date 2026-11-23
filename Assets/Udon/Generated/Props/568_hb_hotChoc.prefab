@@ -15,6 +15,8 @@ GameObject:
   - component: {fileID: 116485996013866433}
   - component: {fileID: 8422750374054935657}
   - component: {fileID: 188298349229630734}
+  - component: {fileID: 5071831040924511776}
+  - component: {fileID: 5725288362582081404}
   - component: {fileID: 344206235431829865}
   m_Layer: 11
   m_Name: 568_hb_hotChoc
@@ -33,7 +35,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  m_LocalScale: {x: 0.346, y: 0.346, z: 0.346}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3710981123936881556}
@@ -46,7 +48,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1829343744388411024}
-  m_Mesh: {fileID: -6394883627295147268, guid: 149915242533a5e49a931740b2227c93, type: 2}
+  m_Mesh: {fileID: 3208378522432029103, guid: 149915242533a5e49a931740b2227c93, type: 2}
 --- !u!23 &1741841855216283003
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -108,8 +110,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.48562646, y: 0.43210524, z: 0.37585026}
-  m_Center: {x: -0.041972637, y: 0.21605262, z: -0.06378749}
+  m_Size: {x: 0.48562646, y: 0.46016574, z: 0.37752575}
+  m_Center: {x: -0.041972637, y: 0.23008287, z: -0.06294975}
 --- !u!65 &116485996013866433
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -129,8 +131,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.29911008, y: 0.4148107, z: 0.0672887}
-  m_Center: {x: -0.05239038, y: 0.2195854, z: 0.1605725}
+  m_Size: {x: 0.29911008, y: 0.30610204, z: 0.0672887}
+  m_Center: {x: -0.05239038, y: 0.27393973, z: 0.1605725}
 --- !u!65 &8422750374054935657
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -150,8 +152,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.12813288, y: 0.27598512, z: 0.07527954}
-  m_Center: {x: 0.27456394, y: 0.20993835, z: -0.030795317}
+  m_Size: {x: 0.12813288, y: 0.27152884, z: 0.07527954}
+  m_Center: {x: 0.27456394, y: 0.2077102, z: -0.030795317}
 --- !u!65 &188298349229630734
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -171,8 +173,50 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.2599396, y: 0.14406466, z: 0.2507497}
-  m_Center: {x: -0.20866057, y: 0.5069032, z: 0.12633777}
+  m_Size: {x: 0.23911607, y: 0.11484444, z: 0.24121311}
+  m_Center: {x: -0.20969063, y: 0.5215133, z: 0.12156947}
+--- !u!65 &5071831040924511776
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1829343744388411024}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.21867973, y: 0.07653248, z: 0.057803474}
+  m_Center: {x: -0.06010008, y: 0.050446317, z: 0.14605477}
+--- !u!65 &5725288362582081404
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1829343744388411024}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.13468874, y: 0.19211376, z: 0.12566447}
+  m_Center: {x: -0.271286, y: 0.3648787, z: 0.18888038}
 --- !u!54 &344206235431829865
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -227,7 +271,7 @@ Transform:
   m_GameObject: {fileID: 4338534342066580678}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.04, z: 0}
+  m_LocalPosition: {x: 0, y: 0.034682084, z: 0}
   m_LocalScale: {x: 0.5418086, y: 1, z: 0.4027402}
   m_ConstrainProportionsScale: 0
   m_Children: []
