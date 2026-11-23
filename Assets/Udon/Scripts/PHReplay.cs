@@ -293,6 +293,21 @@ public class PHReplay : UdonSharpBehaviour
             tFlag[b + k] = f;
         }
         tCount[i] = k;
+        // the game log (Cor saw a hider turn into a shovel on a map with none, 2026-11-22): each hider track's disguises
+        if (tRole[i] == PHGame.ROLE_HIDER)
+        {
+            string line = "replay slot " + i + " v" + ver + " " + k + " ticks, disguises:";
+            int last = -2, shown = 0;
+            for (int j = 0; j < k && shown < 12; j++)
+            {
+                int dj = tDef[i * MAXT + j];
+                if (dj == last) continue;
+                last = dj; shown++;
+                string nm = dj >= 0 && dj < builder.propPrefabs.Length && builder.propPrefabs[dj] != null ? builder.propPrefabs[dj].name : "-";
+                line += " " + Clock(j * TICK_S) + " " + nm;
+            }
+            game.Log(line);
+        }
         tRound[i] = tr.round;
         tWho[i] = tr.who;
         lastK[i] = -1;
