@@ -56,9 +56,9 @@ public class PHView : UdonSharpBehaviour
     float boltsAt = -99f;
     bool boltsOn;
     public Material capReady, capWait;
-    // the forced taunt's clock (hop playtest, Cor): a ring of pieces round the taunt cap (VR) and round a small icon on
-    // the desktop HUD, filling clockwise from the top towards the next forced taunt and emptying on a taunt
-    // (PHLocal.ForcedProgress). Only pieces switched on and off: nothing moves in the view.
+    // the forced taunt's clock (hop playtest, Cor): a solid ring round the taunt cap (VR) and round a small icon on
+    // the desktop HUD, full just after a taunt and draining clockwise from the top until the next forced taunt
+    // (Cor, 11-22: solid, starts full, disappears) (PHLocal.ForcedProgress). Its pieces touch, so it reads as one ring. Only pieces switched on and off: nothing moves in the view.
     public GameObject[] tauntRingSegs;      // VR: children of the taunt button
     public GameObject deskTauntRing;        // desktop: the icon (its track and speaker) ...
     public GameObject[] deskTauntSegs;      // ... and its pieces
@@ -348,16 +348,22 @@ public class PHView : UdonSharpBehaviour
     }
     int pipWarmRound = -1;
 
-    // the forced taunt's ring: as many pieces lit as the clock has run (none at all while there is no clock)
+    // the forced taunt's ring: the pieces for the time still left stay lit, the ones from the top clockwise go out as
+    // the clock runs (none at all while there is no clock)
     void UpdateTauntRing(PHSlot s, bool hider)
     {
         GameObject[] segs = vr ? tauntRingSegs : deskTauntSegs;
         if (segs == null || segs.Length == 0) return;
         float k = hider ? local.ForcedProgress(s) : -1f;
-        int n = k < 0f ? -1 : Mathf.Clamp(Mathf.CeilToInt(k * segs.Length - 0.001f), 0, segs.Length);
+        // n: how many pieces have gone out (-1: no clock)
+        int n = k < 0f ? -1 : Mathf.Clamp(Mathf.FloorToInt(k * segs.Length), 0, segs.Length);
         if (n == tauntRingShown) return;
         tauntRingShown = n;
-        for (int i = 0; i < segs.Length; i++) if (segs[i] != null && segs[i].activeSelf != (i < n)) segs[i].SetActive(i < n);
+        for (int i = 0; i < segs.Length; i++)
+        {
+            bool on = n >= 0 && i >= n;
+            if (segs[i] != null && segs[i].activeSelf != on) segs[i].SetActive(on);
+        }
         if (!vr && deskTauntRing != null && deskTauntRing.activeSelf != (n >= 0)) deskTauntRing.SetActive(n >= 0);
     }
 

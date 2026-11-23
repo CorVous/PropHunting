@@ -496,7 +496,7 @@ public static class WorldSceneBuilder
         view.desktopPip = pip;
         view.desktopRoot = desk.transform;
         // the forced taunt's clock on the desktop (PHView.UpdateTauntRing): a small round icon left of the health bar,
-        // a speaker in a dark disc, with 24 amber pieces round it that fill clockwise from the top
+        // a speaker in a dark disc, with a solid amber ring of 48 touching pieces round it that drains clockwise from the top
         {
             var tr = new GameObject("TauntClock");
             tr.transform.SetParent(desk.transform, false);
@@ -516,10 +516,10 @@ public static class WorldSceneBuilder
             HudRect(tr.transform, "Cone", new Vector2(-3.5f, 0f), new Vector2(5f, 16f), 0f, ic);
             HudRect(tr.transform, "Wave0", new Vector2(4f, 0f), new Vector2(2.5f, 9f), 0f, ic);
             HudRect(tr.transform, "Wave1", new Vector2(9f, 0f), new Vector2(2.5f, 15f), 0f, ic);
-            const int dn = 24;
+            const int dn = 48;
             const float dr = 23f;
             view.deskTauntSegs = new GameObject[dn];
-            float dseg = 2f * Mathf.PI * dr / dn * 0.8f;
+            float dseg = 2f * Mathf.PI * dr / dn * 1.15f;   // a little longer than the gap between centres: no gaps at the outer edge
             for (int i = 0; i < dn; i++)
             {
                 float a = (i + 0.5f) * 360f / dn;   // clockwise from the top
@@ -596,13 +596,13 @@ public static class WorldSceneBuilder
         var cap = Part(button, PrimitiveType.Cylinder, "Cap", new Vector3(0f, 0f, -0.022f), new Vector3(90f, 0f, 0f), new Vector3(0.066f, 0.012f, 0.066f), red);
         view.tauntButton = button; view.tauntCap = cap.transform; view.tauntCapRenderer = cap.GetComponent<MeshRenderer>();
         view.capReady = red; view.capWait = grey;
-        // the forced taunt's clock round the cap (PHView.UpdateTauntRing): 24 short amber pieces on a circle just
+        // the forced taunt's clock round the cap (PHView.UpdateTauntRing): 48 touching amber pieces (one solid ring) on a circle just
         // outside the button's base (radius 0.041), in front of it, the first at the top, going clockwise as the
         // player sees it (the button faces -z: the player's right is +x)
-        const int tauntRingN = 24;
+        const int tauntRingN = 48;
         const float tauntRingR = 0.0445f;
         view.tauntRingSegs = new GameObject[tauntRingN];
-        float tSeg = 2f * Mathf.PI * tauntRingR / tauntRingN * 0.8f;
+        float tSeg = 2f * Mathf.PI * tauntRingR / tauntRingN * 1.15f;   // overlapping a little: no gaps at the outer edge
         for (int i = 0; i < tauntRingN; i++)
         {
             float a = (i + 0.5f) * 360f / tauntRingN;   // degrees clockwise from the top, seen from the front (-z)
