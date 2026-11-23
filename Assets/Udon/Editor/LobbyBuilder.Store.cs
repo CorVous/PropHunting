@@ -119,7 +119,7 @@ public static partial class LobbyBuilder
         BuildOpeningTrim(root, roomW);
         BuildShelfLabels(root, roomW, text);
         store.dialog = BuildStoreDialog(root, store, text);
-        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 2.75f, 0f));   // the middle of the west wall (the score pad went north: Cor)
+        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 1.7f, 0f));   // the middle of the west wall (the score pad went north: Cor); low, its bottom 0.6 m up (Cor, 2026-11-22: close to the ground)
         UdonSharpEditorUtility.CopyProxyToUdon(store);
         int conv = 0; foreach (var w in cat) if (meshByName.ContainsKey(w.id.Replace(':', '_'))) conv++;
         Debug.Log("[store] " + n + " weapons (" + conv + " with models), " + T + " trophies; picks numbered " + (gameMelee != null ? "from PHWeapons" : "later (no PHWeapons in the scene)"));
