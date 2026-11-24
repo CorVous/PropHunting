@@ -6,7 +6,8 @@ using VRC.SDKBase;
 // One half of the weapon wall on the lobby's east wall (Cor, 2026-11-19): a paternoster shelf with every weapon of
 // one kind on it, ten to a shelf, floor to ceiling: the shelves come up out of a black hole in the floor and go into
 // one at the ceiling (Cor), eight showing. Owned weapons are solid, the rest dithered (the
-// PropHunt/ShelfWeapon shader's _Dither) with a price tag (shop) or a star (trophy).
+// PropHunt/ShelfWeapon shader's _DitherMask) with a price tag (shop) or a star (trophy). Each shelf row's weapons
+// are one mesh, baked with the scene (rowMeshes); a row root shows the mesh of the shelf row it holds.
 // A small panel (two round buttons, PHButton -> Up / Down, and the player's coins), slanted towards the player,
 // stands at a fixed place at this half's inner end, by the middle of the wall (Cor, hop playtest: it no longer
 // follows the player, so it never sits between them and the shelves); only its height follows the player's size.
@@ -27,9 +28,10 @@ public class PHShelf : UdonSharpBehaviour
     public Quaternion itemRot;       // melee stands up, guns lie along the shelf
 
     public Transform[] rows;         // 5 shelf rows (4 showing, 1 out of sight for the turn)
-    public Transform[] items;        // row * cols + column
-    public MeshFilter[] itemMf;
-    public MeshRenderer[] itemMr;
+    public Transform[] items;        // row * cols + column: where each weapon stands (its place)
+    public Mesh[] rowMeshes;         // by shelf row: its weapons as one mesh (LobbyBuilder.Store.BakeRowMeshes)
+    public MeshFilter[] rowMf;       // by row root: the mesh it shows
+    public MeshRenderer[] rowMr;
     public GameObject[] tagShop, tagCool, tagGoofy;
     public GameObject[] glow;        // the warm pool of light under the carried weapon (with the shader's _Glow)
     public TextMeshPro[] price;
@@ -97,6 +99,7 @@ public class PHShelf : UdonSharpBehaviour
                 int i = root * 2 + e;
                 if (i < rowNum.Length && rowNum[i] != null) rowNum[i].text = (shelfRow + 1).ToString();
             }
+        float ditherMask = 0f, bit = 1f, glowCol = -1f;
         for (int col = 0; col < COLS; col++)
         {
             int k = root * COLS + col;
@@ -107,16 +110,10 @@ public class PHShelf : UdonSharpBehaviour
             bool own = any && store.own[c];
             int cat = any ? store.wCat[c] : -1;
             Mesh m = any ? meshes[c] : null;
-            items[k].gameObject.SetActive(m != null);
             if (m != null)
             {
-                itemMf[k].sharedMesh = m;
-                items[k].localPosition = itemPos[c];
-                items[k].localRotation = itemRot;
-                items[k].localScale = Vector3.one * itemScale[c];
-                mpb.SetFloat("_Dither", own ? 0f : 1f);
-                mpb.SetFloat("_Glow", store.Picked(c) ? 1f : 0f);   // the one being carried glows (Cor)
-                itemMr[k].SetPropertyBlock(mpb);
+                if (!own) ditherMask += bit;
+                if (store.Picked(c)) glowCol = col;   // the one being carried glows (Cor)
             }
             bool trophy = any && !own && store.wTrophy[c] >= 0;
             bool shop = any && !own && !trophy && cat == PHStore.CAT_SHOP;
@@ -125,7 +122,13 @@ public class PHShelf : UdonSharpBehaviour
             glow[k].SetActive(m != null && store.Picked(c));
             tagCool[k].SetActive(trophy && cat != PHStore.CAT_GOOFY);
             tagGoofy[k].SetActive(trophy && cat == PHStore.CAT_GOOFY);
+            bit *= 2f;
         }
+        if (rowMf == null || root >= rowMf.Length || rowMf[root] == null) return;
+        rowMf[root].sharedMesh = shelfRow < rowMeshes.Length ? rowMeshes[shelfRow] : null;
+        mpb.SetFloat("_DitherMask", ditherMask);
+        mpb.SetFloat("_GlowCol", glowCol);
+        rowMr[root].SetPropertyBlock(mpb);
     }
 
     // ------------------------------------------------------------------ the buttons (PHButton on the cart)

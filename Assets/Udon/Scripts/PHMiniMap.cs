@@ -31,7 +31,12 @@ public class PHMiniMap : UdonSharpBehaviour
     public Material propLit, propLitDither;
     public Material dioMat;              // PropHunt/Diorama on the walls: cut above _ClipY when the upper floors are off
     public Transform propRoot;           // the map's props in miniature (under model)
-    public Material outlineMat;          // PropHunt/DioramaOutline: a hiding spot's prop outlined in the player's colour
+    public Material outlineMat;
+    // the map's props on the table as cheap stand-ins (lobby profiling 2026-11-24: an XL map's 1,132 props were about
+    // 767,000 vertices): one simplified mesh per def (DioramaMiniBaker; null: the full prefab), drawn with a copy of
+    // the template (inactive, the props' material)
+    public Mesh[] miniMeshes;
+    public GameObject miniTemplate;          // PropHunt/DioramaOutline: a hiding spot's prop outlined in the player's colour
     public TextMeshProUGUI upperLabel, soloLabel;   // the table's two buttons
 
     const int MAXP = 1440;               // four points a second: six minutes of hide and hunt
@@ -442,7 +447,10 @@ public class PHMiniMap : UdonSharpBehaviour
             if (def < 0 || def >= fl.Length || (fl[def] & GenData.FL_DECOR) != 0) continue;
             if (def >= builder.propPrefabs.Length || builder.propPrefabs[def] == null) continue;
             Transform st = src.transform;
-            GameObject go = Copy(builder.propPrefabs[def], builder.ToLocal(st.position), st.eulerAngles.y, 1f);
+            bool mini = miniTemplate != null && miniMeshes != null && def < miniMeshes.Length && miniMeshes[def] != null;
+            GameObject go = Copy(mini ? miniTemplate : builder.propPrefabs[def], builder.ToLocal(st.position), st.eulerAngles.y, 1f);
+            // (the template's renderer may be off: PHLobbyCull switches the lobby's off while the player is away)
+            if (mini) { go.GetComponent<MeshFilter>().sharedMesh = miniMeshes[def]; go.GetComponent<MeshRenderer>().enabled = true; }
             mapUpper[nMapProp] = st.position.y - origin.y > UPPER_Y;
             go.SetActive(upperOn || propsDither || !mapUpper[nMapProp]);
             if (mapUpper[nMapProp] && propLit != null)

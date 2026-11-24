@@ -30,8 +30,10 @@ Material:
     m_Ints: []
     m_Floats:
     - _Dither: 0
+    - _DitherMask: 0
     - _Fade: 0.8
     - _Glow: 0
+    - _GlowCol: -1
     - _Halo: 0.012
     m_Colors:
     - _GlowColor: {r: 1, g: 0.82, b: 0.34999996, a: 1}

@@ -55,6 +55,16 @@ public static partial class LobbyBuilder
         if (olMat == null) { olMat = new Material(Shader.Find("PropHunt/DioramaOutline")) { name = "DioramaOutline" }; AssetDatabase.CreateAsset(olMat, "Assets/Udon/Generated/DioramaOutline.mat"); }
         olMat.shader = Shader.Find("PropHunt/DioramaOutline"); olMat.enableInstancing = false; EditorUtility.SetDirty(olMat);
         mm.outlineMat = olMat;
+        // the map's props as cheap stand-ins (DioramaMiniBaker): their meshes, and the object each copy is made from
+        mm.miniMeshes = DioramaMiniBaker.Bake(builder.propPrefabs);
+        var tmpl = new GameObject("MiniProp");
+        tmpl.transform.SetParent(content.transform, false);
+        tmpl.AddComponent<MeshFilter>();
+        var tr = tmpl.AddComponent<MeshRenderer>();
+        tr.sharedMaterial = mm.propLit;
+        tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        tmpl.SetActive(false);
+        mm.miniTemplate = tmpl;
         mm.dioWalls = Holder(model.transform, "Walls", dioMat);
         mm.dioGround = Holder(model.transform, "Ground", dioMat);   // (cut to the map's rectangle by the same material)
         mm.dioScenery = new MeshFilter[16];

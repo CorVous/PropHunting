@@ -214,7 +214,11 @@ public static partial class LobbyBuilder
         shelf.shown = Shown;
         shelf.rows = new Transform[roots];
         int slots = roots * Cols;
-        shelf.items = new Transform[slots]; shelf.itemMf = new MeshFilter[slots]; shelf.itemMr = new MeshRenderer[slots];
+        shelf.items = new Transform[slots];
+        // each shelf row's weapons as one mesh (lobby profiling 2026-11-24: a draw call per weapon and pass was about
+        // 400 of the lobby's 700); the row roots swap meshes as the shelves turn (PHShelf.Bind)
+        shelf.rowMeshes = BakeRowMeshes(shelf, kind);
+        shelf.rowMf = new MeshFilter[roots]; shelf.rowMr = new MeshRenderer[roots];
         shelf.tagShop = new GameObject[slots]; shelf.tagCool = new GameObject[slots]; shelf.tagGoofy = new GameObject[slots];
         shelf.price = new TextMeshPro[slots]; shelf.glow = new GameObject[slots];
         shelf.slotCol = new Collider[slots];
@@ -226,6 +230,12 @@ public static partial class LobbyBuilder
             row.SetParent(t, false);
             row.localPosition = new Vector3(0f, BaseY + r * RowH, 0f);
             shelf.rows[r] = row;
+            var weapons = new GameObject("Weapons");
+            weapons.transform.SetParent(row, false);
+            shelf.rowMf[r] = weapons.AddComponent<MeshFilter>();
+            shelf.rowMr[r] = weapons.AddComponent<MeshRenderer>();
+            shelf.rowMr[r].sharedMaterial = mat;
+            shelf.rowMr[r].shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             var board = new GameObject("Board");   // rounded off (Cor)
             board.transform.SetParent(row, false);
             board.transform.localPosition = new Vector3(0f, -0.045f, (Depth - 0.12f) / 2f);   // its back 0.12 m into the wall: flat there (Cor)
@@ -261,13 +271,9 @@ public static partial class LobbyBuilder
                 var pu = UdonSharpEditorUtility.GetBackingUdonBehaviour(ps);
                 pu.proximity = 8f; pu.interactText = "";   // (the high shelves: clicked from the floor)
 
-                var item = new GameObject("Item");
+                var item = new GameObject("Item");   // where the weapon stands (it is drawn in its row's mesh)
                 item.transform.SetParent(place, false);
                 shelf.items[k] = item.transform;
-                shelf.itemMf[k] = item.AddComponent<MeshFilter>();
-                shelf.itemMr[k] = item.AddComponent<MeshRenderer>();
-                shelf.itemMr[k].sharedMaterial = mat;
-                shelf.itemMr[k].shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
                 // the tags on the shelf's lip: a price with the lobby's own coin (shop), a star (trophy: gold cool,
                 // coral goofy). The weapon being carried glows (PHShelf, the shader's _Glow).
@@ -559,6 +565,63 @@ public static partial class LobbyBuilder
         if (m == null) { m = new Material(sh); AssetDatabase.CreateAsset(m, path); }
         m.shader = sh; EditorUtility.SetDirty(m);
         return m;
+    }
+
+    // one mesh per shelf row (16 places): every weapon placed as PHShelf used to place it in its own slot, its place
+    // number in uv2.x for PropHunt/ShelfWeapon's per-place dither and glow. Kept in Generated/ShelfRows.asset, the
+    // meshes refilled in place on a rebuild (their references stay the same)
+    static Mesh[] BakeRowMeshes(PHShelf shelf, int kind)
+    {
+        const string path = "Assets/Udon/Generated/ShelfRows.asset";
+        var existing = new Dictionary<string, Mesh>();
+        foreach (var o in AssetDatabase.LoadAllAssetsAtPath(path)) if (o is Mesh) existing[o.name] = (Mesh)o;
+        int[] order = shelf.order;
+        int nRows = (order.Length + Cols - 1) / Cols;
+        var result = new Mesh[nRows];
+        for (int sr = 0; sr < nRows; sr++)
+        {
+            var v = new List<Vector3>(); var nrm = new List<Vector3>(); var col = new List<Color>(); var uv = new List<Vector2>(); var uv2 = new List<Vector2>();
+            var tri = new List<int>();
+            for (int c = 0; c < Cols; c++)
+            {
+                int o = sr * Cols + c;
+                if (o >= order.Length) break;
+                int i = order[o];
+                Mesh m = shelf.meshes[i];
+                if (m == null) continue;
+                var place = Matrix4x4.Translate(new Vector3((Cols / 2f - 0.5f - c) * SlotW, 0f, Depth / 2f));
+                var mtx = place * Matrix4x4.TRS(shelf.itemPos[i], shelf.itemRot, Vector3.one * shelf.itemScale[i]);
+                int b = v.Count;
+                var mv = m.vertices; var mn = m.normals; var mc = m.colors; var mu = m.uv;
+                for (int q = 0; q < mv.Length; q++)
+                {
+                    v.Add(mtx.MultiplyPoint3x4(mv[q]));
+                    nrm.Add(q < mn.Length ? mtx.MultiplyVector(mn[q]).normalized : Vector3.up);
+                    col.Add(q < mc.Length ? mc[q] : Color.white);
+                    uv.Add(q < mu.Length ? mu[q] : Vector2.zero);
+                    uv2.Add(new Vector2(c, 0f));
+                }
+                for (int sm = 0; sm < m.subMeshCount; sm++)
+                    foreach (int x in m.GetTriangles(sm)) tri.Add(b + x);
+            }
+            string name = (kind == 0 ? "Melee" : "Guns") + "Row" + sr;
+            Mesh mesh;
+            bool isNew = !existing.TryGetValue(name, out mesh);
+            if (isNew) mesh = new Mesh { name = name }; else mesh.Clear();
+            mesh.indexFormat = v.Count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
+            mesh.SetVertices(v); mesh.SetNormals(nrm); mesh.SetColors(col); mesh.SetUVs(0, uv); mesh.SetUVs(1, uv2);
+            mesh.SetTriangles(tri, 0);
+            mesh.RecalculateBounds();
+            if (isNew)
+            {
+                if (AssetDatabase.LoadMainAssetAtPath(path) == null) AssetDatabase.CreateAsset(mesh, path);
+                else AssetDatabase.AddObjectToAsset(mesh, path);
+            }
+            EditorUtility.SetDirty(mesh);
+            result[sr] = mesh;
+        }
+        AssetDatabase.SaveAssets();
+        return result;
     }
 
     static Material ShelfMat()
