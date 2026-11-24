@@ -186,25 +186,62 @@ public static class PropPrefabBaker
     static Vector3 DoorAt(int model, int pm) { return pivot[pm] + ZFight.PartShift(mesh[model], mesh[pm], pivot[pm]); }
 
     // ------------------------------------------------------------------ the cage (shader PropHunt/Cage)
-    // The hider's own prop in first person: its feature edges as lines (MapBuilderUdon.Cage lends one object to the
-    // local hider's prop). An edge is a feature where the mesh ends (an open edge, or the rim of a two-sided card) or
-    // where its faces meet at more than CAGE_ANGLE degrees (positions welded, so split normals and uv seams do not
-    // count). Runs of edges in one line become one edge. A busy model gets a steeper angle, 10 degrees at a time up to
-    // 80, until it has no more than CAGE_CAP lines; past that the longest and sharpest are kept. Lines shorter than
-    // CAGE_SHORT on the largest prop that uses the model are dropped (bevels and screws would be dots). In the
-    // prefab's space before its scale (the cage hangs under the prop's root), so one mesh serves a model at every
-    // scale: one per model (and its doors, for openables). Each edge is a quad of 4 vertices in two half-float
-    // streams (16 bytes a vertex): position = this end; TEXCOORD1 = the other end, and the side (-1, +1) in w. The
-    // shader widens it on screen. All in Cages.asset; the prefabs themselves are untouched.
+    // The hider's own prop in first person, as its outline (Cor, 2026-11-24: "outline only", not every feature edge;
+    // MapBuilderUdon.Cage lends one object to the local hider's prop). The mesh holds every edge that can be on the
+    // outline from somewhere, each with the normals of its two faces, and the shader keeps only those where one face
+    // turns toward the eye and the other away. An edge is stored where the mesh ends (an open edge, or the rim of a
+    // two-sided card: always drawn) or where its faces meet at CAGE_FLOOR degrees or more (positions welded, so split
+    // normals and uv seams do not count; flatter edges barely bend the outline). Runs of edges in one line between the
+    // same two faces become one edge. A busy model gets a steeper floor, 5 degrees at a time up to 45, until it has no
+    // more than CAGE_CAP lines (the smoothest bends go first); past that the longest and sharpest are kept. Lines
+    // shorter than CAGE_SHORT on the largest prop that uses the model are dropped (bevels and screws would be dots).
+    // In the prefab's space before its scale (the cage hangs under the prop's root), so one mesh serves a model at
+    // every scale: one per model (and its doors, for openables). Each edge is a quad of 4 vertices in three streams
+    // (20 bytes a vertex): position (half) = this end, and in w the model's largest side (the shader pulls its
+    // viewpoint back by that, since the eye is often inside the prop), negative on an edge drawn always; TEXCOORD1
+    // (half) = the other end, and the side (-1, +1) in w; TEXCOORD2 (signed bytes) = the two face normals,
+    // octahedron-packed. All in Cages.asset, rebaked in place (the meshes keep their identity, so the scene's
+    // references hold: PropHunt > Rebake cages); the prefabs themselves are untouched.
     public const int CAGE_CAP = 160;
-    const float CAGE_ANGLE = 40f, CAGE_SHORT = 0.015f;
-    public static int cageMade, cageLines, cageMaxLines, cageCapped, cageStepped, cageVerts;
+    const float CAGE_FLOOR = 15f, CAGE_SHORT = 0.015f;
+    public static int cageMade, cageLines, cageMaxLines, cageCapped, cageStepped, cageVerts, cageNew;
+
+    // only the cages, from the models as last baked (Models.asset): for a change to the cage alone, without the
+    // 4-5 minute prefab bake
+    [MenuItem("PropHunt/Rebake cages")]
+    public static void RebakeCages()
+    {
+        GenData.Build();
+        LoadModels();
+        var baked = new System.Collections.Generic.Dictionary<string, Mesh>();
+        foreach (var o in AssetDatabase.LoadAllAssetsAtPath(OUT + "/Models.asset"))
+        {
+            var bm = o as Mesh;
+            if (bm != null && !baked.ContainsKey(bm.name)) baked[bm.name] = bm;
+        }
+        for (int m = 0; m < mesh.Length; m++)
+        {
+            Mesh bm;
+            if (mesh[m] != null && baked.TryGetValue(mesh[m].name, out bm)) mesh[m] = bm;
+        }
+        BakeCages();
+        if (cageNew > 0) Debug.LogWarning("[prophunt] " + cageNew + " cages are new: run Bake prop prefabs (or Assign) so the scene gets them");
+    }
 
     static Mesh[] BakeCages()
     {
         var t0 = System.Diagnostics.Stopwatch.StartNew();
         string path = OUT + "/Cages.asset";
-        AssetDatabase.DeleteAsset(path);
+        // the meshes already there are refilled, not replaced, so whatever points at them still does
+        var old = new System.Collections.Generic.Dictionary<string, Mesh>();
+        Mesh first = AssetDatabase.LoadMainAssetAtPath(path) as Mesh;
+        if (first != null)
+            foreach (var o in AssetDatabase.LoadAllAssetsAtPath(path))
+            {
+                var om = o as Mesh;
+                if (om != null && !old.ContainsKey(om.name)) old[om.name] = om;
+            }
+        else AssetDatabase.DeleteAsset(path);
         var byKey = new System.Collections.Generic.Dictionary<string, Mesh>();
         // the largest scale each model is used at (the short lines are judged there)
         var bigScale = new System.Collections.Generic.Dictionary<string, float>();
@@ -216,8 +253,10 @@ public static class PropPrefabBaker
         }
         cageVerts = 0;
         var result = new Mesh[GenData.nDefs];
-        cageMade = 0; cageLines = 0; cageMaxLines = 0; cageCapped = 0; cageStepped = 0;
-        Mesh first = null;
+        cageMade = 0; cageLines = 0; cageMaxLines = 0; cageCapped = 0; cageStepped = 0; cageNew = 0;
+        var used = new System.Collections.Generic.HashSet<Mesh>();
+        // the file's main mesh is named after the file, not its model: it is the first cage made, as when it was made
+        bool firstMade = false;
         for (int d = 0; d < GenData.nDefs; d++)
         {
             int model = GenData.defModel[d];
@@ -227,30 +266,47 @@ public static class PropPrefabBaker
             Mesh m;
             if (!byKey.TryGetValue(key, out m))
             {
-                m = MakeCage(model, bigScale[key], open);
+                string name = "Cage_" + GenModels.Name[model] + (open ? "_doors" : "");
+                Mesh into;
+                if (!old.TryGetValue(name, out into) && !firstMade && first != null && !used.Contains(first)) into = first;
+                m = MakeCage(model, bigScale[key], open, into);
+                if (m != null) firstMade = true;
                 byKey[key] = m;
                 if (m != null)
                 {
-                    m.name = "Cage_" + GenModels.Name[model] + (open ? "_doors" : "");
-                    if (first == null) { first = m; AssetDatabase.CreateAsset(m, path); }
-                    else AssetDatabase.AddObjectToAsset(m, first);
+                    m.name = name;
+                    used.Add(m);
+                    if (into == null)
+                    {
+                        cageNew++;
+                        if (first == null) { first = m; AssetDatabase.CreateAsset(m, path); }
+                        else AssetDatabase.AddObjectToAsset(m, first);
+                    }
                     var so = new SerializedObject(m);   // only drawn, never read: no CPU copy in the build
                     so.FindProperty("m_IsReadable").boolValue = false;
                     so.ApplyModifiedPropertiesWithoutUndo();
+                    EditorUtility.SetDirty(m);
                 }
             }
             result[d] = m;
         }
+        // cages of models gone (or now without lines) leave the file; the main one stays, emptied
+        foreach (var kv in old)
+            if (!used.Contains(kv.Value))
+            {
+                if (kv.Value == first) { kv.Value.Clear(); EditorUtility.SetDirty(kv.Value); }
+                else { AssetDatabase.RemoveObjectFromAsset(kv.Value); UnityEngine.Object.DestroyImmediate(kv.Value, true); }
+            }
         AssetDatabase.SaveAssets();
         long bytes = File.Exists(path) ? new FileInfo(path).Length : 0;
-        Debug.Log("[prophunt] cages: " + cageMade + " meshes, " + cageLines + " lines, " + cageVerts + " vertices (most " + cageMaxLines + ", cap " + CAGE_CAP + "; " + cageStepped
-            + " took a steeper angle, " + cageCapped + " cut to the cap), " + (bytes / 1024) + " KB, " + t0.ElapsedMilliseconds + " ms");
+        Debug.Log("[prophunt] cages: " + cageMade + " meshes (" + cageNew + " new), " + cageLines + " lines, " + cageVerts + " vertices (most " + cageMaxLines + ", cap " + CAGE_CAP + "; " + cageStepped
+            + " took a steeper floor, " + cageCapped + " cut to the cap), " + (bytes / 1024) + " KB, " + t0.ElapsedMilliseconds + " ms");
         return result;
     }
 
-    struct CageEdge { public int a, b; public float sharp; }
+    struct CageEdge { public int a, b; public float sharp; public Vector3 na, nb; public bool always; }
 
-    static Mesh MakeCage(int model, float sc, bool open)
+    static Mesh MakeCage(int model, float sc, bool open, Mesh into)
     {
         // the parts as they stand in the prefab (doors closed)
         var parts = new System.Collections.Generic.List<Mesh> { mesh[model] };
@@ -286,32 +342,37 @@ public static class PropPrefabBaker
                 AddFace(faces, a, b, nr); AddFace(faces, b, c, nr); AddFace(faces, c, a, nr);
             }
         }
-        // each edge's sharpness: the widest angle between its faces (an open edge, or a two-sided card's rim: 90)
+        // each edge: its two faces (where more meet, the pair at the widest angle), and how sharp it is
         var all = new System.Collections.Generic.List<CageEdge>();
         foreach (var kv in faces)
         {
             var l = kv.Value;
-            float sharp;
-            if (l.Count == 1 || (l.Count == 2 && Vector3.Dot(l[0], l[1]) < -0.999f)) sharp = 90f;
+            var e = new CageEdge { a = (int)(kv.Key >> 32), b = (int)(kv.Key & 0xffffffffL) };
+            if (l.Count == 1 || (l.Count == 2 && Vector3.Dot(l[0], l[1]) < -0.999f))
+            {
+                e.always = true; e.sharp = 90f; e.na = l[0]; e.nb = l[0];
+            }
             else
             {
-                float minDot = 1f;
+                float minDot = 2f; int bi = 0, bj = 1;
                 for (int i = 0; i < l.Count; i++)
                     for (int j = i + 1; j < l.Count; j++)
                     {
                         float dt = Vector3.Dot(l[i], l[j]);
-                        if (dt > -0.999f && dt < minDot) minDot = dt;   // two faces back to back are one sheet
+                        if (dt > -0.999f && dt < minDot) { minDot = dt; bi = i; bj = j; }   // two faces back to back are one sheet
                     }
-                sharp = Mathf.Acos(Mathf.Clamp(minDot, -1f, 1f)) * Mathf.Rad2Deg;
+                if (minDot > 1f) continue;
+                e.sharp = Mathf.Acos(Mathf.Clamp(minDot, -1f, 1f)) * Mathf.Rad2Deg;
+                e.na = l[bi]; e.nb = l[bj];
             }
-            if (sharp < CAGE_ANGLE) continue;
-            all.Add(new CageEdge { a = (int)(kv.Key >> 32), b = (int)(kv.Key & 0xffffffffL), sharp = sharp });
+            if (e.sharp < CAGE_FLOOR) continue;
+            all.Add(e);
         }
         // steeper and steeper until it fits
         System.Collections.Generic.List<CageEdge> keep = null;
         float shortest = CAGE_SHORT / sc;
         bool stepped = false;
-        for (float angle = CAGE_ANGLE; angle <= 80.5f; angle += 10f)
+        for (float angle = CAGE_FLOOR; angle <= 45.5f; angle += 5f)
         {
             var sel = new System.Collections.Generic.List<CageEdge>();
             for (int i = 0; i < all.Count; i++) if (all[i].sharp >= angle) sel.Add(all[i]);
@@ -328,31 +389,49 @@ public static class PropPrefabBaker
             keep.Sort((x, y) => Score(y, pts).CompareTo(Score(x, pts)));
             keep.RemoveRange(CAGE_CAP, keep.Count - CAGE_CAP);
         }
-        // the quads: two half-float streams
+        Bounds bb = new Bounds(pts[keep[0].a], Vector3.zero);
+        for (int i = 0; i < keep.Count; i++) { bb.Encapsulate(pts[keep[i].a]); bb.Encapsulate(pts[keep[i].b]); }
+        float size = Mathf.Max(bb.size.x, Mathf.Max(bb.size.y, bb.size.z));
+        // the quads: three streams
         int nv = keep.Count * 4;
         var pos = new ushort[nv * 4];
         var oth = new ushort[nv * 4];
+        var nrm = new sbyte[nv * 4];
         var tris = new ushort[keep.Count * 6];
-        Bounds bb = new Bounds(pts[keep[0].a], Vector3.zero);
         for (int i = 0; i < keep.Count; i++)
         {
-            Vector3 p = pts[keep[i].a], q = pts[keep[i].b];
-            bb.Encapsulate(p); bb.Encapsulate(q);
+            CageEdge e = keep[i];
+            Vector3 p = pts[e.a], q = pts[e.b];
+            float w = e.always ? -size : size;
+            Vector2 oa = Octa(e.na), ob = Octa(e.nb);
             int k = i * 4;
-            CageVertex(pos, oth, k, p, q, 1f);
-            CageVertex(pos, oth, k + 1, p, q, -1f);
-            CageVertex(pos, oth, k + 2, q, p, -1f);   // seen from q, its -1 side is p's +1 side
-            CageVertex(pos, oth, k + 3, q, p, 1f);
+            CageVertex(pos, oth, k, p, q, 1f, w);
+            CageVertex(pos, oth, k + 1, p, q, -1f, w);
+            CageVertex(pos, oth, k + 2, q, p, -1f, w);   // seen from q, its -1 side is p's +1 side
+            CageVertex(pos, oth, k + 3, q, p, 1f, w);
+            for (int j = k; j < k + 4; j++)
+            {
+                nrm[j * 4] = SNorm(oa.x); nrm[j * 4 + 1] = SNorm(oa.y); nrm[j * 4 + 2] = SNorm(ob.x); nrm[j * 4 + 3] = SNorm(ob.y);
+            }
             int t = i * 6;
             tris[t] = (ushort)k; tris[t + 1] = (ushort)(k + 1); tris[t + 2] = (ushort)(k + 3);
             tris[t + 3] = (ushort)(k + 1); tris[t + 4] = (ushort)(k + 2); tris[t + 5] = (ushort)(k + 3);
         }
-        var m = new Mesh();
+        var m = into != null ? into : new Mesh();
+        if (into != null)
+        {
+            var so = new SerializedObject(m);   // refilled from code: readable while it is
+            so.FindProperty("m_IsReadable").boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            m.Clear();
+        }
         m.SetVertexBufferParams(nv,
             new UnityEngine.Rendering.VertexAttributeDescriptor(UnityEngine.Rendering.VertexAttribute.Position, UnityEngine.Rendering.VertexAttributeFormat.Float16, 4, 0),
-            new UnityEngine.Rendering.VertexAttributeDescriptor(UnityEngine.Rendering.VertexAttribute.TexCoord1, UnityEngine.Rendering.VertexAttributeFormat.Float16, 4, 1));
+            new UnityEngine.Rendering.VertexAttributeDescriptor(UnityEngine.Rendering.VertexAttribute.TexCoord1, UnityEngine.Rendering.VertexAttributeFormat.Float16, 4, 1),
+            new UnityEngine.Rendering.VertexAttributeDescriptor(UnityEngine.Rendering.VertexAttribute.TexCoord2, UnityEngine.Rendering.VertexAttributeFormat.SNorm8, 4, 2));
         m.SetVertexBufferData(pos, 0, 0, pos.Length, 0);
         m.SetVertexBufferData(oth, 0, 0, oth.Length, 1);
+        m.SetVertexBufferData(nrm, 0, 0, nrm.Length, 2);
         m.SetIndexBufferParams(tris.Length, UnityEngine.Rendering.IndexFormat.UInt16);
         m.SetIndexBufferData(tris, 0, 0, tris.Length);
         m.subMeshCount = 1;
@@ -364,11 +443,21 @@ public static class PropPrefabBaker
         return m;
     }
 
-    static void CageVertex(ushort[] pos, ushort[] oth, int k, Vector3 p, Vector3 q, float side)
+    static void CageVertex(ushort[] pos, ushort[] oth, int k, Vector3 p, Vector3 q, float side, float w)
     {
-        pos[k * 4] = Mathf.FloatToHalf(p.x); pos[k * 4 + 1] = Mathf.FloatToHalf(p.y); pos[k * 4 + 2] = Mathf.FloatToHalf(p.z); pos[k * 4 + 3] = Mathf.FloatToHalf(1f);
+        pos[k * 4] = Mathf.FloatToHalf(p.x); pos[k * 4 + 1] = Mathf.FloatToHalf(p.y); pos[k * 4 + 2] = Mathf.FloatToHalf(p.z); pos[k * 4 + 3] = Mathf.FloatToHalf(w);
         oth[k * 4] = Mathf.FloatToHalf(q.x); oth[k * 4 + 1] = Mathf.FloatToHalf(q.y); oth[k * 4 + 2] = Mathf.FloatToHalf(q.z); oth[k * 4 + 3] = Mathf.FloatToHalf(side);
     }
+
+    // a unit vector folded onto the octahedron, then flat (as PropCage.shader's Unocta undoes)
+    static Vector2 Octa(Vector3 n)
+    {
+        n /= Mathf.Abs(n.x) + Mathf.Abs(n.y) + Mathf.Abs(n.z);
+        if (n.z >= 0f) return new Vector2(n.x, n.y);
+        return new Vector2((1f - Mathf.Abs(n.y)) * (n.x >= 0f ? 1f : -1f), (1f - Mathf.Abs(n.x)) * (n.y >= 0f ? 1f : -1f));
+    }
+
+    static sbyte SNorm(float f) { return (sbyte)Mathf.Clamp(Mathf.RoundToInt(f * 127f), -127, 127); }
 
     static float Score(CageEdge e, System.Collections.Generic.List<Vector3> pts)
     {
@@ -383,7 +472,15 @@ public static class PropPrefabBaker
         l.Add(n);
     }
 
-    // edges that continue each other in a straight line through a point no other edge meets become one
+    // the same two faces (in either order), or both drawn always
+    static bool SameFaces(CageEdge x, CageEdge y)
+    {
+        if (x.always || y.always) return x.always && y.always;
+        return (Vector3.Dot(x.na, y.na) > 0.999f && Vector3.Dot(x.nb, y.nb) > 0.999f) || (Vector3.Dot(x.na, y.nb) > 0.999f && Vector3.Dot(x.nb, y.na) > 0.999f);
+    }
+
+    // edges that continue each other in a straight line between the same two faces, through a point no other edge
+    // meets, become one
     static System.Collections.Generic.List<CageEdge> JoinRuns(System.Collections.Generic.List<CageEdge> sel, System.Collections.Generic.List<Vector3> pts)
     {
         var edges = new System.Collections.Generic.List<CageEdge>(sel);
@@ -404,9 +501,9 @@ public static class PropPrefabBaker
                 int p = e0.a == v ? e0.b : e0.a, q = e1.a == v ? e1.b : e1.a;
                 if (p == q) continue;
                 Vector3 d0 = (pts[v] - pts[p]).normalized, d1 = (pts[q] - pts[v]).normalized;
-                if (Vector3.Dot(d0, d1) < 0.9995f) continue;
+                if (Vector3.Dot(d0, d1) < 0.9995f || !SameFaces(e0, e1)) continue;
                 alive[l[0]] = false; alive[l[1]] = false;
-                edges.Add(new CageEdge { a = p, b = q, sharp = Mathf.Min(e0.sharp, e1.sharp) });
+                edges.Add(new CageEdge { a = p, b = q, sharp = Mathf.Min(e0.sharp, e1.sharp), na = e0.na, nb = e0.nb, always = e0.always });
                 alive.Add(true);
                 int ni = edges.Count - 1;
                 l.Clear();

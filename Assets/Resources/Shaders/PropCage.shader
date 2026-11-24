@@ -1,14 +1,18 @@
-// The hider's own prop as a cage of its edges, in first person only (Cor: "the cage plus the outline"). The hider
-// does not see their own prop in first person (it would fill the view), so the ground outline (PHView) shows its
-// footprint and this shows its shape: the model's feature edges (PropPrefabBaker.MakeCage), each a quad widened in
-// screen space, so a line is the same few pixels wide near and far. Its core is the outline's teal and its rim a dark
-// teal, unlit, so it reads on light and dark floors alike. It is blended, _Keep its opacity (Cor: the dithered lines
+// The hider's own prop as its outline, in first person only (Cor: "the cage plus the outline"; since 2026-11-24
+// "outline only", not every feature edge). The hider does not see their own prop in first person (it would fill the
+// view), so the ground outline (PHView) shows its footprint and this shows its shape: the model's edges that can be on
+// its outline (PropPrefabBaker.MakeCage), each a quad widened in screen space, so a line is the same few pixels wide
+// near and far. An edge is drawn only where one of its two faces turns toward the viewpoint and the other away
+// (Outline), or where the mesh ends. The viewpoint is the eye pulled back along the view by the model's largest side
+// and half a metre: the eye sits at 0.9 of the prop's height, often inside it, where every face is turned away.
+// Its core is the outline's teal and its rim a dark teal, unlit, so it reads on light and dark floors alike. It is blended, _Keep its opacity (Cor: the dithered lines
 // looked messy), less near the eye (gone inside _FadeNear, full from _FadeFar; MapBuilderUdon.Cage sets both
 // by the prop's size), and a faint _KeepBehind where something stands in front of the line. Nothing at or above
 // the eye is drawn (_EyeMargin below the camera), nor anything in the third-person view (384 pixels wide, as
 // PropLit's _PipOnly, the other way round).
-// Mesh (half floats): per vertex, position = this end, TEXCOORD1.xyz = the other end (both in the prop's space),
-// TEXCOORD1.w = the side (-1, +1).
+// Mesh: per vertex, position (half) = this end, w = the model's largest side, negative on an edge always drawn;
+// TEXCOORD1 (half) = the other end (both in the prop's space), w = the side (-1, +1); TEXCOORD2 (signed bytes) = the
+// two faces' normals, octahedron-packed (PropPrefabBaker.Octa).
 // Desktop and VR alike (single-pass instanced stereo: per-eye matrices, camera and screen size), no geometry shader.
 Shader "PropHunt/Cage"
 {
@@ -32,6 +36,7 @@ Shader "PropHunt/Cage"
     {
         float4 vertex : POSITION;
         float4 other : TEXCOORD1;   // xyz: the other end; w: the side
+        float4 faces : TEXCOORD2;   // xy, zw: the two faces' normals, packed
         UNITY_VERTEX_INPUT_INSTANCE_ID
     };
     struct v2f
@@ -45,6 +50,25 @@ Shader "PropHunt/Cage"
     // 1.5 m and more; also the material's own value) gives 0, which leaves its cage exactly as it was; 0.65 m or less
     // (a chair, or smaller) gives 1.
     float Small() { return saturate((0.8 - _FadeFar) / 0.15); }
+    float3 Unocta(float2 f)
+    {
+        float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+        float t = saturate(-n.z);
+        n.x += n.x >= 0.0 ? -t : t;
+        n.y += n.y >= 0.0 ? -t : t;
+        return normalize(n);
+    }
+    // is the edge on the outline, seen from the eye pulled back along the view?
+    bool Outline(float4 v, float3 wa, float3 wb, float4 faces)
+    {
+        if (v.w < 0.0) return true;   // the mesh ends here
+        float scale = length(unity_ObjectToWorld._m00_m10_m20);
+        float3 fwd = -UNITY_MATRIX_V[2].xyz;   // the camera's forward in the world
+        float3 to = _WorldSpaceCameraPos - fwd * (v.w * scale + 0.5) - 0.5 * (wa + wb);
+        float fa = dot(mul(Unocta(faces.xy), (float3x3)unity_WorldToObject), to);
+        float fb = dot(mul(Unocta(faces.zw), (float3x3)unity_WorldToObject), to);
+        return (fa > 0.0) != (fb > 0.0);   // one face toward, one away
+    }
     float Bayer(float2 px)
     {
         static const float b[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
@@ -61,6 +85,7 @@ Shader "PropHunt/Cage"
         if (abs(_ScreenParams.x - 384.0) < 0.5) return o;   // never in the third-person view
         float3 wa = mul(unity_ObjectToWorld, float4(i.vertex.xyz, 1.0)).xyz;
         float3 wb = mul(unity_ObjectToWorld, float4(i.other.xyz, 1.0)).xyz;
+        if (!Outline(i.vertex, wa, wb, i.faces)) return o;
         float3 a = mul(UNITY_MATRIX_V, float4(wa, 1.0)).xyz, b = mul(UNITY_MATRIX_V, float4(wb, 1.0)).xyz;
         a *= 0.993; b *= 0.993;   // a little toward the eye, so edges lying on the floor or a wall are not hidden by it
         float nearZ = -(_ProjectionParams.y + 0.005);
