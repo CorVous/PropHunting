@@ -8,6 +8,10 @@ Shader "PropHunt/Diorama"
         _ClipY ("Cut above (world y)", Float) = 100000
         _DitherY ("See-through screen above (world y)", Float) = 100000
         _Box ("Kept: world x min, z min, x max, z max", Vector) = (-100000, -100000, 100000, 100000)
+        _CutAway ("Cutaway: walls across the view cut to a stub (0 off, 1 on)", Float) = 0
+        _CutStub ("Cutaway stub height above each level's floor (map m)", Float) = 0.5
+        _CutLevel ("Cutaway level height (map m)", Float) = 2.74
+        _CutBand ("Cutaway: half width of a wall line incl. facade (map m)", Float) = 0.47
     }
     SubShader
     {
@@ -22,8 +26,9 @@ Shader "PropHunt/Diorama"
             #include "UnityCG.cginc"
             float _ClipY, _DitherY;
             float4 _Box;
+            float _CutAway, _CutStub, _CutLevel, _CutBand;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
-            struct v2f { float4 pos : SV_POSITION; float3 wp : TEXCOORD0; float3 n : TEXCOORD1; fixed4 color : COLOR; UNITY_VERTEX_OUTPUT_STEREO };
+            struct v2f { float4 pos : SV_POSITION; float3 wp : TEXCOORD0; float3 n : TEXCOORD1; float3 op : TEXCOORD2; float3 on : TEXCOORD3; fixed4 color : COLOR; UNITY_VERTEX_OUTPUT_STEREO };
             v2f vert (appdata v)
             {
                 v2f o;
@@ -34,6 +39,7 @@ Shader "PropHunt/Diorama"
                 o.wp = mul(unity_ObjectToWorld, v.vertex).xyz;
                 o.n = UnityObjectToWorldNormal(v.normal);
                 o.color = v.color;
+                o.op = v.vertex.xyz; o.on = v.normal;   // (the map's own metres: the walls stand on the 4 m grid's lines)
                 return o;
             }
             fixed4 frag (v2f i, fixed facing : VFACE) : SV_Target
@@ -41,6 +47,26 @@ Shader "PropHunt/Diorama"
                 clip(_ClipY - i.wp.y);
                 // (the round's replay with the upper floors off, Cor: the upper floors drawn as a screen of every other pixel)
                 if (i.wp.y > _DitherY && (((int)i.pos.x + (int)i.pos.y) & 1) == 0) discard;
+                // (Cor's cutaway: the walls that face the viewer are cut down to a stub, so the rooms can be seen into;
+                // the walls running away from the viewer stay whole. Which lines are "across" follows the viewer round the table)
+                if (_CutAway > 0.5)
+                {
+                    float3 cam = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1)).xyz;
+                    float2 d = normalize(i.op.xz - cam.xz + 1e-5);
+                    float lv = i.op.y / _CutLevel;
+                    float above = (lv - floor(lv)) * _CutLevel;   // (height over this level's floor)
+                    if (above > _CutStub)
+                    {
+                        float2 g = abs(i.op.xz - round(i.op.xz / 4.0) * 4.0);   // (distance to the nearest grid line in x and z)
+                        bool cx = abs(d.x) > 0.38, cz = abs(d.y) > 0.38;      // (diagonal views: both)
+                        float3 on = normalize(i.on);
+                        bool inX = g.x < _CutBand, inZ = g.y < _CutBand;
+                        // a wall line across the view: cut, but not where a kept wall line crosses it (corner posts)
+                        bool keepX = !cx && (g.x < 0.14 || (inX && abs(on.x) > 0.5));
+                        bool keepZ = !cz && (g.y < 0.14 || (inZ && abs(on.z) > 0.5));
+                        if ((cz && inZ && !keepX) || (cx && inX && !keepZ)) discard;
+                    }
+                }
                 clip(float4(i.wp.x - _Box.x, i.wp.z - _Box.y, _Box.z - i.wp.x, _Box.w - i.wp.z));   // (the ground runs far past the map: only the map's own)
                 float3 n = normalize(i.n) * (facing > 0 ? 1.0 : -1.0);
                 float l = 0.62 + 0.38 * saturate(dot(n, normalize(float3(0.4, 0.85, -0.35))));
