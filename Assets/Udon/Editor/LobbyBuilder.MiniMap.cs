@@ -42,7 +42,8 @@ public static partial class LobbyBuilder
         // the walls in their own material (PropHunt/Diorama): cut above the ground floor when the upper floors are off
         var dioMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/Diorama.mat");
         if (dioMat == null) { dioMat = new Material(Shader.Find("PropHunt/Diorama")) { name = "Diorama" }; AssetDatabase.CreateAsset(dioMat, "Assets/Udon/Generated/Diorama.mat"); }
-        dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.SetVector("_Box", new Vector4(-100000f, -100000f, 100000f, 100000f)); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
+        dioMat.shader = Shader.Find("PropHunt/Diorama"); dioMat.SetFloat("_ClipY", 100000f); dioMat.SetFloat("_CutAway", 1f);   // (Cor: the walls facing the viewer cut to a stub, the far walls kept)
+        dioMat.SetVector("_Box", new Vector4(-100000f, -100000f, 100000f, 100000f)); dioMat.enableInstancing = true; EditorUtility.SetDirty(dioMat);
         mm.dioMat = dioMat;
         // the props' material and its screened twin (PropHunt/LitDither): the upper floors in the replay with them off (Cor)
         mm.propLit = AssetDatabase.LoadAssetAtPath<Material>("Assets/Udon/Generated/PropLit.mat");

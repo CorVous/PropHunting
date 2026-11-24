@@ -26,6 +26,10 @@ Material:
     m_Ints: []
     m_Floats:
     - _ClipY: 100000
+    - _CutAway: 1
+    - _CutBand: 0.47
+    - _CutLevel: 2.74
+    - _CutStub: 0.5
     - _DitherY: 100000
     m_Colors:
     - _Box: {r: -100000, g: -100000, b: 100000, a: 100000}
