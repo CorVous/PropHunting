@@ -119,7 +119,7 @@ public static partial class LobbyBuilder
         BuildOpeningTrim(root, roomW);
         BuildShelfLabels(root, roomW, text);
         store.dialog = BuildStoreDialog(root, store, text);
-        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 2.75f, 0f));   // the middle of the west wall (the score pad went north: Cor)
+        store.board = BuildTrophyBoard(lobby, store, text, new Vector3(-roomW / 2f + 0.06f, 1.7f, 0f));   // the middle of the west wall (the score pad went north: Cor); low, its bottom 0.6 m up (Cor, 2026-11-22: close to the ground)
         UdonSharpEditorUtility.CopyProxyToUdon(store);
         int conv = 0; foreach (var w in cat) if (meshByName.ContainsKey(w.id.Replace(':', '_'))) conv++;
         Debug.Log("[store] " + n + " weapons (" + conv + " with models), " + T + " trophies; picks numbered " + (gameMelee != null ? "from PHWeapons" : "later (no PHWeapons in the scene)"));
@@ -684,7 +684,8 @@ public static partial class LobbyBuilder
     }
 
     // ------------------------------------------------------------------ the Trophies board (south wall)
-    // 2900 x 1190 canvas units at 3.7 mm: 10.7 x 4.4 m, on the west wall. Two halves of 4 x 10 cards (all 40 used), a
+    // 2900 x 1190 canvas units at 1.85 mm: 5.4 x 2.2 m, on the west wall (Cor, 2026-11-22: half the old 3.7 mm size).
+    // Every card has a fixed place (Cor: no sorting by progress). Two halves of 4 x 10 cards (all 40 used), a
     // count over each.
     const int BoardCols = 4;
     const float CardW = 330f, CardH = 100f, Gap = 10f, HalfW = BoardCols * CardW + (BoardCols - 1) * Gap;
@@ -692,7 +693,7 @@ public static partial class LobbyBuilder
     static PHTrophyBoard BuildTrophyBoard(Transform lobby, PHStore store, Dictionary<string, string> text, Vector3 at)
     {
         const float W = 2900f, Hh = 1190f;
-        var cv = Canvas(lobby, "Trophies", at, Quaternion.Euler(0f, -90f, 0f), new Vector2(W, Hh), 0.0037f, false);
+        var cv = Canvas(lobby, "Trophies", at, Quaternion.Euler(0f, -90f, 0f), new Vector2(W, Hh), 0.00185f, false);
         var board = cv.gameObject.AddUdonSharpComponent<PHTrophyBoard>();
         board.store = store;
         board.progressFormat = Get(text, "store.progress");
@@ -703,9 +704,8 @@ public static partial class LobbyBuilder
         float halfShift = HalfW + 60f;
         float x0 = -halfShift / 2f - HalfW / 2f + CardW / 2f;   // the left half's first column
         float y0 = Hh / 2f - 60f - CardH / 2f;                  // under the heading
-        board.halfShift = halfShift;
-        board.place = new Vector2[PHStore.HUNTER_TROPHIES];
-        for (int i = 0; i < board.place.Length; i++) board.place[i] = new Vector2(x0 + (i % BoardCols) * (CardW + Gap), y0 - (i / BoardCols) * (CardH + Gap));
+        var place = new Vector2[PHStore.HUNTER_TROPHIES];
+        for (int i = 0; i < place.Length; i++) place[i] = new Vector2(x0 + (i % BoardCols) * (CardW + Gap), y0 - (i / BoardCols) * (CardH + Gap));
         for (int h = 0; h < 2; h++)
         {
             float cx = (h == 0 ? -1 : 1) * halfShift / 2f;
@@ -723,7 +723,7 @@ public static partial class LobbyBuilder
         for (int t = 0; t < T; t++)
         {
             int slot = t % PHStore.HUNTER_TROPHIES, h = t / PHStore.HUNTER_TROPHIES;
-            var cpos = board.place[slot] + new Vector2(h * halfShift, 0f);
+            var cpos = place[slot] + new Vector2(h * halfShift, 0f);
             var card = Rect(cv, "Card " + store.tKey[t], cpos, new Vector2(CardW, CardH));
             board.card[t] = card;
             board.cardBg[t] = Img(card, "Back", Vector2.zero, new Vector2(CardW, CardH), sRound, C("e9dab6"), 3f);
