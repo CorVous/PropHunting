@@ -97,7 +97,7 @@ public static class WorldSceneBuilder
         var lobby = new GameObject("Lobby");
         lobby.transform.SetParent(world.transform, false);
         lobby.transform.position = LobbyOrigin;
-        lobby.AddUdonSharpComponent<PHLobbyCull>();   // not drawn while the player is out on the map (profiling)
+        var lobbyCull = lobby.AddUdonSharpComponent<PHLobbyCull>();   // not drawn while the player is out on the map (profiling)
         // the inside of a game box (LobbyBuilder dresses it)
         var floorMat = Mat("LobbyFloor", new Color(0.953f, 0.906f, 0.788f));
         var wallMat = Mat("LobbyWall", new Color(0.141f, 0.376f, 0.290f));
@@ -417,6 +417,8 @@ public static class WorldSceneBuilder
         LobbyBuilder.BuildHandBoards(lobby.transform, game, gameGo.GetComponentInChildren<PHWeapons>(true), RoomW);
         // small pictographic plaques over the Trophies board (the weapon wall has word labels: BuildStore)
         LobbyBuilder.BuildPlaques(lobby.transform, RoomW, RoomD);
+        // the lobby's sun shadows, baked now that the room is dressed (the sun's realtime ones are off in the lobby)
+        LobbyShadowBaker.Bake(lobby.transform, sun, lobbyCull);
         // the audio board's levels reach the sources outside PHAudio too (the panel's, the explore button's, the taunts')
         LobbyBuilder.ListAudioSources(local.sound);
 
@@ -1050,7 +1052,8 @@ public static class WorldSceneBuilder
         string path = "Assets/Udon/Generated/" + name + ".mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(path);
         // Light Volumes' PBR (Standard's properties) so the lobby's lamps light the floor and walls
-        var lit = Shader.Find("Light Volume Samples/Light Volume PBR");
+        var lit = Shader.Find("PropHunt/LobbyLit");   // (and the lobby's baked sun shadow: LobbyShadowBaker)
+        if (lit == null) lit = Shader.Find("Light Volume Samples/Light Volume PBR");
         if (m == null) { m = new Material(lit != null ? lit : Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
         if (lit != null) m.shader = lit;
         m.color = c; LobbyBuilder.Matte(m, 0f);

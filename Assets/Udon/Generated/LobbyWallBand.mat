@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: LobbyWallBand
-  m_Shader: {fileID: 4800000, guid: dc867ffc74922af46bf171d92ae67b80, type: 3}
+  m_Shader: {fileID: 4800000, guid: ac82e424d704a9f419d4307570055f1d, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:

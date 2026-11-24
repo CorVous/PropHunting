@@ -1467,7 +1467,8 @@ public static partial class LobbyBuilder
 
     // the lobby's lit shader: Light Volumes' PBR (Standard's properties, and it takes Light Volumes' light), Standard
     // when the package is missing
-    static Shader LitShader() { var s = Shader.Find("Light Volume Samples/Light Volume PBR"); return s != null ? s : Shader.Find("Standard"); }
+    // (PropHunt/LobbyLit since 2026-11-24: the same, plus the lobby's baked sun shadow, LobbyShadowBaker)
+    static Shader LitShader() { var s = Shader.Find("PropHunt/LobbyLit"); if (s == null) s = Shader.Find("Light Volume Samples/Light Volume PBR"); return s != null ? s : Shader.Find("Standard"); }
 
     // matte (Cor: walls are not shiny unless they are metal): no specular highlights, no reflections
     public static void Matte(Material m, float smoothness)
