@@ -27,6 +27,16 @@ Shader "PropHunt/Diorama"
             float _ClipY, _DitherY;
             float4 _Box;
             float _CutAway, _CutStub, _CutLevel, _CutBand;
+            sampler2D _UdonPHIndoor;      // (MapBuilderUdon.IndoorMap: a texel a cell, red the building's top in 5 cm steps)
+            float4 _UdonPHIndoorArea;     // (x, y: 1 / its size in metres; z: 1 while a map is up)
+            // is the cell holding map point p (the map's metres) inside a building at height y?
+            bool Indoor(float2 p, float y)
+            {
+                if (_UdonPHIndoorArea.z < 0.5) return true;
+                float2 uv = (floor(p / 4.0) + 0.5) * 4.0 * _UdonPHIndoorArea.xy;
+                if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1) return false;
+                return y < tex2Dlod(_UdonPHIndoor, float4(uv, 0, 0)).r * 12.75 - 0.05;
+            }
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; fixed4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct v2f { float4 pos : SV_POSITION; float3 wp : TEXCOORD0; float3 n : TEXCOORD1; float3 op : TEXCOORD2; float3 on : TEXCOORD3; fixed4 color : COLOR; UNITY_VERTEX_OUTPUT_STEREO };
             v2f vert (appdata v)
@@ -64,7 +74,11 @@ Shader "PropHunt/Diorama"
                         // a wall line across the view: cut, but not where a kept wall line crosses it (corner posts)
                         bool keepX = !cx && (g.x < 0.14 || (inX && abs(on.x) > 0.5));
                         bool keepZ = !cz && (g.y < 0.14 || (inZ && abs(on.z) > 0.5));
-                        if ((cz && inZ && !keepX) || (cx && inX && !keepZ)) discard;
+                        // a far wall stays (Cor): a line whose far side (away from the viewer) is outdoors at this height
+                        float2 gl = round(i.op.xz / 4.0) * 4.0;
+                        bool farZ = !Indoor(float2(i.op.x, gl.y + (d.y > 0 ? 2.0 : -2.0)), i.op.y);
+                        bool farX = !Indoor(float2(gl.x + (d.x > 0 ? 2.0 : -2.0), i.op.z), i.op.y);
+                        if ((cz && inZ && !keepX && !farZ) || (cx && inX && !keepZ && !farX)) discard;
                     }
                 }
                 clip(float4(i.wp.x - _Box.x, i.wp.z - _Box.y, _Box.z - i.wp.x, _Box.w - i.wp.z));   // (the ground runs far past the map: only the map's own)
