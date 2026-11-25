@@ -12,3 +12,8 @@ Numbers (all in sRGB grey, 0 black .. 1 white):
 - Line strength: 0.60 unpainted, 0.85 painted (was 0.30 / 0.62).
 - `_Iridescence` = 0.4 (0 turns it off): a zero-mean thin-film hue swing of up to about 0.06 on the lines and stars, a fifth of that on the base, stronger at grazing angles. The hue phase comes from view angle, the 3D pattern phase and the shared `_Flow` clock, so it slides slowly as you move your head and stays seamless. The flat-colour toggle is unaffected.
 - Cost: a few extra ALU ops per pixel, no textures.
+
+## Per-eye sheen (binocular lustre)
+
+- `eyes_room30.png`, `eyes_room52.png`: left eye | right eye, 6.4 cm apart, a line close-up. Mock stereo in the editor (the right eye's index forced with a debug value), not a headset.
+- `_EyeSheen` = 0.05 (0 turns it off): the right eye's thin-film hue sits 0.05 further round the ramp, on top of the small natural difference from the two eyes' view angles. Uses the stereo eye index (single-pass instanced on PC, multiview on Quest); desktop and non-stereo use eye 0, no change. The shader compiled in a VRChat world export (no stereo macro errors).
