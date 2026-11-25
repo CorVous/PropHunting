@@ -11,3 +11,7 @@ All 12 crossings fired a real area teleport (walker log: area 1->0->1 on 2/3, ar
 `backwards_watch_sheet.png`: one row per crossing, 8 frames 0.2 s apart from each view.
 
 Review: B's view of A stays smooth through every crossing (no pop, slide, vanish or wrong turn). In A's view, B's hair and cape flick sideways for about 0.3 s at every crossing, because B is redrawn 1000 m over in A's new area copy and the avatar's physics sees that jump.
+
+## Mockup: world slides instead of the player teleporting
+
+`world_slide_mockup.mp4` (27 s, top-down, not to scale) compares the current teleport with the proposed approach, where each client moves the root of all four area copies by 1000 m at a crossing so the local player never teleports and other players' stations never jump. It ends with a card listing the costs and risks.
