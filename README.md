@@ -17,3 +17,5 @@ Review: B's view of A stays smooth through every crossing (no pop, slide, vanish
 `world_slide_mockup.mp4` (27 s, top-down, not to scale) compares the current teleport with the proposed approach, where each client moves the root of all four area copies by 1000 m at a crossing so the local player never teleports and other players' stations never jump. It ends with a card listing the costs and risks.
 
 `world_slide_mockup_8.mp4`: the same mockup with one person in every room, all drawn as A's client sees them (people are placed in A's current copy, or parked if A's copy lacks their room).
+
+`distance_mockup.mp4`: who A's client should show, by how many rooms away each person is (everyone a different colour). 0 and 1 away: see and hear; 2 away: hear only (walls hide them); 3 away: the open question (they would stand on a footprint you can see into); 4 away: would stand in your own room. A walks 3 -> 2 -> 1 so the distances shift. Ends with the options for 3 away.
