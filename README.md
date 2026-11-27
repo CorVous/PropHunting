@@ -16,6 +16,9 @@ About 0.37 ms per frame for all 12 passes, on an RTX 4070 Ti. It runs once per f
 
 Method: in Play mode, frame time with the chain idle against the chain updated 8 times per frame, divided by 8.
 
-## Not done yet
+## Screen light (VRC Light Volumes)
 
-VRC Light Volumes (screen light on avatars and walls) needs Cor's OK to add the third-party package. It wasn't installed.
+`tv_light_compare.png`: Play mode (ClientSim), room 1 darkened around the TV for the test. Left: the lights parked. Right: on, with the soft pool of the screen's light on the floor in front of it. The colour comes from VRCLV's LightVolumeTVGI reading the CRT output; it's grey here because the test frame is grey.
+
+- Three screen-sized area lights follow the TVs nearest you.
+- The ink shader and VRCLV-aware avatar shaders pick them up.
